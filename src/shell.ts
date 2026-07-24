@@ -2588,7 +2588,7 @@ document.getElementById("licensingBody")!.addEventListener("click", (e) => {
     fullLicenseReturn = () => openLicensing(tab);
     openFullLicense();
   } else {
-    // LICENSE.md / ATTRIBUTION.md / THIRD_PARTY swap the tab in place; README.md
+    // LICENSING.md / ATTRIBUTION.md / THIRD_PARTY swap the tab in place; README.md
     // opens its own modal.
     INTERNAL_DOC_LINKS[doc]?.();
   }
@@ -2663,7 +2663,7 @@ async function loadLicensingTab(tab: string): Promise<void> {
   body.innerHTML = `<p class="changelog-loading">Loading...</p>`;
 
   const urls: Record<string, string> = {
-    license: "/LICENSE.md",
+    license: "/LICENSING.md",
     attribution: "/ATTRIBUTION.md",
     thirdparty: "/THIRD_PARTY_LICENSES.md",
   };
@@ -2966,7 +2966,7 @@ imageLightboxBack.addEventListener("click", () => {
 
 /** Internal doc filenames that should open a modal instead of the browser. */
 const INTERNAL_DOC_LINKS: Record<string, () => void> = {
-  "LICENSE.md": () => openLicensing("license"),
+  "LICENSING.md": () => openLicensing("license"),
   LICENSE: () => openFullLicense(),
   "ATTRIBUTION.md": () => openLicensing("attribution"),
   "THIRD_PARTY_LICENSES.md": () => openLicensing("thirdparty"),

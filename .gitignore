@@ -47,7 +47,7 @@ resized-*/
 # the originals at the repo root are the tracked source of truth)
 public/README.md
 public/LICENSE
-public/LICENSE.md
+public/LICENSING.md
 public/ATTRIBUTION.md
 public/CHANGELOG.json
 public/CONTRIBUTING.md

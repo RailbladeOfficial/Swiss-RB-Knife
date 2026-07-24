@@ -37,7 +37,7 @@ const PUBLIC_DIR = path.join(ROOT_DIR, "public");
 const FILES_TO_COPY = [
   "README.md",
   "LICENSE",
-  "LICENSE.md",
+  "LICENSING.md",
   "ATTRIBUTION.md",
   "CONTRIBUTING.md",
   "CHANGELOG.json",
