@@ -235,7 +235,7 @@ Found something wrong in the code? Want a new tool / UX experience? Got an idea 
 
 ## Installing (Prebuilt)
 
-Grab the latest installer from the [Releases](../../releases) page and run it.
+Grab the latest installer from the [Releases](https://github.com/RailbladeOfficial/Swiss-RB-Knife/releases) page and run it.
 
 **Heads-up: the installer isn't code-signed.** I'm one person doing this for fun, and a code-signing certificate costs real money every year. Because it's unsigned, Windows will be suspicious of it — and that's expected, not a sign anything's wrong:
 
