@@ -1,0 +1,251 @@
+/* =============================================================================
+   MODALS — SHARED CHROME
+   -----------------------------------------------------------------------------
+   The structural skeleton + behaviour styling common to every modal in the app.
+   Driven by modal.ts. Content-specific modal styling (settings rows, changelog,
+   licensing tabs, tool pickers, etc.) stays in shell.css / the owning tool CSS.
+
+   All colours reference var(--color-*) from the active theme — never hardcoded.
+============================================================================= */
+
+/* Set by modal.ts (syncBodyClass) while any modal is open.
+   Used internally to block body scroll. Not hooked by any tool CSS —
+   if you need to style against modal presence, use this class here only. */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* =============================================================================
+   BACKDROP + PANEL
+============================================================================= */
+
+/* Single shared dim + blur layer. Sits below all backdrops (z-index 999).
+   Fades in when the first modal opens, fades out when the last closes.
+   Never touched during modal-to-modal transitions — no flicker, no double-dim. */
+#modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    backdrop-filter 0.2s ease;
+}
+
+#modalOverlay.active {
+  opacity: 1;
+  pointer-events: none; /* clicks pass through to the backdrop above */
+}
+
+/* Backdrops are now transparent centering containers only — no background,
+   no blur. The shared overlay provides the dim/blur beneath them. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.modal-backdrop.open {
+  display: flex;
+  opacity: 1;
+}
+
+.modal {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+  width: 500px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  transform: scale(0.85);
+  opacity: 0;
+  transition:
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.2s ease;
+  /* Every modal must fit the viewport: cap the panel height and let the body
+     scroll (see the .modal-body overflow rule below). Column-flex keeps the
+     header (and any footer actions) fixed while only the body overflows.
+     Previously opt-in via .modal-scrollable — now the default, because a
+     modal taller than the window with no scrollbar is never the right
+     outcome, and per-modal opt-in kept missing cases. */
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Solid modals — full opaque panel background.
+   These are fallback rules for themes that don't define their own .modal
+   background. The random theme overrides both with !important via a <style>
+   tag injected by applyRandomModalStyles() in shell.ts. */
+body.solid-modals .modal {
+  background: var(--color-panel);
+}
+
+/* Translucent modals — frosted glass effect.
+   Same caveat: fallback only; random theme overrides via injected <style>. */
+body:not(.solid-modals) .modal {
+  background: color-mix(in srgb, var(--color-panel) 60%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.modal-backdrop.open .modal {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* =============================================================================
+   HEADER  (drag handle — close top-right, optional button top-left)
+============================================================================= */
+
+.modal-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  min-height: 28px;
+  user-select: none;
+}
+
+.modal-header-left  { position: absolute; left: 0; }
+.modal-header-right { position: absolute; right: 0; }
+
+.modal-close-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  width: 24px;
+  height: 24px;
+  padding: 3px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.modal-close-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* =============================================================================
+   BODY + ACTIONS
+============================================================================= */
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  text-align: center;
+  /* Paired with the .modal max-height: the body is the scroll region.
+     min-height: 0 lets it actually shrink inside the column flex — without
+     it, flex items refuse to go below their content height and the cap
+     silently does nothing. */
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.modal-body p { margin: 0; }
+
+.modal-body a {
+  color: color-mix(in srgb, var(--color-btn) 80%, white);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--hover-transition);
+}
+
+.modal-body a:hover { color: var(--color-btn-hover); }
+
+.modal-cancel-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background var(--hover-transition), color var(--hover-transition),
+              border-color var(--hover-transition);
+}
+
+.modal-cancel-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* Confirm/cancel modals (exit, delete) — centred body + spread actions row */
+.exit-modal-body {
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.exit-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* =============================================================================
+   SCROLLABLE MODALS  (legacy opt-in — now the default)
+   -----------------------------------------------------------------------------
+   Every .modal now caps its height and scrolls its body (see the base .modal
+   and .modal-body rules above), so this class is redundant. It's kept only so
+   existing class="modal modal-scrollable" markup stays valid — safe to remove
+   from markup at leisure.
+============================================================================= */
+
+.modal.modal-scrollable {
+  max-height: 85vh;
+}
+
+/* =============================================================================
+   BACK-ARROW BUTTON  (secondary modals that replace a parent)
+   -----------------------------------------------------------------------------
+   Standard back-arrow that sits top-left in the modal header (.modal-header-left).
+   Use a <button class="nav-back-btn modal-header-left"> and it Just Works.
+============================================================================= */
+
+.nav-back-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  width: 24px;
+  height: 24px;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.nav-back-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.nav-back-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}

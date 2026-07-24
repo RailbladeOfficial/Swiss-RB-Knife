@@ -1,0 +1,263 @@
+:root {
+  --color-bg:                  #000000;
+  --color-panel:               #040a04;
+  --color-input-bg:            #081008;
+  --color-border:              #0a2a0a;
+  --color-border-dashed:       #00aa00;
+  --color-text:                #00ff00;
+  --color-text-muted:          #007700;
+  --color-hover:               #001a00;
+
+  --color-btn:                 #00cc00;
+  --color-btn-hover:           #00ff00;
+  --color-btn-text:            #000000;
+
+  --color-danger:              #ff0000;
+  --color-danger-subtle:       rgba(255, 0, 0, 0.12);
+
+  --color-accent-input:        #00ff00;
+  --color-accent-view:         #00cc00;
+  --color-accent-totals:       #00aa00;
+  --color-accent-entries:      #007700;
+
+  --color-toggle-off:          #0a2a0a;
+  --color-toggle-on:           #00cc00;
+
+  --color-toast-success-bg:    #001a00;
+  --color-toast-success-border:#00ff00;
+  --color-toast-success-text:  #00ff00;
+  --color-toast-error-bg:      #1a0000;
+  --color-toast-error-border:  #ff0000;
+  --color-toast-error-text:    #ff6666;
+  /* ── Budget chart palette ── Green brightness steps — authentic monochrome terminal palette */
+  --color-chart-1:             #00ff00;
+  --color-chart-2:             #007700;
+  --color-chart-3:             #00cc00;
+  --color-chart-4:             #44ff44;
+  --color-chart-5:             #00aa00;
+  --color-chart-6:             #33dd33;
+  --color-chart-7:             #119900;
+  --color-chart-8:             #22bb22;
+}
+
+/* ── Blinking cursor scanline overlay ── */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 0, 0.015) 2px,
+    rgba(0, 255, 0, 0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ── Time Tracker panels — green shades, starkly left-bordered ── */
+.input-panel {
+  border-left: 4px solid #00ff00;
+  border-color: rgba(0, 255, 0, 0.25) !important;
+}
+.controls-panel {
+  border-left: 4px solid #00cc00;
+  border-color: rgba(0, 204, 0, 0.2) !important;
+}
+.totals-panel {
+  border-left: 4px solid #00aa00;
+  border-color: rgba(0, 170, 0, 0.2) !important;
+}
+.entries-panel {
+  border-left: 4px solid #007700;
+  border-color: rgba(0, 119, 0, 0.2) !important;
+}
+
+/* ── Glowing inputs ── */
+input:focus {
+  outline: none;
+  border-color: #00ff00 !important;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.4) !important;
+}
+
+/* ── Tool / section header ── */
+.tool-view-header,
+.section-header {
+  background: #000000 !important;
+  border-bottom-color: #00cc00 !important;
+  box-shadow: none !important;
+}
+.tool-view-title,
+.section-title {
+  color: #00ff00 !important;
+  text-shadow: 0 0 8px rgba(0, 255, 0, 0.6) !important;
+  opacity: 1 !important;
+}
+
+/* ── Modal — solid: pure black with green border ── */
+body.solid-modals .modal {
+  background: #040a04 !important;
+  border-color: #0a2a0a !important;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* ── Modal — translucent: frosted black glass with green tint ── */
+body:not(.solid-modals) .modal {
+  background: rgba(4, 10, 4, 0.35) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-color: rgba(0, 204, 0, 0.2) !important;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.06), 0 24px 48px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* ── Primary button ── */
+.primary-btn {
+  background: #001a00 !important;
+  border-color: #00cc00 !important;
+  color: #00ff00 !important;
+}
+.primary-btn:hover {
+  background: #002800 !important;
+  border-color: #00ff00 !important;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3) !important;
+  color: #00ff00 !important;
+}
+
+/* ── Danger button — red ── */
+.danger-btn {
+  background: #1a0000 !important;
+  border-color: #cc0000 !important;
+  color: #ff0000 !important;
+}
+.danger-btn:hover {
+  background: #280000 !important;
+  border-color: #ff0000 !important;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.3) !important;
+  color: #ff0000 !important;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  border-left: 3px solid rgba(0, 204, 0, 0.4);
+  border-color: rgba(0, 204, 0, 0.15) !important;
+}
+#media-tool-image-ccr .result-panel {
+  border-left: 3px solid #00cc00 !important;
+  border-color: rgba(0, 204, 0, 0.2) !important;
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: rgba(0, 204, 0, 0.4) !important; }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: #007700 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.tab-btn:hover {
+  color: #00cc00 !important;
+  border-color: rgba(0, 204, 0, 0.3) !important;
+  background: rgba(0, 204, 0, 0.06) !important;
+  box-shadow: none !important;
+}
+.tab-btn.active {
+  color: #00ff00 !important;
+  border-color: #00cc00 !important;
+  background: rgba(0, 204, 0, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #081008 !important;
+  color: #007700 !important;
+  border-color: #0a2a0a !important;
+  box-shadow: none !important;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: #00cc00 !important;
+  border-color: rgba(0, 204, 0, 0.4) !important;
+  background: #081008 !important;
+  box-shadow: none !important;
+}
+.dir-btn.active, .prv-btn.active {
+  color: #00ff00 !important;
+  border-color: #00cc00 !important;
+  background: rgba(0, 204, 0, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge { background: #00cc00 !important; color: #000000 !important; }
+
+/* ── Preview cards ── */
+.preview-card:hover      { border-color: #00cc00 !important; }
+.preview-card.anchor-card { border-color: #00ff00 !important; box-shadow: 0 0 8px rgba(0, 255, 0, 0.2) !important; }
+.preview-card.drag-target  { border-color: #ff0000 !important; box-shadow: 0 0 8px rgba(255, 0, 0, 0.2) !important; }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: #00cc00 !important;
+  border-color: #000000 !important;
+  box-shadow: none !important;
+}
+.img-slider::-webkit-slider-thumb:hover {
+  background: #00ff00 !important;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.5) !important;
+}
+.slider-val   { color: #00ff00 !important; }
+.estimate-val { color: #00cc00 !important; }
+.result-preview-wrap { border-color: rgba(0, 204, 0, 0.2) !important; }
+
+
+/* ── Budget Tracker ── */
+
+.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(0, 255, 0, 0.06) 0%, #040a04 100%); }
+.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(0, 204, 0, 0.05) 0%, #040a04 100%); }
+.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(0, 170, 0, 0.05) 0%, #040a04 100%); }
+.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(0, 119, 0, 0.06) 0%, #040a04 100%); }
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #00ff00;
+  box-shadow: 0 0 12px rgba(0, 255, 0, 0.1) !important;
+}
+.budget-annual-stats-title {
+  color: #00ff00;
+  text-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+}
+
+.budget-summary-tab.active {
+  color: #00ff00;
+  border-bottom-color: #00cc00;
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #00ff00; border-color: #00ff00; }
+.budget-stats-count-late    { color: #00cc00; border-color: #00cc00; }
+.budget-stats-count-overdue { color: #ff0000; border-color: #ff0000; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(0, 170, 0, 0.35);
+  color: #007700;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(0, 204, 0, 0.08);
+  border-color: #00cc00;
+  color: #00ff00;
+}
+
+.budget-view-mode-btn.active {
+  background: #00cc00 !important;
+  color: #000000 !important;
+  border-color: #00cc00 !important;
+}
+.budget-stats-section-heading { color: #007700; }

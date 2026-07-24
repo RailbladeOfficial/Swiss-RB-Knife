@@ -1,0 +1,254 @@
+:root {
+  --color-bg:                  #0a0a0a;
+  --color-panel:               #120a1a;
+  --color-input-bg:            #1a0f24;
+  --color-border:              #2d1f3d;
+  --color-border-dashed:       #ff6600;
+  --color-text:                #f0e6d0;
+  --color-text-muted:          #9370db;
+  --color-hover:               #2d1f3d;
+
+  --color-btn:                 #ff6600;
+  --color-btn-hover:           #e55c00;
+  --color-btn-text:            #000000;
+
+  --color-danger:              #ff4444;
+  --color-danger-subtle:       rgba(255, 68, 68, 0.1);
+
+  --color-accent-input:        #ff6600;
+  --color-accent-view:         #9370db;
+  --color-accent-totals:       #ffcc00;
+  --color-accent-entries:      #cc0000;
+
+  --color-toggle-off:          #2d1f3d;
+  --color-toggle-on:           #ff6600;
+
+  --color-toast-success-bg:    #1a0f24;
+  --color-toast-success-border:#9370db;
+  --color-toast-success-text:  #e0d0f0;
+  --color-toast-error-bg:      #1a0a00;
+  --color-toast-error-border:  #ff6600;
+  --color-toast-error-text:    #ffe0cc;
+
+  /* ── Budget chart palette ── Orange / purple / yellow / dark-red / amber / deep-purple / gold / maroon */
+  --color-chart-1:             #ff6600;
+  --color-chart-2:             #9370db;
+  --color-chart-3:             #ffcc00;
+  --color-chart-4:             #cc0000;
+  --color-chart-5:             #ff9933;
+  --color-chart-6:             #b030d0;
+  --color-chart-7:             #e6b800;
+  --color-chart-8:             #990000;
+}
+
+/* ── Time Tracker panels — orange / purple / yellow / red ── */
+.input-panel    {
+  background: linear-gradient(135deg, rgba(255, 102, 0, 0.07) 0%, #0f0800 100%);
+  border-left: 4px solid #ff6600;
+}
+.controls-panel {
+  background: linear-gradient(135deg, rgba(147, 112, 219, 0.07) 0%, #0d0015 100%);
+  border-left: 4px solid #9370db;
+}
+.totals-panel {
+  background: linear-gradient(135deg, rgba(255, 204, 0, 0.07) 0%, #0f0d00 100%);
+  border-left: 4px solid #ffcc00;
+}
+.entries-panel {
+  background: linear-gradient(135deg, rgba(204, 0, 0, 0.07) 0%, #150000 100%);
+  border-left: 4px solid #cc0000;
+}
+
+/* ── Tool / section header — orange flicker ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, rgba(255, 102, 0, 0.12), rgba(147, 112, 219, 0.08)) !important;
+  border-bottom-color: rgba(255, 102, 0, 0.4) !important;
+  box-shadow: 0 0 20px rgba(255, 102, 0, 0.12) !important;
+}
+
+.tool-view-title,
+.section-title {
+  color: #ff6600 !important;
+  text-shadow: 0 0 16px rgba(255, 102, 0, 0.6) !important;
+}
+
+/* ── Modal — translucent: purple-tinted frosted glass (original look) ── */
+body:not(.solid-modals) .modal {
+  background: linear-gradient(135deg, rgba(147, 112, 219, 0.08) 0%, rgba(13, 0, 21, 0.55) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-color: rgba(147, 112, 219, 0.35) !important;
+  box-shadow: 0 0 30px rgba(147, 112, 219, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* ── Modal — solid: deep black-purple panel ── */
+body.solid-modals .modal {
+  background: linear-gradient(135deg, #1e0a2e 0%, #0d0015 100%) !important;
+  border-color: rgba(147, 112, 219, 0.35) !important;
+  box-shadow: 0 0 30px rgba(147, 112, 219, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* ── Primary button ── */
+.primary-btn {
+  background: rgba(255, 102, 0, 0.15) !important;
+  border-color: rgba(255, 102, 0, 0.5) !important;
+  color: #ff6600 !important;
+}
+
+.primary-btn:hover {
+  background: rgba(255, 102, 0, 0.28) !important;
+  border-color: #ff6600 !important;
+  box-shadow: 0 0 16px rgba(255, 102, 0, 0.3) !important;
+  color: #ff6600 !important;
+}
+
+/* ── Image CCR panels — orange glow ── */
+#media-tool-image-ccr .panel {
+  background: linear-gradient(135deg, rgba(255, 102, 0, 0.06) 0%, #0f0800 100%) !important;
+  border-color: rgba(255, 102, 0, 0.35) !important;
+  box-shadow: 0 0 16px rgba(255, 102, 0, 0.1) !important;
+}
+
+#media-tool-image-ccr .result-panel {
+  background: linear-gradient(135deg, rgba(147, 112, 219, 0.07) 0%, #0d0015 100%) !important;
+  border-color: rgba(147, 112, 219, 0.4) !important;
+  border-left-color: rgba(147, 112, 219, 0.4) !important;
+  box-shadow: 0 0 16px rgba(147, 112, 219, 0.1) !important;
+}
+
+/* ── Drop zone ── */
+.drop-zone {
+  border-color: rgba(255, 102, 0, 0.4) !important;
+}
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: var(--color-text-muted) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tab-btn:hover {
+  color: #ff6600 !important;
+  border-color: rgba(255, 102, 0, 0.35) !important;
+  background: rgba(255, 102, 0, 0.08) !important;
+  box-shadow: none !important;
+}
+
+.tab-btn.active {
+  color: #ff6600 !important;
+  border-color: rgba(255, 102, 0, 0.5) !important;
+  background: rgba(255, 102, 0, 0.12) !important;
+  box-shadow: none !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #1a0f24 !important;
+  color: #9370db !important;
+  border-color: rgba(255, 102, 0, 0.2) !important;
+  box-shadow: none !important;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: #ff6600 !important;
+  border-color: rgba(255, 102, 0, 0.4) !important;
+  background: #1a0f24 !important;
+  box-shadow: none !important;
+}
+
+.dir-btn.active, .prv-btn.active {
+  color: #ff6600 !important;
+  border-color: #ff6600 !important;
+  background: rgba(255, 102, 0, 0.12) !important;
+  box-shadow: none !important;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge {
+  background: rgba(255, 102, 0, 0.85) !important;
+  color: #000 !important;
+}
+
+/* ── Preview card accents ── */
+.preview-card:hover    { border-color: rgba(255, 102, 0, 0.6) !important; box-shadow: 0 0 10px rgba(255, 102, 0, 0.15) !important; }
+.preview-card.anchor-card { border-color: #ff6600 !important; box-shadow: 0 0 12px rgba(255, 102, 0, 0.3) !important; }
+.preview-card.drag-target  { border-color: #9370db !important; box-shadow: 0 0 12px rgba(147, 112, 219, 0.3) !important; }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: #ff6600 !important;
+  border-color: #0a0a0a !important;
+  box-shadow: 0 0 8px rgba(255, 102, 0, 0.5) !important;
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: #9370db !important;
+  box-shadow: 0 0 12px rgba(147, 112, 219, 0.5) !important;
+}
+
+.slider-val   { color: #ff6600 !important; }
+.estimate-val { color: #ff6600 !important; }
+
+/* ── Result preview border ── */
+.result-preview-wrap {
+  border-color: rgba(147, 112, 219, 0.3) !important;
+}
+
+
+/* ── Budget Tracker ── */
+
+/* Panel backgrounds — very dark with on-brand tints */
+.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 102, 0, 0.09) 0%, #120a1a 100%); }
+.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(147, 112, 219, 0.08) 0%, #120a1a 100%); }
+.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(255, 204, 0, 0.07) 0%, #120a1a 100%); }
+.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(204, 0, 0, 0.08) 0%, #120a1a 100%); }
+
+/* Annual Stats title panel — orange glow accent */
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #ff6600;
+  box-shadow: 0 0 16px rgba(255, 102, 0, 0.12) !important;
+}
+.budget-annual-stats-title {
+  color: #ff6600;
+  text-shadow: 0 0 12px rgba(255, 102, 0, 0.4);
+}
+
+/* Summary tab active */
+.budget-summary-tab.active { color: #ff6600; border-bottom-color: #ff6600; }
+
+/* Stats table values */
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+/* Stats badges */
+.budget-stats-count-good    { color: #9370db; border-color: #9370db; }
+.budget-stats-count-late    { color: #ffcc00; border-color: #ffcc00; }
+.budget-stats-count-overdue { color: #ff6600; border-color: #ff6600; }
+
+/* Chart buttons */
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(255, 102, 0, 0.3);
+  color: #9370db;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(255, 102, 0, 0.1);
+  border-color: #ff6600;
+  color: #ff6600;
+}
+
+/* View-mode active button — orange */
+.budget-view-mode-btn.active {
+  background: #ff6600 !important;
+  color: #000000 !important;
+  border-color: #ff6600 !important;
+}
+
+/* Stats headings */
+.budget-stats-section-heading { color: #9370db; }

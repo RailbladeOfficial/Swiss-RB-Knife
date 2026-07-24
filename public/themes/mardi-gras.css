@@ -1,0 +1,243 @@
+:root {
+  --color-bg:                  #0f0520;
+  --color-panel:               #180a30;
+  --color-input-bg:            #220f40;
+  --color-border:              #6b2fa0;
+  --color-border-dashed:       #ffd700;
+  --color-text:                #fff8e8;
+  --color-text-muted:          #d4af37;
+  --color-hover:               #2a1a4a;
+
+  --color-btn:                 #00a550;
+  --color-btn-hover:           #008a42;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #ff4444;
+  --color-danger-subtle:       rgba(255, 68, 68, 0.15);
+
+  --color-accent-input:        #ffd700;
+  --color-accent-view:         #00a550;
+  --color-accent-totals:       #7b2fbe;
+  --color-accent-entries:      #ffd700;
+
+  --color-toggle-off:          #3a1a5a;
+  --color-toggle-on:           #00a550;
+
+  --color-toast-success-bg:    #0a2a18;
+  --color-toast-success-border:#00a550;
+  --color-toast-success-text:  #c8f0d8;
+  --color-toast-error-bg:      #2a0a0a;
+  --color-toast-error-border:  #ff4444;
+  --color-toast-error-text:    #ffd0d0;
+
+  /* ── Budget chart palette ── Gold / purple / green / orange / pale-gold / deep-purple / bright-green / amber */
+  --color-chart-1:             #ffd700;
+  --color-chart-2:             #7b2fbe;
+  --color-chart-3:             #00a550;
+  --color-chart-4:             #ff8c00;
+  --color-chart-5:             #e6c200;
+  --color-chart-6:             #5a1d8a;
+  --color-chart-7:             #00c060;
+  --color-chart-8:             #cc7000;
+}
+
+/* ── Time Tracker panels — gold / green / purple / gold ── */
+.input-panel {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%);
+  border-left: 4px solid #ffd700;
+  border-color: rgba(255, 215, 0, 0.35) !important;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.1) !important;
+}
+.controls-panel {
+  background: linear-gradient(135deg, rgba(0, 165, 80, 0.07) 0%, #0f0520 100%);
+  border-left: 4px solid #00a550;
+  border-color: rgba(0, 165, 80, 0.35) !important;
+  box-shadow: 0 0 16px rgba(0, 165, 80, 0.1) !important;
+}
+.totals-panel {
+  background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, #0f0520 100%);
+  border-left: 4px solid #7b2fbe;
+  border-color: rgba(123, 47, 190, 0.4) !important;
+  box-shadow: 0 0 16px rgba(123, 47, 190, 0.12) !important;
+}
+.entries-panel {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%);
+  border-left: 4px solid #ffd700;
+  border-color: rgba(255, 215, 0, 0.35) !important;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.1) !important;
+}
+
+/* ── Tool / section header — gold-to-purple festive gradient ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.1), rgba(123, 47, 190, 0.1)) !important;
+  border-bottom-color: rgba(255, 215, 0, 0.35) !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.1) !important;
+}
+.tool-view-title,
+.section-title {
+  color: #ffd700 !important;
+  text-shadow: 0 0 14px rgba(255, 215, 0, 0.4) !important;
+  opacity: 1 !important;
+}
+
+/* ── Modal — translucent: purple-tinted frosted glass (original look) ── */
+body:not(.solid-modals) .modal {
+  background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, rgba(15, 5, 32, 0.6) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-color: rgba(123, 47, 190, 0.4) !important;
+  box-shadow: 0 0 30px rgba(123, 47, 190, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* ── Modal — solid: fully opaque deep purple panel ── */
+body.solid-modals .modal {
+  background: linear-gradient(135deg, #2a0f4a 0%, #0f0520 100%) !important;
+  border-color: rgba(123, 47, 190, 0.4) !important;
+  box-shadow: 0 0 30px rgba(123, 47, 190, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* ── Primary button — green outlined ── */
+.primary-btn {
+  background: rgba(0, 165, 80, 0.12) !important;
+  border-color: rgba(0, 165, 80, 0.45) !important;
+  color: #00a550 !important;
+}
+.primary-btn:hover {
+  background: rgba(0, 165, 80, 0.25) !important;
+  border-color: #00a550 !important;
+  box-shadow: 0 0 14px rgba(0, 165, 80, 0.25) !important;
+  color: #00a550 !important;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, #0f0520 100%) !important;
+  border-color: rgba(255, 215, 0, 0.3) !important;
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.08) !important;
+}
+#media-tool-image-ccr .result-panel {
+  background: linear-gradient(135deg, rgba(123, 47, 190, 0.08) 0%, #0f0520 100%) !important;
+  border-color: rgba(123, 47, 190, 0.4) !important;
+  border-left-color: #7b2fbe !important;
+  box-shadow: 0 0 14px rgba(123, 47, 190, 0.1) !important;
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: rgba(255, 215, 0, 0.4) !important; }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: #d4af37 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.tab-btn:hover {
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.35) !important;
+  background: rgba(255, 215, 0, 0.07) !important;
+  box-shadow: none !important;
+}
+.tab-btn.active {
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.5) !important;
+  background: rgba(255, 215, 0, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #220f40 !important;
+  color: #d4af37 !important;
+  border-color: rgba(255, 215, 0, 0.2) !important;
+  box-shadow: none !important;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: #ffd700 !important;
+  border-color: rgba(255, 215, 0, 0.45) !important;
+  background: #220f40 !important;
+  box-shadow: none !important;
+}
+.dir-btn.active, .prv-btn.active {
+  color: #ffd700 !important;
+  border-color: #ffd700 !important;
+  background: rgba(255, 215, 0, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge { background: rgba(255, 215, 0, 0.9) !important; color: #0f0520 !important; }
+
+/* ── Preview cards ── */
+.preview-card:hover     { border-color: rgba(255, 215, 0, 0.5) !important; box-shadow: 0 0 10px rgba(255, 215, 0, 0.12) !important; }
+.preview-card.anchor-card { border-color: #ffd700 !important; box-shadow: 0 0 12px rgba(255, 215, 0, 0.25) !important; }
+.preview-card.drag-target  { border-color: #7b2fbe !important; box-shadow: 0 0 12px rgba(123, 47, 190, 0.25) !important; }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: #ffd700 !important;
+  border-color: #0f0520 !important;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5) !important;
+}
+.img-slider::-webkit-slider-thumb:hover { background: #7b2fbe !important; box-shadow: 0 0 10px rgba(123, 47, 190, 0.5) !important; }
+.slider-val   { color: #ffd700 !important; }
+.estimate-val { color: #ffd700 !important; }
+.result-preview-wrap { border-color: rgba(123, 47, 190, 0.3) !important; }
+
+
+/* ── Budget Tracker ── */
+
+/* Panel backgrounds — very dark purple with the Mardi Gras trinity tints */
+.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, #180a30 100%); }
+.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(0, 165, 80, 0.07) 0%, #180a30 100%); }
+.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, #180a30 100%); }
+.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #180a30 100%); }
+
+/* Annual Stats title panel — gold with festive glow */
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #ffd700;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.06) 0%, #180a30 100%);
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.1) !important;
+}
+.budget-annual-stats-title {
+  color: #ffd700;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+}
+
+/* Summary tab active — gold */
+.budget-summary-tab.active { color: #ffd700; border-bottom-color: #ffd700; }
+
+/* Stats table values — green pos, gold neg for Mardi Gras flair */
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+/* Stats badges */
+.budget-stats-count-good    { color: #00a550; border-color: #00a550; }
+.budget-stats-count-late    { color: #ffd700; border-color: #ffd700; }
+.budget-stats-count-overdue { color: #ff4444; border-color: #ff4444; }
+
+/* Chart buttons */
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(255, 215, 0, 0.25);
+  color: #d4af37;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(255, 215, 0, 0.08);
+  border-color: #ffd700;
+  color: #ffd700;
+}
+
+/* View-mode active button — gold */
+.budget-view-mode-btn.active {
+  background: #ffd700 !important;
+  color: #0f0520 !important;
+  border-color: #ffd700 !important;
+}
+
+/* Stats headings */
+.budget-stats-section-heading { color: #d4af37; }

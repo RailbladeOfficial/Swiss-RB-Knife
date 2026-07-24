@@ -1,0 +1,7 @@
+success:
+
+<a href="https://freesound.org/people/grunz/sounds/109663/">success_low.wav</a> by <a href="https://freesound.org/people/grunz/">grunz</a> | License: <a href="http://creativecommons.org/licenses/by/3.0/">Attribution 3.0</a>
+
+error:
+
+<a href="https://freesound.org/people/F.M.Audio/sounds/662346/">Interface Error 7.wav</a> by <a href="https://freesound.org/people/F.M.Audio/">F.M.Audio</a> | License: <a href="https://creativecommons.org/licenses/by/4.0/">Attribution 4.0</a>

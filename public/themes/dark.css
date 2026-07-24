@@ -1,0 +1,175 @@
+:root {
+  --color-bg:                  #0a0a0a;
+  --color-panel:               #141414;
+  --color-input-bg:            #1c1c1c;
+  --color-border:              #2a2a2a;
+  --color-border-dashed:       #3a3a3a;
+  --color-text:                #d1d5db;
+  --color-text-muted:          #6b7280;
+  --color-hover:               #2a2a2a;
+
+  --color-btn:                 #404040;
+  --color-btn-hover:           #525252;
+  --color-btn-text:            #e5e7eb;
+
+  --color-danger:              #b91c1c;
+  --color-danger-subtle:       rgba(185, 28, 28, 0.1);
+
+  --color-accent-input:        #6366f1;
+  --color-accent-view:         #0d9488;
+  --color-accent-totals:       #78716c;
+  --color-accent-entries:      #b91c1c;
+
+  --color-toggle-off:          #374151;
+  --color-toggle-on:           #525252;
+
+  --color-toast-success-bg:    #1a2e1a;
+  --color-toast-success-border:#374151;
+  --color-toast-success-text:  #9ca3af;
+  --color-toast-error-bg:      #2a1010;
+  --color-toast-error-border:  #b91c1c;
+  --color-toast-error-text:    #fca5a5;
+
+  /* ── Budget chart palette ── Indigo / cyan / amber / rose / soft violet / sky / crimson / emerald */
+  --color-chart-1:             #6366f1;
+  --color-chart-2:             #2dd4bf;
+  --color-chart-3:             #d97706;
+  --color-chart-4:             #fb7185;
+  --color-chart-5:             #c4b5fd;
+  --color-chart-6:             #38bdf8;
+  --color-chart-7:             #f43f5e;
+  --color-chart-8:             #34d399;
+}
+
+/* ── Time Tracker panels — desaturated accent borders ── */
+.input-panel    { border-left: 4px solid #6366f1; }
+.controls-panel { border-left: 4px solid #0d9488; }
+.totals-panel   { border-left: 4px solid #78716c; }
+.entries-panel  { border-left: 4px solid #b91c1c; }
+
+/* ── Tool / section header — very subtle, near-black ── */
+.tool-view-header,
+.section-header {
+  background: #1a1a1a !important;
+  border-bottom-color: #2a2a2a !important;
+}
+
+.tool-view-title,
+.section-title {
+  color: #d1d5db !important;
+  opacity: 0.9;
+}
+
+/* ── Modal — solid: near-black panel ── */
+body.solid-modals .modal {
+  background: #141414 !important;
+  border-color: #2a2a2a !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* ── Modal — translucent: deep frosted black ── */
+body:not(.solid-modals) .modal {
+  background: rgba(20, 20, 20, 0.25) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-color: rgba(42, 42, 42, 0.6) !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* ── Primary button ── */
+.primary-btn {
+  background: #404040 !important;
+  border-color: #525252 !important;
+  color: #e5e7eb !important;
+}
+
+.primary-btn:hover {
+  background: #525252 !important;
+  border-color: #6b7280 !important;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  border-left: 3px solid #6366f1;
+}
+
+#media-tool-image-ccr .result-panel {
+  border-left: 3px solid #0d9488 !important;
+}
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: var(--color-text-muted) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+.tab-btn:hover {
+  color: #d1d5db !important;
+  border-color: #3a3a3a !important;
+  background: #2a2a2a !important;
+  box-shadow: none !important;
+}
+
+.tab-btn.active {
+  color: #e5e7eb !important;
+  border-color: #525252 !important;
+  background: #333333 !important;
+  box-shadow: none !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn.active, .prv-btn.active {
+  color: #e5e7eb !important;
+  border-color: #525252 !important;
+  background: #333333 !important;
+}
+
+/* ── Slider ── */
+.slider-val   { color: #d1d5db !important; }
+.estimate-val { color: #d1d5db !important; }
+
+/* ── Preview card accents ── */
+.preview-card.anchor-card { border-color: #6366f1 !important; }
+.preview-card.drag-target  { border-color: #0d9488 !important; }
+
+
+/* ── Budget Tracker ── */
+
+/* Panel backgrounds — near-black, minimal tint to preserve the dark theme's
+   subdued aesthetic. Borders do the accent work. */
+.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, #141414 100%); }
+.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(13, 148, 136, 0.06) 0%, #141414 100%); }
+.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(120, 113, 108, 0.08) 0%, #141414 100%); }
+.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(185, 28, 28, 0.06) 0%, #141414 100%); }
+
+/* Annual Stats title panel */
+.budget-annual-stats-title-panel { border-left: 4px solid #6366f1; }
+.budget-annual-stats-title { color: #d1d5db; }
+
+/* Summary tab active */
+.budget-summary-tab.active { color: #c4b5fd; border-bottom-color: #6366f1; }
+
+/* Stats table values */
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+/* Stats badges */
+.budget-stats-count-good    { color: #2dd4bf; border-color: #2dd4bf; }
+.budget-stats-count-late    { color: #d97706; border-color: #d97706; }
+.budget-stats-count-overdue { color: #fb7185; border-color: #fb7185; }
+
+/* Chart buttons — match the dark theme's understated palette */
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: #3a3a3a;
+  color: #6b7280;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: #2a2a2a;
+  border-color: #525252;
+  color: #d1d5db;
+}

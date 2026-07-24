@@ -1,0 +1,7 @@
+success:
+
+<a href="https://freesound.org/people/jolup123/sounds/668791/">success.mp3</a> by <a href="https://freesound.org/people/jolup123/">jolup123</a> | License: <a href="http://creativecommons.org/publicdomain/zero/1.0/">Creative Commons 0</a>
+
+error:
+
+<a href="https://freesound.org/people/chrisw92/sounds/110931/">error2.wav</a> by <a href="https://freesound.org/people/chrisw92/">chrisw92</a> | License: <a href="https://creativecommons.org/licenses/by/4.0/">Attribution 4.0</a>

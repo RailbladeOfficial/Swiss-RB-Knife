@@ -1,0 +1,292 @@
+[
+  {
+    "version": "0.3.3",
+    "date": "2026-07-24",
+    "changes": {
+      "features": {
+        "App Overall": [
+          "Initial public beta release."
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "Added modals for Security and Contributing, accessible from the About modal."
+        ],
+        "Auto-Backup": [
+          "Added dismissable disclaimer screen to the Auto-Backup tool.",
+          "Added confirmation modal on every backup run as a security measure.",
+          "Made progress bar animation use better math to look more... progressive.",
+          "Added more accurate estimates to the Summary Panel so you can know how long you have in the bathroom while the run(s) occur(s)."
+        ]
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Fixed an issue with shell overriding tool specific settings."
+        ],
+        "Auto-Backup": [
+          "Minor fixes and optimizations."
+        ]
+      }
+    }
+  },
+  {
+    "version": "0.3.2",
+    "date": "2026-07-10",
+    "changes": {
+      "features": {
+        
+      },
+      "improvements": {
+        
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Various minor security fixes and improvements."
+        ],
+        "Budget Tracker": [
+          "When encryption required reauth on every tool entry, ensured that listeners were only added once."
+        ]
+      }
+    }
+  },
+  {
+    "version": "0.3.1",
+    "date": "2026-07-09",
+    "changes": {
+      "features": {
+
+      },
+      "improvements": {
+        "Budget Tracker": [
+          "Added automatic backups in the user's data folder that happen hourly in buckets."
+        ]
+      },
+      "bugfixes": {
+        "Budget Tracker": [
+          "Fixed an issue where encryption reauth 'on every tool entry' didn't take effect until the next app-load.",
+          "Fixed an issue with data retention between version updates."
+        ]
+      }
+    }
+  },
+  {
+    "version": "0.3.0",
+    "date": "2026-07-08",
+    "changes": {
+      "features": {
+        "App Overall": [
+          "Added ability to choose Sound Pack in General Settings, allowing for a variety of notification boops."
+        ],
+        "Budget Tracker": [
+          "Added new tool that allows you to track personal cashflow to help with simple budgeting.",
+          "Track income and expenses, and set up recurring scheduled bills, helping to visualize obligations you still need to pay soon.",
+          "Set month-based Income Expectations and Expense Thresholds to help you reach financial goals.",
+          "View various stats and metrics to analyze how and where your money is going, and now how much you need each month to live.",
+          "Optionally enable encryption for this tool, ensuring your data is only loaded in memory and not viewable by anyone else accessing your device."
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "Alt+F4 just closes app in on the App Lock screen instead of launching a close modal.",
+          "Renamed Settings Modal to General Settings and removed App Overall subheader.",
+          "Removed Tool Categories and Category Landing pages, for now.",
+          "The sidebar now just lists the exact tools by name."
+        ],
+        "Time Tracker": [
+          "Moved Time Tracker Settings From General Settings Modal to an in-tool Setup modal."
+        ]
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Fixed modals / tools being cut off if the screen was smaller.",
+          "App lock now scales to fit smaller window sizes."
+        ],
+        "Image CCR": [
+          "Progress bar counts should accurately update on bulk image resize completion."
+        ],
+        "Auto-Backup": [
+          "Ensured that a log file was placed in each destination folder when a backup is set to mirror to multiple destinations."
+        ]
+      }
+    }
+  },
+  {
+    "version": "0.2.0",
+    "date": "2026-06-12",
+    "changes": {
+      "features": {
+        "App Overall": [
+          "New Theme Added - Terminal.",
+          "Added ability to create and manage Custom themes via the Settings modal.",
+          "Can create a new theme, base it off an existing one, and then modify set colors and other styles.",
+          "Added General Setting 'App Lock', allowing you to set a pin / password to solely control opening of the app and accessing its tools."
+        ],
+        "Dummy File Generator": [
+          "Added new tool that allows you to quickly generate multiple dummy files for testing purposes.",
+          "Can be used to generate batches of files of various file types - text files will have text added into their files.",
+          "When generating multiple batches, you can choose to generate all files in one folder, sort the output by extension, or sort by line.",
+          "Selecting '123', 'abc', or '0xF' specifies how the filenames should increment - either numerically, alphabetically, or hexidecimally.",
+          "You can also add a filename prefix or suffix to all generated files in a batch.",
+          "For the extension type, you can either manually type in an extension, or use the in-field extension picker to choose an extension from the popup modal."
+        ],
+        "Image CCR": [
+          "For Combine, added ability to preview combinations before saving.",
+          "Added ability to define a gap between images if you don't want them combined right next to eachother.",
+          "Added ability to add a border around the combined images, defining the border thickness and color.",
+          "Added Canvas Color, so you can define the color of the extra space around the combined images, inside the border.",
+          "Added output filetype options of JPG and PNG when combining images.",
+          "Added the Resize tab to the Image CCR tool.",
+          "Resize allows you to select a folder of one or more images and homogenize their width, height, or complete canvas size.",
+          "Using 'Resize To' proportionately scales the image to the specified dimensions.",
+          "Using 'Set manual canvas size' allows definition of the end file's exact dimensions, within which the optionally resized image will be placed."
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "Added ability to navigate app using mouse back and forward buttons.",
+          "Added tool subheaders for the changelog, including historical versions.",
+          "Improved the app installer.",
+          "Set a proper app icon.",
+          "Added Agree to License modal on first launch of app.",
+          "Added Changelog launch on first run of a new version.",
+          "Pressing Alt+F4 now shows the Close modal instead of just exiting the app.",
+          "Homogenized modal handling so all modals behave the same.",
+          "Clicking outside a modal no longer closes it - but hitting Escape does.",
+          "Increased the vertical header region whereby modals can be clicked and dragged around.",
+          "Other minor optimizations and improvements."
+        ],
+        "Image CCR": [
+          "Renamed Image CC tool to Image CCR."
+        ]
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Toast notifications weren't staying visible when hovered over, and weren't clearing on click as intended.",
+          "Prevented the click to enter mouse-cursor from showing when hovering over a notification toast.",
+          "Fixed 'On Startup' settings 'Last Tool' and 'Last Category' not handling the Home page as intended.",
+          "Fixed Window Size Saving Issues, ensured consistency across devices / scales.",
+          "Fixed Random Theme not styling the Category / Tool header row.",
+          "Fixed an issue where the bottoms of changelog versions were getting cut off."
+        ]
+      }
+    }
+  },
+  {
+    "version": "0.1.0",
+    "date": "2026-05-27",
+    "changes": {
+      "features": {
+        "App Overall": [
+          "Refactored things to support a multi-tool application implementation, widening scope beyond just the Time Tracker tool.",
+          "Globalized many of the Time Tracker's settings excluding those specific to that tool.",
+          "The Settings Modal now has a General Section, followed by tool-specific settings sections.",
+          "Added General Setting to choose whether modals have a solid or transparent background.",
+          "Added General Setting to choose where the app will start at when launched.",
+          "You can choose between Last View (default), Last Tool, Last Category, Home, a specific Category, or a specific Tool.",
+          "Created Category pages to group various tools under.",
+          "Created a Home Dashboard that lists all Categories and their respective tools.",
+          "Created a collapsible/expandible sidebar for tool categories and the Home Dashboard.",
+          "New Theme Added - Matte.",
+          "New Theme Added - Patriot.",
+          "New Theme Added - Cake.",
+          "New Theme Added - Retro-Electric.",
+          "Added modals for README, Licensing, Attributions, and Third Party Licenses, accessible from the About modal."
+        ],
+        "Image CCR": [
+          "Added new tool to the Files Category that allows the user to combine images or compress an image.",
+          "Combine mode allows you to select mutliple image files and append them to eachother in a specified direction.",
+          "The first image is the anchor image - you then choose a direction below by which to add subsequent images to the anchor image.",
+          "Compress mode allows you to select one image and shrink it's size / dimensions quickly and easily for uploading to websites with filesize constraints."
+        ],
+        "Auto-Backup": [
+          "Added new tool that allows you to define one or many source folders and one or multiple destination folders for a backup.",
+          "Browse for folders via Windows, or add raw paths manually. You can also double-click a path to inline edit it.",
+          "Uses Windows' robocopy utility to mirror the entirety of the source folder(s) (and any subfolders / files) to each of the Destination folders.",
+          "Only new / modified files get mirrored over to save time. If the Destination folder already has the same file, it will be skipped.",
+          "Note that the point of this tool is to exactly 'mirror' the Source folder structure / contents into the Destination.",
+          "For future backups, this means that files changed in the Source will overwrite older versions in the Destination.",
+          "This also means that files that are no longer in the Source will be removed from the Destination.",
+          "You can create Presets of commonly used Source / Destination Folder setups.",
+          "Stats show in the Summary section, including an 'overestimate' of time to complete the backup.",
+          "Backup progress is then shown in the Last Run section at the bottom. A summary log .txt file is included in the first Destination folder provided."
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "Click outside a modal to close it.",
+          "Added ability to click and drag modals by their header.",
+          "Replaced themes 'Persistent Random' and 'True Random' with a single theme, Random.",
+          "When Random is the active theme, subsettings Mode and Palette are shown, as well as a die button to re-randomize the theme.",
+          "Random Mode: Persistent retains the randomly chosen colors, where Regenerative Mode re-randomizes the theme on every tool change, app reload, modal interaction, etc.",
+          "Random Palette: Harmonized applies a random theme that's ensured to be legible, where Chaotic Palette is just truly random, throwing caution to the wind.",
+          "Renamed theme 'Work' to 'Knowledge'.",
+          "Grouped Themes by categories 'Main', 'Holiday', and 'Special'.",
+          "Moved the buttons to open the About and Settings modals from the top-right corner of the app to the bottom of the sidebar."
+        ]
+      },
+      "bugfixes": {
+        "App Overall": [
+          "The Random theme's Persistent mode now properly saves on close / reopen of the app.",
+          "Ensured that all scrollable modals restart at the top of the modal when they're closed and later reopened."
+        ]
+      }
+    }
+  },
+  {
+    "version": "0.0.2",
+    "date": "2026-04-13",
+    "changes": {
+      "features": {
+        "App Overall": [
+          "Added an About Modal via the '?' icon at the top right of the app.",
+          "Added a changelog for obvious reasons."
+        ],
+        "Time Tracker": [
+          "Added Confirmation Modal when deleting Entries.",
+          "Added Setting 'Quick Delete' that allows deleting Entries without the confirmation modal.",
+          "Added left and right arrows around the Control Panel's Start / End Dates to easily move the date back / forward one day.",
+          "Added 'Last 14 Days' View Preset.",
+          "Added Setting 'Pay Period' that, when enabled, shows View Preset buttons 'Last Pay Period' and 'This Pay Period'.",
+          "When Pay Period is enabled, the user can set an anchor date to start the pay period from, and choose a 7- or 14-day pay period."
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "Replaced the stock Windows close app modal with an in-app, styled version.",
+          "Hid scrollbars in the app while still allowing scrolling. It's just prettier this way.",
+          "Some color adjustments to the Mardi Gras and Work themes."
+        ],
+        "Time Tracker": [
+          "Grouped Entries by date.",
+          "Added calendar icon at end of the row to update the date for that entry.",
+          "Day's total time is now included in the subheader next to the grouped date.",
+          "Reordered Entry Panel columns to Activity, Start Time, End Time, then Duration.",
+          "Activity column in Entry Panel now wraps text.",
+          "In the Controls Panel, the Start Date now cannot be later than the End Date, and the End Date cannot be earlier than the Start Date.",
+          "If dates are manually adjusted and match a preset button, the preset button now lights up."
+        ]
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Fixed an issue where notifications weren't persiting when hovered over, and weren't clearing when clicked.",
+          "Prevented scrolling of the background app while a modal was open."
+        ],
+        "Time Tracker": [
+          "Clicking out of inline editing in the Entry Panel saved edits but didn't give a success notification.",
+          "Pressing Escape when doing inline editing on an Entry was saving edits instead of discarding them."
+        ]
+      }
+    }
+  },
+  {
+    "version": "0.0.1",
+    "date": "2026-04-08",
+    "changes": {
+      "features": {
+        "App Overall": "Initial private alpha release."
+      },
+      "improvements": {},
+      "bugfixes": {}
+    }
+  }
+]

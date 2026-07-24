@@ -1,0 +1,241 @@
+:root {
+  --color-bg:                  #3a3a3c;
+  --color-panel:               #484848;
+  --color-input-bg:            #555558;
+  --color-border:              #5a5a5e;
+  --color-border-dashed:       #ffa500;
+  --color-text:                #f0f0f0;
+  --color-text-muted:          rgba(240, 240, 240, 0.5);
+
+  --color-hover:               #5e5e62;
+
+  --color-btn:                 #36c0f1;
+  --color-btn-hover:           #1aaad8;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #ffa500;
+  --color-danger-subtle:       rgba(255, 165, 0, 0.15);
+
+  --color-accent-input:        #ffa500;
+  --color-accent-view:         #36c0f1;
+  --color-accent-totals:       #ffa500;
+  --color-accent-entries:      #36c0f1;
+
+  --color-toggle-off:          #505052;
+  --color-toggle-on:           #36c0f1;
+
+  --color-toast-success-bg:    #384448;
+  --color-toast-success-border:#36c0f1;
+  --color-toast-success-text:  #b8e8f8;
+  --color-toast-error-bg:      #484035;
+  --color-toast-error-border:  #e05555;
+  --color-toast-error-text:    #f8c0c0;
+
+  /* ── Budget chart palette ── Sky-blue / orange / violet / burnt-orange / cyan / amber / flame / green */
+  --color-chart-1:             #36c0f1;
+  --color-chart-2:             #ffa500;
+  --color-chart-3:             #a855f7;
+  --color-chart-4:             #f97316;
+  --color-chart-5:             #22d3ee;
+  --color-chart-6:             #f59e0b;
+  --color-chart-7:             #ff6b35;
+  --color-chart-8:             #2ecc71;
+}
+
+/* ── Panels — sky blue / orange alternating on gunmetal ── */
+.input-panel {
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%);
+  border-left: 4px solid #ffa500;
+  border-color: rgba(255, 165, 0, 0.35) !important;
+}
+.controls-panel {
+  background: linear-gradient(135deg, rgba(54, 192, 241, 0.1) 0%, #484848 100%);
+  border-left: 4px solid #36c0f1;
+  border-color: rgba(54, 192, 241, 0.3) !important;
+}
+.totals-panel {
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%);
+  border-left: 4px solid #ffa500;
+  border-color: rgba(255, 165, 0, 0.35) !important;
+}
+.entries-panel {
+  background: linear-gradient(135deg, rgba(54, 192, 241, 0.1) 0%, #484848 100%);
+  border-left: 4px solid #36c0f1;
+  border-color: rgba(54, 192, 241, 0.3) !important;
+}
+
+/* ── Tool / section header ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, rgba(255, 165, 0, 0.1), rgba(54, 192, 241, 0.08)) !important;
+  border-bottom-color: rgba(255, 165, 0, 0.3) !important;
+  box-shadow: 0 0 16px rgba(255, 165, 0, 0.06) !important;
+}
+.tool-view-title,
+.section-title {
+  color: #f0f0f0 !important;
+  opacity: 1 !important;
+}
+
+/* ── Modal — solid: flat gunmetal panel (original look) ── */
+body.solid-modals .modal {
+  background: #484848 !important;
+  border-color: rgba(255, 165, 0, 0.3) !important;
+  box-shadow: 0 0 24px rgba(255, 165, 0, 0.1), 0 24px 48px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* ── Modal — translucent: frosted gunmetal glass ── */
+body:not(.solid-modals) .modal {
+  background: rgba(72, 72, 72, 0.25) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-color: rgba(255, 165, 0, 0.25) !important;
+  box-shadow: 0 0 24px rgba(255, 165, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* ── Primary button — sky blue ghost ── */
+.primary-btn {
+  background: rgba(54, 192, 241, 0.12) !important;
+  border-color: rgba(54, 192, 241, 0.5) !important;
+  color: #36c0f1 !important;
+}
+.primary-btn:hover {
+  background: rgba(255, 165, 0, 0.18) !important;
+  border-color: #ffa500 !important;
+  box-shadow: 0 0 14px rgba(255, 165, 0, 0.25) !important;
+  color: #ffa500 !important;
+}
+
+/* ── Danger button — solid orange ── */
+.danger-btn {
+  background: #ffa500 !important;
+  border-color: #ffa500 !important;
+  color: #ffffff !important;
+}
+.danger-btn:hover {
+  background: #e09000 !important;
+  border-color: #e09000 !important;
+  box-shadow: 0 0 14px rgba(255, 165, 0, 0.4) !important;
+  color: #ffffff !important;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  background: linear-gradient(135deg, rgba(54, 192, 241, 0.08) 0%, #484848 100%) !important;
+  border-color: rgba(54, 192, 241, 0.25) !important;
+}
+#media-tool-image-ccr .result-panel {
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%) !important;
+  border-color: rgba(255, 165, 0, 0.35) !important;
+  border-left-color: #ffa500 !important;
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: rgba(54, 192, 241, 0.4) !important; }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: rgba(240, 240, 240, 0.4) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.tab-btn:hover {
+  color: #f0f0f0 !important;
+  border-color: rgba(54, 192, 241, 0.35) !important;
+  background: rgba(54, 192, 241, 0.08) !important;
+  box-shadow: none !important;
+}
+.tab-btn.active {
+  color: #ffa500 !important;
+  border-color: rgba(255, 165, 0, 0.5) !important;
+  background: rgba(255, 165, 0, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #555558 !important;
+  color: rgba(240, 240, 240, 0.55) !important;
+  border-color: rgba(255, 165, 0, 0.2) !important;
+  box-shadow: none !important;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: #f0f0f0 !important;
+  border-color: rgba(255, 165, 0, 0.45) !important;
+  background: #555558 !important;
+  box-shadow: none !important;
+}
+.dir-btn.active, .prv-btn.active {
+  color: #ffa500 !important;
+  border-color: #ffa500 !important;
+  background: rgba(255, 165, 0, 0.12) !important;
+  box-shadow: none !important;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge { background: #ffa500 !important; color: #1a1a1a !important; }
+
+/* ── Preview cards ── */
+.preview-card:hover      { border-color: rgba(54, 192, 241, 0.5) !important; }
+.preview-card.anchor-card { border-color: #ffa500 !important; box-shadow: 0 0 10px rgba(255, 165, 0, 0.25) !important; }
+.preview-card.drag-target  { border-color: #36c0f1 !important; }
+
+/* ── Slider — silver/chrome feel ── */
+.img-slider::-webkit-slider-thumb {
+  background: linear-gradient(135deg, #d8d8d8, #909898) !important;
+  border-color: #2c2c2e !important;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255,255,255,0.3) !important;
+}
+.img-slider::-webkit-slider-thumb:hover {
+  background: linear-gradient(135deg, #ffc04a, #ffa500) !important;
+}
+.slider-val   { color: #ffa500 !important; }
+.estimate-val { color: #36c0f1 !important; }
+.result-preview-wrap { border-color: rgba(54, 192, 241, 0.3) !important; }
+
+
+/* ── Budget Tracker ── */
+
+/* Panel backgrounds — gunmetal with alternating sky/orange tints */
+.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%); }
+.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(54, 192, 241, 0.1) 0%, #484848 100%); }
+.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%); }
+.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(54, 192, 241, 0.1) 0%, #484848 100%); }
+
+/* Annual Stats title panel */
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #36c0f1;
+  background: linear-gradient(135deg, rgba(54, 192, 241, 0.08) 0%, #484848 100%);
+}
+.budget-annual-stats-title { color: #36c0f1; }
+
+/* Summary tab active — alternating orange/blue matches cake theme personality */
+.budget-summary-tab.active { color: #ffa500; border-bottom-color: #ffa500; }
+
+/* Stats table values */
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+/* Stats badges */
+.budget-stats-count-good    { color: #36c0f1; border-color: #36c0f1; }
+.budget-stats-count-late    { color: #ffa500; border-color: #ffa500; }
+.budget-stats-count-overdue { color: #e05555; border-color: #e05555; }
+
+/* Chart buttons */
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(54, 192, 241, 0.3);
+  color: rgba(240, 240, 240, 0.5);
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(54, 192, 241, 0.1);
+  border-color: #36c0f1;
+  color: #36c0f1;
+}
+
+/* Stats headings */
+.budget-stats-section-heading { color: rgba(240, 240, 240, 0.55); }

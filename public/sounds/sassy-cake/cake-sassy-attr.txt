@@ -1,0 +1,11 @@
+success:
+
+<a href="https://glados.c-net.org/grab?id=825903">825903</a> by <a href="https://glados.c-net.org/">GLaDOS Voice Generator</a> | License: <a href="https://cathedral-networks.org/adhoc/wtfpl.txt">WTFPL</a>
+
+caution:
+
+<a href="https://glados.c-net.org/grab?id=825904">825904</a> by <a href="https://glados.c-net.org/">GLaDOS Voice Generator</a> | License: <a href="https://cathedral-networks.org/adhoc/wtfpl.txt">WTFPL</a>
+
+error:
+
+<a href="https://glados.c-net.org/grab?id=825906">825906</a> by <a href="https://glados.c-net.org/">GLaDOS Voice Generator</a> | License: <a href="https://cathedral-networks.org/adhoc/wtfpl.txt">WTFPL</a>

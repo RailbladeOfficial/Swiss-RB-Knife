@@ -1,0 +1,7 @@
+success:
+
+futuristic-1-success by <a href="https://www.hamsteralliance.com/">The Hamster Alliance</a> | YouTube: <a href="https://www.youtube.com/hamsteralliance">The Hamster Alliance"</a> | License: <a href="https://creativecommons.org/licenses/by-nc-nd/3.0/">Creative Commons CC BY-NC-ND 3.0</a>
+
+error:
+
+futuristic-1-error by <a href="https://www.hamsteralliance.com/">The Hamster Alliance</a> | YouTube: <a href="https://www.youtube.com/hamsteralliance">The Hamster Alliance"</a> | License: <a href="https://creativecommons.org/licenses/by-nc-nd/3.0/">Creative Commons CC BY-NC-ND 3.0</a>

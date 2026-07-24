@@ -1,0 +1,29 @@
+{
+  "name": "swiss-rb-knife",
+  "private": true,
+  "version": "0.3.3",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "description": "A Multi-Tool Application.",
+  "authors": "Railblade",
+  "scripts": {
+    "predev": "node scripts/copy-public-docs.mjs && node scripts/generate-licenses.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/copy-public-docs.mjs && node scripts/generate-licenses.mjs",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-opener": "^2",
+    "lts": "^2.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^25.6.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
+  }
+}

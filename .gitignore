@@ -1,0 +1,74 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+/data
+dist
+.env
+.env.*
+src-tauri/target
+dist-ssr
+*.local
+
+# ─── Belt-and-suspenders: never commit runtime / user data ──────────────────
+# /data (above) already covers the dev data directory where these normally
+# live. These extra patterns catch a sensitive file even if a stray copy ever
+# ended up somewhere else in the tree (e.g. dragged to the repo root to inspect
+# it). The .enc envelopes and the lock hash are the crown jewels — losing those
+# to a public commit is the one outcome worth being paranoid about.
+*.enc
+lock.json
+budget-*.json
+time-tracker.json
+draft.json
+settings.json
+*-settings.json
+custom-themes.json
+shell-state.json
+window.json
+auto-backup.json
+auto-backup-presets.json
+backups/
+
+# Atomic-write temp files (pid-tagged) and tool outputs, in case any were ever
+# produced inside the repo during testing.
+*.tmp-*
+robocopy_log_*.txt
+files-generated-*/
+resized-*/
+
+# Build-generated copies in public/ (created by copy-public-docs.mjs —
+# the originals at the repo root are the tracked source of truth)
+public/README.md
+public/LICENSE
+public/LICENSE.md
+public/ATTRIBUTION.md
+public/CHANGELOG.json
+public/CONTRIBUTING.md
+public/SECURITY.md
+public/swiss-rb-knife-logo.png
+public/screenshots/
+
+# Tauri-generated schemas (regenerated on every dev/build)
+src-tauri/gen/schemas
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Windows junk
+Thumbs.db
+Desktop.ini

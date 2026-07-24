@@ -1,0 +1,1042 @@
+/* =============================================================================
+   IMAGE CCR  —  tool-specific styles
+   All colours reference CSS custom properties defined in shell.css / themes.
+   Classes that already exist in shell.css are NOT redefined here.
+   Load order: shell.css → image-ccr.css → active theme
+============================================================================= */
+
+/* =============================================================================
+   TAB NAV  (Combine / Compress switcher inside the tool view header)
+============================================================================= */
+
+.tab-nav {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.tab-btn {
+  font-size: 0.85rem;
+  padding: 4px 16px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.tab-btn:hover {
+  color: var(--color-btn-text);
+  border-color: var(--color-border);
+  background: var(--color-hover);
+}
+
+.tab-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+  background: var(--color-hover);
+}
+
+/* =============================================================================
+   TAB PANELS
+============================================================================= */
+
+.tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tab-panel.active {
+  display: flex;
+}
+
+/* =============================================================================
+   TOOL PANEL HEADER / BODY
+   Like shell's .section-header but scoped inside a .panel, no border-bottom
+   by default (the panel border handles separation).
+============================================================================= */
+
+.tool-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  gap: 12px;
+}
+
+.tool-panel-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  opacity: 0.85;
+}
+
+.tool-panel-body {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* =============================================================================
+   ITEM BADGE  (e.g. "3 images" count next to a panel header)
+============================================================================= */
+
+.item-badge {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 2px 10px;
+}
+
+/* =============================================================================
+   DROP ZONE  (file selection area)
+============================================================================= */
+
+.drop-zone {
+  border: 2px dashed var(--color-border-dashed);
+  border-radius: 8px;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.drop-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.drop-label {
+  font-size: 1rem;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.drop-formats {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.06em;
+  margin: 4px 0 0;
+}
+
+/* =============================================================================
+   PRIMARY BUTTON  (Combine Images / Compress Image)
+   Shell's default button is the secondary style; this is the prominent CTA.
+============================================================================= */
+
+.primary-btn {
+  display: inline-block;
+  padding: 9px 24px;
+  border-radius: 6px;
+  border: 1px solid var(--color-btn);
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  font-size: 0.95rem;
+  font-weight: bold;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.primary-btn:hover {
+  background: var(--color-btn-hover);
+  border-color: var(--color-btn-text);
+}
+
+.primary-btn.loading {
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+/* =============================================================================
+   OPTION ROW / GROUP / LABELS  (direction, filename, folder inputs)
+============================================================================= */
+
+.option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+}
+
+.option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.option-label {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.input-ext {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-top: -2px;
+}
+
+.folder-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.folder-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* =============================================================================
+   RESULT PANEL  (magenta/view accent — mirrors entries-panel pattern)
+============================================================================= */
+
+.result-panel {
+  border-left: 4px solid var(--color-accent-view);
+}
+
+.result-preview-wrap {
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 420px;
+}
+
+.result-preview-img {
+  max-width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  display: block;
+}
+
+.result-meta {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  margin: 0;
+}
+
+/* =============================================================================
+   PREVIEW STRIP  (combine — draggable image cards)
+============================================================================= */
+
+.preview-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.preview-card {
+  position: relative;
+  width: 130px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-panel);
+  overflow: visible;
+  cursor: grab;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  user-select: none;
+}
+
+.preview-card:hover {
+  border-color: var(--color-btn-text);
+}
+
+.preview-card.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.preview-card.anchor-card {
+  border-color: var(--color-btn-text);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.preview-card.drag-target {
+  border-color: var(--color-accent-view);
+}
+
+.preview-card img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 6px 6px 0 0;
+  display: block;
+  pointer-events: none;
+}
+
+.preview-card-info {
+  padding: 6px 8px;
+}
+
+.preview-card-name {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-card-dims {
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.preview-card-btns {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px 6px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.card-move-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.card-move-btn:hover {
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+.preview-card-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--color-danger);
+  background: var(--color-panel);
+  color: var(--color-danger);
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  z-index: 2;
+}
+
+.preview-card-remove:hover {
+  background: var(--color-danger-subtle);
+}
+
+.anchor-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 0.55rem;
+  background: var(--color-btn-text);
+  color: var(--color-bg);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+/* =============================================================================
+   DIRECTION GRID  (combine — Above/Below/Left/Right)
+============================================================================= */
+
+.direction-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 200px;
+}
+
+.dir-btn, .prv-btn {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-btn);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+.dir-btn.active, .prv-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+.dir-btn.loading {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+/* =============================================================================
+   PREVIEW BUTTON  (combine)
+============================================================================= */
+
+.prv-btn {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-btn);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.prv-btn:hover {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+.prv-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+.prv-btn.loading {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+/* =============================================================================
+   LOADED FILE  (compress — thumbnail + metadata row)
+============================================================================= */
+
+.loaded-file {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  position: relative;
+}
+
+.loaded-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.loaded-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.loaded-name {
+  font-size: 0.8rem;
+  color: var(--color-text);
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.loaded-dims,
+.loaded-size {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.loaded-clear {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  font-size: 0.7rem;
+}
+
+/* =============================================================================
+   SLIDER  (compress — quality/scale range input)
+============================================================================= */
+
+.slider-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.slider-labels span:first-child {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.slider-val {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--color-btn-text);
+}
+
+.img-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--color-btn-text) 0%,
+    var(--color-btn-text) var(--pct, 80%),
+    var(--color-border) var(--pct, 80%),
+    var(--color-border) 100%
+  );
+  outline: none;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.img-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-btn-text);
+  border: 2px solid var(--color-bg);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: var(--color-text);
+}
+
+.img-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-btn-text);
+  border: 2px solid var(--color-bg);
+  cursor: pointer;
+}
+
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+/* =============================================================================
+   FORMAT GRID  (JPG / PNG toggle buttons)
+============================================================================= */
+
+.fmt-grid {
+  display: flex;
+  gap: 6px;
+}
+
+.fmt-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-btn);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+}
+
+.fmt-btn:hover {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+.fmt-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+/* =============================================================================
+   COMBINE ACTIONS  (Combine + Preview buttons inline)
+============================================================================= */
+
+.combine-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+/* =============================================================================
+   HEX INLINE INPUT  (editable hex field that replaces the hex label on dblclick)
+============================================================================= */
+
+.hex-inline-input {
+  width: 74px;
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: var(--color-text);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-btn-text);
+  border-radius: 4px;
+  padding: 1px 4px;
+  letter-spacing: 0.04em;
+  outline: none;
+}
+
+/* =============================================================================
+   LIVE PREVIEW  (shown inside options panel after Preview is clicked)
+============================================================================= */
+
+.live-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* =============================================================================
+   SIZE ESTIMATE  (compress — dimension / filesize preview table)
+============================================================================= */
+
+.size-estimate {
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.estimate-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.estimate-label {
+  color: var(--color-text-muted);
+}
+
+.estimate-val {
+  color: var(--color-btn-text);
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =============================================================================
+   NUMBER INPUT ROW  (gap, thickness, radius — number field + "px" unit label)
+============================================================================= */
+
+.number-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.number-input-row input[type="number"] {
+  width: 80px;
+  /* Hide browser spinner arrows */
+  -moz-appearance: textfield;
+}
+
+.number-input-row input[type="number"]::-webkit-inner-spin-button,
+.number-input-row input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input-unit {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+/* =============================================================================
+   TOGGLE ROW  (border enable checkbox + label)
+============================================================================= */
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--color-btn-text);
+  flex-shrink: 0;
+}
+
+.toggle-label {
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+/* =============================================================================
+   BORDER FIELDS  (inline group of thickness / color / radius revealed on toggle)
+============================================================================= */
+
+.border-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+}
+
+/* =============================================================================
+   COLOR INPUT ROW  (color swatch + hex label)
+============================================================================= */
+
+.color-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-swatch {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 36px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+.color-hex {
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+}
+
+/* =============================================================================
+   RESIZE TAB
+============================================================================= */
+
+/* Folder stats grid */
+/* Outer row: count pill on left, 2×2 dims grid on right, vertically centred */
+.resize-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* "Images found" cell — sits to the left, self-stretches to match grid height */
+.resize-stat-count {
+  align-self: stretch;
+  justify-content: center;
+  min-width: 110px;
+}
+
+/* The 2×2 dimension grid */
+.resize-stats-dims {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Keep the old .resize-stats-grid name harmless if referenced anywhere */
+.resize-stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.resize-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  min-width: 100px;
+}
+
+.resize-stat-label {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.resize-stat-val {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--color-btn-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dimension pair row (W × H) */
+.resize-dim-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resize-dim-sep {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* Small hint text below a field */
+.option-hint {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  margin-top: -2px;
+}
+
+/* Gravity 3×3 grid */
+.gravity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 32px);
+  gap: 4px;
+}
+
+.gravity-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  background: var(--color-btn);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.gravity-btn:hover {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+.gravity-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+/* Resize format buttons — reuse fmt-btn look but scoped separately
+   so theme overrides for .fmt-btn don't bleed across tabs */
+.resize-fmt-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-btn);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+}
+
+.resize-fmt-btn:hover {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+.resize-fmt-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn-text);
+  background: var(--color-btn-hover);
+}
+
+/* =============================================================================
+   RESIZE — action row (Run + Cancel + inline result)
+============================================================================= */
+
+.resize-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.resize-result-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#resize-result-text {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-family: monospace;
+}
+
+/* =============================================================================
+   RESIZE — progress area
+============================================================================= */
+
+#resize-progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.resize-progress-file {
+  font-size: 0.78rem;
+  font-family: monospace;
+  color: var(--color-text-muted);
+  min-height: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resize-progress-count {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  text-align: right;
+}
+
+/* =============================================================================
+   RESIZE — options header group (title + inline info button)
+============================================================================= */
+
+.resize-options-header-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Info button — styled as a small primary button */
+.resize-info-btn {
+  background: var(--color-btn);
+  border: 1px solid var(--color-btn);
+  color: var(--color-btn-text);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  line-height: 1.4;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.resize-info-btn:hover {
+  background: var(--color-btn-hover);
+  border-color: var(--color-btn-text);
+}
+
+/* =============================================================================
+   RESIZE INFO MODAL
+============================================================================= */
+
+.resize-info-modal {
+  width: min(560px, 92vw);
+}
+
+.resize-info-body {
+  text-align: left;
+  gap: 0;
+}
+
+.resize-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+
+.resize-info-heading {
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: var(--color-btn-text);
+  margin: 0;
+}
+
+.resize-info-body p {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.resize-info-body strong {
+  color: var(--color-text);
+}
+
+.resize-info-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0 12px;
+}

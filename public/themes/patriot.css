@@ -1,0 +1,243 @@
+:root {
+  --color-bg:                  #ffffff;
+  --color-panel:               #f0f0f0;
+  --color-input-bg:            #e8e8f0;
+  --color-border:              #aaaacc;
+  --color-border-dashed:       #ff0000;
+  --color-text:                #111111;
+  --color-text-muted:          rgba(17, 17, 17, 0.5);
+
+  --color-hover:               #dde0f0;
+
+  --color-btn:                 #0000cc;
+  --color-btn-hover:           #0000aa;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #cc0000;
+  --color-danger-subtle:       rgba(204, 0, 0, 0.12);
+
+  --color-accent-input:        #cc0000;
+  --color-accent-view:         #0000cc;
+  --color-accent-totals:       #cc0000;
+  --color-accent-entries:      #0000cc;
+
+  --color-toggle-off:          #bbbbdd;
+  --color-toggle-on:           #0000cc;
+
+  --color-toast-success-bg:    #e8e8ff;
+  --color-toast-success-border:#0000cc;
+  --color-toast-success-text:  #00008a;
+  --color-toast-error-bg:      #ffe8e8;
+  --color-toast-error-border:  #cc0000;
+  --color-toast-error-text:    #8a0000;
+  /* ── Budget chart palette ── Red / blue / silver / red-dark / navy / white / blue-mid / grey — red, white, blue on light bg */
+  --color-chart-1:             #cc0000;
+  --color-chart-2:             #0000cc;
+  --color-chart-3:             #aaaadd;
+  --color-chart-4:             #dd2222;
+  --color-chart-5:             #3333bb;
+  --color-chart-6:             #ffffff;
+  --color-chart-7:             #2255cc;
+  --color-chart-8:             #888899;
+}
+
+/* ── Patriotic gradient background ── */
+body {
+  background: linear-gradient(160deg, #ffcccc 0%, #ffd9d9 20%, #ffffff 40%, #ffffff 60%, #d9d9ff 80%, #ccccff 100%) fixed !important;
+}
+
+/* ── Panels — bold red / blue cards ── */
+.input-panel {
+  background: #fff0f0 !important;
+  border-left: 4px solid #cc0000;
+  border-color: rgba(204, 0, 0, 0.35) !important;
+}
+.controls-panel {
+  background: #f0f0ff !important;
+  border-left: 4px solid #0000cc;
+  border-color: rgba(0, 0, 204, 0.3) !important;
+}
+.totals-panel {
+  background: #fff0f0 !important;
+  border-left: 4px solid #cc0000;
+  border-color: rgba(204, 0, 0, 0.35) !important;
+}
+.entries-panel {
+  background: #f0f0ff !important;
+  border-left: 4px solid #0000cc;
+  border-color: rgba(0, 0, 204, 0.3) !important;
+}
+
+/* ── Tool / section header ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, rgba(204, 0, 0, 0.08), rgba(0, 0, 204, 0.08)) !important;
+  border-bottom-color: rgba(100, 100, 180, 0.3) !important;
+  box-shadow: none !important;
+}
+.tool-view-title,
+.section-title {
+  color: #111111 !important;
+  opacity: 1 !important;
+}
+
+/* ── Modal — solid: white card (original look) ── */
+body.solid-modals .modal {
+  background: #ffffff !important;
+  border-color: rgba(100, 100, 200, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 180, 0.15), 0 24px 48px rgba(0, 0, 0, 0.2) !important;
+  color: #111111 !important;
+}
+
+/* ── Modal — translucent: frosted stars-and-stripes glass ── */
+body:not(.solid-modals) .modal {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-color: rgba(100, 100, 200, 0.4) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 180, 0.12), 0 24px 48px rgba(0, 0, 0, 0.15) !important;
+  color: #111111 !important;
+}
+
+/* ── Primary button — solid blue ── */
+.primary-btn {
+  background: #0000ff !important;
+  border-color: #0000ff !important;
+  color: #ffffff !important;
+}
+.primary-btn:hover {
+  background: #0000cc !important;
+  border-color: #0000cc !important;
+  box-shadow: 0 0 14px rgba(0, 0, 255, 0.3) !important;
+  color: #ffffff !important;
+}
+
+/* ── Danger button — solid red ── */
+.danger-btn {
+  background: #cc0000 !important;
+  border-color: #cc0000 !important;
+  color: #ffffff !important;
+}
+.danger-btn:hover {
+  background: #aa0000 !important;
+  border-color: #aa0000 !important;
+  box-shadow: 0 0 14px rgba(204, 0, 0, 0.35) !important;
+  color: #ffffff !important;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  background: #f8f8ff !important;
+  border-color: rgba(0, 0, 204, 0.2) !important;
+}
+#media-tool-image-ccr .result-panel {
+  background: #fff8f8 !important;
+  border-color: rgba(204, 0, 0, 0.3) !important;
+  border-left-color: #cc0000 !important;
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: rgba(0, 0, 204, 0.4) !important; }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: rgba(17, 17, 17, 0.4) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.tab-btn:hover {
+  color: #111111 !important;
+  border-color: rgba(0, 0, 204, 0.3) !important;
+  background: rgba(0, 0, 204, 0.06) !important;
+  box-shadow: none !important;
+}
+.tab-btn.active {
+  color: #cc0000 !important;
+  border-color: rgba(204, 0, 0, 0.45) !important;
+  background: rgba(204, 0, 0, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #f0f0f8 !important;
+  color: rgba(17, 17, 17, 0.55) !important;
+  border-color: rgba(0, 0, 204, 0.2) !important;
+  box-shadow: none !important;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: #111111 !important;
+  border-color: rgba(0, 0, 204, 0.45) !important;
+  background: #f0f0f8 !important;
+  box-shadow: none !important;
+}
+.dir-btn.active, .prv-btn.active {
+  color: #cc0000 !important;
+  border-color: #cc0000 !important;
+  background: rgba(204, 0, 0, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge { background: #0000cc !important; color: #ffffff !important; }
+
+/* ── Preview cards ── */
+.preview-card:hover      { border-color: rgba(0, 0, 204, 0.45) !important; }
+.preview-card.anchor-card { border-color: #cc0000 !important; box-shadow: 0 0 10px rgba(204, 0, 0, 0.2) !important; }
+.preview-card.drag-target  { border-color: #0000cc !important; }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: #cc0000 !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 8px rgba(204, 0, 0, 0.4) !important;
+}
+.img-slider::-webkit-slider-thumb:hover { background: #0000cc !important; }
+.slider-val   { color: #cc0000 !important; }
+.estimate-val { color: #0000cc !important; }
+.result-preview-wrap { border-color: rgba(0, 0, 204, 0.25) !important; }
+
+
+/* ── Budget Tracker ── */
+
+.finance-tool-budget .panel-accent-input  { background: #fff4f4; }
+.finance-tool-budget .panel-accent-view   { background: #f4f4ff; }
+.finance-tool-budget .panel-accent-totals { background: #fff4f4; }
+.finance-tool-budget .panel-accent-entries{ background: #f4f4ff; }
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #cc0000;
+  background: linear-gradient(90deg, #fff8f8, #f0f0f0);
+}
+.budget-annual-stats-title { color: #cc0000; }
+
+.budget-summary-tab.active { color: #cc0000; border-bottom-color: #cc0000; }
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #0000cc; border-color: #0000cc; }
+.budget-stats-count-late    { color: #888800; border-color: #888800; }
+.budget-stats-count-overdue { color: #cc0000; border-color: #cc0000; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(0, 0, 204, 0.3);
+  color: rgba(17, 17, 17, 0.5);
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(0, 0, 204, 0.06);
+  border-color: #0000cc;
+  color: #0000cc;
+}
+
+.budget-view-mode-btn.active {
+  background: #0000cc !important;
+  color: #ffffff !important;
+  border-color: #0000cc !important;
+}
+.budget-stats-section-heading { opacity: 0.5; color: #111111; }

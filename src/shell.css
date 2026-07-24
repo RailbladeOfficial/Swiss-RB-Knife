@@ -1,0 +1,2190 @@
+/* =============================================================================
+   BASE
+   Inherits CSS custom properties from the active theme file (themes/*.css).
+   All color references use var(--color-*) — never hardcoded values.
+============================================================================= */
+
+:root {
+  --font-scale: 0;
+  font-size: calc(20px + var(--font-scale) * 1px);
+
+  /* Sidebar dimensions — change these two values to resize the sidebar.
+     Expanded width sized to fit the longest nav label (currently
+     "Dummy File Generator") at the base font scale without clipping. */
+  --sidebar-collapsed-width: 52px;
+  --sidebar-expanded-width: 240px;
+  --sidebar-transition: 200ms ease;
+
+  /* Title bar height — referenced by both titleBar and appBody */
+  --titlebar-height: 36px;
+
+  /* Universal hover transition — applies to all buttons, links, and
+     interactive elements. Set once here; never override in themes. */
+  --hover-transition: 0.5s ease;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: sans-serif;
+  font-size: 1rem;
+  margin: 0;
+  overflow: hidden; /* The inner scroll areas handle scrolling */
+}
+
+/* Hide all scrollbars while keeping scrolling functional */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* =============================================================================
+   TITLE BAR
+============================================================================= */
+
+#titleBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-border);
+  -webkit-app-region: drag;
+  user-select: none;
+  z-index: 100;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 600;
+  opacity: 0.85;
+  letter-spacing: 0.03em;
+}
+
+#windowControls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+#clock {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  padding: 2px 8px;
+  margin-right: 4px;
+}
+
+/* Shared style for all icon buttons in the title bar */
+.titlebar-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+.titlebar-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.titlebar-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.close-btn {
+  color: var(--color-danger);
+}
+
+.close-btn:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+/* =============================================================================
+   APP BODY LAYOUT  (sidebar + main content, below the title bar)
+============================================================================= */
+
+#appBody {
+  display: flex;
+  position: fixed;
+  top: var(--titlebar-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* =============================================================================
+   SIDEBAR
+============================================================================= */
+
+#sidebar {
+  width: var(--sidebar-collapsed-width);
+  flex-shrink: 0;
+  background: var(--color-panel);
+  border-right: 1px solid var(--color-border);
+  overflow: hidden;
+  transition: width var(--sidebar-transition);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* pushes navBottom to the bottom */
+  z-index: 50;
+}
+
+#sidebar.expanded {
+  width: var(--sidebar-expanded-width);
+}
+
+#sidebar.expanded .nav-label {
+  opacity: 1;
+}
+
+#navList {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#navBottom {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* nav-label fade also applies to navBottom items */
+#sidebar.expanded #navBottom .nav-label {
+  opacity: 1;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+  border-left: 3px solid transparent;
+  user-select: none;
+}
+
+.nav-item:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.nav-item.active {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-left-color: var(--color-btn);
+}
+
+.nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.nav-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.nav-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity var(--sidebar-transition);
+  pointer-events: none;
+  /* Safety net for larger font-scale settings — truncates gracefully
+     instead of clipping mid-character against the sidebar's edge. */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* =============================================================================
+   MAIN CONTENT AREA
+============================================================================= */
+
+#mainContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* =============================================================================
+   CONTENT SECTIONS  (one per nav item; only .active is shown)
+============================================================================= */
+
+.content-section {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  animation: sectionFadeIn 0.18s ease;
+}
+
+.content-section.active {
+  display: flex;
+}
+
+@keyframes sectionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 8px 8px 0 0;
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+  opacity: 0.85;
+}
+
+/* =============================================================================
+   PANELS
+   Same visual treatment as the time tracker — accent border left, themed bg.
+============================================================================= */
+
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+/* Each section can assign its own accent colour to child panels via a
+   modifier class, keeping the pattern from the time tracker. */
+.panel-accent-input {
+  border-left: 4px solid var(--color-accent-input);
+}
+.panel-accent-view {
+  border-left: 4px solid var(--color-accent-view);
+}
+.panel-accent-totals {
+  border-left: 4px solid var(--color-accent-totals);
+}
+.panel-accent-entries {
+  border-left: 4px solid var(--color-accent-entries);
+}
+
+.placeholder-text {
+  opacity: 0.5;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* =============================================================================
+   COMMON LAYOUT UTILITIES
+   Generic flex row patterns reusable across tools.
+============================================================================= */
+
+.controls,
+.inputs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inputs input {
+  margin: 10px 0;
+}
+
+/* =============================================================================
+   INPUTS  (carried over wholesale from the time tracker)
+============================================================================= */
+
+input,
+select {
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-input-bg) inset !important;
+  -webkit-text-fill-color: var(--color-text) !important;
+  caret-color: var(--color-text);
+}
+
+/* Hide number input spinners everywhere — they clutter narrow amount/interval
+   fields and aren't needed since all of these are typed or stepped via other
+   controls. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* =============================================================================
+   BUTTONS  (carried over from the time tracker)
+============================================================================= */
+
+button {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition),
+    box-shadow var(--hover-transition);
+}
+
+button:hover {
+  background: var(--color-btn-hover);
+}
+
+.danger-btn {
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition),
+    box-shadow var(--hover-transition);
+}
+
+.danger-btn:hover {
+  background: var(--color-danger-subtle);
+}
+
+/* =============================================================================
+   TOAST NOTIFICATIONS  (identical to time tracker)
+============================================================================= */
+
+#toastContainer {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10000; /* above lock screen (9999) so toasts show during unlock */
+  width: auto;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+.toast {
+  pointer-events: auto;
+  cursor: default;
+  width: fit-content;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(-10px);
+  animation: toastIn 0.25s ease forwards;
+  will-change: transform, opacity;
+  -webkit-app-region: no-drag;
+}
+
+@keyframes toastIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast.hide {
+  animation: toastOut 0.3s ease forwards;
+}
+
+@keyframes toastOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 100px;
+    padding: 10px 14px;
+    margin: 0 auto;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+    padding: 0 14px;
+    margin: 0;
+  }
+}
+
+.toast.success {
+  background: var(--color-toast-success-bg);
+  border: 1px solid var(--color-toast-success-border);
+  color: var(--color-toast-success-text);
+}
+
+.toast.error {
+  background: var(--color-toast-error-bg);
+  border: 1px solid var(--color-toast-error-border);
+  color: var(--color-toast-error-text);
+}
+
+/* =============================================================================
+   MODAL BACKDROP — stacking context fix
+   -----------------------------------------------------------------------------
+   modal.css puts backdrop-filter: blur(4px) directly on .modal-backdrop, which
+   forces a new compositing layer. That layer can paint over siblings with a
+   higher z-index (including the toast container at 9999) because backdrop-filter
+   creates a stacking context regardless of z-index order.
+   Fix: strip the blur from the backdrop div and move it to a ::before
+   pseudo-element that covers the same area. The backdrop div itself no longer
+   creates a stacking context, so the toast z-index wins cleanly.
+============================================================================= */
+
+.modal-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.modal-backdrop::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* =============================================================================
+   MODALS — SETTINGS
+============================================================================= */
+
+/* Settings modal — scrollable body when window is short */
+#settingsModal {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 2px;
+}
+
+/* Time Tracker Settings modal — same sizing/scroll as the General Settings modal */
+#ttSettingsModal {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-label {
+  font-size: 0.65rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#settingsReset {
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+#settingsReset:hover {
+  background: var(--color-danger-subtle);
+}
+
+#fontScaleValue::-webkit-inner-spin-button,
+#fontScaleValue::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+#fontScaleValue {
+  width: 52px;
+  height: 20px;
+  text-align: center;
+  font-size: 1rem;
+  padding: 3px 6px;
+  margin: 0;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--color-toggle-off);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--color-toggle-on);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.toggle-with-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#rerollBtn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color var(--hover-transition),
+    border-color var(--hover-transition),
+    background var(--hover-transition);
+  flex-shrink: 0;
+}
+
+#rerollBtn:hover {
+  color: var(--color-text);
+  border-color: var(--color-btn);
+  background: var(--color-hover);
+}
+
+/* Compact select used in Settings rows (theme picker, startup target, etc.) */
+.settings-select {
+  width: auto;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* =============================================================================
+   HOME DASHBOARD
+============================================================================= */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--hover-transition);
+}
+
+.dashboard-card-header:hover {
+  background: var(--color-hover);
+}
+
+.dashboard-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--color-btn);
+}
+
+.dashboard-card-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.dashboard-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.dashboard-tool-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-tool-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  border-radius: 0;
+  padding: 5px 14px;
+  font-size: 0.8rem;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+.dashboard-tool-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.dashboard-tool-placeholder {
+  display: block;
+  padding: 5px 14px;
+  font-size: 0.8rem;
+  opacity: 0.35;
+  font-style: italic;
+}
+
+/* "Coming Soon" badge — sits in a dashboard-card-header next to the title
+   for categories with no implemented tools yet. */
+.coming-soon-badge {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-input-bg);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   COMING SOON  — category landing placeholder (e.g. Music)
+============================================================================= */
+
+.coming-soon-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 60px 20px;
+  color: var(--color-text-muted);
+}
+
+.coming-soon-icon {
+  opacity: 0.4;
+}
+
+.coming-soon-icon svg {
+  width: 40px;
+  height: 40px;
+}
+
+.coming-soon-title {
+  font-size: 1rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.coming-soon-desc {
+  font-size: 0.82rem;
+  opacity: 0.5;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+/* =============================================================================
+   CATEGORY LANDING PAGES
+============================================================================= */
+
+.tool-landing {
+  display: block;
+}
+
+.tool-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.tool-card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 16px 14px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition);
+  user-select: none;
+}
+
+.tool-card:hover {
+  background: var(--color-hover);
+  border-color: var(--color-btn);
+}
+
+.tool-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-btn);
+}
+
+.tool-card-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.tool-card-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.tool-card-desc {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  line-height: 1.5;
+}
+
+/* =============================================================================
+   TOOL VIEWS  (individual tool within a category)
+============================================================================= */
+
+.tool-view {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tool-view-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 8px 8px 0 0;
+  flex-shrink: 0;
+}
+
+.tool-view-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* Optional right-aligned action button in a tool view header (e.g. "Setup"). */
+.tool-view-header-action {
+  margin-left: auto;
+}
+
+/* Shared back-arrow button used in tool view headers (.tool-back-btn) and
+   category landing page headers (.section-back-btn). Both are identical in
+   appearance; the two class names are kept in HTML for semantic clarity. */
+.tool-back-btn,
+.section-back-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+.tool-back-btn svg,
+.section-back-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.tool-back-btn:hover,
+.section-back-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* =============================================================================
+   CHANGELOG MODAL STYLES  (moved here from time-tracker.css — now universal)
+============================================================================= */
+
+#changelogModal,
+#licensingModal,
+#fullLicenseModal,
+#readmeModal,
+#securityModal,
+#contributingModal {
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.changelog-body {
+  overflow-y: scroll;
+  flex: 1;
+  gap: 20px;
+  padding-right: 2px;
+}
+
+.changelog-version-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.changelog-version-block + .changelog-version-block {
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.changelog-version-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.changelog-version-number {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--color-text);
+}
+
+.changelog-version-date {
+  font-size: 0.75rem;
+  opacity: 0.5;
+  flex: 1;
+}
+
+.changelog-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: center;
+  transition:
+    color var(--hover-transition),
+    transform 0.2s ease;
+}
+
+.changelog-toggle-btn svg {
+  width: 100%;
+  height: 100%;
+  transition: transform 0.2s ease;
+}
+
+.changelog-toggle-btn.rotated svg {
+  transform: rotate(-90deg);
+}
+
+.changelog-toggle-btn:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+.changelog-version-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  opacity: 1;
+  transition:
+    max-height 0.35s ease,
+    opacity 0.25s ease;
+}
+
+.changelog-version-block.collapsed .changelog-version-content {
+  max-height: 0 !important;
+  opacity: 0;
+  transition:
+    max-height 0.3s ease,
+    opacity 0.2s ease;
+}
+
+.changelog-category {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.changelog-category-header {
+  font-size: 0.82rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+}
+
+.changelog-category-header.features {
+  color: var(--color-accent-input);
+}
+.changelog-category-header.improvements {
+  color: var(--color-accent-view);
+}
+.changelog-category-header.bugfixes {
+  color: var(--color-accent-entries);
+}
+
+.changelog-item {
+  font-size: 0.85rem;
+  padding-left: 10px;
+  border-left: 2px solid var(--color-border);
+  line-height: 1.5;
+  text-align: left;
+}
+
+.changelog-category.features .changelog-item {
+  border-left-color: var(--color-accent-input);
+}
+.changelog-category.improvements .changelog-item {
+  border-left-color: var(--color-accent-view);
+}
+.changelog-category.bugfixes .changelog-item {
+  border-left-color: var(--color-accent-entries);
+}
+
+.changelog-tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.changelog-tool-group + .changelog-tool-group {
+  margin-top: 8px;
+}
+
+.changelog-tool-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  opacity: 0.75;
+  text-align: left;
+}
+
+.changelog-loading {
+  opacity: 0.5;
+  font-size: 0.85rem;
+}
+
+/* =============================================================================
+   LICENSING MODAL — TABS
+============================================================================= */
+
+.licensing-modal {
+  display: flex;
+  flex-direction: column;
+}
+
+.licensing-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 16px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.licensing-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition:
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+  margin-bottom: -1px;
+}
+
+.licensing-tab:hover {
+  color: var(--color-text);
+}
+
+.licensing-tab.active {
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+}
+
+.full-license-btn {
+  display: block;
+  margin-top: 20px;
+  width: 100%;
+  text-align: center;
+}
+
+/* =============================================================================
+   FULL LICENSE TEXT
+============================================================================= */
+
+.full-license-body {
+  font-family: monospace;
+}
+
+.full-license-text {
+  font-family: monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text);
+  margin: 0;
+}
+
+/* =============================================================================
+   MARKDOWN RENDERER OUTPUT
+============================================================================= */
+
+.md-h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 10px 0 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.md-h1:first-child {
+  margin-top: 0;
+}
+
+.md-h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 8px 0 3px;
+  color: var(--color-text);
+}
+
+.md-h3 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 6px 0 2px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.md-h4 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 5px 0 2px;
+  color: var(--color-text-muted);
+}
+
+.md-p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0 0 3px;
+  color: var(--color-text);
+}
+
+.md-hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 8px 0;
+}
+
+/* Collapsed blank-line spacer — one gap regardless of how many blank lines */
+.md-gap {
+  height: 6px;
+}
+
+.md-li {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-left: 16px;
+  list-style: disc;
+  display: list-item;
+  color: var(--color-text);
+}
+
+.md-img {
+  height: auto;
+  margin: 6px 0;
+  cursor: zoom-in;
+}
+
+/* =============================================================================
+   README IMAGE LIGHTBOX
+============================================================================= */
+
+.image-lightbox-modal {
+  width: min(90vw, 1100px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.image-lightbox-modal .modal-header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 32px; /* clears the header-left / header-right buttons */
+}
+
+.image-lightbox-body {
+  flex: 1;
+  overflow: auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-lightbox-body img {
+  display: block;
+  max-width: 100%;
+  max-height: 78vh;
+  height: auto;
+  border-radius: 8px;
+  margin: 0 auto;
+}
+
+.md-blockquote {
+  border-left: 3px solid var(--color-btn);
+  padding-left: 10px;
+  margin: 4px 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.md-code-block {
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.md-code-block code {
+  font-family: monospace;
+  color: var(--color-text);
+  white-space: pre;
+  display: block;
+  width: max-content;
+  min-width: 100%;
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin: 4px 0;
+}
+
+.md-table th,
+.md-table td {
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  text-align: left;
+  color: var(--color-text);
+}
+
+.md-table th {
+  background: var(--color-input-bg);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.changelog-body a,
+.full-license-body a {
+  color: var(--color-btn);
+  text-decoration: none;
+}
+
+.changelog-body a:hover,
+.full-license-body a:hover {
+  text-decoration: underline;
+}
+
+/* Internal doc links styled same as external links */
+a.md-internal-link {
+  color: var(--color-btn);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.md-internal-link:hover {
+  text-decoration: underline;
+}
+
+.changelog-body code {
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 0.82em;
+  font-family: monospace;
+}
+
+/* =============================================================================
+   LICENSE AGREEMENT MODAL
+============================================================================= */
+
+.license-agreement-modal {
+  width: 600px;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+
+.license-agreement-body {
+  flex: 1;
+  overflow-y: auto;
+  text-align: left;
+  font-family: monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text);
+  /* Intentionally no padding-bottom — user must scroll to see footer */
+}
+
+.license-agreement-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.license-accept-btn {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+.license-accept-btn:hover {
+  background: var(--color-btn-hover);
+  border-color: var(--color-btn-hover);
+  color: var(--color-btn-text);
+}
+
+.license-footer-locked {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* =============================================================================
+   CUSTOM THEME SUBSETTINGS  (Settings modal)
+============================================================================= */
+
+.custom-theme-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.custom-theme-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-theme-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.custom-theme-icon-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.custom-theme-icon-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.custom-theme-icon-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-btn);
+}
+
+.custom-theme-delete-btn:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+.custom-theme-empty {
+  font-size: 0.78rem;
+  opacity: 0.55;
+  font-style: italic;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+/* =============================================================================
+   THEME EDITOR MODAL
+============================================================================= */
+
+.theme-editor-modal {
+  width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.theme-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+/* Top row: name + base picker */
+.te-top-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.te-name-field,
+.te-base-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.te-name-field {
+  flex: 1;
+}
+.te-base-field {
+  flex-shrink: 0;
+}
+
+.te-field-label {
+  font-size: 0.68rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.te-name-input {
+  width: 100%;
+  font-size: 0.9rem;
+  padding: 5px 8px;
+  box-sizing: border-box;
+}
+
+/* Scrollable groups area — used by both tab panes */
+.te-groups {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 2px;
+  min-height: 0;
+}
+
+/* Tab bar */
+.te-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.te-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition:
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+  margin-bottom: -1px;
+}
+
+.te-tab:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+.te-tab.active {
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+  background: transparent;
+}
+
+/* Tab pane — each tab's scrollable content area */
+.te-tab-pane {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Individual group */
+.te-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.te-group-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Color row */
+.te-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.te-swatch-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.te-swatch {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  flex-shrink: 0;
+}
+
+.te-hex {
+  font-family: monospace;
+  font-size: 0.72rem;
+  width: 62px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: inherit;
+  opacity: 0.75;
+  padding: 1px 3px;
+  text-transform: uppercase;
+  cursor: text;
+  transition: border-color var(--hover-transition), opacity var(--hover-transition),
+              background var(--hover-transition);
+}
+
+.te-hex:hover {
+  opacity: 1;
+  border-color: var(--color-border);
+}
+
+.te-hex:focus {
+  outline: none;
+  opacity: 1;
+  border-color: var(--color-btn);
+  background: var(--color-input-bg);
+}
+
+.te-label {
+  font-size: 0.8rem;
+  flex: 1;
+}
+
+.te-label-text {
+  cursor: default;
+  display: inline;
+}
+
+/* Advanced sub-controls */
+.te-adv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0 3px 8px;
+}
+
+.te-adv-label {
+  font-size: 0.78rem;
+  flex: 1;
+  opacity: 0.8;
+}
+
+.te-adv-toggle {
+  flex-shrink: 0;
+}
+
+.te-adv-sub {
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.te-angle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.te-angle-input {
+  width: 52px;
+  text-align: center;
+  font-size: 0.82rem;
+  padding: 3px 5px;
+}
+
+.te-angle-deg {
+  font-size: 0.78rem;
+  opacity: 0.65;
+}
+
+/* Intensity buttons */
+.te-intensity-wrap {
+  display: flex;
+  gap: 3px;
+}
+
+.te-intensity-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.te-intensity-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.te-intensity-btn.te-intensity-active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+/* Footer */
+.te-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   THEME EDITOR — CSS VAR NAME TOOLTIP
+============================================================================= */
+
+.te-var-tooltip {
+  position: fixed;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-family: monospace;
+  font-size: 0.68rem;
+  padding: 3px 7px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 10000;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.te-var-tooltip.visible {
+  opacity: 1;
+}
+
+/* =============================================================================
+   APP LOCK SCREEN
+   Full-window overlay shown before the app is usable. Not a Modal — no Escape,
+   no drag, no close button. Removed on correct credential entry.
+============================================================================= */
+
+#lockScreen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  z-index: 9999; /* above everything including modals */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 3vh, 24px);
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  /* Scales contents down via vh/vw-based clamp()s below so everything stays
+     visible on small windows without raising the app's minimum window size.
+     overflow-y is a last-resort safety net for extreme aspect ratios. */
+  padding: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+#lockScreen.lock-fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lock-icon {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.lock-icon svg {
+  width: clamp(30px, 7vh, 52px);
+  height: clamp(30px, 7vh, 52px);
+}
+
+.lock-title {
+  font-size: clamp(0.9rem, 2.4vh, 1.15rem);
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.lock-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: -16px;
+}
+
+/* Spacer elements — replace fixed inline-style heights so the gaps inside
+   the PIN/password views can scale down on short windows like everything
+   else here, instead of holding their full size and forcing an overflow. */
+.lock-spacer-sm {
+  height: clamp(2px, 1.5vh, 10px);
+  flex-shrink: 0;
+}
+
+.lock-spacer-md {
+  height: clamp(4px, 2vh, 14px);
+  flex-shrink: 0;
+}
+
+/* PIN dot display */
+#lockPinView,
+#lockPasswordView {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#lockPasswordView {
+  gap: clamp(6px, 1.5vh, 12px);
+}
+
+.lock-pin-dots {
+  display: flex;
+  gap: clamp(8px, 1.8vh, 14px);
+}
+
+.lock-dot {
+  width: clamp(10px, 1.8vh, 13px);
+  height: clamp(10px, 1.8vh, 13px);
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lock-dot.filled {
+  background: var(--color-btn);
+  border-color: var(--color-btn);
+}
+
+.lock-dot.error {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* PIN numpad */
+.lock-numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(6px, 1.5vh, 10px);
+  width: min(220px, 80vw);
+}
+
+.lock-numpad-btn {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: 8px;
+  font-size: clamp(0.85rem, 2vh, 1.1rem);
+  font-weight: 500;
+  height: clamp(34px, 6.5vh, 52px);
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition),
+    color var(--hover-transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-numpad-btn:hover {
+  background: var(--color-hover);
+  border-color: var(--color-btn);
+}
+
+.lock-numpad-btn:active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+/* The ⌫ backspace key spans the last column in its row — placed via auto-flow */
+.lock-numpad-btn.lock-backspace {
+  font-size: 1.3rem;
+}
+
+/* Password input variant */
+.lock-password-wrap {
+  position: relative;
+  width: min(260px, 84vw);
+}
+
+.lock-password-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  padding: clamp(6px, 1.4vh, 10px) 40px clamp(6px, 1.4vh, 10px) 14px;
+  outline: none;
+  transition: border-color var(--hover-transition);
+  text-align: center;
+}
+
+.lock-password-input:focus {
+  border-color: var(--color-btn);
+}
+
+.lock-password-input.lock-input-error {
+  border-color: var(--color-danger);
+}
+
+/* Hide the browser's built-in reveal so only our button shows */
+.lock-password-input::-ms-reveal { display: none; }
+.lock-password-input::-webkit-credentials-auto-fill-button { display: none; }
+
+.lock-show-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+.lock-show-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.lock-show-btn svg { width: 18px; height: 18px; }
+
+.lock-submit-btn {
+  width: min(260px, 84vw);
+  padding: clamp(6px, 1.4vh, 10px);
+  border-radius: 8px;
+  border: none;
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--hover-transition);
+}
+
+.lock-submit-btn:hover { background: var(--color-btn-hover); }
+
+/* Exit app button — muted danger style, sits in the numpad grid (PIN) or
+   below Unlock (password). Smaller and less prominent than Unlock. */
+.lock-exit-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.lock-exit-btn:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* Standalone version (password view — full width, fixed height like submit btn) */
+.lock-exit-standalone {
+  width: min(260px, 84vw);
+  padding: clamp(5px, 1.2vh, 8px);
+  font-size: 0.8rem;
+}
+
+.lock-error-msg {
+  font-size: 0.8rem;
+  color: var(--color-danger);
+  height: 1em;
+  text-align: center;
+}
+
+/* =============================================================================
+   SETTINGS — SECURITY SECTION
+============================================================================= */
+
+.lock-credential-type {
+  display: flex;
+  gap: 8px;
+}
+
+.lock-type-btn {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.lock-type-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.lock-type-btn.active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+/* Change/Remove credential link row */
+.lock-cred-actions {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.lock-cred-link {
+  background: transparent;
+  border: none;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: inherit;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+/* "Change" — accent-coloured text, hover gets a hover-bg tint */
+.lock-cred-link.change {
+  color: color-mix(in srgb, var(--color-btn) 80%, white);
+}
+
+.lock-cred-link.change:hover {
+  background: var(--color-hover);
+  color: var(--color-btn);
+}
+
+/* "Remove" — danger-coloured text, hover gets a subtle danger tint */
+.lock-cred-link.danger {
+  color: var(--color-danger);
+}
+
+.lock-cred-link.danger:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+/* Set-credential modal body */
+.set-lock-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.set-lock-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.set-lock-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  padding: 9px 36px 9px 12px;
+  outline: none;
+  transition: border-color var(--hover-transition);
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+/* Suppress browser built-in reveal/autofill buttons that break centering */
+.set-lock-input::-ms-reveal { display: none; }
+.set-lock-input::-webkit-credentials-auto-fill-button { display: none; }
+
+.set-lock-input:focus { border-color: var(--color-btn); }
+.set-lock-input.input-error { border-color: var(--color-danger); }
+
+.set-lock-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.set-lock-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.set-lock-actions button {
+  flex: 1;
+}

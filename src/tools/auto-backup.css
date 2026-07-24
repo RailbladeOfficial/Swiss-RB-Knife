@@ -1,0 +1,952 @@
+/* =============================================================================
+   AUTO-BACKUP  — tool-scoped styles
+   All colours reference CSS custom properties from the active theme.
+   No hardcoded values.
+============================================================================= */
+
+/* =============================================================================
+   LAYOUT — two-column config grid (sources | destinations)
+============================================================================= */
+
+.ab-config-grid {
+  display: grid;
+  /* minmax(0, 1fr), NOT bare 1fr: a bare 1fr's implicit minimum is `auto`,
+     which lets one long unbreakable path push its column — and the whole
+     panel — past the window edge. minmax(0, …) makes the columns actually
+     honor their share of the width. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 860px) {
+  .ab-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =============================================================================
+   PANEL HEADERS  (reused inside each panel)
+============================================================================= */
+
+.ab-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.ab-panel-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+/* =============================================================================
+   INPUT ROW  (text input + add button, used for both sources and destinations)
+============================================================================= */
+
+.ab-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ab-input-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  padding: 5px 8px;
+  margin: 0;
+}
+
+.ab-input-row button {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+/* =============================================================================
+   FOLDER LIST  (scrollable list of added paths)
+============================================================================= */
+
+.ab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  min-height: 40px;
+}
+
+.ab-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  animation: abRowIn 0.15s ease;
+}
+
+@keyframes abRowIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ab-list-path {
+  flex: 1;
+  /* Without min-width: 0, a flex child refuses to shrink below its content
+     width — the ellipsis styling this rule used to carry never actually
+     engaged, and long paths just widened the row off-screen. */
+  min-width: 0;
+  font-size: 0.78rem;
+  font-family: monospace;
+  opacity: 0.85;
+  /* Long paths WRAP to extra lines rather than truncating: for paths the
+     tail (the leaf folder) is the informative part, and it's exactly what
+     an ellipsis would hide. break-all because path segments have no natural
+     break points. */
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: normal;
+}
+
+.ab-list-size {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ab-list-remove {
+  /* Override the global danger-btn defaults to be icon-sized */
+  width: 22px !important;
+  height: 22px !important;
+  padding: 3px !important;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ab-list-remove svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ab-list-empty {
+  font-size: 0.78rem;
+  opacity: 0.4;
+  padding: 8px;
+  font-style: italic;
+}
+
+/* Inline edit input — replaces the path label on double-click */
+.ab-edit-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-family: monospace;
+  padding: 2px 5px;
+  margin: 0;
+  border-radius: 4px;
+}
+
+/* Browse/replace button on each row (the "…" button) */
+.ab-list-browse {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 2px 6px !important;
+  min-width: 24px;
+  height: 22px;
+  line-height: 1;
+}
+
+/* =============================================================================
+   SUMMARY PANEL  (total size, est. time, free space, speed)
+============================================================================= */
+
+.ab-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+/* Sub-group titles inside the Summary panel ("Sources" / "Next Backup…").
+   The second group gets breathing room from the grid above it. */
+.ab-summary-subtitle {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.45;
+  margin-bottom: 8px;
+}
+
+.ab-summary-grid + .ab-summary-subtitle {
+  margin-top: 14px;
+}
+
+/* Inline "scanning…" chip beside the Next Backup subtitle while a
+   robocopy /L estimate pass is running. */
+.ab-summary-status {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  font-style: italic;
+  opacity: 0.8;
+  margin-left: 6px;
+}
+
+/* Second row of the Next Backup group (Estimated Time / Free Space / Speed)
+   sits directly under the first without a repeated subtitle. */
+.ab-summary-grid + .ab-summary-grid {
+  margin-top: 10px;
+}
+
+/* =============================================================================
+   INFO BUTTON + INFO MODAL  (mirrors the Image Resizer's resize-info pattern)
+============================================================================= */
+
+/* Run Estimate button — lives in the Summary panel header */
+.ab-estimate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  padding: 4px 14px;
+}
+
+.ab-estimate-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Small spinner ring for buttons ("⟳ Estimating…" / "⟳ Backing up…") */
+@keyframes ab-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ab-btn-spinner {
+  width: 11px;
+  height: 11px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: ab-spin 0.7s linear infinite;
+}
+
+/* Value + inline ℹ button row (e.g. Dirs to Copy's conditional info button) */
+.ab-value-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Small ℹ button — sized to sit inline with the Copy Speed input row */
+.ab-info-btn {
+  background: var(--color-btn);
+  border: 1px solid var(--color-btn);
+  color: var(--color-btn-text);
+  border-radius: 6px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  font-weight: bold;
+  line-height: 1.4;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ab-info-btn:hover {
+  background: var(--color-btn-hover);
+  border-color: var(--color-btn-text);
+}
+
+.ab-info-modal {
+  width: min(560px, 92vw);
+}
+
+.ab-info-body {
+  text-align: left;
+  gap: 0;
+}
+
+.ab-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+
+.ab-info-heading {
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: var(--color-btn-text);
+  margin: 0;
+}
+
+.ab-info-body p {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.ab-info-body strong {
+  color: var(--color-text);
+}
+
+.ab-info-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0 12px;
+}
+
+.ab-summary-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ab-summary-label {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ab-summary-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-accent-totals);
+}
+
+/* Speed input inline with its label */
+.ab-speed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ab-speed-row input {
+  width: 56px;
+  text-align: center;
+  font-size: 0.9rem;
+  padding: 3px 6px;
+  margin: 0;
+}
+
+.ab-speed-unit {
+  font-size: 0.75rem;
+  opacity: 0.55;
+}
+
+/* =============================================================================
+   ACTION ROW  (Run / Cancel buttons)
+============================================================================= */
+
+.ab-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ab-run-btn {
+  font-size: 0.9rem;
+  padding: 7px 20px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ab-run-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#ab-cancel-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   PROGRESS PANEL
+============================================================================= */
+
+#ab-progress-panel {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ab-progress-current {
+  font-size: 0.8rem;
+  font-family: monospace;
+  opacity: 0.85;
+  word-break: break-all;
+}
+
+/* Progress bar */
+.ab-progress-bar-track {
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ab-progress-bar-fill {
+  height: 100%;
+  background: var(--color-btn);
+  border-radius: 3px;
+  width: 0%;
+  /* No width transition: the bar is driven per-frame by the animation engine
+     in auto-backup.ts, which supplies its own easing. A CSS transition layered
+     on top would add lag and mush to every frame update. */
+}
+
+/* Indeterminate state — shown during the preflight "Calculating…" phase,
+   before the plan (and therefore a meaningful percentage) exists. A short
+   segment sweeps the track, Windows-style. */
+@keyframes ab-bar-sweep {
+  0%   { margin-left: -30%; }
+  100% { margin-left: 100%; }
+}
+
+.ab-progress-bar-fill.ab-bar-indeterminate {
+  width: 30% !important;
+  animation: ab-bar-sweep 1.2s linear infinite;
+}
+
+/* Per-file bar uses a subtler accent so it reads as secondary */
+.ab-file-bar-fill {
+  background: var(--color-accent-entries);
+  opacity: 0.6;
+  transition: width 0.2s ease;
+}
+
+/* Label row above each bar: left label + right value */
+.ab-bar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ab-bar-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.ab-bar-label {
+  font-size: 0.62rem;
+  opacity: 0.45;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ab-bar-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-accent-entries);
+}
+
+/* Stats row */
+.ab-progress-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.ab-stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ab-stat-label {
+  font-size: 0.62rem;
+  opacity: 0.45;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ab-stat-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-accent-entries);
+}
+
+/* Log file reference row — sits below the stats grid */
+.ab-log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ab-log-value {
+  font-size: 0.72rem;
+  font-family: monospace;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =============================================================================
+   TOOL-VIEW HEADER NAV  (Presets button, mirrors image-ccr tab-btn style)
+============================================================================= */
+
+.ab-header-nav {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ab-header-btn {
+  font-size: 0.85rem;
+  padding: 4px 16px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--hover-transition), color var(--hover-transition),
+              border-color var(--hover-transition);
+}
+
+.ab-header-btn:hover {
+  color: var(--color-btn-text);
+  border-color: var(--color-border);
+  background: var(--color-hover);
+}
+
+.ab-header-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+  background: var(--color-hover);
+}
+
+.ab-header-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =============================================================================
+   PROGRESS PANEL — always-visible state
+============================================================================= */
+
+.ab-progress-idle {
+  font-size: 0.8rem;
+  opacity: 0.4;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.ab-clear-btn {
+  font-size: 0.72rem;
+  padding: 2px 10px !important;
+}
+
+.ab-clear-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   PRESETS MODAL
+============================================================================= */
+
+.ab-presets-modal {
+  width: min(800px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ab-presets-body {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  padding: 0;
+  min-height: 0;
+}
+
+/* Sidebar — preset list */
+.ab-presets-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.ab-presets-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+}
+
+.ab-preset-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--hover-transition), color var(--hover-transition);
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.ab-preset-item:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.ab-preset-item.active {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-btn);
+}
+
+.ab-presets-list-empty {
+  font-size: 0.75rem;
+  opacity: 0.4;
+  font-style: italic;
+  padding: 8px 10px;
+}
+
+.ab-preset-new-btn {
+  flex-shrink: 0;
+  margin: 8px;
+  font-size: 0.78rem;
+  padding: 5px 10px;
+}
+
+/* Editor pane */
+.ab-presets-editor {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ab-presets-placeholder {
+  font-size: 0.8rem;
+  opacity: 0.4;
+  font-style: italic;
+  margin: auto;
+  text-align: center;
+}
+
+.ab-presets-form {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ab-presets-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ab-presets-field-label {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ab-presets-name-input {
+  font-size: 0.9rem;
+  padding: 5px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+/* Two-column layout inside editor */
+.ab-presets-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* see .ab-config-grid */
+  gap: 12px;
+}
+
+.ab-presets-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ab-presets-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ab-presets-col-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.ab-presets-add-row {
+  display: flex;
+  gap: 4px;
+}
+
+.ab-presets-add-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  padding: 4px 6px;
+  margin: 0;
+}
+
+.ab-presets-add-row button {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+}
+
+.ab-presets-path-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 150px;
+  overflow-y: auto;
+  min-height: 32px;
+}
+
+.ab-preset-path-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+.ab-preset-path-label {
+  flex: 1;
+  min-width: 0; /* see .ab-list-path */
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: normal;
+  opacity: 0.85;
+}
+
+.ab-preset-path-remove {
+  width: 18px !important;
+  height: 18px !important;
+  padding: 2px !important;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ab-preset-path-remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+.ab-presets-path-empty {
+  font-size: 0.73rem;
+  opacity: 0.35;
+  font-style: italic;
+  padding: 4px 6px;
+}
+
+/* Bottom actions row */
+.ab-presets-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+  margin-top: 4px;
+}
+
+/* =============================================================================
+   LOCKDOWN STATE  (during backup)
+============================================================================= */
+
+/* Disables all buttons inside a list while backup is running */
+.ab-list-locked button {
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+/* Suppress the pointer/text cursor on path labels while list is locked
+   so the double-click-to-edit affordance is visually hidden */
+.ab-list-locked .ab-list-path {
+  cursor: default;
+  user-select: none;
+}
+
+/* Style the input-row Add / Browse buttons as locked when disabled,
+   matching the opacity treatment of per-row buttons under ab-list-locked */
+.ab-input-row button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   CURRENT FILE LINE  (below the folder label in progress panel)
+============================================================================= */
+
+.ab-progress-current-file {
+  font-size: 0.72rem;
+  font-family: monospace;
+  opacity: 0.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+  min-height: 1em; /* hold space even when empty so the layout doesn't jump */
+}
+
+/* =============================================================================
+   FACE SWITCHER  — disclaimer ⇄ tool cross-fade
+   Mirrors the Budget main ⇄ Annual Stats pattern (budget.css): only one face
+   is ever in normal flow, JS fades the outgoing face out, swaps display at
+   the midpoint, then fades the incoming face in.
+============================================================================= */
+
+/* Transparent wrapper — faces behave as direct children of the tool view */
+.ab-flip-card {
+  display: contents;
+}
+
+.ab-face-tool,
+.ab-face-disclaimer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Disclaimer face hidden by default; entry logic flips display as needed */
+.ab-face-disclaimer {
+  display: none;
+}
+
+@keyframes ab-face-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes ab-face-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.ab-face-hiding {
+  animation: ab-face-out 0.4s ease both;
+  pointer-events: none;
+}
+
+.ab-face-showing {
+  animation: ab-face-in 0.4s ease both;
+}
+
+/* =============================================================================
+   DISCLAIMER FACE  — first-entry warning panel
+============================================================================= */
+
+.ab-disclaimer-panel {
+  display: flex;
+  justify-content: center;
+}
+
+.ab-disclaimer-inner {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 4px;
+}
+
+.ab-disclaimer-title {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent-totals);
+}
+
+.ab-disclaimer-inner p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  opacity: 0.85;
+}
+
+/* Checkbox row — sits above the action buttons, aligned with Continue (right) */
+.ab-disclaimer-skip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  font-size: 0.78rem;
+  opacity: 0.7;
+  cursor: pointer;
+  user-select: none;
+  margin-top: 4px;
+}
+
+.ab-disclaimer-skip input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.ab-disclaimer-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ab-disclaimer-actions button {
+  font-size: 0.85rem;
+  padding: 6px 18px;
+}
+
+/* =============================================================================
+   RUN CONFIRMATION MODAL
+============================================================================= */
+
+.ab-run-confirm-modal {
+  width: min(480px, 92vw);
+}
+
+.ab-run-confirm-modal .exit-modal-actions {
+  flex-wrap: wrap;
+}

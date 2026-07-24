@@ -1,0 +1,17 @@
+# Normalize line endings so contributors on macOS/Linux don't fight your CRLF
+# files (git stores LF, checks out native). Set once, before the first commit,
+# so it never triggers a repo-wide "everything changed" diff later.
+* text=auto
+
+# Keep these binary so git never mangles them with line-ending conversion.
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.flac binary

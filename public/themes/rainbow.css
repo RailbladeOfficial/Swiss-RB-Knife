@@ -1,0 +1,278 @@
+:root {
+  --color-bg:                  #ffffff;
+  --color-panel:               #fafafa;
+  --color-input-bg:            #f0f0f0;
+  --color-border:              #dddddd;
+  --color-border-dashed:       #ff4444;
+  --color-text:                #111111;
+  --color-text-muted:          #555555;
+  --color-hover:               #e0e0e0;
+
+  --color-btn:                 #6600cc;
+  --color-btn-hover:           #5500aa;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #cc0000;
+  --color-danger-subtle:       rgba(204, 0, 0, 0.1);
+
+  --color-accent-input:        #ff2200;
+  --color-accent-view:         #00bb00;
+  --color-accent-totals:       #ffaa00;
+  --color-accent-entries:      #6600cc;
+
+  --color-toggle-off:          #cccccc;
+  --color-toggle-on:           #0055ff;
+
+  --color-toast-success-bg:    #e6ffe6;
+  --color-toast-success-border:#00aa00;
+  --color-toast-success-text:  #003300;
+  --color-toast-error-bg:      #ffe6e6;
+  --color-toast-error-border:  #cc0000;
+  --color-toast-error-text:    #440000;
+  /* ── Budget chart palette ── Red / orange / yellow / green / blue / purple / pink / teal — full spectrum on white */
+  --color-chart-1:             #ff2200;
+  --color-chart-2:             #ff8800;
+  --color-chart-3:             #ddcc00;
+  --color-chart-4:             #00bb00;
+  --color-chart-5:             #0055ff;
+  --color-chart-6:             #6600cc;
+  --color-chart-7:             #dd00aa;
+  --color-chart-8:             #009999;
+}
+
+/* ── Rainbow body background ── */
+body {
+  background: linear-gradient(
+    180deg,
+    #ffcccc 0%,
+    #ffd9aa 16%,
+    #ffffaa 33%,
+    #ccffcc 50%,
+    #aaccff 66%,
+    #ddaaff 83%,
+    #ffaaff 100%
+  ) !important;
+  background-attachment: fixed !important;
+}
+
+/* ── Time Tracker panels ── */
+.input-panel {
+  background: #ffe0e0 !important;
+  border-color: #ff4444 !important;
+  border-left: 4px solid #ff2200 !important;
+}
+.controls-panel {
+  background: #fffacc !important;
+  border-color: #ddcc00 !important;
+  border-left: 4px solid #00bb00 !important;
+}
+.totals-panel {
+  background: #e0ffe0 !important;
+  border-color: #44cc44 !important;
+  border-left: 4px solid #ffaa00 !important;
+}
+.entries-panel {
+  background: #eeddff !important;
+  border-color: #aa55ff !important;
+  border-left: 4px solid #6600cc !important;
+}
+
+/* ── Tool / section header — full ROYGBV gradient ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(
+    90deg,
+    #ffcccc 0%,
+    #ffd9aa 25%,
+    #ffffcc 50%,
+    #ccffcc 75%,
+    #ccddff 100%
+  ) !important;
+  border-bottom: 2px solid #cc88ff !important;
+  box-shadow: 0 1px 6px rgba(100, 0, 200, 0.15) !important;
+}
+.tool-view-title,
+.section-title {
+  color: #6600cc !important;
+  opacity: 1 !important;
+}
+
+/* ── Panel base ── */
+.panel {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ── Modal — translucent: rainbow pastel frosted glass (original look) ── */
+body:not(.solid-modals) .modal {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 224, 224, 0.55) 0%,
+    rgba(255, 245, 204, 0.55) 25%,
+    rgba(224, 255, 224, 0.55) 50%,
+    rgba(224, 238, 255, 0.55) 75%,
+    rgba(240, 221, 255, 0.55) 100%
+  ) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-color: #cc88ff !important;
+  box-shadow: 0 24px 48px rgba(100, 0, 200, 0.3) !important;
+}
+
+/* ── Modal — solid: clean white card with rainbow border ── */
+body.solid-modals .modal {
+  background: #ffffff !important;
+  border-color: #cc88ff !important;
+  box-shadow: 0 24px 48px rgba(100, 0, 200, 0.2) !important;
+}
+
+/* ── Settings modal specifics ── */
+.settings-label { color: #6600cc !important; opacity: 1 !important; }
+#settingsReset  { color: #cc0000 !important; border-color: #cc0000 !important; }
+#themeSelect, #fontScaleValue {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-color: #cc88ff !important;
+}
+
+/* ── Buttons ── */
+button {
+  border: 1px solid rgba(102, 0, 204, 0.3) !important;
+}
+button:hover {
+  border-color: #6600cc !important;
+  box-shadow: 0 0 0 2px rgba(102, 0, 204, 0.15) !important;
+}
+
+/* ── Primary button ── */
+.primary-btn {
+  background: #6600cc !important;
+  border-color: #6600cc !important;
+  color: #ffffff !important;
+}
+.primary-btn:hover {
+  background: #5500aa !important;
+  border-color: #5500aa !important;
+  box-shadow: 0 0 0 3px rgba(102, 0, 204, 0.2) !important;
+  color: #ffffff !important;
+}
+
+/* ── Inputs ── */
+input { background: rgba(255, 255, 255, 0.8) !important; border-color: #ccaaff !important; }
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  background: #f0e8ff !important;
+  border-color: #cc88ff !important;
+  border-left: 3px solid #6600cc !important;
+}
+#media-tool-image-ccr .result-panel {
+  background: #e8fff0 !important;
+  border-color: #88cc88 !important;
+  border-left: 3px solid #00bb00 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: #cc88ff !important; }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: #555555 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.tab-btn:hover {
+  color: #6600cc !important;
+  border-color: rgba(102, 0, 204, 0.4) !important;
+  background: rgba(102, 0, 204, 0.07) !important;
+  box-shadow: none !important;
+}
+.tab-btn.active {
+  color: #6600cc !important;
+  border-color: #6600cc !important;
+  background: rgba(102, 0, 204, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #f0f0f0 !important;
+  color: #555555 !important;
+  border-color: #dddddd !important;
+  box-shadow: none !important;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: #6600cc !important;
+  border-color: #cc88ff !important;
+  background: rgba(102, 0, 204, 0.07) !important;
+  box-shadow: none !important;
+}
+.dir-btn.active, .prv-btn.active {
+  color: #6600cc !important;
+  border-color: #6600cc !important;
+  background: rgba(102, 0, 204, 0.12) !important;
+  box-shadow: none !important;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge { background: #6600cc !important; color: #ffffff !important; }
+
+/* ── Preview cards ── */
+.preview-card:hover     { border-color: #cc88ff !important; }
+.preview-card.anchor-card { border-color: #6600cc !important; box-shadow: 0 0 8px rgba(102, 0, 204, 0.2) !important; }
+.preview-card.drag-target  { border-color: #00bb00 !important; }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: #6600cc !important;
+  border-color: #ffffff !important;
+}
+.img-slider::-webkit-slider-thumb:hover { background: #ff2200 !important; }
+.slider-val   { color: #6600cc !important; }
+.estimate-val { color: #6600cc !important; }
+.size-estimate { background: rgba(255,255,255,0.7) !important; border-color: #ccaaff !important; }
+.result-preview-wrap { border-color: #cc88ff !important; }
+
+
+/* ── Budget Tracker ── */
+
+.finance-tool-budget .panel-accent-input  { background: #fff0ee; box-shadow: 0 1px 4px rgba(255, 34, 0, 0.08), inset 3px 0 0 #ff2200 !important; }
+.finance-tool-budget .panel-accent-view   { background: #f0fff0; box-shadow: 0 1px 4px rgba(0, 187, 0, 0.08), inset 3px 0 0 #00bb00 !important; }
+.finance-tool-budget .panel-accent-totals { background: #fffbee; box-shadow: 0 1px 4px rgba(221, 204, 0, 0.08), inset 3px 0 0 #ddcc00 !important; }
+.finance-tool-budget .panel-accent-entries{ background: #f5eeff; box-shadow: 0 1px 4px rgba(102, 0, 204, 0.08), inset 3px 0 0 #6600cc !important; }
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #6600cc;
+  background: linear-gradient(90deg, #f5eeff, #fafafa);
+}
+.budget-annual-stats-title { color: #6600cc; }
+
+.budget-summary-tab.active { color: #6600cc; border-bottom-color: #6600cc; }
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #00bb00; border-color: #00bb00; }
+.budget-stats-count-late    { color: #cc8800; border-color: #cc8800; }
+.budget-stats-count-overdue { color: #cc0000; border-color: #cc0000; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(102, 0, 204, 0.3);
+  color: #555555;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(102, 0, 204, 0.07);
+  border-color: #6600cc;
+  color: #6600cc;
+}
+
+.budget-view-mode-btn.active {
+  background: #6600cc !important;
+  color: #ffffff !important;
+  border-color: #6600cc !important;
+}
+.budget-stats-section-heading { opacity: 0.55; color: #111111; }

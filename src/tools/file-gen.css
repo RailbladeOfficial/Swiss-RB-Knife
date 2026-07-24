@@ -1,0 +1,484 @@
+/* =============================================================================
+   DUMMY FILE GENERATOR  (file-gen.css)
+   All color references use var(--color-*) from the active theme.
+============================================================================= */
+
+/* ── Container ─────────────────────────────────────────────────────────────── */
+
+.dfg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Header reset button ───────────────────────────────────────────────────── */
+
+.dfg-header-reset {
+  margin-left: auto;
+  font-size: 0.75rem;
+}
+
+/* ── Options row: Output Dir + Organize ─────────────────────────────────────── */
+
+.dfg-options-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 20px;
+  align-items: start;  /* both columns start at the top so labels align */
+}
+
+@media (max-width: 580px) {
+  .dfg-options-row { grid-template-columns: 1fr; gap: 12px; }
+}
+
+.dfg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dfg-field--output {
+  min-width: 0;
+}
+
+.dfg-field--organize {
+  flex-shrink: 0;
+}
+
+.dfg-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dfg-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.dfg-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Subheader below "Organize" showing active mode */
+.dfg-organize-sublabel {
+  font-size: 0.75rem;
+  opacity: 0.55;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+/* ── Shared segmented-button group (naming + organize) ──────────────────────── */
+
+.dfg-naming-group,
+.dfg-organize-group {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.dfg-naming-btn,
+.dfg-organize-btn {
+  background: var(--color-input-bg);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 0 10px;
+  min-height: 28px;
+  font-size: 0.75rem;
+  font-family: monospace;
+  cursor: pointer;
+  border-radius: 0;
+  transition: background var(--hover-transition), color var(--hover-transition),
+              border-color var(--hover-transition);
+  white-space: nowrap;
+}
+
+.dfg-naming-btn:first-child,
+.dfg-organize-btn:first-child { border-radius: 6px 0 0 6px; }
+
+.dfg-naming-btn:last-child,
+.dfg-organize-btn:last-child  { border-radius: 0 6px 6px 0; }
+
+/* Merge borders between adjacent buttons */
+.dfg-naming-btn + .dfg-naming-btn,
+.dfg-organize-btn + .dfg-organize-btn { border-left: none; }
+
+.dfg-naming-btn:hover,
+.dfg-organize-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  z-index: 1;
+}
+
+.dfg-naming-btn.active,
+.dfg-organize-btn.active {
+  background: var(--color-btn);
+  border-color: var(--color-btn);
+  color: var(--color-btn-text, #fff);
+  z-index: 2;
+}
+
+/* ── Batch entry panel ─────────────────────────────────────────────────────── */
+
+.dfg-batch-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dfg-batch-top-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dfg-add-btn {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.dfg-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Batch entry card ──────────────────────────────────────────────────────── */
+/*
+   Each entry is a small card with:
+     Row A:  [Count input]  [123|abc|0xF naming toggle]  [✕]
+     Row B:  [Prefix]  [Extension]  [Suffix]
+
+   This two-row card approach is narrow-window–safe: Row A uses fixed/auto
+   widths; Row B is a simple equal-thirds flex row.
+*/
+
+.dfg-entry-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Row A: count + naming mode + remove */
+.dfg-entry-row-a {
+  display: grid;
+  grid-template-columns: 80px 1fr 28px;
+  gap: 0;
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dfg-entry-row-a .dfg-batch-count {
+  border: none;
+  border-right: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-input-bg);
+  text-align: right;
+  padding: 6px 8px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.dfg-batch-count::-webkit-inner-spin-button,
+.dfg-batch-count::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Naming group sits in the middle of Row A */
+.dfg-entry-row-a .dfg-naming-group {
+  display: flex;
+  align-items: stretch;
+}
+
+.dfg-entry-row-a .dfg-naming-btn {
+  flex: 1;
+  border: none;
+  border-right: 1px solid var(--color-border);
+  border-radius: 0;
+  min-height: unset;
+}
+
+.dfg-entry-row-a .dfg-naming-btn:last-child {
+  border-right: none;
+}
+
+.dfg-entry-row-a .dfg-naming-btn.active {
+  border-color: transparent;
+}
+
+/* Remove button — right edge of Row A */
+.dfg-entry-row-a .dfg-batch-remove {
+  border: none;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  width: 28px;
+  height: 100%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.dfg-entry-row-a .dfg-batch-remove:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.dfg-entry-row-a .dfg-batch-remove:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.dfg-entry-row-a .dfg-batch-remove:disabled:hover {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+/* Row B: prefix | extension | suffix — equal thirds, labelled */
+.dfg-entry-row-b {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+}
+
+.dfg-entry-field {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Dividers between Row B cells */
+.dfg-entry-field + .dfg-entry-field {
+  border-left: 1px solid var(--color-border);
+}
+
+.dfg-entry-field-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  opacity: 0.45;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 8px 0;
+}
+
+.dfg-entry-field input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 3px 8px 6px;
+  font-size: 0.88rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dfg-entry-field input:focus {
+  outline: none;
+  background: var(--color-hover);
+}
+
+/* ── Extension field row (input + picker button) ────────────────────────────── */
+
+/* Wrapper inside the Extension dfg-entry-field — input + ⊞ button side by side */
+.dfg-ext-field-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+/* The input inside the field row needs to match height & flush border */
+.dfg-entry-field .dfg-ext-field-row input {
+  flex: 1;
+  min-width: 0;
+  border-right: 1px solid var(--color-border) !important;
+}
+
+.dfg-ext-picker-btn {
+  border: none !important;
+  border-left: none !important;
+  border-radius: 0 !important;
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 3px 8px 6px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.dfg-ext-picker-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* ── Ext-picker modal overrides ─────────────────────────────────────────────── */
+
+.dfg-ext-modal {
+  width: 640px;
+  max-width: 90vw;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dfg-ext-modal-body {
+  text-align: left;
+  gap: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Extension quick-pick — two-column layout (used inside modal) ───────────── */
+
+.dfg-ext-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dfg-ext-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 20px;
+}
+
+@media (max-width: 560px) {
+  .dfg-ext-columns { grid-template-columns: 1fr; }
+}
+
+.dfg-ext-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dfg-ext-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+.dfg-ext-group-label {
+  font-size: 0.65rem;
+  opacity: 0.45;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  width: 100%;
+  margin-bottom: 1px;
+}
+
+.dfg-ext-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-family: monospace;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--hover-transition), color var(--hover-transition),
+              border-color var(--hover-transition);
+}
+
+.dfg-ext-pill:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-btn);
+}
+
+.dfg-ext-pill.active {
+  background: var(--color-btn);
+  border-color: var(--color-btn);
+  color: var(--color-btn-text, #fff);
+}
+
+/* ── Actions ───────────────────────────────────────────────────────────────── */
+
+.dfg-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dfg-generate-btn {
+  flex: 1;
+}
+
+/* ── Results list ──────────────────────────────────────────────────────────── */
+
+.dfg-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dfg-result-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-input-bg);
+  font-size: 0.82rem;
+}
+
+.dfg-result-card--success { border-color: var(--color-success, #4caf50); }
+.dfg-result-card--error   { border-color: var(--color-danger); }
+
+.dfg-result-card .dfg-status-icon {
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.dfg-result-card--success .dfg-status-icon { color: var(--color-success, #4caf50); }
+.dfg-result-card--error   .dfg-status-icon { color: var(--color-danger); }
+
+.dfg-result-card .dfg-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dfg-result-card .dfg-status-title  { font-weight: 600; }
+
+.dfg-result-card .dfg-status-detail,
+.dfg-result-card .dfg-status-folder {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dfg-result-card .dfg-status-detail {
+  font-size: 0.72rem;
+  opacity: 0.6;
+}
+
+.dfg-result-card .dfg-status-folder {
+  font-size: 0.68rem;
+  opacity: 0.45;
+  font-family: monospace;
+}
+
+.dfg-status-clear-btn {
+  margin-left: auto;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}

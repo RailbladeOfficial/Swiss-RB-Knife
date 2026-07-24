@@ -1,0 +1,1447 @@
+/* =============================================================================
+   BUDGET TRACKER — COMPONENT STYLES
+   Shell-level styles (panels, inputs, buttons, modals) live in shell.css.
+   Ledger row primitives (.entry-row, .entry-date-subheader, .entry-field,
+   .entry-delete-btn) and toggle buttons (.preset-btn) are reused from
+   time-tracker.css, which is always loaded — keeps the budget ledger visually
+   consistent with the Time Tracker entries list without duplicating those
+   rules.
+============================================================================= */
+
+/* Pay / Edit Payment modal — read-only bill details block (item 8) */
+.budget-bill-action-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.budget-bill-action-detail {
+  display: flex;
+  gap: 8px;
+}
+
+.budget-bill-action-detail-label {
+  opacity: 0.6;
+  flex-shrink: 0;
+  width: 6rem;
+}
+
+
+
+/* =============================================================================
+   HEADER ACTIONS GROUP
+   Two-button group (View Annual Stats + Setup) sitting at the right of the
+   tool header without a gap between them — same visual weight as a single
+   button, but two discrete actions.
+============================================================================= */
+
+.budget-header-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto; /* push to right, matching single .tool-view-header-action behaviour */
+}
+
+/* =============================================================================
+   SUMMARY PANEL TABS  (Overview / Expense by Category / Expense by Source)
+============================================================================= */
+
+.budget-totals-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 !important; /* tabs bleed to edges; body gets its own padding */
+}
+
+.budget-summary-tabs {
+  display: flex;
+  width: 100%;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.budget-summary-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 7px 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  transition: color var(--hover-transition), border-color var(--hover-transition);
+  margin-bottom: -1px;
+}
+
+.budget-summary-tab:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+.budget-summary-tab.active {
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+  background: transparent;
+}
+
+.budget-summary-pane {
+  padding: 10px 12px;
+}
+
+/* Expectations & Thresholds tab */
+.budget-expect-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.budget-expect-row-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+
+/* Grid layout: fixed-width amount column | bar fills the rest.
+   All rows share the same column widths so bars are vertically aligned. */
+.budget-expect-row-stats {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.budget-expect-row-amount {
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.75;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.budget-expect-bar-track {
+  position: relative;
+  height: 1.4rem;
+  border-radius: 4px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.budget-expect-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.budget-expect-bar-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Category / Source panes: table on left, chart on right.
+   TUNING: change the two flex values below to adjust the split.
+   Current: 7 + 3 = 70% table / 30% chart.
+   Examples: "flex: 3" + "flex: 2" = 60/40,  "flex: 4" + "flex: 1" = 80/20 */
+.budget-summary-body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.budget-summary-body .budget-totals-grid {
+  flex: 7; /* ← TUNING: table portion */
+  min-width: 0;
+}
+
+/* Chart column */
+.budget-summary-chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  flex: 3; /* ← TUNING: chart portion */
+  min-width: 0;
+  /* Prevent the chart from ever causing horizontal scroll */
+  max-width: clamp(80px, 30%, 260px);
+}
+
+.budget-summary-chart {
+  display: block;
+  /* Width and height are set explicitly by JS measuring the column container.
+     Do NOT set width:100% or aspect-ratio on canvas — they don't give canvas
+     a concrete clientWidth to measure, so JS sizing fails. */
+}
+
+/* Button row above chart: cycle button + expand button side-by-side */
+.budget-chart-btn-row {
+  display: flex;
+  gap: 4px;
+}
+
+.budget-chart-cycle-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.budget-chart-cycle-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.budget-chart-expand-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.budget-chart-expand-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* Hover tooltip */
+.budget-chart-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: var(--color-text);
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Chart expand modal */
+.budget-chart-expand-modal {
+  width: min(640px, 96vw);
+  max-width: 96vw;
+}
+
+/* Bar/Pie toggle button in the modal header top-left */
+.budget-chart-modal-cycle-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: 4px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.budget-chart-modal-cycle-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.budget-chart-expand-body {
+  text-align: left;
+  gap: 10px;
+}
+
+.budget-chart-expand-subtitle {
+  font-size: 0.82rem;
+  opacity: 0.6;
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+.budget-chart-expand-canvas {
+  display: block;
+  /* Width and height set explicitly by JS after modal transition completes */
+}
+
+/* 4-column summary rows: label | charges | avg | total */
+.budget-summary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 4px;
+  font-size: 0.9rem;
+  padding: 2px 0;
+  align-items: baseline;
+}
+
+.budget-summary-row-header {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.5;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 2px;
+}
+
+.budget-summary-row-total {
+  font-size: 1rem;
+  font-weight: bold;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+.budget-summary-col-label {
+  opacity: 0.85;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-summary-col-num {
+  text-align: right;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.budget-summary-col-total {
+  font-weight: 600;
+}
+
+/* Eye-off icon shown next to categories / sources excluded from charts */
+.budget-summary-excluded-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  opacity: 0.45;
+  vertical-align: middle;
+  cursor: default;
+  color: var(--color-btn);
+}
+
+
+/* =============================================================================
+   FACE SWITCHER  — cross-fade transition
+   Only one face is ever in normal flow at a time, so height is always exact
+   with zero leftover gap. JS fades the outgoing face out, swaps which face is
+   visible at the midpoint, then fades the incoming face in.
+
+   .budget-flip-front / .budget-flip-back are plain block containers.
+   JS drives the swap via the .budget-face-hiding / .budget-face-showing classes.
+============================================================================= */
+
+/* Transparent wrapper — faces behave as direct children of the container */
+.budget-flip-card {
+  display: contents;
+}
+
+.budget-flip-front,
+.budget-flip-back {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Back face hidden by default; JS flips display at the midpoint of the fade */
+.budget-flip-back {
+  display: none;
+}
+
+/* Fade-out keyframe: outgoing face */
+@keyframes budget-face-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Fade-in keyframe: incoming face */
+@keyframes budget-face-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.budget-face-hiding {
+  animation: budget-face-out 0.4s ease both;
+  pointer-events: none;
+}
+
+.budget-face-showing {
+  animation: budget-face-in 0.4s ease both;
+}
+
+/* Greyed-out view mode buttons in Annual Stats mode */
+.budget-view-mode-btn.budget-view-mode-btn-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+
+
+/* =============================================================================
+   ANNUAL STATS PAGE
+   Each section is a .panel card (same as main tool panels), with the title
+   at the top as its own panel. The .budget-flip-back wrapper just stacks
+   them.
+============================================================================= */
+
+.budget-annual-stats-title-panel {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.budget-annual-stats-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.budget-stats-section-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin-bottom: 10px;
+}
+
+/* Indented sub-rows (e.g. "  • Fixed Recurring") in the Glance section */
+.budget-total-row.budget-total-row-indent .budget-total-label {
+  padding-left: 1.2em;
+  font-size: 0.88rem;
+  opacity: 0.7;
+}
+
+/* Bill payment count badges */
+.budget-stats-counts {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.budget-stats-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+}
+
+.budget-stats-count-good    { color: #00cc44; border-color: #00cc44; }
+.budget-stats-count-late    { color: #cc9900; border-color: #cc9900; }
+.budget-stats-count-overdue { color: #cc2200; border-color: #cc2200; }
+
+/* Stats tables */
+.budget-stats-table-wrap {
+  overflow-x: auto;
+}
+
+.budget-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.budget-stats-table th,
+.budget-stats-table td {
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.budget-stats-table th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+
+.budget-stats-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.budget-stats-table td.num,
+.budget-stats-table th.num {
+  text-align: right;
+}
+
+.budget-stats-table td.pos { color: #00cc44; }
+.budget-stats-table td.neg { color: #cc2200; }
+
+.budget-stats-table tr.stats-total-row td {
+  font-weight: 700;
+  border-top: 1px solid var(--color-border);
+  border-bottom: none;
+}
+
+.budget-stats-table tr.stats-avg-row td {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  border-bottom: none;
+}
+
+/* Month-by-month table needs a bit more room */
+.budget-stats-table-month th,
+.budget-stats-table-month td {
+  padding: 5px 6px;
+  font-size: 0.79rem;
+}
+
+
+
+.budget-view-mode-panel {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.budget-view-mode-label {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.budget-view-mode-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 3px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.budget-view-mode-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.budget-view-mode-btn.active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+/* =============================================================================
+   RANGE NAV PANEL  (Snap to: [button]  ‹  June 2026  ›)
+============================================================================= */
+
+.budget-range-nav {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: flex-start;
+  position: relative; /* anchor for the absolutely-centered nav group */
+  gap: 0;
+}
+
+/* Left zone: "Snap to:" label + snap button — left aligned */
+.budget-range-nav-snap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  z-index: 1; /* stays above the centered group's hit area */
+}
+
+.budget-range-snap-label {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.budget-snap-btn {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* Center zone: absolutely centered so the snap zone never pushes it */
+.budget-range-nav-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.budget-range-arrow {
+  padding: 4px 10px;
+}
+
+.budget-month-nav-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 4px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background var(--hover-transition), color var(--hover-transition);
+  flex-shrink: 0;
+}
+
+.budget-month-nav-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* Fixed width so the label never shifts regardless of value length.
+   "December 2026" and "Week 52, 2026" are the widest cases. */
+.budget-month-label {
+  font-size: 1.05rem;
+  font-weight: bold;
+  width: 13rem;
+  text-align: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* Inline edit input — shown in place of the label */
+.budget-month-input {
+  width: 13rem;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+/* Budget settings tab — reuse settings-row style from shell.css */
+.budget-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Toggle inside a form field (Autopay, Cleared) */
+.budget-setup-field-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.budget-setup-toggle {
+  gap: 6px;
+}
+
+/* Align baseline of two-column rows that mix a toggle and an input */
+.budget-setup-row-baseline {
+  align-items: flex-start;
+}
+
+
+
+/* Type toggle row — "Add Entry:" label left, Income / Expense buttons right.
+   No &nbsp; hacks: gap handles spacing between label and buttons. */
+.budget-type-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.budget-type-toggle-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* Type toggle (Income / Fluctuating Expense) — own class so the Time Tracker's
+   global document.querySelectorAll(".preset-btn") doesn't pick these up and
+   clobber their active state when TT syncs its own preset selection. */
+.budget-type-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.budget-type-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.budget-type-btn.active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+
+
+.budget-entry-fields {
+  margin: 0;
+}
+
+.budget-field-grow {
+  flex: 1;
+  min-width: 140px;
+}
+
+.budget-field-amount {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   TOTALS
+============================================================================= */
+
+.budget-totals-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.budget-total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+}
+
+.budget-total-row.budget-total-net {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+.budget-total-label {
+  opacity: 0.8;
+}
+
+.budget-total-value {
+  font-weight: 600;
+}
+
+/* =============================================================================
+   RECURRING BILLS
+============================================================================= */
+
+.budget-bills-panel #budgetBills {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.budget-overdue-badge {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.budget-bill-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--hover-transition);
+}
+
+/* When the Cleared column is hidden via settings, redistribute across 5 */
+.budget-bill-row.budget-bill-row-no-cleared {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.budget-bill-row:hover {
+  background: var(--color-hover);
+}
+
+.budget-bill-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Date columns — always equal-width grid cells; pending rows show "—" */
+.budget-bill-date-col {
+  min-width: 0;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.budget-bill-date-label {
+  display: block;
+  font-size: 0.65rem;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 1px;
+}
+
+.budget-bill-amount {
+  min-width: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.budget-bill-status {
+  min-width: 0;
+  width: fit-content;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+}
+
+.budget-bill-row.budget-bill-paid-ontime {
+  border-left: 3px solid #00FF00;
+  opacity: 0.65;
+}
+
+.budget-bill-row.budget-bill-pending {
+  border-left: 3px solid #0000FF;
+}
+
+.budget-bill-row.budget-bill-paid-late {
+  border-left: 3px solid #FFFF00;
+  opacity: 0.65;
+}
+
+.budget-bill-row.budget-bill-overdue {
+  border-left: 3px solid #FF0000;
+  border-color: #FF0000;
+}
+
+.budget-bill-row.budget-bill-overdue .budget-bill-status {
+  color: #FF0000;
+  border-color: #FF0000;
+}
+
+/* =============================================================================
+   LEDGER ENTRIES — income vs. expense accent
+============================================================================= */
+
+/* Ledger row accent — exact colors, not theme variables, so they have
+   unambiguous meaning regardless of the active theme.
+   Green (#00FF00) = money coming in or expense credit (positive net effect).
+   Red  (#FF0000) = money going out or income deficit (negative net effect). */
+.budget-row-income-positive {
+  border-left: 3px solid #00FF00;
+}
+
+.budget-row-income-negative {
+  border-left: 3px solid #FF0000;
+}
+
+.budget-row-expense-positive {
+  border-left: 3px solid #FF0000;
+}
+
+.budget-row-expense-negative {
+  border-left: 3px solid #00FF00;
+}
+
+/* Bill entries in the ledger are always outgoing money — always red */
+.budget-row-bill {
+  border-left: 3px solid #FF0000;
+}
+
+/* Ledger rows — 5 equidistant grid columns (Category, Source, Amount, Notes,
+   Buttons), scoped to #budgetEntries so the shared .entry-row flex layout
+   used elsewhere in the shell is untouched. */
+#budgetEntries .entry-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+}
+
+.entry-col-category {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Income rows have no category — shown as a non-editable placeholder dash. */
+span.entry-col-category:not(.entry-field) {
+  opacity: 0.4;
+}
+
+/* Column 2 — income source name, or expense description/source text. */
+.entry-col-name {
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.entry-col-amount {
+  min-width: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.entry-col-notes {
+  min-width: 0;
+  opacity: 0.7;
+  font-size: 0.85rem;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Column 5 — action buttons (cal/delete), or an empty spacer for read-only
+   bill-payment rows so every row still occupies all five grid cells. */
+.entry-col-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* =============================================================================
+   SETUP MODAL — shared chrome
+   Visually mirrors .te-tabs/.te-tab/.te-tab-pane (theme editor) but under new
+   class names — the theme editor wires its tab-switching with an unscoped
+   document.querySelectorAll(".te-tab"), which would otherwise pick these up
+   and fight over .active state.
+============================================================================= */
+
+.budget-setup-modal {
+  width: 640px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.budget-bill-edit-modal {
+  width: 480px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bill Pay / Edit Payment modal */
+#budgetBillActionModal {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.budget-setup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.budget-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.budget-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color var(--hover-transition), border-color var(--hover-transition);
+  margin-bottom: -1px;
+}
+
+.budget-tab:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+.budget-tab.active {
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+  background: transparent;
+}
+
+.budget-tab-pane {
+  min-height: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* =============================================================================
+   SIMPLE LISTS — Categories / Income Sources / Descriptions
+============================================================================= */
+
+.budget-setup-add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.budget-setup-add-row input {
+  flex: 1;
+}
+
+.budget-setup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.budget-setup-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.budget-setup-item.budget-setup-item-retired {
+  opacity: 0.7;
+}
+
+.budget-setup-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-setup-status-btn {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.budget-setup-status-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* Delete icon — only ever shown for already-retired items (simple lists and
+   recurring bills alike), so its mere presence signals "this is permanent". */
+.budget-setup-delete-btn {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background var(--hover-transition);
+}
+
+.budget-setup-delete-btn:hover {
+  background: var(--color-danger-subtle);
+}
+
+/* =============================================================================
+   RECURRING BILLS — clickable list rows
+   Each row opens the Bill Editor modal (item 12) instead of expanding inline.
+============================================================================= */
+
+.budget-setup-new-btn {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.budget-setup-bill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.budget-setup-bill-item {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: background var(--hover-transition);
+}
+
+.budget-setup-bill-item:hover {
+  background: var(--color-hover);
+}
+
+.budget-setup-bill-item.budget-setup-item-retired {
+  opacity: 0.7;
+}
+
+.budget-setup-bill-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.budget-setup-bill-summary-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-setup-bill-summary-meta {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  opacity: 0.5;
+}
+
+.budget-setup-bill-summary-amount {
+  flex-shrink: 0;
+  width: 4.5rem;
+  text-align: right;
+}
+
+/* "Every [N] [unit]" recurrence row inside the bill editor */
+.budget-setup-recurrence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.budget-setup-recurrence span {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.budget-setup-recurrence-interval {
+  width: 52px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* Override .budget-setup-field input { width:100% } which would otherwise
+   force the interval input to full width. The extra .budget-setup-recurrence
+   ancestor raises specificity above the generic field rule. */
+.budget-setup-recurrence .budget-setup-recurrence-interval {
+  width: 52px !important;
+}
+
+/* The unit select must flex-grow so it fills the remaining space and shows
+   the selected value as text (not just a collapsed dropdown arrow). */
+.budget-setup-recurrence select {
+  flex: 1;
+  min-width: 80px;
+  box-sizing: border-box;
+}
+
+/* Same override for the select inside the recurrence row */
+.budget-setup-recurrence select {
+  width: auto;
+}
+
+.budget-setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.budget-setup-row {
+  display: flex;
+  gap: 16px;
+}
+
+.budget-setup-row .budget-setup-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.budget-setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.budget-setup-field label {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.budget-setup-field input:not(.budget-setup-recurrence-interval),
+.budget-setup-field select:not(.budget-setup-recurrence select) {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.budget-setup-field-checkbox {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding-top: 18px;
+}
+
+.budget-setup-field-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  opacity: 1;
+}
+
+.budget-setup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* =============================================================================
+   BUDGET AUTH GATE
+   -----------------------------------------------------------------------------
+   Just another internal view of the Budget tool — a flex sibling of
+   #budgetToolContent inside #finance-tool-budget. It lives and dies entirely
+   with the tool's own visibility, exactly like every other tool-internal
+   panel (Setup, bill editor, etc). No positioning tricks, no coupling to
+   shell.ts: when shell.ts shows/hides #finance-tool-budget, this comes along
+   for free as a normal child element.
+
+   #finance-tool-budget is display:flex; flex-direction:column (set inline by
+   shell.ts). This gate takes flex:1 to fill all available space within the
+   tool view and centers its own content within that space.
+
+   Reuses all lock-* classes from shell.css for identical visual appearance
+   to the App Lock screen. #budgetAuthView mirrors #lockPasswordView
+   (gap:12px inner items); the gate itself uses gap:24px between icon/title/view.
+============================================================================= */
+
+#budgetAuthGate {
+  flex: 1;
+  /* flex:1 only fills real space if every ancestor up to a height-bearing
+     element resolves a definite height. That chain isn't guaranteed here
+     (#mainContent/.content-section can collapse to content height), so
+     flex:1 alone was leaving this at its natural (collapsed, top-pinned)
+     height. min-height pins this to (viewport - title bar) directly,
+     guaranteeing real vertical space to center within regardless of how
+     the ancestors resolve their own height. */
+  min-height: calc(100vh - var(--titlebar-height));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+#budgetAuthView {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* =============================================================================
+   ENCRYPTION SETTINGS UI
+============================================================================= */
+
+.budget-encrypt-label-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.budget-encrypt-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.settings-action-btn {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+}
+
+.budget-encrypt-info-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.settings-section-divider {
+  border-top: 1px solid var(--color-border);
+  margin: 6px 0;
+}
+
+/* =============================================================================
+   BUDGET AUTH GATE — loading spinner
+   Shown after correct password while data decrypts, so the tool appears
+   fully populated rather than loading in front of the user.
+============================================================================= */
+
+.budget-auth-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px; /* same height as lock-submit-btn so the layout doesn't jump */
+}
+
+.budget-auth-spinner-ring {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-btn);
+  border-radius: 50%;
+  animation: budget-spin 0.75s linear infinite;
+}
+
+@keyframes budget-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* =============================================================================
+   LEDGER SORT SELECT
+   Affixed to the right side of the Ledger panel header row.
+============================================================================= */
+
+.budget-ledger-sort-select {
+  background: var(--color-input-bg);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: color var(--hover-transition), border-color var(--hover-transition);
+}
+
+.budget-ledger-sort-select:hover {
+  color: var(--color-text);
+  border-color: var(--color-btn);
+}
+
+.budget-ledger-sort-select:focus {
+  outline: none;
+  border-color: var(--color-btn);
+}
+
+/* =============================================================================
+   SIMPLE ITEM ROWS — clickable (Income Sources / Categories / Expense Sources)
+   Inline editing removed; click opens the item editor modal instead.
+============================================================================= */
+
+.budget-setup-item {
+  cursor: pointer;
+  transition: background var(--hover-transition);
+}
+
+.budget-setup-item:hover {
+  background: var(--color-hover);
+}
+
+/* Two-column layout: name (left col) | budget badge (right col) | chevron.
+   Both columns are flex:1 so they each occupy half the available space,
+   giving the badge a consistent left-edge alignment regardless of name length. */
+.budget-setup-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: inherit;
+}
+
+/* Expectation/Threshold text — flex:1 column, same weight/size as the name
+   but faded so it reads as secondary. Left-aligned within its column. */
+.budget-setup-item-budget-badge {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: inherit;
+  opacity: 0.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "Retired" badge shown inline on retired items */
+.budget-setup-item-retired-badge {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* Chevron arrow on the right */
+.budget-setup-item-chevron {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+  line-height: 1;
+}

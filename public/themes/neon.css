@@ -1,0 +1,285 @@
+:root {
+  --color-bg:                  #010108;
+  --color-panel:               #03030f;
+  --color-input-bg:            #06061a;
+  --color-border:              #00ffff66;
+  --color-border-dashed:       #ff00ff;
+  --color-text:                #ffffff;
+  --color-text-muted:          #00ffff;
+  --color-hover:               #00ffff1a;
+
+  --color-btn:                 #ff00ff;
+  --color-btn-hover:           #dd00dd;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #ff4400;
+  --color-danger-subtle:       rgba(255, 68, 0, 0.15);
+
+  --color-accent-input:        #00ffff;
+  --color-accent-view:         #39ff14;
+  --color-accent-totals:       #ff8800;
+  --color-accent-entries:      #ff00ff;
+
+  --color-toggle-off:          #0a0a20;
+  --color-toggle-on:           #00ffff;
+
+  --color-toast-success-bg:    #001500;
+  --color-toast-success-border:#39ff14;
+  --color-toast-success-text:  #aaffaa;
+  --color-toast-error-bg:      #150500;
+  --color-toast-error-border:  #ff4400;
+  --color-toast-error-text:    #ffccaa;
+  /* ── Budget chart palette ── Cyan / magenta / lime / orange / yellow / pink / mint / sky — neon glow palette */
+  --color-chart-1:             #00ffff;
+  --color-chart-2:             #ff00ff;
+  --color-chart-3:             #39ff14;
+  --color-chart-4:             #ff8800;
+  --color-chart-5:             #ffee00;
+  --color-chart-6:             #ff44aa;
+  --color-chart-7:             #44ff88;
+  --color-chart-8:             #00aaff;
+}
+
+/* ── Scanline overlay ── */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ── Time Tracker panels ── */
+.input-panel {
+  border-left: 4px solid #00ffff;
+  border-color: #00ffff88 !important;
+  box-shadow: 0 0 18px #00ffff55, inset 0 0 8px #00ffff11 !important;
+}
+.controls-panel {
+  border-left: 4px solid #39ff14;
+  border-color: #39ff1488 !important;
+  box-shadow: 0 0 18px #39ff1455, inset 0 0 8px #39ff1411 !important;
+}
+.totals-panel {
+  border-left: 4px solid #ff8800;
+  border-color: #ff880088 !important;
+  box-shadow: 0 0 18px #ff880055, inset 0 0 8px #ff880011 !important;
+}
+.entries-panel {
+  border-left: 4px solid #ff00ff;
+  border-color: #ff00ff88 !important;
+  box-shadow: 0 0 18px #ff00ff55, inset 0 0 8px #ff00ff11 !important;
+}
+
+/* ── Glowing buttons ── */
+button {
+  box-shadow: 0 0 12px #ff00ffaa, 0 0 24px #ff00ff44 !important;
+}
+button:hover {
+  box-shadow: 0 0 20px #ff00ffcc, 0 0 40px #ff00ff66 !important;
+}
+
+/* ── Glowing inputs ── */
+input:focus {
+  outline: none;
+  border-color: #00ffff !important;
+  box-shadow: 0 0 10px #00ffff88 !important;
+}
+
+/* ── Tool / section header ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, rgba(0, 255, 255, 0.1), rgba(255, 0, 255, 0.08)) !important;
+  border-bottom-color: #00ffff88 !important;
+  box-shadow: 0 0 24px #00ffff44, 0 0 8px #ff00ff22 !important;
+}
+.tool-view-title,
+.section-title {
+  color: #00ffff !important;
+  text-shadow: 0 0 16px #00ffff, 0 0 32px #00ffff88 !important;
+  opacity: 1 !important;
+}
+
+/* ── Modal — translucent: cyan-tinted frosted glass (original look) ── */
+body:not(.solid-modals) .modal {
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(3, 3, 15, 0.55) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-color: #00ffff55 !important;
+  box-shadow: 0 0 30px #00ffff33, 0 24px 48px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* ── Modal — solid: deep black panel with cyan glow ── */
+body.solid-modals .modal {
+  background: linear-gradient(135deg, #0a1a1a 0%, #03030f 100%) !important;
+  border-color: #00ffff55 !important;
+  box-shadow: 0 0 30px #00ffff33, 0 24px 48px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* ── App Lock Change / Remove buttons — opt out of global button glow ── */
+.lock-cred-link {
+  box-shadow: none !important;
+}
+.lock-cred-link:hover {
+  box-shadow: none !important;
+}
+
+/* ── Primary button ── */
+.primary-btn {
+  background: rgba(255, 0, 255, 0.15) !important;
+  border-color: #ff00ffaa !important;
+  color: #ff00ff !important;
+  box-shadow: 0 0 12px #ff00ff88 !important;
+}
+.primary-btn:hover {
+  background: rgba(255, 0, 255, 0.3) !important;
+  border-color: #ff00ff !important;
+  box-shadow: 0 0 24px #ff00ffcc !important;
+  color: #ff00ff !important;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  border-color: #00ffff55 !important;
+  box-shadow: 0 0 16px #00ffff33 !important;
+}
+#media-tool-image-ccr .result-panel {
+  border-color: #39ff1455 !important;
+  border-left-color: #39ff14 !important;
+  box-shadow: 0 0 16px #39ff1433 !important;
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: #ff00ff88 !important; }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: #00ffff !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.tab-btn:hover {
+  color: #ffffff !important;
+  border-color: #00ffff88 !important;
+  background: rgba(0, 255, 255, 0.08) !important;
+  box-shadow: 0 0 8px #00ffff44 !important;
+}
+.tab-btn.active {
+  color: #00ffff !important;
+  border-color: #00ffff !important;
+  background: rgba(0, 255, 255, 0.12) !important;
+  box-shadow: 0 0 12px #00ffff88 !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #06061a !important;
+  color: #00ffff !important;
+  border-color: #00ffff44 !important;
+  box-shadow: none !important;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: #ff00ff !important;
+  border-color: #ff00ffaa !important;
+  background: #06061a !important;
+  box-shadow: 0 0 8px #ff00ff55 !important;
+}
+.dir-btn.active, .prv-btn.active {
+  color: #00ffff !important;
+  border-color: #00ffff !important;
+  background: rgba(0, 255, 255, 0.1) !important;
+  box-shadow: 0 0 10px #00ffff88 !important;
+}
+
+/* ── Preview cards ── */
+.anchor-badge { background: #00ffff !important; color: #010108 !important; }
+.preview-card:hover     { border-color: #00ffff !important; box-shadow: 0 0 12px #00ffff66 !important; }
+.preview-card.anchor-card { border-color: #00ffff !important; box-shadow: 0 0 16px #00ffff88 !important; }
+.preview-card.drag-target  { border-color: #ff00ff !important; box-shadow: 0 0 16px #ff00ff88 !important; }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: #00ffff !important;
+  border-color: #010108 !important;
+  box-shadow: 0 0 10px #00ffff !important;
+}
+.img-slider::-webkit-slider-thumb:hover {
+  background: #ff00ff !important;
+  box-shadow: 0 0 14px #ff00ff !important;
+}
+.slider-val   { color: #00ffff !important; text-shadow: 0 0 10px #00ffff88 !important; }
+.estimate-val { color: #00ffff !important; }
+.result-preview-wrap { border-color: #39ff1455 !important; }
+
+
+/* ── Budget Tracker ── */
+
+.finance-tool-budget .panel-accent-input  {
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.07) 0%, #03030f 100%);
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.1), inset 0 0 6px rgba(0, 255, 255, 0.04) !important;
+}
+.finance-tool-budget .panel-accent-view   {
+  background: linear-gradient(135deg, rgba(57, 255, 20, 0.06) 0%, #03030f 100%);
+  box-shadow: 0 0 14px rgba(57, 255, 20, 0.08), inset 0 0 6px rgba(57, 255, 20, 0.03) !important;
+}
+.finance-tool-budget .panel-accent-totals {
+  background: linear-gradient(135deg, rgba(255, 136, 0, 0.07) 0%, #03030f 100%);
+  box-shadow: 0 0 14px rgba(255, 136, 0, 0.1), inset 0 0 6px rgba(255, 136, 0, 0.03) !important;
+}
+.finance-tool-budget .panel-accent-entries{
+  background: linear-gradient(135deg, rgba(255, 0, 255, 0.07) 0%, #03030f 100%);
+  box-shadow: 0 0 14px rgba(255, 0, 255, 0.08), inset 0 0 6px rgba(255, 0, 255, 0.03) !important;
+}
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #00ffff;
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.2) !important;
+}
+.budget-annual-stats-title {
+  color: #00ffff;
+  text-shadow: 0 0 12px rgba(0, 255, 255, 0.7);
+}
+
+.budget-summary-tab.active {
+  color: #00ffff;
+  border-bottom-color: #00ffff;
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #39ff14; border-color: #39ff14; }
+.budget-stats-count-late    { color: #ffee00; border-color: #ffee00; }
+.budget-stats-count-overdue { color: #ff4400; border-color: #ff4400; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(0, 255, 255, 0.3);
+  color: #00ffff;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(0, 255, 255, 0.08);
+  border-color: #00ffff;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
+}
+
+.budget-view-mode-btn.active {
+  background: #ff00ff !important;
+  color: #ffffff !important;
+  border-color: #ff00ff !important;
+  box-shadow: 0 0 12px rgba(255, 0, 255, 0.5) !important;
+}
+.budget-stats-section-heading { color: #00ffff; text-shadow: 0 0 8px rgba(0, 255, 255, 0.4); }

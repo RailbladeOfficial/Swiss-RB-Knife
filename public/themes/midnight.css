@@ -1,0 +1,217 @@
+:root {
+  --color-bg:                  #000000;
+  --color-panel:               #050505;
+  --color-input-bg:            #0a0a0a;
+  --color-border:              #141414;
+  --color-border-dashed:       #1f1f1f;
+  --color-text:                #e5e7eb;
+  --color-text-muted:          #4b5563;
+  --color-hover:               #141414;
+
+  --color-btn:                 #0000ff;
+  --color-btn-hover:           #0000cc;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #ff0000;
+  --color-danger-subtle:       rgba(255, 0, 0, 0.1);
+
+  --color-accent-input:        #0000ff;
+  --color-accent-view:         #00ff00;
+  --color-accent-totals:       #ffff00;
+  --color-accent-entries:      #ff0000;
+
+  --color-toggle-off:          #1f1f1f;
+  --color-toggle-on:           #0000ff;
+
+  --color-toast-success-bg:    #001a00;
+  --color-toast-success-border:#00ff00;
+  --color-toast-success-text:  #ccffcc;
+  --color-toast-error-bg:      #1a0000;
+  --color-toast-error-border:  #ff0000;
+  --color-toast-error-text:    #ffcccc;
+  /* ── Budget chart palette ── Blue / green / yellow / red / cyan / lime / magenta / white — pure RGB on pure black */
+  --color-chart-1:             #0000ff;
+  --color-chart-2:             #00ff00;
+  --color-chart-3:             #ffff00;
+  --color-chart-4:             #ff0000;
+  --color-chart-5:             #00ccff;
+  --color-chart-6:             #88ff00;
+  --color-chart-7:             #ff00cc;
+  --color-chart-8:             #ffffff;
+}
+
+/* ── Time Tracker panels — pure RGB, stark left borders ── */
+.input-panel {
+  border-left: 4px solid #0000ff;
+  border-color: rgba(0, 0, 255, 0.3) !important;
+}
+.controls-panel {
+  border-left: 4px solid #00ff00;
+  border-color: rgba(0, 255, 0, 0.2) !important;
+}
+.totals-panel {
+  border-left: 4px solid #ffff00;
+  border-color: rgba(255, 255, 0, 0.2) !important;
+}
+.entries-panel {
+  border-left: 4px solid #ff0000;
+  border-color: rgba(255, 0, 0, 0.2) !important;
+}
+
+/* ── Tool / section header — pure black, blue bottom border ── */
+.tool-view-header,
+.section-header {
+  background: #050505 !important;
+  border-bottom-color: #0000ff !important;
+  box-shadow: none !important;
+}
+.tool-view-title,
+.section-title {
+  color: #e5e7eb !important;
+  opacity: 1 !important;
+}
+
+/* ── Modal — solid: pure black panel (original look) ── */
+body.solid-modals .modal {
+  background: #050505 !important;
+  border-color: #141414 !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* ── Modal — translucent: deep frosted void ── */
+body:not(.solid-modals) .modal {
+  background: rgba(5, 5, 5, 0.25) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-color: rgba(20, 20, 20, 0.7) !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* ── Primary button ── */
+.primary-btn {
+  background: #0000ff !important;
+  border-color: #0000ff !important;
+  color: #ffffff !important;
+}
+.primary-btn:hover {
+  background: #0000cc !important;
+  border-color: #0000cc !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  border-left: 3px solid rgba(0, 0, 255, 0.5);
+  border-color: #141414 !important;
+}
+#media-tool-image-ccr .result-panel {
+  border-left: 3px solid #00ff00 !important;
+  border-color: rgba(0, 255, 0, 0.2) !important;
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: #1f1f1f !important; }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: #4b5563 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.tab-btn:hover {
+  color: #e5e7eb !important;
+  border-color: #141414 !important;
+  background: #0a0a0a !important;
+  box-shadow: none !important;
+}
+.tab-btn.active {
+  color: #e5e7eb !important;
+  border-color: #0000ff !important;
+  background: rgba(0, 0, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #0a0a0a !important;
+  color: #4b5563 !important;
+  border-color: #141414 !important;
+  box-shadow: none !important;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: #e5e7eb !important;
+  border-color: #0000ff !important;
+  background: #0a0a0a !important;
+  box-shadow: none !important;
+}
+.dir-btn.active, .prv-btn.active {
+  color: #e5e7eb !important;
+  border-color: #0000ff !important;
+  background: rgba(0, 0, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge { background: #0000ff !important; color: #ffffff !important; }
+
+/* ── Preview cards ── */
+.preview-card:hover     { border-color: #0000ff !important; }
+.preview-card.anchor-card { border-color: #0000ff !important; }
+.preview-card.drag-target  { border-color: #00ff00 !important; }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: #0000ff !important;
+  border-color: #000000 !important;
+  box-shadow: none !important;
+}
+.img-slider::-webkit-slider-thumb:hover { background: #ff0000 !important; }
+.slider-val   { color: #e5e7eb !important; }
+.estimate-val { color: #e5e7eb !important; }
+.result-preview-wrap { border-color: rgba(0, 255, 0, 0.2) !important; }
+
+
+/* ── Budget Tracker ── */
+
+.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(0, 0, 255, 0.08) 0%, #050505 100%); }
+.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(0, 255, 0, 0.05) 0%, #050505 100%); }
+.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(255, 255, 0, 0.05) 0%, #050505 100%); }
+.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(255, 0, 0, 0.07) 0%, #050505 100%); }
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #0000ff;
+  border-color: rgba(0, 0, 255, 0.4) !important;
+}
+.budget-annual-stats-title { color: #e5e7eb; }
+
+.budget-summary-tab.active { color: #e5e7eb; border-bottom-color: #0000ff; }
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #00ff00; border-color: #00ff00; }
+.budget-stats-count-late    { color: #ffff00; border-color: #ffff00; }
+.budget-stats-count-overdue { color: #ff0000; border-color: #ff0000; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: #141414;
+  color: #4b5563;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(0, 0, 255, 0.1);
+  border-color: #0000ff;
+  color: #e5e7eb;
+}
+
+.budget-view-mode-btn.active {
+  background: #0000ff !important;
+  color: #ffffff !important;
+  border-color: #0000ff !important;
+}
+.budget-stats-section-heading { color: #4b5563; }
