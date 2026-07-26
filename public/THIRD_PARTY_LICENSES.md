@@ -3,7 +3,7 @@
 Swiss RB Knife makes use of the following open-source packages and libraries.
 All credit and gratitude to their respective authors and maintainers.
 
-> **Generated automatically on 2026-07-24.**
+> **Generated automatically on 2026-07-26.**
 > Re-run `node generate-licenses.mjs` (or `npm run build`) to refresh.
 
 ---

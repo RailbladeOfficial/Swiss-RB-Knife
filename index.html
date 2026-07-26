@@ -932,6 +932,18 @@
                 <span id="ab-run-btn-label">Run Backup</span>
               </button>
               <button id="ab-cancel-btn" class="danger-btn" disabled>Cancel Backup</button>
+              <!-- Details toggle. On (default) = live per-file progress but
+                   slower; off = robocopy runs unmonitored, much faster, with
+                   the bar/stats updating per-folder and no file text. The
+                   text label reflects the CURRENT state. -->
+              <div id="ab-details-toggle-wrap" class="ab-details-toggle-wrap toggle-with-label"
+                title="Live progress makes large backups slower; turn it off for speed">
+                <span id="ab-details-label">Show Progress Details (slow)</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ab-details-toggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -948,6 +960,13 @@
             <div id="ab-progress-content" style="display:none; flex-direction:column; gap:10px;">
               <p id="ab-progress-current" class="ab-progress-current">Ready</p>
               <p id="ab-progress-current-file" class="ab-progress-current-file"></p>
+
+              <!-- Shown only when the last run had files it couldn't copy
+                   (locked/access error) — sits between the status text above
+                   and the Backup Progress bar below, left-aligned. -->
+              <button id="ab-skipped-files-btn" class="modal-cancel-btn ab-skipped-files-btn" style="display:none;">
+                View Skipped Files
+              </button>
 
               <!-- Overall progress bar -->
               <div class="ab-bar-group">
@@ -1082,10 +1101,13 @@
             </div>
 
             <!-- Preview strip -->
-            <div class="panel" id="combine-preview-section" style="display:none">
+            <div class="panel is-disabled" id="combine-preview-section">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">2 · Preview &amp; Order</h2>
-                <button class="danger-btn" id="combine-clear">Clear All</button>
+                <div class="panel-header-right">
+                  <span class="panel-lock-hint" id="combine-preview-lock">Select images first</span>
+                  <button class="danger-btn" id="combine-clear">Clear All</button>
+                </div>
               </div>
               <div class="tool-panel-body">
                 <p class="placeholder-text">Drag cards to reorder · First card = anchor image</p>
@@ -1094,9 +1116,10 @@
             </div>
 
             <!-- Options + run -->
-            <div class="panel" id="combine-options-section" style="display:none">
+            <div class="panel is-disabled" id="combine-options-section">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">3 · Options &amp; Output</h2>
+                <span class="panel-lock-hint" id="combine-options-lock">Select at least 2 images</span>
               </div>
               <div class="tool-panel-body">
 
@@ -1139,6 +1162,10 @@
                     <div class="color-input-row">
                       <input type="color" id="combine-canvas-color" value="#000000" class="color-swatch" />
                       <span class="color-hex" id="combine-canvas-color-hex">#000000</span>
+                      <label class="transparent-toggle">
+                        <input type="checkbox" id="combine-canvas-transparent" />
+                        <span>Transparent</span>
+                      </label>
                     </div>
                   </div>
                   <div class="option-group">
@@ -1168,10 +1195,19 @@
                       <div class="color-input-row">
                         <input type="color" id="combine-border-color" value="#000000" class="color-swatch" />
                         <span class="color-hex" id="combine-border-color-hex">#000000</span>
+                        <label class="transparent-toggle">
+                          <input type="checkbox" id="combine-border-transparent" />
+                          <span>Transparent</span>
+                        </label>
                       </div>
                     </div>
                   </div>
                 </div>
+
+                <!-- Transparency note (shown when a transparent fill is set but format is JPG) -->
+                <p class="transparent-hint" id="combine-transparent-hint" style="display:none">
+                  ⚠ Transparency needs PNG output — JPG will fill transparent areas with black.
+                </p>
 
                 <!-- Actions -->
                 <div class="combine-actions">
@@ -1234,9 +1270,10 @@
             </div>
 
             <!-- Slider -->
-            <div class="panel" id="compress-options-section" style="display:none">
+            <div class="panel is-disabled" id="compress-options-section">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">2 · Compression</h2>
+                <span class="panel-lock-hint" id="compress-options-lock">Select an image first</span>
               </div>
               <div class="tool-panel-body">
                 <div class="slider-wrap">
@@ -1302,18 +1339,30 @@
           <!-- ── RESIZE TAB ── -->
           <div class="tab-panel" id="tab-resize">
 
-            <!-- Step 1: Select folder -->
+            <!-- Step 1: Select source (folder OR individual files) -->
             <div class="panel">
               <div class="tool-panel-header">
-                <h2 class="tool-panel-title">1 · Select Source Folder</h2>
+                <h2 class="tool-panel-title">1 · Select Source</h2>
               </div>
               <div class="tool-panel-body">
                 <div class="folder-row">
-                  <input type="text" id="resize-source-path" placeholder="Paste a path or browse…" />
-                  <button id="resize-browse-source">Browse</button>
+                  <input type="text" id="resize-source-path" placeholder="Paste a folder path, or browse a folder / files…" />
+                  <button id="resize-browse-folder">Browse Folder</button>
+                  <button id="resize-browse-files">Browse Files</button>
                   <button id="resize-scan-source">Scan</button>
                 </div>
-                <!-- Folder stats — shown after folder is scanned -->
+                <p class="option-hint">Pick a whole folder, or select one or more individual images.</p>
+
+                <!-- Scan progress — shown while the source is being analysed -->
+                <div id="resize-scan-progress" class="resize-scan-progress" style="display:none">
+                  <span class="scan-spinner"></span>
+                  <div class="ab-progress-bar-track">
+                    <div class="ab-progress-bar-fill" id="resize-scan-bar" style="width:0%"></div>
+                  </div>
+                  <span class="resize-scan-label" id="resize-scan-label">Scanning…</span>
+                </div>
+
+                <!-- Folder stats — shown after the source is scanned -->
                 <div id="resize-folder-stats" class="resize-stats-row" style="display:none">
                   <div class="resize-stat resize-stat-count">
                     <span class="resize-stat-label">Images found</span>
@@ -1342,12 +1391,13 @@
             </div>
 
             <!-- Step 2: Options -->
-            <div class="panel" id="resize-options-section" style="display:none">
+            <div class="panel is-disabled" id="resize-options-section">
               <div class="tool-panel-header">
                 <div class="resize-options-header-group">
                   <h2 class="tool-panel-title">2 · Resize &amp; Canvas Options</h2>
                   <button class="resize-info-btn" id="resize-info-btn" title="How Resize and Canvas work">ℹ</button>
                 </div>
+                <span class="panel-lock-hint" id="resize-options-lock">Select a source folder or files first</span>
               </div>
               <div class="tool-panel-body">
 
@@ -1411,6 +1461,10 @@
                     <div class="color-input-row">
                       <input type="color" id="resize-bg-color" value="#000000" class="color-swatch" />
                       <span class="color-hex" id="resize-bg-color-hex">#000000</span>
+                      <label class="transparent-toggle">
+                        <input type="checkbox" id="resize-bg-transparent" />
+                        <span>Transparent</span>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -1433,6 +1487,11 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- Transparency note (shown when transparent background is set but format is JPG) -->
+                <p class="transparent-hint" id="resize-transparent-hint" style="display:none">
+                  ⚠ Transparency needs PNG output — JPG will fill transparent areas with black.
+                </p>
 
                 <!-- Actions row -->
                 <div class="resize-action-row">
@@ -3281,10 +3340,44 @@
           <span id="ab-confirm-drives">—</span>, which can
           <strong>add, edit, and delete</strong> files in the destination folders.
         </p>
+        <!-- Free-space warnings — one paragraph per destination that doesn't
+             have room for its planned copy. Non-blocking: "size to copy"
+             counts the full size of every changed file, not just the actual
+             new bytes an overwrite adds, so this is a caution, not a hard
+             limit. Empty/hidden when nothing is short on space. -->
+        <div id="ab-confirm-space-warnings"></div>
         <p>Are you sure you want to run this backup?</p>
         <div class="exit-modal-actions">
           <button id="abRunConfirmProceedBtn" class="danger-btn">Proceed with Backup</button>
           <button id="abRunConfirmAbortBtn" class="modal-cancel-btn">Whoa! I didn't mean to click that!</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skipped Files modal — files robocopy couldn't copy (locked/access
+       error) on the last run. The destination still completed; these were
+       skipped, not a run failure. -->
+  <div id="abSkippedFilesBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="abSkippedFilesModal" class="modal ab-skipped-files-modal">
+      <div class="modal-header">
+        <span>Skipped Files</span>
+        <button id="abSkippedFilesClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>
+          These files were locked or otherwise inaccessible when robocopy tried to copy
+          them, so they were skipped — the rest of the backup still ran normally.
+        </p>
+        <p id="ab-skipped-files-count" class="ab-skipped-files-count">0 files couldn't be copied</p>
+        <div id="ab-skipped-files-list" class="ab-skipped-files-list"></div>
+        <div class="exit-modal-actions">
+          <button id="ab-skipped-files-explorer-btn" class="modal-cancel-btn">Open Explorer</button>
         </div>
       </div>
     </div>

@@ -41,6 +41,11 @@ interface BackupConfig {
   /** True once the user checks "Never show this warning again" on the
    *  entry disclaimer — suppresses the disclaimer face on future entries. */
   skipDisclaimer: boolean;
+  /** When true (default), show live per-file progress during a backup. This
+   *  is slower because parsing robocopy's per-file output live can throttle
+   *  robocopy on trees full of small files. When false, robocopy runs
+   *  unmonitored and the bar/stats update per-folder instead — much faster. */
+  showDetails: boolean;
 }
 
 interface BackupFolderStartEvent {
@@ -59,8 +64,19 @@ interface BackupFolderDoneEvent {
   dirs_copied: number;
   bytes_copied: number;
   elapsed_secs: number;
+  /** Which destination (by index) this folder pair belongs to — destinations
+   *  now mirror concurrently, so folder-done events interleave across them. */
+  dest_index: number;
   folders_done: number;
   folders_total: number;
+}
+
+/** One file that couldn't be copied (locked/access error, not a "no
+ *  difference" skip — see run_destination's doc comment in Rust for why
+ *  those two can't be confused here). */
+interface SkippedFileEntry {
+  source: string;
+  destination: string;
 }
 
 interface BackupCompleteEvent {
@@ -73,10 +89,14 @@ interface BackupCompleteEvent {
   total_extras: number;
   total_secs: number;
   aborted_file: string | null;
+  skipped_files: SkippedFileEntry[];
+  skipped_log_paths: string[];
 }
 
 interface BackupFileProgressEvent {
-  /** Bytes of COMPLETED files (excludes the file currently copying). */
+  /** Bytes of COMPLETED files (excludes the file currently copying). RUN-WIDE
+   *  — sums every destination's progress, since destinations now mirror
+   *  concurrently rather than one after another. */
   bytes_done: number;
   files_done: number;
   dirs_done: number;
@@ -84,6 +104,11 @@ interface BackupFileProgressEvent {
   /** Size of the file currently being copied. */
   current_file_bytes: number;
   file_pct: number | null;
+  /** Which destination (by index) this file belongs to. */
+  dest_index: number;
+  /** This destination's OWN completed-bytes total (excludes the in-flight
+   *  file) — the numerator for that destination's own progress bar. */
+  dest_bytes_done: number;
 }
 
 interface BackupPlanProgressEvent {
@@ -151,6 +176,7 @@ let config: BackupConfig = {
   destinations: [],
   copySpeed: DEFAULT_COPY_SPEED,
   skipDisclaimer: false,
+  showDetails: true, // on by default; users opt into fast mode
 };
 
 /** Cached folder sizes: path → bytes (or null = pending). */
@@ -168,6 +194,10 @@ let runTotalFiles = 0;
 let runTotalDirs = 0;
 let runTotalBytes = 0;
 let hasRunOnce = false; // tracks whether a backup has run this session
+
+/** Files the last run couldn't copy (locked/access error) — populated by
+ *  backup-complete, read by the "View Skipped Files" modal. */
+let lastSkippedFiles: SkippedFileEntry[] = [];
 
 /* ── Smooth progress-bar state ─────────────────────────────────────────────
    The bar is driven by a requestAnimationFrame loop, not directly by events.
@@ -276,6 +306,9 @@ let speedInput: HTMLInputElement;
 
 let runBtn: HTMLButtonElement;
 let cancelBtn: HTMLButtonElement;
+let detailsToggle: HTMLInputElement;
+let detailsLabel: HTMLElement;
+let detailsToggleWrap: HTMLElement;
 
 let progressPanel: HTMLElement;
 let progressContent: HTMLElement;
@@ -307,6 +340,13 @@ let runConfirmModal: Modal; // initialised in initRunConfirmModal
 let confirmFilesEl: HTMLElement;
 let confirmSizeEl: HTMLElement;
 let confirmDrivesEl: HTMLElement;
+let confirmSpaceWarningsEl: HTMLElement;
+
+/* Skipped-files modal */
+let skippedFilesModal: Modal; // initialised in initSkippedFilesModal
+let skippedFilesBtn: HTMLButtonElement;
+let skippedFilesCountEl: HTMLElement;
+let skippedFilesListEl: HTMLElement;
 
 /** Set once initAutoBackup completes. Entry-hook calls that arrive before
  *  then (the startup-restore path navigates before tools initialise) are
@@ -355,6 +395,9 @@ async function loadConfig(): Promise<void> {
     config.destinations   = destinations;
     config.copySpeed      = copySpeed;
     config.skipDisclaimer = parsed?.skipDisclaimer === true;
+    // Default ON when the key is missing (older configs) or malformed — only
+    // an explicit stored `false` turns details off.
+    config.showDetails    = parsed?.showDetails !== false;
   } catch {
     // use defaults
   }
@@ -572,6 +615,19 @@ function syncEstimateButton(): void {
   estimateBtn.disabled = estimateScanning || backupRunning;
 }
 
+/** Reflects the CURRENT mode on the toggle: the switch position (checked =
+ *  details on) and the text beside it. Disabled mid-run, since the mode is
+ *  captured at launch and can't change once a backup is in flight.
+ *  ON = live details, slower; OFF = fast. */
+function renderDetailsToggle(): void {
+  detailsToggle.checked  = config.showDetails;
+  detailsToggle.disabled = backupRunning;
+  detailsToggleWrap.classList.toggle("ab-details-locked", backupRunning);
+  detailsLabel.textContent = config.showDetails
+    ? "Show Progress Details (slow)"
+    : "Hide Progress Details (fast)";
+}
+
 async function runEstimate(): Promise<void> {
   const fp = estimateFingerprint();
   if (!_estimateForce && fp === _lastEstimateFp) return;
@@ -593,6 +649,11 @@ async function runEstimate(): Promise<void> {
   estimateScanning = true;
   syncEstimateButton();
   renderEstimateCells();
+
+  // Re-check free space too — a drive that was "unavailable" (not plugged in
+  // when the app opened) may be connected now. Fire-and-forget: this just
+  // refreshes a display value and shouldn't hold up the estimate itself.
+  void refreshFreeSpace();
 
   let superseded = false;
   try {
@@ -715,6 +776,13 @@ function refreshEstSize(): void {
   renderEstimateCells();
 }
 
+/** Per-drive-letter free space in bytes, from the last successful check —
+ *  read by the confirmation modal to warn about destinations that don't have
+ *  room for what's about to be copied. A letter with no entry here means the
+ *  last check failed (unplugged drive, etc.) — treated as "unknown", not
+ *  "definitely enough room", so no warning fires for it either way. */
+const freeSpaceByLetter = new Map<string, number>();
+
 /**
  * Queries free space for all destinations, but only once per unique drive letter.
  * Renders one line per drive.
@@ -737,9 +805,11 @@ async function refreshFreeSpace(): Promise<void> {
   for (const [letter, path] of driveMap) {
     try {
       const bytes = await invoke<number>("get_free_space", { path });
+      freeSpaceByLetter.set(letter, bytes);
       lines.push(`${letter}: ${formatBytes(bytes)} free`);
     } catch (e) {
       devError(`get_free_space failed for ${path}:`, e);
+      freeSpaceByLetter.delete(letter);
       lines.push(`${letter}: unavailable`);
     }
   }
@@ -1036,6 +1106,8 @@ function resetProgress(): void {
   runTotalDirs  = 0;
   runTotalBytes = 0;
   runStartTime  = null;
+  lastSkippedFiles = [];
+  syncSkippedFilesButton();
 }
 
 function startElapsedTimer(): void {
@@ -1110,6 +1182,9 @@ function setBackupRunning(running: boolean): void {
   clearBtn.disabled        = running;
   clearSourceBtn.disabled  = running;
   clearDestBtn.disabled    = running;
+  // Mode can't change mid-run (it's captured at launch). renderDetailsToggle
+  // handles both the input's disabled state and the wrapper's locked styling.
+  renderDetailsToggle();
   // Lock all per-row remove and browse buttons by toggling a CSS class on the lists.
   // The class `ab-list-locked` sets pointer-events:none on child buttons.
   sourceList.classList.toggle("ab-list-locked", running);
@@ -1358,6 +1433,8 @@ async function attachBackupListeners(): Promise<void> {
     "backup-folder-start",
     ({ payload }) => {
       const { source, destination, source_index, source_total, dest_index, dest_total } = payload;
+      // Destinations run one at a time, so a single label describing the
+      // current folder is accurate — nothing else is copying to fight over it.
       progressCurrentLabel.textContent =
         `[Dest ${dest_index + 1}/${dest_total}] ` +
         `[Folder ${source_index + 1}/${source_total}] ` +
@@ -1365,9 +1442,9 @@ async function attachBackupListeners(): Promise<void> {
       // Show scanning state until the first file-progress event arrives.
       progressCurrentFileEl.textContent = "Scanning files…";
 
-      // Advance the work model's active pair. Pairs arrive in the same
-      // destination-major order the plan array was built in, so an ordinal
-      // counter stays aligned even if two pairs share a source.
+      // Advance the work model's active pair. Pairs arrive in order (one
+      // destination fully finishes before the next starts), so an ordinal
+      // counter stays aligned.
       activePairIdx += 1;
       pairStartedAt = performance.now();
       pairStartBytes = doneBytes;
@@ -1383,7 +1460,11 @@ async function attachBackupListeners(): Promise<void> {
       progressBytesEl.textContent = formatBytes(runTotalBytes);
       progressFilesEl.textContent = runTotalFiles.toLocaleString();
       progressDirsEl.textContent  = runTotalDirs.toLocaleString();
-      progressCurrentFileEl.textContent = `Copying ${payload.current_file}`;
+      // Empty current_file = fast mode's per-folder synthetic event, which
+      // carries no filename; leave the (hidden) line alone in that case.
+      if (payload.current_file) {
+        progressCurrentFileEl.textContent = `Copying ${payload.current_file}`;
+      }
 
       // Feed the bar engine: completed bytes, the in-flight file, and the
       // throughput estimate the in-flight interpolation runs on.
@@ -1473,13 +1554,29 @@ async function attachBackupListeners(): Promise<void> {
         progressLogEl.title = payload.log_paths.join("\n");
       }
 
+      lastSkippedFiles = payload.skipped_files ?? [];
+      syncSkippedFilesButton();
+
       if (payload.success) {
-        progressCurrentLabel.textContent = "Complete ✓";
-        flash(
-          `Backup complete — ${payload.total_files.toLocaleString()} files, ${formatBytes(payload.total_bytes)}`,
-          "success",
-          6000
-        );
+        const skipCount = lastSkippedFiles.length;
+        if (skipCount > 0) {
+          // Succeeded, but some files couldn't be copied — flag it with the
+          // same ⚠ used in the Estimate Summary rather than a clean ✓.
+          progressCurrentLabel.textContent =
+            `⚠ Complete — ${skipCount} file${skipCount === 1 ? "" : "s"} skipped`;
+          flash(
+            `Backup complete, but ${skipCount} file${skipCount === 1 ? "" : "s"} couldn't be copied — see Skipped Files.`,
+            "error",
+            7000
+          );
+        } else {
+          progressCurrentLabel.textContent = "Complete ✓";
+          flash(
+            `Backup complete — ${payload.total_files.toLocaleString()} files, ${formatBytes(payload.total_bytes)}`,
+            "success",
+            6000
+          );
+        }
       } else if (payload.aborted_file) {
         // Mid-file cancel: name what was interrupted, right where the person
         // is already looking (the line that showed "Copying …" a moment ago).
@@ -1562,11 +1659,11 @@ async function startBackup(): Promise<void> {
   // Everything below is gated behind an explicit confirmation — /MIR can
   // delete files in the destinations, so a stray click on Run must never
   // start a backup by itself.
-  openRunConfirmModal();
+  await openRunConfirmModal();
 }
 
 /** Fills the confirmation modal's dynamic text and opens it. */
-function openRunConfirmModal(): void {
+async function openRunConfirmModal(): Promise<void> {
   // Prefer the live estimate — it's the EXACT workload of this run (the /L
   // delta), which is what the person is actually consenting to. "Fresh"
   // means: a scan has completed, none is in flight, and the path sets
@@ -1595,7 +1692,58 @@ function openRunConfirmModal(): void {
   }
   confirmDrivesEl.textContent = formatDriveList(config.destinations);
 
+  // Open right away with whatever we've got, then refresh free space and
+  // fill in the warnings once that resolves — a drive plugged in seconds ago
+  // shouldn't still show as unavailable at exactly this moment. The modal
+  // isn't gated behind this network round-trip; the warnings just appear a
+  // beat after the rest of the text if the check takes a moment.
+  confirmSpaceWarningsEl.innerHTML = "";
   runConfirmModal.open();
+
+  await refreshFreeSpace();
+  renderSpaceWarnings(estFresh);
+}
+
+/**
+ * Builds one warning paragraph per destination whose free space is less than
+ * what this run plans to copy TO it. Non-blocking by design: "size to copy"
+ * is the full size of every changed file, not the actual new bytes an
+ * overwrite adds (robocopy replaces a changed file wholesale rather than
+ * patching it, so the real new disk usage for a changed file is only the
+ * size difference — usually smaller, sometimes nothing). Only shown when a
+ * fresh estimate gives real per-destination numbers to compare against.
+ */
+function renderSpaceWarnings(estFresh: boolean): void {
+  confirmSpaceWarningsEl.innerHTML = "";
+  if (!estFresh || !estimate) return;
+
+  const bytesByDest = new Map<string, number>();
+  for (const per of estimate.per_destination) {
+    bytesByDest.set(per.destination, (bytesByDest.get(per.destination) ?? 0) + per.bytes);
+  }
+
+  for (const destination of config.destinations) {
+    const plannedBytes = bytesByDest.get(destination) ?? 0;
+    if (plannedBytes === 0) continue;
+
+    const first = destination.trim().charAt(0);
+    const isDriveLetter = /[a-z]/i.test(first);
+    const letter = isDriveLetter ? first.toUpperCase() : null;
+    const freeBytes = letter ? freeSpaceByLetter.get(letter) : undefined;
+    // No reading for this drive (unplugged, or a UNC path free-space can't
+    // check) means "unknown", not "definitely fine" — stay silent rather
+    // than guess either way.
+    if (freeBytes === undefined || freeBytes >= plannedBytes) continue;
+
+    const p = document.createElement("p");
+    p.className = "ab-confirm-space-warning";
+    p.textContent =
+      `⚠ ${destination} has ${formatBytes(freeBytes)} free, but this run plans to copy ` +
+      `${formatBytes(plannedBytes)} to it. That number counts the full size of every ` +
+      `changed file, not just the new bytes an overwrite actually adds, so this may still ` +
+      `fit — but it's close enough to be worth checking first.`;
+    confirmSpaceWarningsEl.appendChild(p);
+  }
 }
 
 /**
@@ -1637,6 +1785,9 @@ async function launchBackup(): Promise<void> {
 
   resetProgress();
   showProgressContent(true);
+  // Fast mode has no live per-file text — hide that line for this run so it
+  // doesn't sit frozen on a stale filename. Details mode shows it as usual.
+  progressCurrentFileEl.style.display = config.showDetails ? "" : "none";
   hasRunOnce = true;
   clearBtn.disabled = true; // disabled while running
   setBackupRunning(true);
@@ -1644,11 +1795,15 @@ async function launchBackup(): Promise<void> {
   startElapsedTimer();
   progressCurrentLabel.textContent = "Calculating backup size…";
   flash("Backup started.", "success", 3000);
+  // Same reasoning as runEstimate: a drive connected after the app opened
+  // (or since the last check) should stop showing "unavailable".
+  void refreshFreeSpace();
 
   try {
     await invoke("run_backup", {
       sources:      config.sources,
       destinations: config.destinations,
+      showDetails:  config.showDetails,
     });
   } catch (e) {
     stopElapsedTimer();
@@ -1788,6 +1943,7 @@ function initRunConfirmModal(): void {
   confirmFilesEl  = document.getElementById("ab-confirm-files")!;
   confirmSizeEl   = document.getElementById("ab-confirm-size")!;
   confirmDrivesEl = document.getElementById("ab-confirm-drives")!;
+  confirmSpaceWarningsEl = document.getElementById("ab-confirm-space-warnings")!;
 
   // X and the abort button both simply close — closing IS the abort, since
   // nothing has been started yet. Escape and header-drag come free from the
@@ -1801,6 +1957,81 @@ function initRunConfirmModal(): void {
     runConfirmModal.close();
     launchBackup();
   });
+}
+
+/* =============================================================================
+   SKIPPED FILES MODAL
+   -----------------------------------------------------------------------------
+   Files robocopy attempted to copy but couldn't (locked/access error) — the
+   destination still completed; these were skipped, not the reason for a
+   failure. Populated once per run by the backup-complete handler.
+============================================================================= */
+
+function initSkippedFilesModal(): void {
+  skippedFilesModal = new Modal(document.getElementById("abSkippedFilesBackdrop")!);
+  skippedFilesBtn      = document.getElementById("ab-skipped-files-btn") as HTMLButtonElement;
+  skippedFilesCountEl  = document.getElementById("ab-skipped-files-count")!;
+  skippedFilesListEl   = document.getElementById("ab-skipped-files-list")!;
+
+  skippedFilesBtn.addEventListener("click", () => {
+    renderSkippedFilesList();
+    skippedFilesModal.open();
+  });
+  document.getElementById("abSkippedFilesClose")!
+    .addEventListener("click", () => skippedFilesModal.close());
+
+  document.getElementById("ab-skipped-files-explorer-btn")!.addEventListener("click", async () => {
+    if (lastSkippedFiles.length === 0) return;
+    // Open to the FIRST skipped file's SOURCE path, not its destination —
+    // the destination copy was never successfully written (that's the whole
+    // reason it's in this list), so explorer would have nothing to select
+    // there. The source file always exists; robocopy failed to read/write
+    // it, but never touched the original.
+    const path = lastSkippedFiles[0].source;
+    try {
+      await invoke("show_in_explorer", { path });
+    } catch (e) {
+      devError(`show_in_explorer failed for ${path}:`, e);
+    }
+  });
+}
+
+/** Fills the skipped-files modal's count and scrollable list from the last
+ *  run's results. Called each time the modal is opened, not just once at
+ *  backup-complete, so it always reflects lastSkippedFiles exactly. */
+function renderSkippedFilesList(): void {
+  const n = lastSkippedFiles.length;
+  skippedFilesCountEl.textContent = `${n.toLocaleString()} file${n === 1 ? "" : "s"} couldn't be copied`;
+
+  skippedFilesListEl.innerHTML = "";
+  for (const entry of lastSkippedFiles) {
+    const row = document.createElement("div");
+    row.className = "ab-skipped-file-row";
+
+    const srcEl = document.createElement("div");
+    srcEl.className = "ab-skipped-file-source";
+    srcEl.textContent = entry.source;
+    srcEl.title = entry.source;
+
+    const arrowEl = document.createElement("div");
+    arrowEl.className = "ab-skipped-file-arrow";
+    arrowEl.textContent = "→";
+
+    const destEl = document.createElement("div");
+    destEl.className = "ab-skipped-file-dest";
+    destEl.textContent = entry.destination;
+    destEl.title = entry.destination;
+
+    row.appendChild(srcEl);
+    row.appendChild(arrowEl);
+    row.appendChild(destEl);
+    skippedFilesListEl.appendChild(row);
+  }
+}
+
+/** Shows/hides the "View Skipped Files" button based on the last run. */
+function syncSkippedFilesButton(): void {
+  skippedFilesBtn.style.display = lastSkippedFiles.length > 0 ? "" : "none";
 }
 
 /* =============================================================================
@@ -2058,6 +2289,9 @@ export async function initAutoBackup(): Promise<void> {
 
   runBtn    = document.getElementById("ab-run-btn") as HTMLButtonElement;
   cancelBtn = document.getElementById("ab-cancel-btn") as HTMLButtonElement;
+  detailsToggle = document.getElementById("ab-details-toggle") as HTMLInputElement;
+  detailsLabel  = document.getElementById("ab-details-label")!;
+  detailsToggleWrap = document.getElementById("ab-details-toggle-wrap")!;
 
   progressPanel        = document.getElementById("ab-progress-panel")!;
   progressContent      = document.getElementById("ab-progress-content")!;
@@ -2085,6 +2319,7 @@ export async function initAutoBackup(): Promise<void> {
 
   renderSourceList();
   renderDestList();
+  renderDetailsToggle();
   refreshSummary();
   refreshEstSize();
   refreshFreeSpace();
@@ -2129,6 +2364,17 @@ export async function initAutoBackup(): Promise<void> {
     void runEstimate();
   });
 
+  detailsToggle.addEventListener("change", () => {
+    if (backupRunning) {
+      // Shouldn't fire (disabled mid-run), but guard anyway: revert.
+      detailsToggle.checked = config.showDetails;
+      return;
+    }
+    config.showDetails = detailsToggle.checked;
+    renderDetailsToggle();
+    saveConfig();
+  });
+
   cancelBtn.addEventListener("click", async () => {
     try {
       await invoke("cancel_backup");
@@ -2171,6 +2417,7 @@ export async function initAutoBackup(): Promise<void> {
 
   initPresetsModal();
   initRunConfirmModal();
+  initSkippedFilesModal();
   initSpeedInfoModal();
   initDirsInfoModal();
   initDisclaimer();

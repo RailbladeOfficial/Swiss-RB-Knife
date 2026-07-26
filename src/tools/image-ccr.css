@@ -1040,3 +1040,121 @@
   background: var(--color-border);
   margin: 4px 0 12px;
 }
+
+/* =============================================================================
+   GATED PANELS  (shown but greyed-out until their prerequisite is met)
+   -----------------------------------------------------------------------------
+   Replaces the old "display:none until ready" behaviour: the option panels stay
+   visible so the whole workflow is discoverable, but their body is dimmed and
+   non-interactive, with a lock hint in the header naming what's still needed.
+============================================================================= */
+
+.panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-lock-hint {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 2px 12px;
+  white-space: nowrap;
+}
+
+.panel-lock-hint::before {
+  content: "🔒 ";
+}
+
+/* Grey only the body — the header (title + lock hint + any info button) stays
+   legible and, where relevant, still clickable. */
+.panel.is-disabled .tool-panel-body {
+  opacity: 0.4;
+  pointer-events: none;
+  filter: grayscale(0.6);
+  user-select: none;
+}
+
+/* =============================================================================
+   TRANSPARENT TOGGLE  (checkbox beside a colour control)
+============================================================================= */
+
+.transparent-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.transparent-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--color-btn-text);
+  flex-shrink: 0;
+}
+
+/* When transparent is active, grey the swatch + hex (but not the checkbox) */
+.color-input-row.is-transparent .color-swatch,
+.color-input-row.is-transparent .color-hex {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* =============================================================================
+   TRANSPARENCY HINT  (transparent fill + JPG output flattens to black)
+============================================================================= */
+
+.transparent-hint {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding: 7px 12px;
+  margin: 4px 0 0;
+}
+
+/* =============================================================================
+   RESIZE — source scan progress (spinner + bar while a source is analysed)
+============================================================================= */
+
+.resize-scan-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.resize-scan-progress .ab-progress-bar-track {
+  flex: 1;
+  min-width: 0;
+}
+
+.resize-scan-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scan-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-btn-text);
+  animation: scan-spin 0.7s linear infinite;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+@keyframes scan-spin {
+  to { transform: rotate(360deg); }
+}

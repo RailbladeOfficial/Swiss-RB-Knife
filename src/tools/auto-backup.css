@@ -378,6 +378,31 @@
   cursor: not-allowed;
 }
 
+/* Details/fast toggle sits at the far right of the action row. margin-left
+   auto pushes it there regardless of the run/cancel buttons' width. The
+   switch itself (.toggle-switch / .toggle-slider) is styled globally. */
+.ab-details-toggle-wrap {
+  margin-left: auto;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* Locked state (while a backup runs): dim the whole control and never show
+   the click-hand cursor. The switch's own :disabled styling lives in the
+   global stylesheet, but that doesn't cover this wrapper's text/label or the
+   pointer cursor the toggle-switch label sets, so scope it here. The wrapper
+   gets .ab-details-locked from renderDetailsToggle() when disabled. */
+.ab-details-toggle-wrap.ab-details-locked {
+  opacity: 0.45;
+}
+.ab-details-toggle-wrap.ab-details-locked,
+.ab-details-toggle-wrap.ab-details-locked .toggle-switch,
+.ab-details-toggle-wrap.ab-details-locked .toggle-slider,
+.ab-details-toggle-wrap.ab-details-locked input,
+.ab-details-toggle-wrap.ab-details-locked #ab-details-label {
+  cursor: not-allowed;
+}
+
 /* =============================================================================
    PROGRESS PANEL
 ============================================================================= */
@@ -392,6 +417,20 @@
   font-family: monospace;
   opacity: 0.85;
   word-break: break-all;
+  margin: 0;
+}
+
+/* "View Skipped Files" sits between the current-file line above and the
+   Backup Progress bar below, left-aligned — only appears when there were
+   skips (the button itself is hidden via inline style until then). It's
+   only ever shown post-completion, when the current-file line above is
+   always blank but still reserves its min-height (so live runs don't jump)
+   — the negative margin pulls the button up into that reserved blank space
+   instead of stacking a second gap on top of it. */
+.ab-skipped-files-btn {
+  align-self: flex-start;
+  white-space: nowrap;
+  margin-top: -8px;
 }
 
 /* Progress bar */
@@ -949,4 +988,68 @@
 
 .ab-run-confirm-modal .exit-modal-actions {
   flex-wrap: wrap;
+}
+
+/* =============================================================================
+   CONFIRM MODAL — free-space warnings
+   -----------------------------------------------------------------------------
+   Non-blocking cautions, not errors: "size to copy" counts the full size of
+   every changed file, not the smaller number of bytes an overwrite actually
+   adds, so a destination showing here might still have enough room.
+============================================================================= */
+
+.ab-confirm-space-warning {
+  font-size: 0.8rem;
+  background: var(--color-hover);
+  border: 1px solid var(--color-danger, #c0392b);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+/* =============================================================================
+   SKIPPED FILES MODAL
+============================================================================= */
+
+.ab-skipped-files-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.75;
+  margin: 4px 0 8px;
+}
+
+.ab-skipped-files-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ab-skipped-file-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.72rem;
+}
+
+.ab-skipped-file-row:last-child {
+  border-bottom: none;
+}
+
+.ab-skipped-file-source,
+.ab-skipped-file-dest {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ab-skipped-file-arrow {
+  opacity: 0.4;
+  flex-shrink: 0;
 }

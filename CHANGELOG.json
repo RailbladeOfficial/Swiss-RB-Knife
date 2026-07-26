@@ -1,5 +1,32 @@
 [
   {
+    "version": "0.4.0",
+    "date": "2026-07-26",
+    "changes": {
+      "features": {
+        
+      },
+      "improvements": {
+        "Auto-Backup": [
+          "Added ability to hide progress details, allowing running of backups to go faster.",
+          "If a file gets skipped, it's now separately logged and viewable in a modal.",
+          "Added warning to the confirmation modal if destination drive doesn't exist / there's not enough space."
+        ],
+        "Image CCR": [
+          "Added parallel threading so that the resize operation would run faster.",
+          "Tools now show their panels locked when there's not enough files chosen, instead of not showing them at all.",
+          "Resize tool can now handle inputs of one or more selected files, not just folders.",
+          "Resize tool's canvas color, Combine tool's canvas and border colors can now be set to transparent, when creating a PNG image."
+        ]
+      },
+      "bugfixes": {
+        "Image CCR": [
+          "Fixed the Image CCR tools not running asynchronously and choking off the computer."
+        ]
+      }
+    }
+  },
+  {
     "version": "0.3.3",
     "date": "2026-07-24",
     "changes": {

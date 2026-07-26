@@ -541,7 +541,7 @@ pub fn run() {
             tools::image_ccr::combine_images,
             tools::image_ccr::compress_image,
             tools::image_ccr::show_in_explorer,
-            tools::image_ccr::get_resize_folder_stats,
+            tools::image_ccr::scan_resize_sources,
             tools::image_ccr::resize_images,
             tools::image_ccr::cancel_resize,
             // Dummy File Generator

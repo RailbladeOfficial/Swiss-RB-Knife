@@ -12,7 +12,7 @@
    Rust commands used:
      get_image_info, preview_combine, combine_images,
      compress_image, show_in_explorer,
-     get_resize_folder_stats, resize_images, cancel_resize
+     scan_resize_sources, resize_images, cancel_resize
 ============================================================================= */
 
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
@@ -52,7 +52,8 @@ interface CompressResult {
   size_bytes:  number;
 }
 
-interface ResizeFolderStats {
+interface ResizeScanResult {
+  paths:   string[];
   count:   number;
   min_w:   number;
   max_w:   number;
@@ -70,11 +71,13 @@ const combineState = {
   outputFolder:    null as string | null,
   resultPath:      null as string | null,
   canvasColor:        "#000000",
+  canvasTransparent:  false,
   gap:                0,
   borderEnabled:      false,
   borderThickness:    0,
   borderColor:        "#000000",
   borderColorUserSet: false,
+  borderTransparent:  false,
   outputFormat:    "jpg" as "jpg" | "png",
 };
 
@@ -86,7 +89,13 @@ const compressState = {
 };
 
 const resizeState = {
+  // The resolved image list the run operates on. Populated by a scan; a browsed
+  // folder and a hand-picked file selection both feed this same list.
+  sourcePaths:       [] as string[],
+  // The browsed folder, when the source came from one. Used only to name the
+  // default output folder; null when the source is a picked file list.
   sourceFolder:      null as string | null,
+  sourceMode:        null as "folder" | "files" | null,
   outputFolder:      null as string | null,
   lastResultFolder:  null as string | null,
   targetW:           null as number | null,
@@ -96,6 +105,7 @@ const resizeState = {
   canvasH:           null as number | null,
   gravity:           "center",
   bgColor:           "#000000",
+  bgTransparent:     false,
   outputFormat:      "jpg" as "jpg" | "png",
 };
 
@@ -125,6 +135,42 @@ function setLoading(btn: HTMLButtonElement, loading: boolean) {
   } else {
     btn.textContent = btn.dataset.label ?? btn.textContent!.replace(" ⟳", "");
   }
+}
+
+/**
+ * Toggles a gated panel between active and a greyed-out "locked" state. The
+ * panel stays visible (so the user can see the step exists) but its body is
+ * dimmed and non-interactive until its prerequisite is met. `hint`, when
+ * provided, shows the requirement text while disabled and hides when enabled.
+ */
+function setPanelEnabled(
+  panel: HTMLElement,
+  hint: HTMLElement | null,
+  enabled: boolean,
+  hintText?: string,
+): void {
+  panel.classList.toggle("is-disabled", !enabled);
+  if (hint) {
+    if (!enabled && hintText) hint.textContent = hintText;
+    hint.style.display = enabled ? "none" : "";
+  }
+}
+
+/**
+ * Wires a "Transparent" checkbox to a colour control. When checked, the swatch
+ * and hex label grey out and the callback fires with `true`; the caller then
+ * sends the "transparent" sentinel to Rust instead of a hex value. Unchecking
+ * restores the previously chosen colour.
+ */
+function wireTransparentToggle(
+  checkbox: HTMLInputElement,
+  row: HTMLElement,
+  onChange: (transparent: boolean) => void,
+): void {
+  checkbox.addEventListener("change", () => {
+    row.classList.toggle("is-transparent", checkbox.checked);
+    onChange(checkbox.checked);
+  });
 }
 
 /**
@@ -282,8 +328,18 @@ function renderCombinePreview() {
     strip.appendChild(card);
   });
 
-  previewSection.style.display = count > 0  ? "" : "none";
-  optionsSection.style.display = count >= 2 ? "" : "none";
+  setPanelEnabled(
+    previewSection,
+    document.getElementById("combine-preview-lock"),
+    count > 0,
+    "Select images first",
+  );
+  setPanelEnabled(
+    optionsSection,
+    document.getElementById("combine-options-lock"),
+    count >= 2,
+    count === 0 ? "Select at least 2 images" : "Add 1 more image",
+  );
   document.getElementById("combine-result-section")!.style.display = "none";
   // Clear live preview when image list changes
   clearLivePreview();
@@ -300,9 +356,25 @@ function showCombineResult(result: CombineResult) {
   section.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+/**
+ * Transparency only survives in PNG. When a transparent fill is active but the
+ * output format is JPG, show a note that transparent areas will flatten to
+ * black — non-blocking, so the user can proceed if that's what they want.
+ */
+function updateCombineTransparentHint() {
+  const hint = document.getElementById("combine-transparent-hint");
+  if (!hint) return;
+  const anyTransparent = combineState.canvasTransparent || combineState.borderTransparent;
+  hint.style.display = anyTransparent && combineState.outputFormat === "jpg" ? "" : "none";
+}
+
 async function addCombineFilePaths(paths: string[]) {
-  for (const path of paths) {
-    if (combineState.images.some((i) => i.path === path)) continue;
+  const countBadge = document.getElementById("combine-count")!;
+  const newPaths   = paths.filter((p) => !combineState.images.some((i) => i.path === p));
+  let done = 0;
+  for (const path of newPaths) {
+    // Live count so a large multi-select shows movement instead of a dead UI.
+    countBadge.textContent = `Loading ${++done} / ${newPaths.length}…`;
     try {
       const info = await invoke<ImageInfo>("get_image_info", { path });
       combineState.images.push(info);
@@ -341,10 +413,10 @@ async function runLivePreview() {
       paths:           combineState.images.map((i) => i.path),
       direction:       combineState.direction,
       gap:             combineState.gap,
-      canvasColor:     combineState.canvasColor,
+      canvasColor:     combineState.canvasTransparent ? "transparent" : combineState.canvasColor,
       borderEnabled:   combineState.borderEnabled,
       borderThickness: combineState.borderThickness,
-      borderColor:     combineState.borderColor,
+      borderColor:     combineState.borderTransparent ? "transparent" : combineState.borderColor,
       outputFormat:    combineState.outputFormat,
     });
     img.src = `${pathToSrc(result.temp_path)}?t=${Date.now()}`;
@@ -375,9 +447,13 @@ function applyCompressInfo(info: ImageInfo) {
   document.getElementById("compress-dims")!.textContent     = `${info.width} × ${info.height} px`;
   document.getElementById("compress-filesize")!.textContent = formatBytes(info.size_bytes);
 
-  document.getElementById("compress-loaded")!.style.display          = "flex";
-  document.getElementById("compress-options-section")!.style.display  = "";
-  document.getElementById("compress-result-section")!.style.display   = "none";
+  document.getElementById("compress-loaded")!.style.display = "flex";
+  setPanelEnabled(
+    document.getElementById("compress-options-section")!,
+    document.getElementById("compress-options-lock"),
+    true,
+  );
+  document.getElementById("compress-result-section")!.style.display = "none";
 
   updateSizeEstimate();
 }
@@ -418,6 +494,31 @@ export async function initImageCCR(): Promise<void> {
     });
   });
 
+  // ── Initial gated-panel states ──
+  // Each tool's option panels stay visible but greyed until their prerequisite
+  // (enough files / a scanned source) is met, so the whole workflow is always
+  // discoverable rather than appearing out of nowhere.
+  setPanelEnabled(
+    document.getElementById("combine-preview-section")!,
+    document.getElementById("combine-preview-lock"),
+    false, "Select images first",
+  );
+  setPanelEnabled(
+    document.getElementById("combine-options-section")!,
+    document.getElementById("combine-options-lock"),
+    false, "Select at least 2 images",
+  );
+  setPanelEnabled(
+    document.getElementById("compress-options-section")!,
+    document.getElementById("compress-options-lock"),
+    false, "Select an image first",
+  );
+  setPanelEnabled(
+    document.getElementById("resize-options-section")!,
+    document.getElementById("resize-options-lock"),
+    false, "Select a source folder or files first",
+  );
+
   // ── Combine: browse ──
   document.getElementById("combine-browse-btn")!.addEventListener("click", async () => {
     const selected = await open({
@@ -425,7 +526,13 @@ export async function initImageCCR(): Promise<void> {
       filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp"] }],
     });
     if (!selected) return;
-    await addCombineFilePaths(Array.isArray(selected) ? selected : [selected]);
+    const btn = document.getElementById("combine-browse-btn") as HTMLButtonElement;
+    setLoading(btn, true);
+    try {
+      await addCombineFilePaths(Array.isArray(selected) ? selected : [selected]);
+    } finally {
+      setLoading(btn, false);
+    }
   });
 
   // ── Combine: clear all ──
@@ -464,6 +571,16 @@ export async function initImageCCR(): Promise<void> {
   });
   makeHexEditable(canvasColorHex as HTMLElement, canvasColorInput, applyCanvasColor);
 
+  // Canvas transparent toggle
+  wireTransparentToggle(
+    document.getElementById("combine-canvas-transparent") as HTMLInputElement,
+    canvasColorInput.closest(".color-input-row") as HTMLElement,
+    (transparent) => {
+      combineState.canvasTransparent = transparent;
+      updateCombineTransparentHint();
+    },
+  );
+
   // ── Combine: gap ──
   document.getElementById("combine-gap")!.addEventListener("input", (e) => {
     combineState.gap = parseInt((e.target as HTMLInputElement).value) || 0;
@@ -495,6 +612,16 @@ export async function initImageCCR(): Promise<void> {
   });
   makeHexEditable(borderColorHex as HTMLElement, borderColorInput, applyBorderColor);
 
+  // Border transparent toggle
+  wireTransparentToggle(
+    document.getElementById("combine-border-transparent") as HTMLInputElement,
+    borderColorInput.closest(".color-input-row") as HTMLElement,
+    (transparent) => {
+      combineState.borderTransparent = transparent;
+      updateCombineTransparentHint();
+    },
+  );
+
   // ── Combine: output format ──
   document.querySelectorAll<HTMLButtonElement>(".fmt-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -502,6 +629,7 @@ export async function initImageCCR(): Promise<void> {
       btn.classList.add("active");
       combineState.outputFormat = btn.dataset.fmt as "jpg" | "png";
       document.getElementById("combine-output-ext")!.textContent = `.${combineState.outputFormat}`;
+      updateCombineTransparentHint();
     });
   });
 
@@ -537,10 +665,10 @@ export async function initImageCCR(): Promise<void> {
         outputFolder:    combineState.outputFolder ?? null,
         outputName,
         gap:             combineState.gap,
-        canvasColor:     combineState.canvasColor,
+        canvasColor:     combineState.canvasTransparent ? "transparent" : combineState.canvasColor,
         borderEnabled:   combineState.borderEnabled,
         borderThickness: combineState.borderThickness,
-        borderColor:     combineState.borderColor,
+        borderColor:     combineState.borderTransparent ? "transparent" : combineState.borderColor,
         outputFormat:    combineState.outputFormat,
       });
       combineState.resultPath = result.output_path;
@@ -567,12 +695,16 @@ export async function initImageCCR(): Promise<void> {
       filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp"] }],
     });
     if (!selected) return;
+    const btn = document.getElementById("compress-browse-btn") as HTMLButtonElement;
+    setLoading(btn, true);
     try {
       const path = Array.isArray(selected) ? selected[0] : selected;
       const info = await invoke<ImageInfo>("get_image_info", { path });
       applyCompressInfo(info);
     } catch (err) {
       flash(`Could not load file: ${err}`, "error");
+    } finally {
+      setLoading(btn, false);
     }
   });
 
@@ -580,9 +712,14 @@ export async function initImageCCR(): Promise<void> {
   document.getElementById("compress-clear")!.addEventListener("click", () => {
     compressState.image      = null;
     compressState.resultPath = null;
-    document.getElementById("compress-loaded")!.style.display          = "none";
-    document.getElementById("compress-options-section")!.style.display  = "none";
-    document.getElementById("compress-result-section")!.style.display   = "none";
+    document.getElementById("compress-loaded")!.style.display = "none";
+    setPanelEnabled(
+      document.getElementById("compress-options-section")!,
+      document.getElementById("compress-options-lock"),
+      false,
+      "Select an image first",
+    );
+    document.getElementById("compress-result-section")!.style.display = "none";
   });
 
   // ── Compress: slider ──
@@ -646,6 +783,7 @@ export async function initImageCCR(): Promise<void> {
   // =============================================================================
 
   let resizeRunning    = false;
+  let resizeScanning   = false;
   let resizeUnlisteners: Array<() => void> = [];
 
   // ── Resize info modal ──
@@ -658,6 +796,7 @@ export async function initImageCCR(): Promise<void> {
     document.getElementById("resize-canvas-fields")!.style.display  = visible ? "" : "none";
     document.getElementById("resize-gravity-group")!.style.display  = visible ? "" : "none";
     document.getElementById("resize-bgcolor-group")!.style.display  = visible ? "" : "none";
+    updateResizeTransparentHint();
   }
 
   function setResizeRunning(running: boolean) {
@@ -672,49 +811,135 @@ export async function initImageCCR(): Promise<void> {
     document.getElementById("resize-progress-count")!.textContent = "";
   }
 
-  async function scanResizeFolder(folder: string) {
-    if (!folder.trim()) return;
-    resizeState.sourceFolder = folder.trim();
-    (document.getElementById("resize-source-path") as HTMLInputElement).value = resizeState.sourceFolder;
+  // Enable/disable the whole "2 · Options" panel based on whether a scan has
+  // produced any images. Panel stays visible-but-greyed until then.
+  function gateResizeOptions(enabled: boolean, hintText?: string) {
+    setPanelEnabled(
+      document.getElementById("resize-options-section")!,
+      document.getElementById("resize-options-lock"),
+      enabled,
+      hintText,
+    );
+  }
+
+  // Show/hide the scan progress row and toggle the scanning UI lock.
+  function setResizeScanUI(scanning: boolean) {
+    resizeScanning = scanning;
+    document.getElementById("resize-scan-progress")!.style.display = scanning ? "" : "none";
+    (document.getElementById("resize-browse-folder") as HTMLButtonElement).disabled = scanning;
+    (document.getElementById("resize-browse-files")  as HTMLButtonElement).disabled = scanning;
+    (document.getElementById("resize-scan-source")   as HTMLButtonElement).disabled = scanning;
+    if (scanning) {
+      document.getElementById("resize-scan-bar")!.style.width      = "0%";
+      document.getElementById("resize-scan-label")!.textContent    = "Scanning…";
+    }
+  }
+
+  const resizeSourceInput = document.getElementById("resize-source-path") as HTMLInputElement;
+
+  // Core scan: takes EITHER a folder OR a picked file list, runs the backend
+  // header-only scan (off the UI thread, with progress events), then populates
+  // stats and the resolved path list the run will consume.
+  async function runResizeScan(opts: { folder?: string; files?: string[] }): Promise<void> {
+    if (resizeScanning) return;
+
+    if (opts.folder !== undefined) {
+      resizeState.sourceMode   = "folder";
+      resizeState.sourceFolder = opts.folder.trim();
+      resizeSourceInput.value  = resizeState.sourceFolder;
+      resizeSourceInput.readOnly = false;
+    } else {
+      resizeState.sourceMode   = "files";
+      resizeState.sourceFolder = null;
+      const n = opts.files!.length;
+      resizeSourceInput.value    = `${n} file${n !== 1 ? "s" : ""} selected`;
+      resizeSourceInput.readOnly = true;
+    }
+
+    setResizeScanUI(true);
+    const { listen } = await import("@tauri-apps/api/event");
+    const unlistenScan = await listen<{ done: number; total: number }>(
+      "resize-scan-progress",
+      ({ payload }) => {
+        const pct = payload.total > 0 ? (payload.done / payload.total) * 100 : 0;
+        document.getElementById("resize-scan-bar")!.style.width   = `${pct.toFixed(1)}%`;
+        document.getElementById("resize-scan-label")!.textContent = `Scanning… ${payload.done} / ${payload.total}`;
+      },
+    );
+
     try {
-      const stats = await invoke<ResizeFolderStats>("get_resize_folder_stats", { folder: resizeState.sourceFolder });
-      document.getElementById("resize-stat-count")!.textContent = String(stats.count);
-      document.getElementById("resize-stat-max-w")!.textContent = `${stats.max_w}px`;
-      document.getElementById("resize-stat-min-w")!.textContent = `${stats.min_w}px`;
-      document.getElementById("resize-stat-max-h")!.textContent = `${stats.max_h}px`;
-      document.getElementById("resize-stat-min-h")!.textContent = `${stats.min_h}px`;
-      document.getElementById("resize-folder-stats")!.style.display    = "";
-      document.getElementById("resize-options-section")!.style.display  = stats.count > 0 ? "" : "none";
-      document.getElementById("resize-result-inline")!.style.display   = "none";
+      const res = await invoke<ResizeScanResult>("scan_resize_sources", {
+        folder: opts.folder ?? null,
+        files:  opts.files  ?? null,
+      });
+      resizeState.sourcePaths = res.paths;
+
+      document.getElementById("resize-stat-count")!.textContent = String(res.count);
+      document.getElementById("resize-stat-max-w")!.textContent = `${res.max_w}px`;
+      document.getElementById("resize-stat-min-w")!.textContent = `${res.min_w}px`;
+      document.getElementById("resize-stat-max-h")!.textContent = `${res.max_h}px`;
+      document.getElementById("resize-stat-min-h")!.textContent = `${res.min_h}px`;
+      document.getElementById("resize-folder-stats")!.style.display  = "";
+      document.getElementById("resize-result-inline")!.style.display = "none";
       resetResizeProgress();
       document.getElementById("resize-progress-section")!.style.display = "none";
-      if (stats.count === 0) flash("No supported images found in that folder.", "error");
+
+      if (res.count === 0) {
+        gateResizeOptions(false, "No supported images — select a folder or files with images");
+        flash("No supported images found.", "error");
+      } else {
+        gateResizeOptions(true);
+      }
     } catch (err) {
-      flash(`Could not read folder: ${err}`, "error");
+      resizeState.sourcePaths = [];
+      gateResizeOptions(false, "Select a source folder or files first");
+      flash(`Scan failed: ${err}`, "error");
+    } finally {
+      unlistenScan();
+      setResizeScanUI(false);
     }
   }
 
   // ── Resize: browse source folder ──
-  document.getElementById("resize-browse-source")!.addEventListener("click", async () => {
+  document.getElementById("resize-browse-folder")!.addEventListener("click", async () => {
     const selected = await open({ directory: true, multiple: false });
     if (!selected || typeof selected !== "string") return;
-    await scanResizeFolder(selected);
+    await runResizeScan({ folder: selected });
   });
 
-  // ── Resize: manual path — scan on Enter or blur ──
-  const resizeSourceInput = document.getElementById("resize-source-path") as HTMLInputElement;
+  // ── Resize: browse individual files ──
+  document.getElementById("resize-browse-files")!.addEventListener("click", async () => {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif"] }],
+    });
+    if (!selected) return;
+    const files = Array.isArray(selected) ? selected : [selected];
+    if (files.length === 0) return;
+    await runResizeScan({ files });
+  });
+
+  // ── Resize: manual folder path — scan on Enter or blur ──
+  // The input is readOnly in files mode (it shows a synthetic "N files selected"
+  // label), so these only ever act on a genuinely typed folder path.
   resizeSourceInput.addEventListener("keydown", async (e) => {
-    if (e.key === "Enter") await scanResizeFolder(resizeSourceInput.value);
+    if (e.key === "Enter" && !resizeSourceInput.readOnly && resizeSourceInput.value.trim()) {
+      await runResizeScan({ folder: resizeSourceInput.value });
+    }
   });
   resizeSourceInput.addEventListener("blur", async () => {
-    if (resizeSourceInput.value.trim() && resizeSourceInput.value.trim() !== resizeState.sourceFolder) {
-      await scanResizeFolder(resizeSourceInput.value);
+    if (resizeSourceInput.readOnly) return;
+    const v = resizeSourceInput.value.trim();
+    if (v && v !== resizeState.sourceFolder) {
+      await runResizeScan({ folder: v });
     }
   });
 
-  // ── Resize: scan button ──
+  // ── Resize: scan button (re-scan the typed folder path) ──
   document.getElementById("resize-scan-source")!.addEventListener("click", async () => {
-    await scanResizeFolder(resizeSourceInput.value);
+    if (!resizeSourceInput.readOnly && resizeSourceInput.value.trim()) {
+      await runResizeScan({ folder: resizeSourceInput.value });
+    }
   });
 
   // ── Resize: target dimensions ──
@@ -765,12 +990,31 @@ export async function initImageCCR(): Promise<void> {
   });
   makeHexEditable(resizeBgHex as HTMLElement, resizeBgInput, applyResizeBgColor);
 
+  // Resize transparent-background toggle + PNG-only hint
+  function updateResizeTransparentHint() {
+    const hint = document.getElementById("resize-transparent-hint");
+    if (!hint) return;
+    const show = resizeState.bgTransparent
+      && resizeState.canvasManual
+      && resizeState.outputFormat === "jpg";
+    hint.style.display = show ? "" : "none";
+  }
+  wireTransparentToggle(
+    document.getElementById("resize-bg-transparent") as HTMLInputElement,
+    resizeBgInput.closest(".color-input-row") as HTMLElement,
+    (transparent) => {
+      resizeState.bgTransparent = transparent;
+      updateResizeTransparentHint();
+    },
+  );
+
   // ── Resize: output format ──
   document.querySelectorAll<HTMLButtonElement>(".resize-fmt-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".resize-fmt-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       resizeState.outputFormat = btn.dataset.fmt as "jpg" | "png";
+      updateResizeTransparentHint();
     });
   });
 
@@ -830,8 +1074,8 @@ export async function initImageCCR(): Promise<void> {
   // ── Resize: run ──
   document.getElementById("resize-run")!.addEventListener("click", async () => {
     if (resizeRunning) return;
-    if (!resizeState.sourceFolder) {
-      flash("No source folder selected.", "error");
+    if (resizeState.sourcePaths.length === 0) {
+      flash("No source images selected.", "error");
       return;
     }
     const hasResize = resizeState.targetW !== null || resizeState.targetH !== null;
@@ -854,14 +1098,15 @@ export async function initImageCCR(): Promise<void> {
 
     try {
       await invoke("resize_images", {
-        sourceFolder:  resizeState.sourceFolder,
+        paths:         resizeState.sourcePaths,
+        sourceFolder:  resizeState.sourceFolder ?? null,
         outputFolder:  resizeState.outputFolder ?? null,
         targetW:       resizeState.targetW ?? null,
         targetH:       resizeState.targetH ?? null,
         canvasW:       resizeState.canvasManual ? (resizeState.canvasW ?? null) : null,
         canvasH:       resizeState.canvasManual ? (resizeState.canvasH ?? null) : null,
         gravity:       resizeState.gravity,
-        bgColor:       resizeState.bgColor,
+        bgColor:       resizeState.bgTransparent ? "transparent" : resizeState.bgColor,
         outputFormat:  resizeState.outputFormat,
       });
     } catch (err) {
