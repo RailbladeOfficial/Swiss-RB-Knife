@@ -3,7 +3,7 @@
 Swiss RB Knife makes use of the following open-source packages and libraries.
 All credit and gratitude to their respective authors and maintainers.
 
-> **Generated automatically on 2026-07-26.**
+> **Generated automatically on 2026-07-27.**
 > Re-run `node generate-licenses.mjs` (or `npm run build`) to refresh.
 
 ---
@@ -624,9 +624,13 @@ All credit and gratitude to their respective authors and maintainers.
 | [reqwest](https://github.com/seanmonstar/reqwest) | 0.13.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rfd](https://github.com/PolyMeilex/rfd) | 0.16.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [rgb](https://github.com/kornelski/rust-rgb) | 0.8.53 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [ring](https://github.com/briansmith/ring) | 0.17.14 | [Apache-2.0 AND ISC](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustc_version](https://github.com/djc/rustc-version-rs) | 0.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustc-hash](https://github.com/rust-lang/rustc-hash) | 2.1.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustix](https://github.com/bytecodealliance/rustix) | 1.1.4 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [rustls](https://github.com/rustls/rustls) | 0.23.42 | [Apache-2.0 OR ISC OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [rustls-pki-types](https://github.com/rustls/pki-types) | 1.15.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [rustls-webpki](https://github.com/rustls/webpki) | 0.103.13 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [rustversion](https://github.com/dtolnay/rustversion) | 1.0.23 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [same-file](https://github.com/BurntSushi/same-file) | 1.0.6 | [MIT OR Unlicense](https://spdx.org/licenses/MIT.html) |
 | [schemars](https://github.com/GREsau/schemars) | 0.8.22 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -668,7 +672,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [strsim](https://github.com/rapidfuzz/strsim-rs) | 0.11.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [subtle](https://github.com/dalek-cryptography/subtle) | 2.6.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
 | [swift-rs](https://github.com/Brendonovich/swift-rs) | 1.0.7 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| swiss-rb-knife | 0.3.3 | [AGPL-3.0-or-later](https://spdx.org/licenses/AGPL-3.0-or-later.html) |
+| swiss-rb-knife | 0.3.2 | [AGPL-3.0-or-later](https://spdx.org/licenses/AGPL-3.0-or-later.html) |
 | [syn](https://github.com/dtolnay/syn) | 1.0.109 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [syn](https://github.com/dtolnay/syn) | 2.0.119 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [syn](https://github.com/dtolnay/syn) | 3.0.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -736,6 +740,8 @@ All credit and gratitude to their respective authors and maintainers.
 | [unicode-ident](https://github.com/dtolnay/unicode-ident) | 1.0.24 | [(Apache-2.0 OR MIT) AND Unicode-3.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [unicode-segmentation](https://github.com/unicode-rs/unicode-segmentation) | 1.13.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [universal-hash](https://github.com/RustCrypto/traits) | 0.5.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [untrusted](https://github.com/briansmith/untrusted) | 0.9.0 | [ISC](https://spdx.org/licenses/ISC.html) |
+| [ureq](https://github.com/algesten/ureq) | 2.12.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [url](https://github.com/servo/rust-url) | 2.5.8 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [urlpattern](https://github.com/denoland/rust-urlpattern) | 0.3.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [utf8_iter](https://github.com/hsivonen/utf8_iter) | 1.0.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -759,6 +765,8 @@ All credit and gratitude to their respective authors and maintainers.
 | [web-sys](https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/web-sys) | 0.3.103 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [webkit2gtk](https://github.com/tauri-apps/webkit2gtk-rs) | 2.0.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [webkit2gtk-sys](https://github.com/tauri-apps/webkit2gtk-rs) | 2.0.2 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [webpki-roots](https://github.com/rustls/webpki-roots) | 0.26.11 | [CDLA-Permissive-2.0](https://spdx.org/licenses/CDLA-Permissive-2.0.html) |
+| [webpki-roots](https://github.com/rustls/webpki-roots) | 1.0.9 | [CDLA-Permissive-2.0](https://spdx.org/licenses/CDLA-Permissive-2.0.html) |
 | [webview2-com](https://github.com/wravery/webview2-rs) | 0.38.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [webview2-com-macros](https://github.com/wravery/webview2-rs) | 0.8.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [webview2-com-sys](https://github.com/wravery/webview2-rs) | 0.38.2 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -814,6 +822,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [windows-strings](https://github.com/microsoft/windows-rs) | 0.5.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [windows-sys](https://github.com/microsoft/windows-rs) | 0.45.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [windows-sys](https://github.com/microsoft/windows-rs) | 0.48.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [windows-sys](https://github.com/microsoft/windows-rs) | 0.52.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [windows-sys](https://github.com/microsoft/windows-rs) | 0.59.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [windows-sys](https://github.com/microsoft/windows-rs) | 0.60.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [windows-sys](https://github.com/microsoft/windows-rs) | 0.61.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |

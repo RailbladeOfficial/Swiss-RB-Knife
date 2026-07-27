@@ -499,6 +499,96 @@ fn clear_lock_hash(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 /* =============================================================================
+   UPDATE CHECK COMMAND  (shell-level)
+   -----------------------------------------------------------------------------
+   The ONLY outbound network call this app ever makes. Queries the GitHub
+   Releases API for the latest published release of this repo and hands the
+   tag + release-page URL back to the frontend alongside the running version,
+   so the frontend can decide whether to surface an update notice.
+
+   Deliberately narrow: unauthenticated, read-only, and aimed at exactly one
+   hardcoded host. There's no token to store, no capability glob to misconfigure,
+   and nothing the webview can reach on its own — the request is made here in
+   Rust, so the locked-down CSP (connect-src 'self' ipc:) still holds. Runs only
+   when the user has opted in (the frontend gates the call on a setting), and it
+   fails soft: any network or parse error comes back as Err and the frontend
+   stays silent, preserving the offline-by-default behaviour.
+============================================================================= */
+
+/// Repo slug ("owner/name") the update check queries. This single constant is
+/// the app's entire network footprint — the one place to edit if the repo moves.
+///
+/// TODO(Railblade): set to the real slug before release, e.g.
+/// "Railblade/swiss-rb-knife".
+const GITHUB_REPO: &str = "RailbladeOfficial/Swiss-RB-Knife";
+
+/// GitHub rejects API requests that omit a User-Agent (HTTP 403), so one is
+/// always sent. Identifies the app + version — nothing user-specific.
+const UPDATE_CHECK_UA: &str =
+    concat!("SwissRBKnife/", env!("CARGO_PKG_VERSION"), " (+update-check)");
+
+/// The subset of the GitHub release payload the frontend needs.
+#[derive(serde::Serialize)]
+struct UpdateInfo {
+    /// Running version, baked in from Cargo at compile time
+    /// (e.g. "0.3.3" — no leading "v").
+    current: String,
+    /// Latest release tag exactly as published (e.g. "v0.3.4").
+    latest: String,
+    /// The release's page URL, opened in the default browser by the frontend.
+    html_url: String,
+}
+
+/// Fetches the latest GitHub release and returns it with the running version.
+/// Blocking (ureq) with short connect/read timeouts; Tauri runs commands on a
+/// thread pool, so this never blocks the UI thread. Non-2xx responses (e.g. a
+/// 404 when no release exists yet) surface as Err — which the frontend treats
+/// as "no update info" and ignores, exactly like a network failure.
+#[tauri::command]
+fn check_for_updates() -> Result<UpdateInfo, String> {
+    let url = format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        GITHUB_REPO
+    );
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(8))
+        .timeout_read(std::time::Duration::from_secs(8))
+        .build();
+
+    let body = agent
+        .get(&url)
+        .set("User-Agent", UPDATE_CHECK_UA)
+        .set("Accept", "application/vnd.github+json")
+        .set("X-GitHub-Api-Version", "2022-11-28")
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_string()
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| e.to_string())?;
+
+    let latest = json
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "release payload missing tag_name".to_string())?
+        .to_string();
+
+    let html_url = json
+        .get("html_url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    Ok(UpdateInfo {
+        current: env!("CARGO_PKG_VERSION").to_string(),
+        latest,
+        html_url,
+    })
+}
+
+/* =============================================================================
    APP ENTRY POINT
 ============================================================================= */
 
@@ -524,6 +614,7 @@ pub fn run() {
             load_shell_state,
             save_custom_themes,
             load_custom_themes,
+            check_for_updates,
             // App lock
             save_lock_hash,
             verify_lock,

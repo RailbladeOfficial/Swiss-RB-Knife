@@ -268,19 +268,10 @@
 
       </ul>
 
-      <!-- BOTTOM NAV — settings and about -->
+      <!-- BOTTOM NAV — about and settings (About first so it sits above
+           Settings; Settings anchors the very bottom edge). Both stay pinned
+           and visible even when #navList scrolls on short screens. -->
       <ul id="navBottom">
-        <li id="settingsBtn" class="nav-item" title="Settings">
-          <span class="nav-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path
-                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </span>
-          <span class="nav-label">Settings</span>
-        </li>
         <li id="aboutBtn" class="nav-item" title="About">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -291,6 +282,17 @@
             </svg>
           </span>
           <span class="nav-label">About</span>
+        </li>
+        <li id="settingsBtn" class="nav-item" title="Settings">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </span>
+          <span class="nav-label">Settings</span>
         </li>
       </ul>
     </nav>
@@ -304,6 +306,8 @@
       <section id="section-home" class="content-section active">
         <div class="section-header">
           <h1 class="section-title">Home</h1>
+          <div id="homeUpdateNotice" class="home-update-notice" style="display: none;">Update Available - <a
+              id="homeUpdateLink" href="#"></a></div>
         </div>
 
         <div class="tool-card-grid">
@@ -2037,6 +2041,17 @@
         </div>
 
         <div class="settings-row">
+          <span>New Version Notification:</span>
+          <div class="toggle-with-label">
+            <span id="newVersionLabel">Disabled</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="newVersionToggle" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
           <span>Theme:</span>
           <div class="theme-select-wrap">
             <button id="rerollBtn" title="Reroll random palette" style="display: none;">⚄</button>
@@ -2153,12 +2168,85 @@
       <div class="modal-body">
         <p><strong>Swiss RB Knife — <span id="appVersion"></span></strong> — <a id="changelogLink" href="#">What's
             New</a></p>
+        <div id="updateNotice" class="update-notice" style="display: none;">
+          <p class="update-notice-text">Yo! A new version is available. Check out <a id="updateNoticeLink"
+              href="#"></a>!</p>
+          <button id="ignoreVersionBtn" class="update-ignore-btn">Ignore this Version</button>
+        </div>
         <span>&nbsp;</span>
         <p>Copyright ©2026 Railblade</p>
         <span>&nbsp;</span>
         <p><a id="readmeLink" href="#">Readme</a> &nbsp;·&nbsp; <a id="licensingLink" href="#">Licensing &amp;
             Attributions</a></p>
         <p><a id="securityLink" href="#">Security</a> &nbsp;·&nbsp; <a id="contributingLink" href="#">Contributing</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       IGNORE VERSION MODAL  (from About — confirms muting the current update)
+  ====================================================================== -->
+  <div id="ignoreVersionBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="ignoreVersionModal" class="modal">
+      <div class="modal-header">
+        <button id="ignoreVersionBack" class="nav-back-btn modal-header-left" title="Back to About">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span>Ignore This Version</span>
+        <button id="ignoreVersionClose" class="modal-close-btn modal-header-right">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p>Ignoring hides the update notice and stops the About icon pulsing for
+          <strong id="ignoreVersionTag"></strong>. If a newer version is released later, the notice comes back for
+          that one.</p>
+        <p>To turn version notifications off entirely, use <strong>New Version Notification</strong> in the General
+          Settings modal.</p>
+        <div class="exit-modal-actions">
+          <button id="ignoreVersionConfirm">Ignore this Version</button>
+          <button id="ignoreVersionCancel" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       ENABLE VERSION NOTIFICATIONS MODAL  (from General Settings — confirms
+       the network implication before the toggle actually turns on)
+  ====================================================================== -->
+  <div id="updateEnableBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="updateEnableModal" class="modal">
+      <div class="modal-header">
+        <button id="updateEnableBack" class="nav-back-btn modal-header-left" title="Back to Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span>Enable Version Notifications</span>
+        <button id="updateEnableClose" class="modal-close-btn modal-header-right">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p>With this on, Swiss RB Knife makes a single network request to GitHub on startup — and once right now, as
+          you enable it — to check whether a newer release exists.</p>
+        <p>That is the only time the app touches the network. No account, no personal data, nothing else is sent, and
+          it stays fully offline otherwise. You can turn this back off anytime.</p>
+        <div class="exit-modal-actions">
+          <button id="updateEnableConfirm">Enable Notifications</button>
+          <button id="updateEnableCancel" class="modal-cancel-btn">Cancel</button>
+        </div>
       </div>
     </div>
   </div>

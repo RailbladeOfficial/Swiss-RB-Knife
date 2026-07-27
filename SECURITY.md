@@ -26,6 +26,7 @@ These are deliberate choices, explained in the README's **Security & Privacy** s
 - Most data is plaintext JSON on purpose; only Budget Tracker offers encryption.
 - App Lock is a UI gate, not encryption.
 - The asset-protocol scope is broad so Image CCR can display images from anywhere you pick.
+- New Version Notification is opt-in and off by default. When it's on, the app makes a single read-only request to GitHub's public Releases API to check for a newer version — that's the app's only network call, and it sends no personal data (see the README's **Security & Privacy** section).
 - The installer is unsigned, so SmartScreen will likely moan about it.
 
 Not sure if something counts? Report it privately anyway. I'd rather get a false alarm than miss something real. Plus I'm lonely and could use the conversation.

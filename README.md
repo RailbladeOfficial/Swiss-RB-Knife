@@ -12,7 +12,7 @@
 
 ## What Is It?
 
-Swiss RB Knife is a completely offline, open-source, personal desktop utility suite — a unified multi-tool of various micro-utilities that I could not find personally useful substitutes for on the interwebs.
+Swiss RB Knife is an offline-by-default, open-source, personal desktop utility suite — a unified multi-tool of various micro-utilities that I could not find personally useful substitutes for on the interwebs.
 
 From image editing and file management, to productivity tracking and other shitnanigans, there's something in here for everyone's niche workflows. Probably.
 
@@ -217,7 +217,9 @@ The app ships as a single compiled binary with no runtime dependencies required 
 
 A few things worth knowing before use:
 
-**Everything is local.** No telemetry, no analytics, no phone-home, no accounts. The app makes zero network requests (for now). Your data lives in `C:\Users\{yourname}\AppData\Roaming\swiss-rb-knife` and nowhere else. In the future, they may be opt-in network activity related to pulling down data from an online database with respective to a future feature implementation. If that happens, this will be updated to reflect that.
+**Local by default.** No telemetry, no analytics, no phone-home, no accounts. Your data lives in `C:\Users\{yourname}\AppData\Roaming\swiss-rb-knife` and nowhere else.
+
+**There's exactly one optional network call, and it's off by default.** Turn on **New Version Notification** in General Settings and the app makes a single request to GitHub's public Releases API — once on startup, plus once right when you enable it — to see whether a newer version than the one you're running exists. That's the *only* time Swiss RB Knife ever touches the network. No account, no telemetry, no personal data leaves your machine — it's the same public version-number lookup your browser makes when you visit the Releases page. Leave it off and the app stays fully offline, same as it ever was. You'll get a heads-up modal explaining all this the first time (and every time) you switch it on, and you can flip it back off whenever. If a newer version is found, the About icon pulses and an "Update Available" link appears that opens the Releases page in your browser — the app never downloads or installs anything on its own; grabbing the update is always your call.
 
 **Most data is stored as plaintext JSON.** Settings, time entries, backup presets are readable by anything with access to your user folder. That's a deliberate simplicity choice: it's *your* data on *your* machine, and plaintext means you can always inspect or recover it by hand.
 

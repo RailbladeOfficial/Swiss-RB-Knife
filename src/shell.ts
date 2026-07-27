@@ -91,7 +91,25 @@ type ShellSettings = {
   appLock: boolean;
   lockCredentialType: "pin" | "password";
   soundPack: string;
+  /** Opt-in: run a single GitHub Releases check on startup (and on enable).
+   *  Off by default — the app is offline-by-default and only touches the
+   *  network when this is explicitly turned on. */
+  autoCheckUpdates: boolean;
+  /** The release tag the user chose to "ignore" (e.g. "v0.3.4"). A release
+   *  NEWER than this re-surfaces the notice; this exact one stays silent.
+   *  Empty string = nothing ignored. */
+  ignoredUpdateVersion: string;
 };
+
+/** Result of a successful update check, shared by the sidebar pulse and the
+ *  About-modal notice so neither has to re-query. `available` folds in both
+ *  the "newer than current" and "newer than ignored" checks. */
+interface UpdateInfo {
+  current: string;   // running version, e.g. "0.3.3" (no leading v)
+  latest: string;    // latest release tag, e.g. "v0.3.4"
+  htmlUrl: string;   // release page, opened in the default browser
+  available: boolean;
+}
 
 /* =============================================================================
    CONSTANTS
@@ -172,6 +190,8 @@ const DEFAULT_SETTINGS: ShellSettings = {
   appLock: false,
   lockCredentialType: "pin",
   soundPack: "default",
+  autoCheckUpdates: false,
+  ignoredUpdateVersion: "",
 };
 
 /* =============================================================================
@@ -211,6 +231,10 @@ let _lastCategory: string | null = null;
 // App version string — fetched once during init and reused by both
 // loadAppVersion() (display) and runStartupGates() (changelog gate).
 let _appVersion = "";
+
+// Latest successful update-check result. null until a check completes (and
+// reset to null on any failure). Read by refreshUpdateUI() — see UPDATE CHECK.
+let _updateInfo: UpdateInfo | null = null;
 
 // Where the full-license modal should return to when its back arrow is used.
 // Set by whatever opens it (README or the licensing modal); the back arrow
@@ -2142,6 +2166,7 @@ function applySettings(): void {
   if (isCustom) refreshCustomThemeSelect();
 
   applyLockSettings();
+  applyUpdateSettings();
   applyTheme(settings.theme);
   updateClock();
 }
@@ -2188,6 +2213,8 @@ async function loadSettings(): Promise<void> {
       soundPack:           typeof merged.soundPack === "string" && SOUND_PACKS.some((p) => p.id === merged.soundPack)
                              ? merged.soundPack
                              : DEFAULT_SETTINGS.soundPack,
+      autoCheckUpdates:    typeof merged.autoCheckUpdates === "boolean" ? merged.autoCheckUpdates : DEFAULT_SETTINGS.autoCheckUpdates,
+      ignoredUpdateVersion: typeof merged.ignoredUpdateVersion === "string" ? merged.ignoredUpdateVersion : DEFAULT_SETTINGS.ignoredUpdateVersion,
     };
   } catch {
     settings = { ...DEFAULT_SETTINGS };
@@ -2365,6 +2392,230 @@ document.getElementById("contributingLink")!.addEventListener("click", (e) => {
   e.preventDefault();
   aboutModal.close();
   openContributing();
+});
+
+/* =============================================================================
+   UPDATE CHECK  (shell-level)
+   -----------------------------------------------------------------------------
+   Opt-in, fire-and-forget version check against the GitHub Releases API (see
+   lib.rs `check_for_updates` — the only network call the app makes). Drives
+   two signals while a newer, un-ignored release exists: the pulsing About icon
+   in the sidebar, and a notice line + Ignore button in the About modal. Every
+   UI reaction funnels through refreshUpdateUI() so there's a single place that
+   reflects _updateInfo into the DOM. (The Settings toggle that enables all of
+   this is wired in the General Settings section.)
+============================================================================= */
+
+const updateNotice      = document.getElementById("updateNotice")!;
+const updateNoticeLink   = document.getElementById("updateNoticeLink") as HTMLAnchorElement;
+const homeUpdateNotice   = document.getElementById("homeUpdateNotice")!;
+const homeUpdateLink     = document.getElementById("homeUpdateLink") as HTMLAnchorElement;
+const ignoreVersionBtn   = document.getElementById("ignoreVersionBtn")!;
+const ignoreVersionBackdrop = document.getElementById("ignoreVersionBackdrop")!;
+const ignoreVersionBack  = document.getElementById("ignoreVersionBack")!;
+const ignoreVersionClose = document.getElementById("ignoreVersionClose")!;
+const ignoreVersionCancel = document.getElementById("ignoreVersionCancel")!;
+const ignoreVersionConfirm = document.getElementById("ignoreVersionConfirm")!;
+const ignoreVersionTag   = document.getElementById("ignoreVersionTag")!;
+
+/** Compares two "vX.Y.Z" strings numerically. Leading 'v'/'V' and surrounding
+ *  whitespace are ignored, missing trailing segments count as 0 (so "1.2" ==
+ *  "1.2.0"), and any non-numeric segment is treated as 0. Returns > 0 when
+ *  `a` is newer than `b`, < 0 when older, 0 when equal. Plain string compare
+ *  would rank "v0.10.0" below "v0.9.0" — this doesn't. */
+function compareVersions(a: string, b: string): number {
+  const parse = (s: string): number[] =>
+    s.trim().replace(/^v/i, "").split(".").map((p) => parseInt(p, 10) || 0);
+  const pa = parse(a);
+  const pb = parse(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** Reflects the current _updateInfo into the DOM — the single choke point for
+ *  every update signal: the sidebar About-icon pulse, the About-modal notice
+ *  line, and the Home top-bar "Update Available" line (both with the latest tag
+ *  linked to the release page). Safe to call anytime — with no update available
+ *  it clears every signal. */
+function refreshUpdateUI(): void {
+  const info = _updateInfo;
+  const available = info?.available ?? false;
+
+  aboutBtn.classList.toggle("update-available", available);
+
+  if (available && info) {
+    updateNoticeLink.textContent = info.latest;
+    updateNoticeLink.href = info.htmlUrl || "#";
+    updateNotice.style.display = "";
+
+    homeUpdateLink.textContent = info.latest;
+    homeUpdateLink.href = info.htmlUrl || "#";
+    homeUpdateNotice.style.display = "";
+  } else {
+    updateNotice.style.display = "none";
+    homeUpdateNotice.style.display = "none";
+  }
+}
+
+// Home top-bar update link → open the release page in the default browser.
+// (The Home header isn't inside a modal, so it has no aboutBackdrop-style
+// delegated link handler — wire it directly.)
+homeUpdateLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (_updateInfo?.htmlUrl) openUrl(_updateInfo.htmlUrl);
+});
+
+/** Runs the version check, then updates state + UI. Never throws: any failure
+ *  (network down, rate-limited, 404 when no release exists, malformed body)
+ *  leaves _updateInfo null and the UI untouched, so offline-by-default holds.
+ *  An update counts as "available" only when the latest release is newer than
+ *  BOTH the running version AND the ignored version — so a release newer than
+ *  an ignored one re-surfaces, while the ignored one itself stays silent.
+ *  Callers gate on settings.autoCheckUpdates; this function does not. */
+async function checkForUpdates(): Promise<void> {
+  try {
+    const raw = await invoke<{ current: string; latest: string; html_url: string }>(
+      "check_for_updates",
+    );
+    const newerThanCurrent = compareVersions(raw.latest, raw.current) > 0;
+    const newerThanIgnored =
+      compareVersions(raw.latest, settings.ignoredUpdateVersion) > 0;
+    _updateInfo = {
+      current: raw.current,
+      latest: raw.latest,
+      htmlUrl: raw.html_url,
+      available: newerThanCurrent && newerThanIgnored,
+    };
+  } catch {
+    // Silent by design — no toast, no noise.
+    _updateInfo = null;
+  }
+  refreshUpdateUI();
+}
+
+/* -----------------------------------------------------------------------------
+   Ignore-version modal — opened from the About-modal Ignore button. Follows the
+   same replace-then-return pattern as the other About sub-modals (changelog,
+   licensing…): About closes, this opens; back-arrow and Cancel return to About;
+   the X closes out entirely. Only the Confirm button actually writes the
+   ignored version — matching the "ignore is committed on the confirm modal,
+   not the About button" behaviour we settled on.
+----------------------------------------------------------------------------- */
+
+const ignoreVersionModal = new Modal(ignoreVersionBackdrop);
+
+ignoreVersionBtn.addEventListener("click", () => {
+  if (_updateInfo) ignoreVersionTag.textContent = _updateInfo.latest;
+  aboutModal.close();
+  ignoreVersionModal.open();
+});
+
+/** Return to the About modal without ignoring — shared by the back arrow and
+ *  Cancel. */
+function returnToAboutFromIgnore(): void {
+  ignoreVersionModal.close();
+  aboutModal.open();
+}
+
+ignoreVersionBack.addEventListener("click", returnToAboutFromIgnore);
+ignoreVersionCancel.addEventListener("click", returnToAboutFromIgnore);
+ignoreVersionClose.addEventListener("click", () => ignoreVersionModal.close());
+
+ignoreVersionConfirm.addEventListener("click", async () => {
+  if (_updateInfo) {
+    // Persist the ignored tag, then locally clear "available" so the notice +
+    // pulse drop immediately (a later release, being newer than this tag, will
+    // re-surface on the next check).
+    settings.ignoredUpdateVersion = _updateInfo.latest;
+    await saveSettings();
+    _updateInfo = { ..._updateInfo, available: false };
+    refreshUpdateUI();
+    flash("Version ignored", "success");
+  }
+  returnToAboutFromIgnore();
+});
+
+/* -----------------------------------------------------------------------------
+   New Version Notification toggle (General Settings) + enable-confirm modal.
+   Off by default. Turning it ON is gated by a confirm modal explaining the one
+   network request; the toggle only commits if the user proceeds (same
+   revert-on-cancel shape as the App Lock toggle). Enabling also runs a check
+   immediately so a pending update surfaces without waiting for the next launch.
+   Turning it OFF stops checks and clears any live signal at once.
+----------------------------------------------------------------------------- */
+
+const newVersionToggle    = document.getElementById("newVersionToggle") as HTMLInputElement;
+const newVersionLabel     = document.getElementById("newVersionLabel")!;
+const updateEnableBackdrop = document.getElementById("updateEnableBackdrop")!;
+const updateEnableBack    = document.getElementById("updateEnableBack")!;
+const updateEnableClose   = document.getElementById("updateEnableClose")!;
+const updateEnableCancel  = document.getElementById("updateEnableCancel")!;
+const updateEnableConfirm = document.getElementById("updateEnableConfirm")!;
+
+const updateEnableModal = new Modal(updateEnableBackdrop, { closeOnEsc: false });
+
+/** Syncs the toggle + its Enabled/Disabled label to the current setting.
+ *  Called from applySettings() so load, reset, and reopen all stay in sync. */
+function applyUpdateSettings(): void {
+  newVersionToggle.checked = settings.autoCheckUpdates;
+  newVersionLabel.textContent = settings.autoCheckUpdates ? "Enabled" : "Disabled";
+}
+
+/** Opens the enable-confirm modal and resolves true only if the user proceeds.
+ *  Back arrow, Cancel, and the X all resolve false; Esc is disabled so it can't
+ *  bypass this resolution and strand the caller. Mirrors openSetLockModal. */
+function openUpdateEnableModal(): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (proceed: boolean): void => {
+      if (settled) return;
+      settled = true;
+      updateEnableBack.onclick = null;
+      updateEnableCancel.onclick = null;
+      updateEnableClose.onclick = null;
+      updateEnableConfirm.onclick = null;
+      updateEnableModal.close();
+      resolve(proceed);
+    };
+    updateEnableBack.onclick = () => done(false);
+    updateEnableCancel.onclick = () => done(false);
+    updateEnableClose.onclick = () => done(false);
+    updateEnableConfirm.onclick = () => done(true);
+    updateEnableModal.open();
+  });
+}
+
+newVersionToggle.addEventListener("change", async () => {
+  if (newVersionToggle.checked) {
+    // Turning ON: revert visually until confirmed, then gate on the modal —
+    // the setting stays off unless the user proceeds through it.
+    newVersionToggle.checked = false;
+    settingsModal.close();
+    const proceed = await openUpdateEnableModal();
+    if (!proceed) {
+      settingsModal.open(); // left off
+      return;
+    }
+    settings.autoCheckUpdates = true;
+    await saveSettings();
+    applyUpdateSettings();
+    settingsModal.open();
+    flash("Version notifications enabled", "success");
+    // Run a check now so a pending update shows without a restart.
+    void checkForUpdates();
+  } else {
+    // Turning OFF: stop checking and clear any live pulse/notice immediately.
+    settings.autoCheckUpdates = false;
+    await saveSettings();
+    applyUpdateSettings();
+    _updateInfo = null;
+    refreshUpdateUI();
+    flash("Version notifications disabled", "success");
+  }
 });
 
 /* =============================================================================
@@ -4037,6 +4288,12 @@ async function init(): Promise<void> {
   }
 
   await getCurrentWindow().show();
+
+  // Opt-in update check — fire-and-forget so a slow or unreachable network can
+  // never delay startup. Off by default; on failure it silently no-ops.
+  if (settings.autoCheckUpdates) {
+    void checkForUpdates();
+  }
 
   // Run after window is visible — license gate then auto-changelog
   await runStartupGates(_appVersion !== "unknown" ? _appVersion : "accepted");

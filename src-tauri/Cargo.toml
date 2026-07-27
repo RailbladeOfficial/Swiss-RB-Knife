@@ -1,6 +1,6 @@
 [package]
 name = "swiss-rb-knife"
-version = "0.3.3"
+version = "0.3.2"
 license = "AGPL-3.0-or-later"
 license-file = "LICENSE"
 description = "A Multi-Tool Application."
@@ -32,3 +32,7 @@ tauri-plugin-dialog = "2"
 chrono = { version = "0.4", features = ["clock"] }
 dirs = "5"
 zeroize = "1"
+# Update check — one blocking GET to the GitHub Releases API (see lib.rs
+# check_for_updates). Pinned to 2.x for a stable API; default features bundle a
+# rustls TLS stack, so there's no system OpenSSL dependency to satisfy on build.
+ureq = "2"

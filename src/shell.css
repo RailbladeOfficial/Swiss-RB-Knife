@@ -166,6 +166,32 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Take all the space between the top of the sidebar and the pinned
+     navBottom, and scroll internally when the tool list is taller than that
+     space (short screens). min-height: 0 lets a flex child actually shrink
+     below its content height so the overflow scroll can engage — without it
+     the list would push navBottom off-screen instead of scrolling.
+     #appBody gives the sidebar a definite height, so no explicit height is
+     needed here. Applies in both collapsed and expanded widths. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Slim, theme-aware scrollbar so it doesn't eat much of the collapsed
+   sidebar's width and only shows when the list actually overflows. */
+#navList::-webkit-scrollbar {
+  width: 6px;
+}
+#navList::-webkit-scrollbar-track {
+  background: transparent;
+}
+#navList::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+#navList::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
 }
 
 #navBottom {
@@ -176,6 +202,9 @@ body {
   flex-direction: column;
   gap: 2px;
   border-top: 1px solid var(--color-border);
+  /* Never shrink or scroll away — About + Settings stay visible at the bottom
+     edge while #navList scrolls under them. */
+  flex-shrink: 0;
 }
 
 /* nav-label fade also applies to navBottom items */
@@ -240,6 +269,41 @@ body {
 }
 
 /* =============================================================================
+   ABOUT-ICON UPDATE PULSE
+   -----------------------------------------------------------------------------
+   Added to #aboutBtn (via the .update-available class from refreshUpdateUI)
+   while a newer release than the running version is available and un-ignored.
+   The row pops to the theme's inverted button colours (accent fill, contrasting
+   icon), holds briefly so the pop registers, then eases the whole row back to
+   the resting muted-icon/transparent look. Looping means it snaps back to the
+   inverted state at the loop boundary — the "pop" — every 2s.
+
+   Colours come entirely from theme vars (--color-btn / --color-btn-text — the
+   same fg/bg pair the primary button uses, so contrast is guaranteed in every
+   theme). No theme styles .nav-item directly, so there's no !important to fight.
+============================================================================= */
+
+@keyframes about-update-pulse {
+  0%   { background-color: var(--color-btn); color: var(--color-btn-text); }
+  15%  { background-color: var(--color-btn); color: var(--color-btn-text); }
+  100% { background-color: transparent;      color: var(--color-text-muted); }
+}
+
+#aboutBtn.update-available {
+  animation: about-update-pulse 2s ease-out infinite;
+}
+
+/* Respect reduced-motion: no pulsing, but keep a steady inverted state so the
+   "update available" signal isn't lost entirely for those users. */
+@media (prefers-reduced-motion: reduce) {
+  #aboutBtn.update-available {
+    animation: none;
+    background-color: var(--color-btn);
+    color: var(--color-btn-text);
+  }
+}
+
+/* =============================================================================
    MAIN CONTENT AREA
 ============================================================================= */
 
@@ -288,6 +352,9 @@ body {
   border-bottom: 1px solid var(--color-border);
   border-radius: 8px 8px 0 0;
   flex-shrink: 0;
+  /* Positioning context for the Home-only #homeUpdateNotice, centred across
+     the full bar independent of the left-aligned title. */
+  position: relative;
 }
 
 .section-title {
@@ -957,6 +1024,75 @@ button:hover {
 .section-back-btn:hover {
   background: var(--color-hover);
   color: var(--color-text);
+}
+
+/* =============================================================================
+   UPDATE NOTICE  (About modal — shown when a newer release is available)
+   -----------------------------------------------------------------------------
+   The callout that slots in under the version line in the About modal, plus its
+   "Ignore this Version" button. Toggled via inline display by refreshUpdateUI().
+   Sits inside .modal-body, so it inherits the centred text + link colour there.
+============================================================================= */
+
+.update-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-btn);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
+}
+
+.update-notice-text {
+  margin: 0;
+  font-weight: 500;
+}
+
+.update-notice-text a {
+  font-weight: 700;
+}
+
+.update-ignore-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.update-ignore-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+/* Home top-bar "Update Available - vX.Y.Z" line. Home section only (the element
+   lives solely in #section-home's header). Absolutely centred across the full
+   bar, coloured with --color-btn to match the About-icon pulse flash. Shown /
+   hidden by refreshUpdateUI() alongside the pulse and the About-modal notice. */
+.home-update-notice {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--color-btn);
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.home-update-notice a {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* =============================================================================
