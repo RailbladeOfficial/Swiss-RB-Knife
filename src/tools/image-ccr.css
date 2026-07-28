@@ -527,8 +527,8 @@
   border-radius: 3px;
   background: linear-gradient(
     to right,
-    var(--color-btn-text) 0%,
-    var(--color-btn-text) var(--pct, 80%),
+    var(--color-btn) 0%,
+    var(--color-btn) var(--pct, 80%),
     var(--color-border) var(--pct, 80%),
     var(--color-border) 100%
   );

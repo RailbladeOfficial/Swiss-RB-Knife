@@ -1,7 +1,7 @@
 [
   {
     "version": "0.4.0",
-    "date": "2026-07-27",
+    "date": "2026-07-28",
     "changes": {
       "features": {
         "App Overall": [
@@ -12,7 +12,7 @@
           "The button to launch the About modal will also pulsate to indicate that a newer version is available.",
           "You can quickly get to the GitHub Releases Page from this notification in the About modal.", 
           "From the About Modal, you can also select to Ignore This Version if you want to skip updating this version, but still get future update available notifications.",
-          "This feature is opt-in, off by default, and can be disabled at any time after enabling. No data ever leaves your device; this is a read-only check on GitHub for the sole purppose of checking the latest available Release.",
+          "This feature is opt-in, off by default, and can be disabled at any time after enabling. No data ever leaves your device; this is a read-only check on GitHub for the sole purpose of checking the latest available Release.",
           "When a Random Theme is chosen, added button next to Reroll Theme to be able to save the randomly generated palette as a Custom Theme.",
           "The saved Custom Theme can then be used / modified by switching the theme from Random to Custom, and choosing the timestamped save from the list of Custom Themes."
         ]
@@ -39,7 +39,7 @@
       },
       "bugfixes": {
         "App Overall": [
-          "Fixed an isue where, when the window size was smallest, subsettings in the General Settings modal weren't visible."
+          "Fixed an issue where, when the window size was smallest, subsettings in the General Settings modal weren't visible."
         ],
         "Image CCR": [
           "Fixed the Image CCR tools not running asynchronously and choking off the computer."
