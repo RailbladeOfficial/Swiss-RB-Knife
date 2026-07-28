@@ -2523,7 +2523,7 @@ function startChristmasSnow(): void {
   }
 
   window.setTimeout(() => {
-    const flakeCount = Math.min(250, Math.round((window.innerWidth * window.innerHeight) / 1000),);
+    const flakeCount = Math.min(200, Math.round((window.innerWidth * window.innerHeight) / 2000),);
     snowflakes = Array.from({ length: flakeCount }, () => spawnSnowflake(true));
   }, 300); // give the window time to reach its final/restored size first
 
