@@ -165,6 +165,11 @@
   display: flex;
   flex-direction: row;
   gap: 8px;
+  /* Wrap instead of forcing horizontal page-scroll when the panel is too
+     narrow to hold both 250px fields + the duration preview on one line
+     (e.g. 800px window with the sidebar expanded). On wider layouts nothing
+     wraps, so the row looks exactly as before. */
+  flex-wrap: wrap;
 }
 
 .time-field {
@@ -172,14 +177,22 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  /* Allow the column to shrink below its input's 250px so the max-width:100%
+     on the input can engage in the rare case a single field is still wider
+     than the available line. */
+  min-width: 0;
 }
 
 .time-field input {
   width: 250px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .time-field button {
   width: 125px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* =============================================================================
@@ -372,19 +385,9 @@
 
 /* =============================================================================
    SETTINGS — TIME TRACKER SPECIFIC
+   (The collapsible .subsettings primitive used here lives in shell.css, since
+   it's shared with the General Settings modal and the Budget setup modals.)
 ============================================================================= */
-
-.subsettings {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow: hidden;
-  max-height: 0;
-  transition: max-height 0.3s ease;
-  padding-left: 12px;
-  border-left: 2px solid var(--color-border);
-  margin-left: 4px;
-}
 
 #payPeriodLength {
   width: auto;

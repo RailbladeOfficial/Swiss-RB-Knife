@@ -632,6 +632,31 @@ button:hover {
   gap: 10px;
 }
 
+/* Collapsible sub-block that expands/collapses beneath a settings row (its
+   max-height is toggled from JS). Shared app-wide — not tool-specific: the
+   General Settings modal (App Lock / Random / Custom-theme sub-options), the
+   Time Tracker settings (pay-period options), and the Budget setup modals
+   (expectation / threshold fields) all use it. Lives here next to the other
+   settings-structure primitives rather than in any one tool's stylesheet.
+
+   overflow:hidden makes this a flex item with an automatic minimum size of 0,
+   so in a height-constrained scroll column (e.g. the settings modal at small
+   window heights) flex compression would squish it to nothing and clip the
+   expanded content. flex-shrink:0 holds its height and lets the ancestor
+   scroll instead. Harmless while collapsed (max-height:0 keeps it at 0). */
+.subsettings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border);
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
 #settingsReset {
   background: transparent;
   color: var(--color-danger);

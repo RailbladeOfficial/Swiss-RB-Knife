@@ -1,6 +1,8 @@
 /* =============================================================================
    BUDGET TRACKER — COMPONENT STYLES
-   Shell-level styles (panels, inputs, buttons, modals) live in shell.css.
+   Shell-level styles (panels, inputs, buttons, modals, and the collapsible
+   .subsettings block used by the setup modals' expectation/threshold fields)
+   live in shell.css.
    Ledger row primitives (.entry-row, .entry-date-subheader, .entry-field,
    .entry-delete-btn) and toggle buttons (.preset-btn) are reused from
    time-tracker.css, which is always loaded — keeps the budget ledger visually

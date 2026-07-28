@@ -38,8 +38,14 @@
         ]
       },
       "bugfixes": {
+        "App Overall": [
+          "Fixed an isue where, when the window size was smallest, subsettings in the General Settings modal weren't visible."
+        ],
         "Image CCR": [
           "Fixed the Image CCR tools not running asynchronously and choking off the computer."
+        ],
+        "Time Tracker": [
+          "Fixed an issue where, when the window size was smallest, Time Tracker fields were going off the screen, causing sidescroll."
         ]
       }
     }
