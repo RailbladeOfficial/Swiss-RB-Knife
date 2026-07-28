@@ -23,6 +23,17 @@
   --color-toggle-off:          #0a2a0a;
   --color-toggle-on:           #00cc00;
 
+  /* ── Changelog accents ── Monochrome green is the whole point of this theme, so true
+     hue contrast isn't on the table — instead: Features gets the brightest green,
+     Improvements a mid-brightness step down, Bugfixes borrows the existing red
+     danger color (a real, semantically-fitting contrast — errors are red on a
+     terminal), and the tool heading gets a dim green step so it recedes below
+     the three category colors. */
+  --color-changelog-features:     #00ff00;
+  --color-changelog-improvements: #00cc00;
+  --color-changelog-bugfixes:     #ff0000;
+  --color-changelog-tool:         #007700;
+
   --color-toast-success-bg:    #001a00;
   --color-toast-success-border:#00ff00;
   --color-toast-success-text:  #00ff00;
@@ -213,6 +224,12 @@ body:not(.solid-modals) .modal {
 .result-preview-wrap { border-color: rgba(0, 204, 0, 0.2) !important; }
 
 
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #00ff00; }
+
 /* ── Budget Tracker ── */
 
 .finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(0, 255, 0, 0.06) 0%, #040a04 100%); }
@@ -231,7 +248,9 @@ body:not(.solid-modals) .modal {
 
 .budget-summary-tab.active {
   color: #00ff00;
-  border-bottom-color: #00cc00;
+  background: rgba(0, 255, 0, 0.1);
+  border-bottom-color: #00ff00;
+  text-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
 }
 
 .budget-stats-table td.pos { color: #00FF00; }

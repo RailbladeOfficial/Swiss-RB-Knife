@@ -24,6 +24,12 @@
   --color-toggle-off:          #505052;
   --color-toggle-on:           #36c0f1;
 
+  /* ── Changelog accents ── Features (sky blue) / Improvements (green) / Bugfixes (orange) / tool heading (violet, "frosting" accent) */
+  --color-changelog-features:     #36c0f1;
+  --color-changelog-improvements: #2ecc71;
+  --color-changelog-bugfixes:     #ffa500;
+  --color-changelog-tool:         #a855f7;
+
   --color-toast-success-bg:    #384448;
   --color-toast-success-border:#36c0f1;
   --color-toast-success-text:  #b8e8f8;
@@ -195,6 +201,12 @@ body:not(.solid-modals) .modal {
 .result-preview-wrap { border-color: rgba(54, 192, 241, 0.3) !important; }
 
 
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #ffa500; }
+
 /* ── Budget Tracker ── */
 
 /* Panel backgrounds — gunmetal with alternating sky/orange tints */
@@ -211,7 +223,14 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title { color: #36c0f1; }
 
 /* Summary tab active — alternating orange/blue matches cake theme personality */
-.budget-summary-tab.active { color: #ffa500; border-bottom-color: #ffa500; }
+.budget-summary-tab.active { color: #ffa500; background: rgba(255, 165, 0, 0.12); border-bottom-color: #ffa500; }
+
+/* View-mode toggle active — sky-blue primary (was missing) */
+.budget-view-mode-btn.active {
+  background: #36c0f1 !important;
+  color: #ffffff !important;
+  border-color: #36c0f1 !important;
+}
 
 /* Stats table values */
 .budget-stats-table td.pos { color: #00FF00; }

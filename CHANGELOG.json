@@ -1,16 +1,34 @@
 [
   {
     "version": "0.4.0",
-    "date": "2026-07-26",
+    "date": "2026-07-27",
     "changes": {
       "features": {
-        
+        "App Overall": [
+          "Added ability to opt-in to New Version Notifications from General Settings.",
+          "This is the first and only time this app ever makes a network call; it pings GitHub to see the latest released version.",
+          "This happens once on app launch, and also once when you enable this setting (so you don't have to relaunch to check).",
+          "If the version you're on is older than the latest released version, the top bar of the Home Page will indicate an update is available and link to the About modal.",
+          "The button to launch the About modal will also pulsate to indicate that a newer version is available.",
+          "You can quickly get to the GitHub Releases Page from this notification in the About modal.", 
+          "From the About Modal, you can also select to Ignore This Version if you want to skip updating this version, but still get future update available notifications.",
+          "This feature is opt-in, off by default, and can be disabled at any time after enabling. No data ever leaves your device; this is a read-only check on GitHub for the sole purppose of checking the latest available Release.",
+          "When a Random Theme is chosen, added button next to Reroll Theme to be able to save the randomly generated palette as a Custom Theme.",
+          "The saved Custom Theme can then be used / modified by switching the theme from Random to Custom, and choosing the timestamped save from the list of Custom Themes."
+        ]
       },
       "improvements": {
+        "App Overall": [
+          "Updated / modernized all themes to better reflect current tools and implementations.",
+          "Overhauled the Retro-Electric theme to be more visually contrasting.",
+          "Made Random Theme's Regenerative mode more responsive to stimuli.",
+          "Made the rainbow theme more vivid.",
+          "Christmas and Halloween themes now have special animations."
+        ],
         "Auto-Backup": [
           "Added ability to hide progress details, allowing running of backups to go faster.",
           "If a file gets skipped, it's now separately logged and viewable in a modal.",
-          "Added warning to the confirmation modal if destination drive doesn't exist / there's not enough space."
+          "Added warning to the confirmation modal if destination drive doesn't exist / there's not enough free space."
         ],
         "Image CCR": [
           "Added parallel threading so that the resize operation would run faster.",

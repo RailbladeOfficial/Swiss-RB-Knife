@@ -23,6 +23,12 @@
   --color-toggle-off:          #cccccc;
   --color-toggle-on:           #0055ff;
 
+  /* ── Changelog accents ── Features (red) / Improvements (green) / Bugfixes (pink) / tool heading (purple, matches --color-btn) */
+  --color-changelog-features:     #ff2200;
+  --color-changelog-improvements: #00bb00;
+  --color-changelog-bugfixes:     #dd00aa;
+  --color-changelog-tool:         #6600cc;
+
   --color-toast-success-bg:    #e6ffe6;
   --color-toast-success-border:#00aa00;
   --color-toast-success-text:  #003300;
@@ -102,6 +108,23 @@ body {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
 }
 
+/* Generic, unaccented tool panels (Auto-Backup, Dummy File Generator, etc.)
+   default to near-white via --color-panel. The :not() chain here bumps
+   specificity above the plain .panel/.input-panel/etc selectors so this wins
+   regardless of source order, without touching panels that already carry
+   their own rainbow accent color. */
+.panel:not(.input-panel):not(.controls-panel):not(.totals-panel):not(.entries-panel):not(.result-panel) {
+  background: linear-gradient(
+    45deg,
+    #ffe0e0 0%,
+    #fff5cc 20%,
+    #e0ffe0 40%,
+    #e0eeff 60%,
+    #f0ddff 80%,
+    #ffdaf5 100%
+  ) !important;
+}
+
 /* ── Modal — translucent: rainbow pastel frosted glass (original look) ── */
 body:not(.solid-modals) .modal {
   background: linear-gradient(
@@ -118,9 +141,18 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 24px 48px rgba(100, 0, 200, 0.3) !important;
 }
 
-/* ── Modal — solid: clean white card with rainbow border ── */
+/* ── Modal — solid: full-saturation 45° rainbow gradient card ── */
 body.solid-modals .modal {
-  background: #ffffff !important;
+  background: linear-gradient(
+    45deg,
+    #ffb3b3 0%,
+    #ffdb99 16%,
+    #fff2a8 33%,
+    #b3ffb3 50%,
+    #a8d8ff 66%,
+    #d1b3ff 83%,
+    #ffb3ea 100%
+  ) !important;
   border-color: #cc88ff !important;
   box-shadow: 0 24px 48px rgba(100, 0, 200, 0.2) !important;
 }
@@ -214,6 +246,61 @@ input { background: rgba(255, 255, 255, 0.8) !important; border-color: #ccaaff !
   box-shadow: none !important;
 }
 
+/* ── Category-landing tool cards — same solid 45° rainbow gradient, in case
+   Home renders these instead of (or alongside) the dashboard cards below ── */
+.tool-card {
+  background: linear-gradient(
+    45deg,
+    #ffb3b3 0%,
+    #ffdb99 16%,
+    #fff2a8 33%,
+    #b3ffb3 50%,
+    #a8d8ff 66%,
+    #d1b3ff 83%,
+    #ffb3ea 100%
+  ) !important;
+  border-color: #cc88ff !important;
+}
+.tool-card:hover {
+  background: linear-gradient(
+    45deg,
+    #ffb3b3 0%,
+    #ffdb99 16%,
+    #fff2a8 33%,
+    #b3ffb3 50%,
+    #a8d8ff 66%,
+    #d1b3ff 83%,
+    #ffb3ea 100%
+  ) !important;
+  border-color: #6600cc !important;
+  box-shadow: 0 0 10px rgba(102, 0, 204, 0.25) !important;
+}
+
+/* ── Home dashboard cards — same solid 45° rainbow gradient as solid modals ── */
+.dashboard-card {
+  background: linear-gradient(
+    45deg,
+    #ffb3b3 0%,
+    #ffdb99 16%,
+    #fff2a8 33%,
+    #b3ffb3 50%,
+    #a8d8ff 66%,
+    #d1b3ff 83%,
+    #ffb3ea 100%
+  ) !important;
+  border-color: #cc88ff !important;
+}
+.dashboard-card-header {
+  border-bottom-color: rgba(102, 0, 204, 0.25) !important;
+}
+.dashboard-card-header:hover {
+  background: rgba(255, 255, 255, 0.35) !important;
+}
+.coming-soon-badge {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border-color: #cc88ff !important;
+}
+
 /* ── Anchor badge ── */
 .anchor-badge { background: #6600cc !important; color: #ffffff !important; }
 
@@ -234,6 +321,60 @@ input { background: rgba(255, 255, 255, 0.8) !important; border-color: #ccaaff !
 .result-preview-wrap { border-color: #cc88ff !important; }
 
 
+/* ── Sidebar & title bar — trans-flag colors: light blue bg, pink text, white icons ── */
+#titleBar,
+#sidebar {
+  background: #4fc3ec !important;
+  border-color: #3aa8d8 !important;
+}
+
+.title,
+#clock,
+.nav-label {
+  color: #ff2e92 !important;
+}
+
+.titlebar-btn,
+.nav-icon {
+  color: #000000 !important;
+}
+
+.titlebar-btn:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+}
+
+.close-btn {
+  color: #000000 !important;
+}
+.close-btn:hover {
+  background: rgba(204, 0, 0, 0.4) !important;
+  color: #ffffff !important;
+}
+
+#navList::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.5) !important;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+  border-left-color: #ffffff !important;
+}
+#navBottom {
+  border-top-color: rgba(255, 255, 255, 0.35) !important;
+}
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #ff2200; }
+
 /* ── Budget Tracker ── */
 
 .finance-tool-budget .panel-accent-input  { background: #fff0ee; box-shadow: 0 1px 4px rgba(255, 34, 0, 0.08), inset 3px 0 0 #ff2200 !important; }
@@ -247,7 +388,7 @@ input { background: rgba(255, 255, 255, 0.8) !important; border-color: #ccaaff !
 }
 .budget-annual-stats-title { color: #6600cc; }
 
-.budget-summary-tab.active { color: #6600cc; border-bottom-color: #6600cc; }
+.budget-summary-tab.active { color: #6600cc; background: rgba(102, 0, 204, 0.1); border-bottom-color: #6600cc; }
 
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }

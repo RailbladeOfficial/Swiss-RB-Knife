@@ -23,6 +23,13 @@
   --color-toggle-off:          #374151;
   --color-toggle-on:           #525252;
 
+  /* ── Changelog accents ── Features (indigo) / Improvements (teal) / Bugfixes (crimson, more vivid than the
+     muted --color-accent-entries so it actually pops against this desaturated theme) / tool heading (amber) */
+  --color-changelog-features:     #6366f1;
+  --color-changelog-improvements: #0d9488;
+  --color-changelog-bugfixes:     #f43f5e;
+  --color-changelog-tool:         #d97706;
+
   --color-toast-success-bg:    #1a2e1a;
   --color-toast-success-border:#374151;
   --color-toast-success-text:  #9ca3af;
@@ -134,6 +141,24 @@ body:not(.solid-modals) .modal {
 .preview-card.drag-target  { border-color: #0d9488 !important; }
 
 
+/* ── Update-notifier accents ──
+   This theme's --color-btn is a neutral grey (its buttons are deliberately
+   understated), but the update signal needs to actually catch the eye — so the
+   pulse, the Home "Update Available" line, the tool-card icons, and modal links
+   are routed to the theme's indigo accent instead, leaving the grey buttons
+   untouched. The pulse is redirected by redefining --color-btn locally on the
+   pulsing element, which the shared keyframes read. */
+#aboutBtn.update-available {
+  --color-btn: #6366f1;
+  --color-btn-text: #ffffff;
+}
+.tool-card-icon { color: #6366f1; }
+.home-update-notice { color: #6366f1; }
+.home-update-notice a { color: #818cf8; }
+.home-update-notice a:hover { color: #a5b4fc; }
+.modal-body a { color: #818cf8; }
+.modal-body a:hover { color: #a5b4fc; }
+
 /* ── Budget Tracker ── */
 
 /* Panel backgrounds — near-black, minimal tint to preserve the dark theme's
@@ -148,7 +173,15 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title { color: #d1d5db; }
 
 /* Summary tab active */
-.budget-summary-tab.active { color: #c4b5fd; border-bottom-color: #6366f1; }
+.budget-summary-tab.active { color: #c4b5fd; background: rgba(99, 102, 241, 0.12); border-bottom-color: #6366f1; }
+
+/* View-mode toggle active — indigo accent (was missing; a grey fill wouldn't
+   read as "selected" in an all-grey theme). */
+.budget-view-mode-btn.active {
+  background: #6366f1 !important;
+  color: #ffffff !important;
+  border-color: #6366f1 !important;
+}
 
 /* Stats table values */
 .budget-stats-table td.pos { color: #00FF00; }

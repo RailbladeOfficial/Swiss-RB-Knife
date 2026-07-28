@@ -23,6 +23,12 @@
   --color-toggle-off:          #3a3a4b;
   --color-toggle-on:           #3498db;
 
+  /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (magenta) / tool heading (amber) */
+  --color-changelog-features:     #3498db;
+  --color-changelog-improvements: #2ecc71;
+  --color-changelog-bugfixes:     #ff44ff;
+  --color-changelog-tool:         #f0a500;
+
   --color-toast-success-bg:    #1a3a28;
   --color-toast-success-border:#2ecc71;
   --color-toast-success-text:  #d4f5e2;
@@ -159,6 +165,12 @@ body:not(.solid-modals) .modal {
 .result-preview-wrap { border-color: rgba(255, 68, 255, 0.25) !important; }
 
 
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #ff44ff; }
+
 /* ── Budget Tracker ── */
 
 .finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(52, 152, 219, 0.08) 0%, #2a2a3b 100%); }
@@ -169,7 +181,19 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title-panel { border-left: 4px solid #3498db; }
 .budget-annual-stats-title { color: #3498db; }
 
-.budget-summary-tab.active { color: #3498db; border-bottom-color: #3498db; }
+.budget-summary-tab.active {
+  color: #3498db;
+  background: rgba(52, 152, 219, 0.14);
+  border-bottom-color: #3498db;
+}
+
+/* View-mode toggle active — flat solid blue (matte deliberately avoids glows).
+   Was missing entirely; every other theme styles this. */
+.budget-view-mode-btn.active {
+  background: #3498db !important;
+  color: #ffffff !important;
+  border-color: #3498db !important;
+}
 
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }

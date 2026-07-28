@@ -721,7 +721,8 @@ button:hover {
   gap: 6px;
 }
 
-#rerollBtn {
+#rerollBtn,
+#saveRandomBtn {
   background: transparent;
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
@@ -735,9 +736,19 @@ button:hover {
     border-color var(--hover-transition),
     background var(--hover-transition);
   flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
 }
 
-#rerollBtn:hover {
+/* Floppy-disc save-random icon, sized to sit level with the die glyph. */
+#saveRandomBtn svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+#rerollBtn:hover,
+#saveRandomBtn:hover {
   color: var(--color-text);
   border-color: var(--color-btn);
   background: var(--color-hover);
@@ -1093,6 +1104,19 @@ button:hover {
   color: inherit;
   text-decoration: underline;
   cursor: pointer;
+  /* Smooth colour fade on hover, matching modal-body links (which get their
+     transition from modal.css). Without this the hover snapped. It lives here
+     in the shared shell so every theme — including random and custom, which
+     have no per-theme hover rule of their own — fades smoothly. */
+  transition: color var(--hover-transition);
+}
+
+/* Base hover — lightens toward the palette's button-hover colour. Named themes
+   may override with their own accent; random and custom themes (which use
+   default.css as a base and set --color-btn-hover from their palette) pick this
+   up automatically, so the link still reacts under them. */
+.home-update-notice a:hover {
+  color: var(--color-btn-hover);
 }
 
 /* =============================================================================
@@ -1211,17 +1235,16 @@ button:hover {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  opacity: 0.5;
 }
 
 .changelog-category-header.features {
-  color: var(--color-accent-input);
+  color: var(--color-changelog-features, var(--color-accent-input));
 }
 .changelog-category-header.improvements {
-  color: var(--color-accent-view);
+  color: var(--color-changelog-improvements, var(--color-accent-view));
 }
 .changelog-category-header.bugfixes {
-  color: var(--color-accent-entries);
+  color: var(--color-changelog-bugfixes, var(--color-accent-entries));
 }
 
 .changelog-item {
@@ -1233,13 +1256,13 @@ button:hover {
 }
 
 .changelog-category.features .changelog-item {
-  border-left-color: var(--color-accent-input);
+  border-left-color: var(--color-changelog-features, var(--color-accent-input));
 }
 .changelog-category.improvements .changelog-item {
-  border-left-color: var(--color-accent-view);
+  border-left-color: var(--color-changelog-improvements, var(--color-accent-view));
 }
 .changelog-category.bugfixes .changelog-item {
-  border-left-color: var(--color-accent-entries);
+  border-left-color: var(--color-changelog-bugfixes, var(--color-accent-entries));
 }
 
 .changelog-tool-group {
@@ -1257,8 +1280,7 @@ button:hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-  opacity: 0.75;
+  color: var(--color-changelog-tool, var(--color-text-muted));
   text-align: left;
 }
 

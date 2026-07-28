@@ -2054,6 +2054,14 @@
         <div class="settings-row">
           <span>Theme:</span>
           <div class="theme-select-wrap">
+            <button id="saveRandomBtn" title="Save this random palette as a custom theme" style="display: none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+            </button>
             <button id="rerollBtn" title="Reroll random palette" style="display: none;">⚄</button>
             <select id="themeSelect" class="settings-select">
               <optgroup label="Main">
@@ -2204,9 +2212,8 @@
         </button>
       </div>
       <div class="modal-body exit-modal-body">
-        <p>Ignoring hides the update notice and stops the About icon pulsing for
-          <strong id="ignoreVersionTag"></strong>. If a newer version is released later, the notice comes back for
-          that one.</p>
+        <p>Ignoring hides the update notice in the Home Top Bar and About modal, and stops the About icon pulsing, for
+          <strong id="ignoreVersionTag"></strong>. If a newer version is released later, then update notifications are resumed.</p>
         <p>To turn version notifications off entirely, use <strong>New Version Notification</strong> in the General
           Settings modal.</p>
         <div class="exit-modal-actions">
@@ -2230,7 +2237,7 @@
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <span>Enable Version Notifications</span>
+        <span>Enable New Version Notifications</span>
         <button id="updateEnableClose" class="modal-close-btn modal-header-right">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -2239,10 +2246,10 @@
         </button>
       </div>
       <div class="modal-body exit-modal-body">
-        <p>With this on, Swiss RB Knife makes a single network request to GitHub on startup — and once right now, as
-          you enable it — to check whether a newer release exists.</p>
-        <p>That is the only time the app touches the network. No account, no personal data, nothing else is sent, and
-          it stays fully offline otherwise. You can turn this back off anytime.</p>
+        <p>With this setting turned on, Swiss RB Knife makes a single network request to GitHub (once on startup, and once right now as
+          you enable the setting) to check whether a newer release is available to install.</p>
+        <p>Note: new updates are never auto-installed, nor even auto-downloaded. This feature is what it is, a notification; nothing more, nothing less.</p>
+        <p>This is the only time the app touches the network. No personal data ever leaves your device; the app otherwise remains fully offline. You can always turn this setting off at any time.</p>
         <div class="exit-modal-actions">
           <button id="updateEnableConfirm">Enable Notifications</button>
           <button id="updateEnableCancel" class="modal-cancel-btn">Cancel</button>

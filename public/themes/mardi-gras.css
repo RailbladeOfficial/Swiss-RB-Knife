@@ -23,6 +23,14 @@
   --color-toggle-off:          #3a1a5a;
   --color-toggle-on:           #00a550;
 
+  /* ── Changelog accents ── Features (gold) / Improvements (green) / Bugfixes (red, matches --color-danger — the
+     Mardi Gras trio of gold/green/purple has no natural "error" color, so red fills that semantic gap) /
+     tool heading (purple, the third trinity color, reserved for this accent role) */
+  --color-changelog-features:     #ffd700;
+  --color-changelog-improvements: #00a550;
+  --color-changelog-bugfixes:     #ff4444;
+  --color-changelog-tool:         #7b2fbe;
+
   --color-toast-success-bg:    #0a2a18;
   --color-toast-success-border:#00a550;
   --color-toast-success-text:  #c8f0d8;
@@ -186,6 +194,12 @@ body.solid-modals .modal {
 .result-preview-wrap { border-color: rgba(123, 47, 190, 0.3) !important; }
 
 
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #ffd700; }
+
 /* ── Budget Tracker ── */
 
 /* Panel backgrounds — very dark purple with the Mardi Gras trinity tints */
@@ -205,8 +219,14 @@ body.solid-modals .modal {
   text-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
 }
 
-/* Summary tab active — gold */
-.budget-summary-tab.active { color: #ffd700; border-bottom-color: #ffd700; }
+/* Summary tab active — gold, now with a filled tint + glow so it clearly
+   stands out from the muted-gold inactive tabs. */
+.budget-summary-tab.active {
+  color: #ffd700;
+  background: rgba(255, 215, 0, 0.12);
+  border-bottom-color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.45);
+}
 
 /* Stats table values — green pos, gold neg for Mardi Gras flair */
 .budget-stats-table td.pos { color: #00FF00; }

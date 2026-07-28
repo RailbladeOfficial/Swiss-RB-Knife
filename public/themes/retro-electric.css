@@ -8,9 +8,17 @@
   --color-text-muted:          #7aaabf;
   --color-hover:               #152035;
 
-  --color-btn:                 #1e2d42;
-  --color-btn-hover:           rgba(0, 207, 255, 0.07);
-  --color-btn-text:            #00dfff;
+  /* --color-btn is consumed across the shell as the BRIGHT accent — tool-card
+     icons, the About-icon pulse, the Home "Update Available" line, active
+     borders, filled active states, and modal links all colour themselves from
+     it. It must be vivid, NOT the dark navy the outlined buttons use: those
+     buttons are hardcoded further down and never read this var, so a cyan value
+     here lights up the accents without touching the button look. */
+  --color-btn:                 #00dfff;
+  --color-btn-hover:           #5fe9ff;
+  /* Dark ink that sits ON a --color-btn (cyan) fill — the pulse icon, filled
+     active-state labels, etc. Kept near-black for contrast against the cyan. */
+  --color-btn-text:            #04121c;
 
   --color-danger:              #f040ff;
   --color-danger-subtle:       rgba(240, 64, 255, 0.13);
@@ -22,6 +30,13 @@
 
   --color-toggle-off:          #1e2d42;
   --color-toggle-on:           #00dfff;
+
+  /* ── Changelog accents ── Features (cyan) / Improvements (mint) / Bugfixes (magenta) / tool heading (violet) —
+     mint and violet step outside the base cyan/magenta duotone so all four read as distinct. */
+  --color-changelog-features:     #00dfff;
+  --color-changelog-improvements: #40ffaa;
+  --color-changelog-bugfixes:     #f040ff;
+  --color-changelog-tool:         #9040ff;
 
   --color-toast-success-bg:    #001c2e;
   --color-toast-success-border:#00dfff;
@@ -90,18 +105,39 @@ body.solid-modals .modal {
   box-shadow: 0 0 30px rgba(240, 64, 255, 0.15), 0 24px 48px rgba(0, 0, 0, 0.6) !important;
 }
 
-/* ── Buttons — nav-link style from source: outlined, colored text, hover glow ── */
+/* ── Buttons — outlined cyan chips with a faint resting glow, magenta on hover.
+   The resting glow + brighter border lift them off the dark panels so they read
+   as real buttons — and so a primary/confirm button stands clearly apart from
+   the quiet .modal-cancel-btn ghost beside it in two-button modals. ── */
 button {
   background: #1e2d42 !important;
   color: #00dfff !important;
-  border: 1px solid rgba(0, 207, 255, 0.3) !important;
+  border: 1px solid rgba(0, 223, 255, 0.5) !important;
+  box-shadow: 0 0 10px rgba(0, 223, 255, 0.12) !important;
 }
 
 button:hover {
   color: #f040ff !important;
-  border-color: rgba(240, 64, 255, 0.5) !important;
-  background: rgba(240, 64, 255, 0.08) !important;
-  box-shadow: 0 0 14px rgba(240, 64, 255, 0.25) !important;
+  border-color: rgba(240, 64, 255, 0.6) !important;
+  background: rgba(240, 64, 255, 0.1) !important;
+  box-shadow: 0 0 16px rgba(240, 64, 255, 0.3) !important;
+}
+
+/* Cancel / secondary button in two-button modals (exit, ignore, enable…) —
+   deliberately a quiet grey ghost with no glow, so the glowing cyan confirm
+   button next to it clearly reads as the primary action. */
+.modal-cancel-btn {
+  background: transparent !important;
+  color: #7aaabf !important;
+  border: 1px solid rgba(122, 170, 191, 0.35) !important;
+  box-shadow: none !important;
+}
+
+.modal-cancel-btn:hover {
+  background: rgba(122, 170, 191, 0.12) !important;
+  color: #e8f4ff !important;
+  border-color: rgba(122, 170, 191, 0.6) !important;
+  box-shadow: none !important;
 }
 
 /* Danger button — magenta outlined */
@@ -129,6 +165,54 @@ input:focus {
   outline: none !important;
   border-color: rgba(0, 207, 255, 0.7) !important;
   box-shadow: 0 0 10px rgba(0, 207, 255, 0.3) !important;
+}
+
+/* ── Shell accents — icons, links, and the update-notifier signals ───────────
+   With --color-btn now cyan, the shell elements that key off it already read
+   bright; these rules add the extra glow / duotone hover the flat theme was
+   missing so everything pops. ── */
+
+/* Left-sidebar icons + labels — lit cyan at rest. Hover/active keep their
+   higher-specificity shell rules (near-white text, cyan active border). */
+.nav-item {
+  color: #5cc9e8;
+}
+
+/* Home tool-card icons — cyan with a soft electric glow (these were the dark
+   navy --color-btn before). */
+.tool-card-icon {
+  color: #00dfff;
+  filter: drop-shadow(0 0 8px rgba(0, 223, 255, 0.4));
+}
+
+/* Home tool-card hover — magenta outline + glow. The base shell hover uses the
+   cyan --color-btn; this swaps it to the theme's magenta so a hovered card pops
+   against the cyan resting borders. */
+.tool-card:hover {
+  border-color: #f040ff !important;
+  box-shadow: 0 0 14px rgba(240, 64, 255, 0.35) !important;
+}
+
+/* Home top-bar "Update Available" line — cyan (matching the About-icon pulse),
+   with a glow, and the version link a brighter cyan that flips magenta on
+   hover so the clickable part is obvious. */
+.home-update-notice {
+  text-shadow: 0 0 10px rgba(0, 223, 255, 0.4);
+}
+.home-update-notice a {
+  color: #5fefff;
+}
+.home-update-notice a:hover {
+  color: #f040ff;
+}
+
+/* Modal links (What's New, README, the About-modal update link…) — bright cyan
+   at rest, magenta on hover. */
+.modal-body a {
+  color: #33e5ff;
+}
+.modal-body a:hover {
+  color: #f472ff;
 }
 
 /* ── Image CCR overrides ── */
@@ -303,9 +387,29 @@ input:focus {
   text-shadow: 0 0 12px rgba(0, 207, 255, 0.5);
 }
 
+/* Summary tabs. NOTE: .budget-summary-tab is a <button>, so this theme's global
+   `button { color/background/border !important }` rule above otherwise wins over
+   these and forces the tab cyan — letting only text-shadow through, which is why
+   the active tab looked like cyan text with a magenta halo. Everything here is
+   therefore !important, so the active tab is LITERALLY magenta — fill, border,
+   glow and all — the way Neon does it (Neon's button rule only sets box-shadow,
+   so it never had this fight). */
+.budget-summary-tab { color: #00dfff !important; }
+.budget-summary-tab:hover { color: #e8f4ff !important; }
 .budget-summary-tab.active {
-  color: #00dfff;
-  border-bottom-color: #00dfff;
+  color: #f040ff !important;
+  background: rgba(240, 64, 255, 0.18) !important;
+  border-color: #f040ff !important;
+  box-shadow: 0 0 14px rgba(240, 64, 255, 0.5) !important;
+  text-shadow: 0 0 10px rgba(240, 64, 255, 0.65) !important;
+}
+
+/* View-mode toggle — cyan fill when active (was falling back to the base rule). */
+.budget-view-mode-btn.active {
+  background: #00dfff !important;
+  color: #04121c !important;
+  border-color: #00dfff !important;
+  box-shadow: 0 0 12px rgba(0, 223, 255, 0.4) !important;
 }
 
 .budget-stats-table td.pos { color: #00FF00; }

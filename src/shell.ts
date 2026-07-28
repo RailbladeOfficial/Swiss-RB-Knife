@@ -30,7 +30,12 @@ import { initTimeTracker } from "./tools/time-tracker";
 import { initImageCCR } from "./tools/image-ccr";
 import { initFileGen } from "./tools/file-gen";
 import { initAutoBackup, onAutoBackupToolEntry } from "./tools/auto-backup";
-import { initBudget, setBudgetAmericanDates, onBudgetToolEntry, onBudgetToolExit } from "./tools/budget";
+import {
+  initBudget,
+  setBudgetAmericanDates,
+  onBudgetToolEntry,
+  onBudgetToolExit,
+} from "./tools/budget";
 
 /* =============================================================================
    TYPES
@@ -52,18 +57,18 @@ type NavEntry = {
  *  absent means "no override" (flat colour from the CSS vars applies). */
 type AdvancedOptions = {
   headerGradient?: { colorA: string; colorB: string; angle: number };
-  headerGlow?:    { color: string; intensity: "low" | "medium" | "high" };
-  bodyGradient?:  { colorA: string; colorB: string; angle: number };
-  modalGlow?:     { color: string; intensity: "low" | "medium" | "high" };
-  panelGlow?:     { color: string; intensity: "low" | "medium" | "high" };
-  buttonGlow?:    { color: string; intensity: "low" | "medium" | "high" };
+  headerGlow?: { color: string; intensity: "low" | "medium" | "high" };
+  bodyGradient?: { colorA: string; colorB: string; angle: number };
+  modalGlow?: { color: string; intensity: "low" | "medium" | "high" };
+  panelGlow?: { color: string; intensity: "low" | "medium" | "high" };
+  buttonGlow?: { color: string; intensity: "low" | "medium" | "high" };
 };
 
 /** A persisted custom theme. vars holds all --color-* values; advanced holds
  *  the optional gradient / glow overrides. */
 type CustomTheme = {
-  id: string;               // stable UUID-style key, never shown to user
-  name: string;             // display name, user-editable
+  id: string; // stable UUID-style key, never shown to user
+  name: string; // display name, user-editable
   vars: Record<string, string>;
   advanced: AdvancedOptions;
 };
@@ -73,10 +78,10 @@ type CustomTheme = {
  *  used by the built-in "None" pack. This is the single source of truth for
  *  the Sound Pack dropdown; add a pack here and it appears in Settings. */
 type SoundPack = {
-  id: string;          // stable key, persisted in settings.soundPack
-  name: string;        // display name shown in the dropdown
-  success?: string;    // e.g. "/sounds/default/success.wav"
-  error?: string;      // e.g. "/sounds/default/error.wav"
+  id: string; // stable key, persisted in settings.soundPack
+  name: string; // display name shown in the dropdown
+  success?: string; // e.g. "/sounds/default/success.wav"
+  error?: string; // e.g. "/sounds/default/error.wav"
 };
 
 type ShellSettings = {
@@ -105,9 +110,9 @@ type ShellSettings = {
  *  About-modal notice so neither has to re-query. `available` folds in both
  *  the "newer than current" and "newer than ignored" checks. */
 interface UpdateInfo {
-  current: string;   // running version, e.g. "0.3.3" (no leading v)
-  latest: string;    // latest release tag, e.g. "v0.3.4"
-  htmlUrl: string;   // release page, opened in the default browser
+  current: string; // running version, e.g. "0.3.3" (no leading v)
+  latest: string; // latest release tag, e.g. "v0.3.4"
+  htmlUrl: string; // release page, opened in the default browser
   available: boolean;
 }
 
@@ -256,10 +261,10 @@ let _activeCustomId: string | null = null;
 // Theme editor session state — tracks what was active before the editor opened
 // so we can revert on cancel.
 let _teMode: "create" | "edit" = "create";
-let _teEditId: string | null = null;      // id of the theme being edited (edit mode)
-let _tePrevTheme: string = "default";     // settings.theme value before editor opened
+let _teEditId: string | null = null; // id of the theme being edited (edit mode)
+let _tePrevTheme: string = "default"; // settings.theme value before editor opened
 let _teWorkingVars: Record<string, string> = {}; // live working copy of vars in editor
-let _teWorkingAdv: AdvancedOptions = {};         // live working copy of advanced options
+let _teWorkingAdv: AdvancedOptions = {}; // live working copy of advanced options
 
 /* =============================================================================
    ELEMENT REFS
@@ -345,9 +350,7 @@ const contributingBackdrop = document.getElementById("contributingBackdrop")!;
 const contributingClose = document.getElementById("contributingClose")!;
 const contributingBack = document.getElementById("contributingBack")!;
 
-const imageLightboxBackdrop = document.getElementById(
-  "imageLightboxBackdrop",
-)!;
+const imageLightboxBackdrop = document.getElementById("imageLightboxBackdrop")!;
 const imageLightboxClose = document.getElementById("imageLightboxClose")!;
 const imageLightboxBack = document.getElementById("imageLightboxBack")!;
 const imageLightboxTitle = document.getElementById("imageLightboxTitle")!;
@@ -362,105 +365,181 @@ const licenseAcceptBtn = document.getElementById("licenseAcceptBtn")!;
 const licenseDeclineBtn = document.getElementById("licenseDeclineBtn")!;
 
 // ── Custom theme subsettings refs ──────────────────────────────────────────
-const customSubsettings     = document.getElementById("customSubsettings")!;
-const customThemeSelect     = document.getElementById("customThemeSelect") as HTMLSelectElement;
-const customThemeCreateBtn  = document.getElementById("customThemeCreateBtn")!;
-const customThemeEditBtn    = document.getElementById("customThemeEditBtn")!;
-const customThemeDeleteBtn  = document.getElementById("customThemeDeleteBtn")!;
-const customThemeEmpty      = document.getElementById("customThemeEmpty")!;
+const customSubsettings = document.getElementById("customSubsettings")!;
+const customThemeSelect = document.getElementById(
+  "customThemeSelect",
+) as HTMLSelectElement;
+const customThemeCreateBtn = document.getElementById("customThemeCreateBtn")!;
+const customThemeEditBtn = document.getElementById("customThemeEditBtn")!;
+const customThemeDeleteBtn = document.getElementById("customThemeDeleteBtn")!;
+const customThemeEmpty = document.getElementById("customThemeEmpty")!;
 
 // ── Theme editor modal refs ────────────────────────────────────────────────
-const themeEditorBackdrop   = document.getElementById("themeEditorBackdrop")!;
-const themeEditorTitle      = document.getElementById("themeEditorTitle")!;
-const themeEditorBack       = document.getElementById("themeEditorBack")!;
-const themeEditorClose      = document.getElementById("themeEditorClose")!;
-const teNameInput           = document.getElementById("teNameInput") as HTMLInputElement;
-const teBaseSelect          = document.getElementById("teBaseSelect") as HTMLSelectElement;
-const teBaseCustomGroup     = document.getElementById("teBaseCustomGroup")!;
-const teCancel              = document.getElementById("teCancel")!;
-const teSave                = document.getElementById("teSave")!;
+const themeEditorBackdrop = document.getElementById("themeEditorBackdrop")!;
+const themeEditorTitle = document.getElementById("themeEditorTitle")!;
+const themeEditorBack = document.getElementById("themeEditorBack")!;
+const themeEditorClose = document.getElementById("themeEditorClose")!;
+const teNameInput = document.getElementById("teNameInput") as HTMLInputElement;
+const teBaseSelect = document.getElementById(
+  "teBaseSelect",
+) as HTMLSelectElement;
+const teBaseCustomGroup = document.getElementById("teBaseCustomGroup")!;
+const teCancel = document.getElementById("teCancel")!;
+const teSave = document.getElementById("teSave")!;
 
 // Advanced controls
-const teHeaderGradientToggle  = document.getElementById("teHeaderGradientToggle") as HTMLInputElement;
-const teHeaderGradientControls= document.getElementById("teHeaderGradientControls")!;
-const teHeaderColorA          = document.getElementById("teHeaderColorA") as HTMLInputElement;
-const teHeaderColorAHex       = document.getElementById("teHeaderColorAHex") as HTMLInputElement;
-const teHeaderColorB          = document.getElementById("teHeaderColorB") as HTMLInputElement;
-const teHeaderColorBHex       = document.getElementById("teHeaderColorBHex") as HTMLInputElement;
-const teHeaderAngle           = document.getElementById("teHeaderAngle") as HTMLInputElement;
-const teHeaderGlowToggle      = document.getElementById("teHeaderGlowToggle") as HTMLInputElement;
-const teHeaderGlowControls    = document.getElementById("teHeaderGlowControls")!;
-const teHeaderGlowColor       = document.getElementById("teHeaderGlowColor") as HTMLInputElement;
-const teHeaderGlowColorHex    = document.getElementById("teHeaderGlowColorHex") as HTMLInputElement;
-const teHeaderGlowIntensity   = document.getElementById("teHeaderGlowIntensity") as HTMLInputElement;
-const teBodyGradientToggle    = document.getElementById("teBodyGradientToggle") as HTMLInputElement;
-const teBodyGradientControls  = document.getElementById("teBodyGradientControls")!;
-const teBodyColorA            = document.getElementById("teBodyColorA") as HTMLInputElement;
-const teBodyColorAHex         = document.getElementById("teBodyColorAHex") as HTMLInputElement;
-const teBodyColorB            = document.getElementById("teBodyColorB") as HTMLInputElement;
-const teBodyColorBHex         = document.getElementById("teBodyColorBHex") as HTMLInputElement;
-const teBodyAngle             = document.getElementById("teBodyAngle") as HTMLInputElement;
-const teModalGlowToggle       = document.getElementById("teModalGlowToggle") as HTMLInputElement;
-const teModalGlowControls     = document.getElementById("teModalGlowControls")!;
-const teModalGlowColor        = document.getElementById("teModalGlowColor") as HTMLInputElement;
-const teModalGlowColorHex     = document.getElementById("teModalGlowColorHex") as HTMLInputElement;
-const teModalGlowIntensity    = document.getElementById("teModalGlowIntensity") as HTMLInputElement;
-const tePanelGlowToggle       = document.getElementById("tePanelGlowToggle") as HTMLInputElement;
-const tePanelGlowControls     = document.getElementById("tePanelGlowControls")!;
-const tePanelGlowColor        = document.getElementById("tePanelGlowColor") as HTMLInputElement;
-const tePanelGlowColorHex     = document.getElementById("tePanelGlowColorHex") as HTMLInputElement;
-const tePanelGlowIntensity    = document.getElementById("tePanelGlowIntensity") as HTMLInputElement;
-const teButtonGlowToggle      = document.getElementById("teButtonGlowToggle") as HTMLInputElement;
-const teButtonGlowControls    = document.getElementById("teButtonGlowControls")!;
-const teButtonGlowColor       = document.getElementById("teButtonGlowColor") as HTMLInputElement;
-const teButtonGlowColorHex    = document.getElementById("teButtonGlowColorHex") as HTMLInputElement;
-const teButtonGlowIntensity   = document.getElementById("teButtonGlowIntensity") as HTMLInputElement;
+const teHeaderGradientToggle = document.getElementById(
+  "teHeaderGradientToggle",
+) as HTMLInputElement;
+const teHeaderGradientControls = document.getElementById(
+  "teHeaderGradientControls",
+)!;
+const teHeaderColorA = document.getElementById(
+  "teHeaderColorA",
+) as HTMLInputElement;
+const teHeaderColorAHex = document.getElementById(
+  "teHeaderColorAHex",
+) as HTMLInputElement;
+const teHeaderColorB = document.getElementById(
+  "teHeaderColorB",
+) as HTMLInputElement;
+const teHeaderColorBHex = document.getElementById(
+  "teHeaderColorBHex",
+) as HTMLInputElement;
+const teHeaderAngle = document.getElementById(
+  "teHeaderAngle",
+) as HTMLInputElement;
+const teHeaderGlowToggle = document.getElementById(
+  "teHeaderGlowToggle",
+) as HTMLInputElement;
+const teHeaderGlowControls = document.getElementById("teHeaderGlowControls")!;
+const teHeaderGlowColor = document.getElementById(
+  "teHeaderGlowColor",
+) as HTMLInputElement;
+const teHeaderGlowColorHex = document.getElementById(
+  "teHeaderGlowColorHex",
+) as HTMLInputElement;
+const teHeaderGlowIntensity = document.getElementById(
+  "teHeaderGlowIntensity",
+) as HTMLInputElement;
+const teBodyGradientToggle = document.getElementById(
+  "teBodyGradientToggle",
+) as HTMLInputElement;
+const teBodyGradientControls = document.getElementById(
+  "teBodyGradientControls",
+)!;
+const teBodyColorA = document.getElementById(
+  "teBodyColorA",
+) as HTMLInputElement;
+const teBodyColorAHex = document.getElementById(
+  "teBodyColorAHex",
+) as HTMLInputElement;
+const teBodyColorB = document.getElementById(
+  "teBodyColorB",
+) as HTMLInputElement;
+const teBodyColorBHex = document.getElementById(
+  "teBodyColorBHex",
+) as HTMLInputElement;
+const teBodyAngle = document.getElementById("teBodyAngle") as HTMLInputElement;
+const teModalGlowToggle = document.getElementById(
+  "teModalGlowToggle",
+) as HTMLInputElement;
+const teModalGlowControls = document.getElementById("teModalGlowControls")!;
+const teModalGlowColor = document.getElementById(
+  "teModalGlowColor",
+) as HTMLInputElement;
+const teModalGlowColorHex = document.getElementById(
+  "teModalGlowColorHex",
+) as HTMLInputElement;
+const teModalGlowIntensity = document.getElementById(
+  "teModalGlowIntensity",
+) as HTMLInputElement;
+const tePanelGlowToggle = document.getElementById(
+  "tePanelGlowToggle",
+) as HTMLInputElement;
+const tePanelGlowControls = document.getElementById("tePanelGlowControls")!;
+const tePanelGlowColor = document.getElementById(
+  "tePanelGlowColor",
+) as HTMLInputElement;
+const tePanelGlowColorHex = document.getElementById(
+  "tePanelGlowColorHex",
+) as HTMLInputElement;
+const tePanelGlowIntensity = document.getElementById(
+  "tePanelGlowIntensity",
+) as HTMLInputElement;
+const teButtonGlowToggle = document.getElementById(
+  "teButtonGlowToggle",
+) as HTMLInputElement;
+const teButtonGlowControls = document.getElementById("teButtonGlowControls")!;
+const teButtonGlowColor = document.getElementById(
+  "teButtonGlowColor",
+) as HTMLInputElement;
+const teButtonGlowColorHex = document.getElementById(
+  "teButtonGlowColorHex",
+) as HTMLInputElement;
+const teButtonGlowIntensity = document.getElementById(
+  "teButtonGlowIntensity",
+) as HTMLInputElement;
 
 // ── Custom theme delete confirm modal refs ─────────────────────────────────
-const customThemeDeleteBackdrop     = document.getElementById("customThemeDeleteBackdrop")!;
-const customThemeDeleteMsg          = document.getElementById("customThemeDeleteMsg")!;
-const customThemeDeleteBack         = document.getElementById("customThemeDeleteBack")!;
-const customThemeDeleteConfirmBtn   = document.getElementById("customThemeDeleteConfirmBtn")!;
-const customThemeDeleteCancelBtn    = document.getElementById("customThemeDeleteCancelBtn")!;
+const customThemeDeleteBackdrop = document.getElementById(
+  "customThemeDeleteBackdrop",
+)!;
+const customThemeDeleteMsg = document.getElementById("customThemeDeleteMsg")!;
+const customThemeDeleteBack = document.getElementById("customThemeDeleteBack")!;
+const customThemeDeleteConfirmBtn = document.getElementById(
+  "customThemeDeleteConfirmBtn",
+)!;
+const customThemeDeleteCancelBtn = document.getElementById(
+  "customThemeDeleteCancelBtn",
+)!;
 
 // ── Security settings refs ─────────────────────────────────────────────────
-const appLockToggle       = document.getElementById("appLockToggle") as HTMLInputElement;
-const appLockLabel        = document.getElementById("appLockLabel")!;
-const lockSubsettings     = document.getElementById("lockSubsettings")!;
-const lockChangeBtn       = document.getElementById("lockChangeBtn")!;
-const lockRemoveBtn       = document.getElementById("lockRemoveBtn")!;
+const appLockToggle = document.getElementById(
+  "appLockToggle",
+) as HTMLInputElement;
+const appLockLabel = document.getElementById("appLockLabel")!;
+const lockSubsettings = document.getElementById("lockSubsettings")!;
+const lockChangeBtn = document.getElementById("lockChangeBtn")!;
+const lockRemoveBtn = document.getElementById("lockRemoveBtn")!;
 
 // ── Set-credential modal refs ──────────────────────────────────────────────
-const setLockBackdrop     = document.getElementById("setLockBackdrop")!;
-const setLockBack         = document.getElementById("setLockBack")!;
-const setLockClose        = document.getElementById("setLockClose")!;
-const setLockTitle        = document.getElementById("setLockTitle")!;
-const setLockHint         = document.getElementById("setLockHint")!;
-const setLockPickPin      = document.getElementById("setLockPickPin")!;
+const setLockBackdrop = document.getElementById("setLockBackdrop")!;
+const setLockBack = document.getElementById("setLockBack")!;
+const setLockClose = document.getElementById("setLockClose")!;
+const setLockTitle = document.getElementById("setLockTitle")!;
+const setLockHint = document.getElementById("setLockHint")!;
+const setLockPickPin = document.getElementById("setLockPickPin")!;
 const setLockPickPassword = document.getElementById("setLockPickPassword")!;
-const setLockInput        = document.getElementById("setLockInput") as HTMLInputElement;
-const setLockShowInput    = document.getElementById("setLockShowInput")!;
-const setLockConfirm      = document.getElementById("setLockConfirm") as HTMLInputElement;
-const setLockShowConfirm  = document.getElementById("setLockShowConfirm")!;
-const setLockConfirmWrap  = document.getElementById("setLockConfirmWrap")!;
-const setLockError        = document.getElementById("setLockError")!;
-const setLockCancelBtn    = document.getElementById("setLockCancelBtn")!;
-const setLockSaveBtn      = document.getElementById("setLockSaveBtn")!;
+const setLockInput = document.getElementById(
+  "setLockInput",
+) as HTMLInputElement;
+const setLockShowInput = document.getElementById("setLockShowInput")!;
+const setLockConfirm = document.getElementById(
+  "setLockConfirm",
+) as HTMLInputElement;
+const setLockShowConfirm = document.getElementById("setLockShowConfirm")!;
+const setLockConfirmWrap = document.getElementById("setLockConfirmWrap")!;
+const setLockError = document.getElementById("setLockError")!;
+const setLockCancelBtn = document.getElementById("setLockCancelBtn")!;
+const setLockSaveBtn = document.getElementById("setLockSaveBtn")!;
 
 // ── Lock screen refs ───────────────────────────────────────────────────────
-const lockScreen          = document.getElementById("lockScreen")!;
-const lockPinView         = document.getElementById("lockPinView")!;
-const lockPasswordView    = document.getElementById("lockPasswordView")!;
-const lockDots            = document.getElementById("lockDots")!;
-const lockNumpad          = document.getElementById("lockNumpad")!;
-const lockBackspace       = document.getElementById("lockBackspace")!;
-const lockPinError        = document.getElementById("lockPinError")!;
-const lockPasswordInput   = document.getElementById("lockPasswordInput") as HTMLInputElement;
-const lockShowPassword    = document.getElementById("lockShowPassword")!;
-const lockSubmitBtn       = document.getElementById("lockSubmitBtn")!;
-const lockPasswordError   = document.getElementById("lockPasswordError")!;
-const lockExitBtn         = document.getElementById("lockExitBtn")!;
-const lockExitBtnPw       = document.getElementById("lockExitBtnPw")!;
+const lockScreen = document.getElementById("lockScreen")!;
+const lockPinView = document.getElementById("lockPinView")!;
+const lockPasswordView = document.getElementById("lockPasswordView")!;
+const lockDots = document.getElementById("lockDots")!;
+const lockNumpad = document.getElementById("lockNumpad")!;
+const lockBackspace = document.getElementById("lockBackspace")!;
+const lockPinError = document.getElementById("lockPinError")!;
+const lockPasswordInput = document.getElementById(
+  "lockPasswordInput",
+) as HTMLInputElement;
+const lockShowPassword = document.getElementById("lockShowPassword")!;
+const lockSubmitBtn = document.getElementById("lockSubmitBtn")!;
+const lockPasswordError = document.getElementById("lockPasswordError")!;
+const lockExitBtn = document.getElementById("lockExitBtn")!;
+const lockExitBtnPw = document.getElementById("lockExitBtnPw")!;
 
 /* =============================================================================
    CLOCK
@@ -560,20 +639,17 @@ function switchSection(sectionKey: string, toolKey?: string): void {
 
   navItems.forEach((item) => {
     const matchesSection = item.dataset.section === sectionKey;
-    const matchesTool = item.dataset.tool ? item.dataset.tool === toolKey : true;
+    const matchesTool = item.dataset.tool
+      ? item.dataset.tool === toolKey
+      : true;
     item.classList.toggle("active", matchesSection && matchesTool);
   });
   contentSections.forEach((section) => {
     section.classList.toggle("active", section.id === `section-${sectionKey}`);
   });
-  // Regenerative random mode regenerates on every view change
-  if (settings.theme === "random" && !settings.randomPersistent) {
-    applyPalette(
-      settings.randomHarmonized
-        ? generateRandomPalette()
-        : generateChaoticPalette(),
-    );
-  }
+  // Regenerative random mode re-rolls on every view change (guarded + deduped
+  // inside maybeRegenerateRandom).
+  maybeRegenerateRandom();
 }
 
 /** Called when a sidebar icon is clicked — always resets to landing or default tool.
@@ -775,9 +851,9 @@ async function loadShellState(): Promise<void> {
 
     // Seed in-memory tracking from persisted state so saveShellState
     // never needs to read back from disk to preserve these fields.
-    _lastTool        = state.lastTool        ?? null;
+    _lastTool = state.lastTool ?? null;
     _lastToolSection = state.lastToolSection ?? null;
-    _lastCategory    = state.lastCategory    ?? null;
+    _lastCategory = state.lastCategory ?? null;
 
     const target = settings.startupTarget ?? "lastView";
 
@@ -904,6 +980,10 @@ const RANDOM_VARS = [
   "--color-accent-entries",
   "--color-toggle-off",
   "--color-toggle-on",
+  "--color-changelog-features",
+  "--color-changelog-improvements",
+  "--color-changelog-bugfixes",
+  "--color-changelog-tool",
   "--color-toast-success-bg",
   "--color-toast-success-border",
   "--color-toast-success-text",
@@ -1008,10 +1088,25 @@ function generateRandomPalette(): Record<string, string> {
     // so even if two hues happen to be close, their lightness differs.
     const sat = isDark ? rInt(60, 85) : rInt(55, 80);
     const lit = isDark
-      ? (i % 2 === 1 ? rInt(52, 65) : rInt(38, 50))
-      : (i % 2 === 1 ? rInt(40, 52) : rInt(55, 67));
+      ? i % 2 === 1
+        ? rInt(52, 65)
+        : rInt(38, 50)
+      : i % 2 === 1
+        ? rInt(40, 52)
+        : rInt(55, 67);
     chartColors[`--color-chart-${i}`] = hslToHex(hue, sat, lit);
   }
+
+  // Changelog accents: 4 hues spread 90° apart from their own random start
+  // (independent of baseHue/accentHue/chartBaseHue) so they're guaranteed
+  // distinct from each other and from the rest of the palette, with lightness
+  // matched to bg darkness the same way the button/accent colors are above.
+  const clBaseHue = rInt(0, 89); // 0-89 ensures a full even spread across 4×90°
+  const clLit = isDark ? rInt(55, 68) : rInt(38, 50);
+  const clFeatures = hslToHex(clBaseHue, rInt(65, 90), clLit);
+  const clImprovements = hslToHex((clBaseHue + 90) % 360, rInt(65, 90), clLit);
+  const clBugfixes = hslToHex((clBaseHue + 180) % 360, rInt(65, 90), clLit);
+  const clTool = hslToHex((clBaseHue + 270) % 360, rInt(65, 90), clLit);
 
   return {
     "--color-bg": bg,
@@ -1033,6 +1128,10 @@ function generateRandomPalette(): Record<string, string> {
     "--color-accent-entries": acEnt,
     "--color-toggle-off": togOff,
     "--color-toggle-on": togOn,
+    "--color-changelog-features": clFeatures,
+    "--color-changelog-improvements": clImprovements,
+    "--color-changelog-bugfixes": clBugfixes,
+    "--color-changelog-tool": clTool,
     "--color-toast-success-bg": tSBg,
     "--color-toast-success-border": tSBord,
     "--color-toast-success-text": tSText,
@@ -1065,6 +1164,10 @@ function generateChaoticPalette(): Record<string, string> {
     "--color-accent-entries": rHex(),
     "--color-toggle-off": rHex(),
     "--color-toggle-on": rHex(),
+    "--color-changelog-features": rHex(),
+    "--color-changelog-improvements": rHex(),
+    "--color-changelog-bugfixes": rHex(),
+    "--color-changelog-tool": rHex(),
     "--color-toast-success-bg": rHex(),
     "--color-toast-success-border": rHex(),
     "--color-toast-success-text": rHex(),
@@ -1099,37 +1202,38 @@ function applyPalette(palette: Record<string, string>): void {
  *  !important, making them respond to the random palette. Covers: modals,
  *  tool/section headers and titles, tab buttons, dir/prv buttons, slider vals. */
 function applyRandomModalStyles(palette: Record<string, string>): void {
-  const panel  = palette["--color-panel"]       ?? "#0f172a";
-  const border = palette["--color-border"]      ?? "#1f2937";
-  const btn    = palette["--color-btn"]         ?? "#2563eb";
+  const panel = palette["--color-panel"] ?? "#0f172a";
+  const border = palette["--color-border"] ?? "#1f2937";
+  const btn = palette["--color-btn"] ?? "#2563eb";
   const textMuted = palette["--color-text-muted"] ?? "#9ca3af";
-  const inputBg = palette["--color-input-bg"]   ?? "#111827";
-  const text   = palette["--color-text"]        ?? "#e5e7eb";
+  const inputBg = palette["--color-input-bg"] ?? "#111827";
+  const text = palette["--color-text"] ?? "#e5e7eb";
 
   // Panel → rgba components for translucent modal
   const r = parseInt(panel.slice(1, 3), 16);
   const g = parseInt(panel.slice(3, 5), 16);
   const b = parseInt(panel.slice(5, 7), 16);
   // Border → rgba components for translucent modal border
-  const br  = parseInt(border.slice(1, 3), 16);
+  const br = parseInt(border.slice(1, 3), 16);
   const bg2 = parseInt(border.slice(3, 5), 16);
-  const bb  = parseInt(border.slice(5, 7), 16);
+  const bb = parseInt(border.slice(5, 7), 16);
   // Btn → rgba components for header gradient and tab tints
   const btnR = parseInt(btn.slice(1, 3), 16);
   const btnG = parseInt(btn.slice(3, 5), 16);
   const btnB = parseInt(btn.slice(5, 7), 16);
+  const btnText = palette["--color-btn-text"] ?? "#ffffff";
 
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   const isDark = luminance < 0.5;
 
-  const translucentBg     = `rgba(${r}, ${g}, ${b}, ${isDark ? "0.25" : "0.45"})`;
+  const translucentBg = `rgba(${r}, ${g}, ${b}, ${isDark ? "0.25" : "0.45"})`;
   const translucentBorder = `rgba(${br}, ${bg2}, ${bb}, 0.6)`;
-  const headerGradient    = `linear-gradient(90deg, rgba(${btnR}, ${btnG}, ${btnB}, 0.12), rgba(${btnR}, ${btnG}, ${btnB}, 0.04))`;
+  const headerGradient = `linear-gradient(90deg, rgba(${btnR}, ${btnG}, ${btnB}, 0.12), rgba(${btnR}, ${btnG}, ${btnB}, 0.04))`;
   const headerBorderColor = `rgba(${btnR}, ${btnG}, ${btnB}, 0.3)`;
-  const tabActiveBg       = `rgba(${btnR}, ${btnG}, ${btnB}, 0.12)`;
-  const tabActiveHoverBg  = `rgba(${btnR}, ${btnG}, ${btnB}, 0.08)`;
+  const tabActiveBg = `rgba(${btnR}, ${btnG}, ${btnB}, 0.12)`;
+  const tabActiveHoverBg = `rgba(${btnR}, ${btnG}, ${btnB}, 0.08)`;
   const tabActiveHoverBorder = `rgba(${btnR}, ${btnG}, ${btnB}, 0.4)`;
-  const tabActiveBorder   = `rgba(${btnR}, ${btnG}, ${btnB}, 0.5)`;
+  const tabActiveBorder = `rgba(${btnR}, ${btnG}, ${btnB}, 0.5)`;
 
   const solidRule = `
     body.solid-modals .modal {
@@ -1200,6 +1304,33 @@ function applyRandomModalStyles(palette: Record<string, string>): void {
     .preview-card.anchor-card { border-color: ${btn} !important; }
     .preview-card.drag-target  { border-color: ${btn} !important; }`;
 
+  // Newer budget accents (summary-tab active, view-mode toggle, annual-stats
+  // title) are hardcoded to default.css's blue and aren't touched by the rules
+  // above — so under random/custom they'd stay blue no matter the palette.
+  // Re-point them at the palette's button colour. Semantic status colours
+  // (good/late/overdue count badges) are intentionally left alone.
+  const budgetRule = `
+    .budget-summary-tab.active {
+      color: ${btn} !important;
+      background: ${tabActiveBg} !important;
+      border-bottom-color: ${btn} !important;
+      text-shadow: none !important;
+    }
+    .budget-view-mode-btn.active {
+      background: ${btn} !important;
+      color: ${btnText} !important;
+      border-color: ${btn} !important;
+      box-shadow: none !important;
+    }
+    .budget-annual-stats-title { color: ${btn} !important; }
+    .budget-annual-stats-title-panel { border-left-color: ${btn} !important; }
+    .budget-chart-cycle-btn:hover,
+    .budget-chart-expand-btn:hover,
+    .budget-chart-modal-cycle-btn:hover {
+      border-color: ${btn} !important;
+      color: ${btn} !important;
+    }`;
+
   let tag = document.getElementById(
     "random-modal-styles",
   ) as HTMLStyleElement | null;
@@ -1208,7 +1339,8 @@ function applyRandomModalStyles(palette: Record<string, string>): void {
     tag.id = "random-modal-styles";
     document.head.appendChild(tag);
   }
-  tag.textContent = solidRule + translucentRule + headerRule + controlsRule;
+  tag.textContent =
+    solidRule + translucentRule + headerRule + controlsRule + budgetRule;
 }
 
 /** Removes all inline random palette properties from :root and removes the
@@ -1222,16 +1354,89 @@ function clearRandomPalette(): void {
   document.getElementById("random-modal-styles")?.remove();
 }
 
-/** Regenerates palette if regenerative random is active — call at the top of any modal open. */
+// Coalesces compound triggers so one user action re-rolls at most once: a click
+// that also opens a modal fires both the global click listener and modal.ts's
+// open hook microseconds apart, and a button that also changes view stacks a
+// third. Anything inside this window collapses to a single roll; genuinely
+// separate interactions are always further apart than this.
+let _lastRegen = 0;
+
+/** Regenerates the palette when — and only when — Regenerative random is active.
+ *  The single choke point for every re-roll trigger (modal opens, view changes,
+ *  button presses, input commits), so it stays a no-op in every other mode. */
 function maybeRegenerateRandom(): void {
-  if (settings.theme === "random" && !settings.randomPersistent) {
-    applyPalette(
-      settings.randomHarmonized
-        ? generateRandomPalette()
-        : generateChaoticPalette(),
-    );
-  }
+  if (settings.theme !== "random" || settings.randomPersistent) return;
+  const now = Date.now();
+  if (now - _lastRegen < 80) return;
+  _lastRegen = now;
+  applyPalette(
+    settings.randomHarmonized
+      ? generateRandomPalette()
+      : generateChaoticPalette(),
+  );
 }
+
+/* -----------------------------------------------------------------------------
+   Regenerative-random reactivity
+   -----------------------------------------------------------------------------
+   In Regenerative mode the palette should feel alive — re-rolling not just on
+   modal opens and view changes (wired elsewhere) but on the interactions that
+   make up actually USING the app: pressing a tool/modal button, switching a tab,
+   collapsing a changelog entry, or committing/discarding a field with
+   Enter/Escape. Two app-wide listeners funnel through maybeRegenerateRandom()
+   above, so there's zero cost in any other theme or mode and no per-tool wiring.
+
+   Deliberately NOT a trigger: modal CLOSES. Every close/dismiss control is
+   excluded below, and Escape only re-rolls when it lands in a field (a discard),
+   never when it's dismissing a modal. Both listeners use the capture phase so a
+   handler that calls stopPropagation() (common on inline-edit Enter/Escape)
+   can't swallow the signal. */
+
+// Skip-list: the theme controls handle themselves (reroll re-rolls on its own;
+// save must keep showing the palette it just captured), and every close/dismiss
+// control counts as a "close", which the user asked to leave alone.
+const REGEN_CLICK_EXCLUDE =
+  "#rerollBtn, #saveRandomBtn, .modal-close-btn, [data-modal-close], .nav-back-btn, .modal-cancel-btn";
+
+document.addEventListener(
+  "click",
+  (e) => {
+    const btn = (e.target as HTMLElement | null)?.closest("button");
+    if (!btn || btn.closest(REGEN_CLICK_EXCLUDE)) return;
+    maybeRegenerateRandom();
+  },
+  true,
+);
+
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key !== "Enter" && e.key !== "Escape") return;
+    const target = e.target as HTMLElement | null;
+    // Only a commit/discard inside a field — never a modal-closing Escape.
+    if (!target || !target.matches("input, textarea, select")) return;
+    maybeRegenerateRandom();
+  },
+  true,
+);
+
+document.addEventListener(
+  "change",
+  (e) => {
+    const el = e.target as HTMLElement | null;
+    if (
+      !el ||
+      !el.matches('input[type="checkbox"], input[type="radio"], select')
+    )
+      return;
+    // The random-mode and palette-type toggles already clear + re-apply a fresh
+    // palette in their own handlers (via applyTheme("random")); skip them here so
+    // flipping either one doesn't redundantly double-roll.
+    if (el.closest("#randomModeToggle, #randomPaletteToggle")) return;
+    maybeRegenerateRandom();
+  },
+  true,
+);
 
 /* =============================================================================
    CUSTOM THEME SYSTEM
@@ -1273,20 +1478,29 @@ async function loadCustomThemes(): Promise<void> {
       customThemes = [];
       return;
     }
-    customThemes = parsed.filter((t): t is CustomTheme =>
-      t !== null &&
-      typeof t === "object" &&
-      typeof t.id === "string" && t.id.length > 0 &&
-      typeof t.name === "string" &&
-      t.vars !== null && typeof t.vars === "object" && !Array.isArray(t.vars)
-    ).map((t) => ({
-      id: t.id,
-      name: t.name,
-      vars: t.vars ?? {},
-      advanced: (t.advanced && typeof t.advanced === "object" && !Array.isArray(t.advanced))
-        ? t.advanced
-        : {},
-    }));
+    customThemes = parsed
+      .filter(
+        (t): t is CustomTheme =>
+          t !== null &&
+          typeof t === "object" &&
+          typeof t.id === "string" &&
+          t.id.length > 0 &&
+          typeof t.name === "string" &&
+          t.vars !== null &&
+          typeof t.vars === "object" &&
+          !Array.isArray(t.vars),
+      )
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        vars: t.vars ?? {},
+        advanced:
+          t.advanced &&
+          typeof t.advanced === "object" &&
+          !Array.isArray(t.advanced)
+            ? t.advanced
+            : {},
+      }));
   } catch {
     customThemes = [];
   }
@@ -1294,9 +1508,9 @@ async function loadCustomThemes(): Promise<void> {
 
 /** Intensity → box-shadow spread/opacity mappings for glow effects. */
 const GLOW_INTENSITY = {
-  low:    { opacity: 0.25, spread: 12 },
+  low: { opacity: 0.25, spread: 12 },
   medium: { opacity: 0.45, spread: 20 },
-  high:   { opacity: 0.65, spread: 32 },
+  high: { opacity: 0.65, spread: 32 },
 };
 
 /** Converts a hex color to rgba with the given opacity (0–1). */
@@ -1313,7 +1527,7 @@ function hexToRgba(hex: string, opacity: number): string {
  *  don't bleed through. */
 function applyCustomThemeStyles(theme: CustomTheme): void {
   const vars = theme.vars;
-  const adv  = theme.advanced;
+  const adv = theme.advanced;
 
   // Re-use the same palette-based overrides as the random theme so all the
   // default.css !important rules are neutralised consistently.
@@ -1375,7 +1589,9 @@ function applyCustomThemeStyles(theme: CustomTheme): void {
   }
 
   if (rules.length > 0) {
-    let advTag = document.getElementById("custom-theme-adv-styles") as HTMLStyleElement | null;
+    let advTag = document.getElementById(
+      "custom-theme-adv-styles",
+    ) as HTMLStyleElement | null;
     if (!advTag) {
       advTag = document.createElement("style");
       advTag.id = "custom-theme-adv-styles";
@@ -1454,7 +1670,13 @@ function cssColorToHex(css: string): string | null {
   if (s.startsWith("#")) {
     const h = s.slice(1).replace(/[^0-9a-fA-F]/g, "");
     if (h.length === 3) {
-      return "#" + h.split("").map((c) => c + c).join("");
+      return (
+        "#" +
+        h
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      );
     }
     if (h.length >= 6) return "#" + h.slice(0, 6);
     return null;
@@ -1462,9 +1684,12 @@ function cssColorToHex(css: string): string | null {
   // rgb / rgba
   const m = s.match(/rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)/);
   if (m) {
-    return "#" + [m[1], m[2], m[3]]
-      .map((n) => parseInt(n).toString(16).padStart(2, "0"))
-      .join("");
+    return (
+      "#" +
+      [m[1], m[2], m[3]]
+        .map((n) => parseInt(n).toString(16).padStart(2, "0"))
+        .join("")
+    );
   }
   return null;
 }
@@ -1474,13 +1699,13 @@ function cssColorToHex(css: string): string | null {
 /** Populates every swatch in the editor body from a vars record. */
 function tePopulateSwatches(vars: Record<string, string>): void {
   document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
-    const varName  = row.dataset.var!;
-    const swatch   = row.querySelector<HTMLInputElement>(".te-swatch")!;
+    const varName = row.dataset.var!;
+    const swatch = row.querySelector<HTMLInputElement>(".te-swatch")!;
     const hexInput = row.querySelector<HTMLInputElement>(".te-hex")!;
-    const val      = vars[varName] ?? "#000000";
-    const hex      = cssColorToHex(val) ?? "#000000";
-    swatch.value      = hex;
-    hexInput.value    = hex.toUpperCase();
+    const val = vars[varName] ?? "#000000";
+    const hex = cssColorToHex(val) ?? "#000000";
+    swatch.value = hex;
+    hexInput.value = hex.toUpperCase();
     _teWorkingVars[varName] = hex;
   });
 }
@@ -1494,9 +1719,11 @@ function tePopulateAdvanced(adv: AdvancedOptions): void {
   teHeaderGradientToggle.checked = !!hg;
   teHeaderGradientControls.style.display = hg ? "" : "none";
   if (hg) {
-    teHeaderColorA.value = hg.colorA; teHeaderColorAHex.value = hg.colorA.toUpperCase();
-    teHeaderColorB.value = hg.colorB; teHeaderColorBHex.value = hg.colorB.toUpperCase();
-    teHeaderAngle.value  = String(hg.angle);
+    teHeaderColorA.value = hg.colorA;
+    teHeaderColorAHex.value = hg.colorA.toUpperCase();
+    teHeaderColorB.value = hg.colorB;
+    teHeaderColorBHex.value = hg.colorB.toUpperCase();
+    teHeaderAngle.value = String(hg.angle);
   }
 
   // Header glow
@@ -1504,7 +1731,8 @@ function tePopulateAdvanced(adv: AdvancedOptions): void {
   teHeaderGlowToggle.checked = !!hglow;
   teHeaderGlowControls.style.display = hglow ? "" : "none";
   if (hglow) {
-    teHeaderGlowColor.value = hglow.color; teHeaderGlowColorHex.value = hglow.color.toUpperCase();
+    teHeaderGlowColor.value = hglow.color;
+    teHeaderGlowColorHex.value = hglow.color.toUpperCase();
     teSetIntensity("teHeaderGlowIntensity", hglow.intensity);
   }
 
@@ -1513,9 +1741,11 @@ function tePopulateAdvanced(adv: AdvancedOptions): void {
   teBodyGradientToggle.checked = !!bg;
   teBodyGradientControls.style.display = bg ? "" : "none";
   if (bg) {
-    teBodyColorA.value = bg.colorA; teBodyColorAHex.value = bg.colorA.toUpperCase();
-    teBodyColorB.value = bg.colorB; teBodyColorBHex.value = bg.colorB.toUpperCase();
-    teBodyAngle.value  = String(bg.angle);
+    teBodyColorA.value = bg.colorA;
+    teBodyColorAHex.value = bg.colorA.toUpperCase();
+    teBodyColorB.value = bg.colorB;
+    teBodyColorBHex.value = bg.colorB.toUpperCase();
+    teBodyAngle.value = String(bg.angle);
   }
 
   // Modal glow
@@ -1523,7 +1753,8 @@ function tePopulateAdvanced(adv: AdvancedOptions): void {
   teModalGlowToggle.checked = !!mg;
   teModalGlowControls.style.display = mg ? "" : "none";
   if (mg) {
-    teModalGlowColor.value = mg.color; teModalGlowColorHex.value = mg.color.toUpperCase();
+    teModalGlowColor.value = mg.color;
+    teModalGlowColorHex.value = mg.color.toUpperCase();
     teSetIntensity("teModalGlowIntensity", mg.intensity);
   }
 
@@ -1532,7 +1763,8 @@ function tePopulateAdvanced(adv: AdvancedOptions): void {
   tePanelGlowToggle.checked = !!pg;
   tePanelGlowControls.style.display = pg ? "" : "none";
   if (pg) {
-    tePanelGlowColor.value = pg.color; tePanelGlowColorHex.value = pg.color.toUpperCase();
+    tePanelGlowColor.value = pg.color;
+    tePanelGlowColorHex.value = pg.color.toUpperCase();
     teSetIntensity("tePanelGlowIntensity", pg.intensity);
   }
 
@@ -1541,7 +1773,8 @@ function tePopulateAdvanced(adv: AdvancedOptions): void {
   teButtonGlowToggle.checked = !!bgl;
   teButtonGlowControls.style.display = bgl ? "" : "none";
   if (bgl) {
-    teButtonGlowColor.value = bgl.color; teButtonGlowColorHex.value = bgl.color.toUpperCase();
+    teButtonGlowColor.value = bgl.color;
+    teButtonGlowColorHex.value = bgl.color.toUpperCase();
     teSetIntensity("teButtonGlowIntensity", bgl.intensity);
   }
 }
@@ -1550,11 +1783,11 @@ function tePopulateAdvanced(adv: AdvancedOptions): void {
 function teSetIntensity(inputId: string, value: string): void {
   const hidden = document.getElementById(inputId) as HTMLInputElement;
   if (hidden) hidden.value = value;
-  document.querySelectorAll<HTMLElement>(
-    `[data-target="${inputId}"]`
-  ).forEach((btn) => {
-    btn.classList.toggle("te-intensity-active", btn.dataset.val === value);
-  });
+  document
+    .querySelectorAll<HTMLElement>(`[data-target="${inputId}"]`)
+    .forEach((btn) => {
+      btn.classList.toggle("te-intensity-active", btn.dataset.val === value);
+    });
 }
 
 /** Live-previews the current working vars + advanced options by applying them
@@ -1577,8 +1810,8 @@ function teLivePreview(): void {
 /** Reads all swatch inputs and rebuilds _teWorkingVars, then live-previews. */
 function teSyncVarsAndPreview(): void {
   document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
-    const varName  = row.dataset.var!;
-    const swatch   = row.querySelector<HTMLInputElement>(".te-swatch")!;
+    const varName = row.dataset.var!;
+    const swatch = row.querySelector<HTMLInputElement>(".te-swatch")!;
     const hexInput = row.querySelector<HTMLInputElement>(".te-hex")!;
     _teWorkingVars[varName] = swatch.value;
     hexInput.value = swatch.value.toUpperCase();
@@ -1594,12 +1827,12 @@ function teSyncAdvAndPreview(): void {
     _teWorkingAdv.headerGradient = {
       colorA: teHeaderColorA.value,
       colorB: teHeaderColorB.value,
-      angle:  parseInt(teHeaderAngle.value, 10) || 90,
+      angle: parseInt(teHeaderAngle.value, 10) || 90,
     };
   }
   if (teHeaderGlowToggle.checked) {
     _teWorkingAdv.headerGlow = {
-      color:     teHeaderGlowColor.value,
+      color: teHeaderGlowColor.value,
       intensity: teHeaderGlowIntensity.value as "low" | "medium" | "high",
     };
   }
@@ -1607,24 +1840,24 @@ function teSyncAdvAndPreview(): void {
     _teWorkingAdv.bodyGradient = {
       colorA: teBodyColorA.value,
       colorB: teBodyColorB.value,
-      angle:  parseInt(teBodyAngle.value, 10) || 160,
+      angle: parseInt(teBodyAngle.value, 10) || 160,
     };
   }
   if (teModalGlowToggle.checked) {
     _teWorkingAdv.modalGlow = {
-      color:     teModalGlowColor.value,
+      color: teModalGlowColor.value,
       intensity: teModalGlowIntensity.value as "low" | "medium" | "high",
     };
   }
   if (tePanelGlowToggle.checked) {
     _teWorkingAdv.panelGlow = {
-      color:     tePanelGlowColor.value,
+      color: tePanelGlowColor.value,
       intensity: tePanelGlowIntensity.value as "low" | "medium" | "high",
     };
   }
   if (teButtonGlowToggle.checked) {
     _teWorkingAdv.buttonGlow = {
-      color:     teButtonGlowColor.value,
+      color: teButtonGlowColor.value,
       intensity: teButtonGlowIntensity.value as "low" | "medium" | "high",
     };
   }
@@ -1663,7 +1896,7 @@ const themeEditorModal = new Modal(themeEditorBackdrop, {
 function openThemeEditor(mode: "create", id?: undefined): void;
 function openThemeEditor(mode: "edit", id: string): void;
 function openThemeEditor(mode: "create" | "edit", id?: string): void {
-  _teMode   = mode;
+  _teMode = mode;
   _teEditId = id ?? null;
   _tePrevTheme = settings.theme;
 
@@ -1675,7 +1908,7 @@ function openThemeEditor(mode: "create" | "edit", id?: string): void {
     teNameInput.value = "";
     // Seed from whatever's currently rendered (the active theme's colours)
     _teWorkingVars = readCurrentVars();
-    _teWorkingAdv  = {};
+    _teWorkingAdv = {};
     tePopulateSwatches(_teWorkingVars);
     tePopulateAdvanced({});
   } else {
@@ -1683,7 +1916,7 @@ function openThemeEditor(mode: "create" | "edit", id?: string): void {
     const theme = customThemes.find((t) => t.id === id)!;
     teNameInput.value = theme.name;
     _teWorkingVars = { ...theme.vars };
-    _teWorkingAdv  = JSON.parse(JSON.stringify(theme.advanced));
+    _teWorkingAdv = JSON.parse(JSON.stringify(theme.advanced));
     tePopulateSwatches(_teWorkingVars);
     tePopulateAdvanced(theme.advanced);
   }
@@ -1731,7 +1964,7 @@ teBaseSelect.addEventListener("change", async () => {
     const theme = customThemes.find((t) => t.id === id);
     if (theme) {
       _teWorkingVars = { ...theme.vars };
-      _teWorkingAdv  = JSON.parse(JSON.stringify(theme.advanced));
+      _teWorkingAdv = JSON.parse(JSON.stringify(theme.advanced));
     }
   } else {
     // Named system theme: load its CSS vars by temporarily loading the CSS
@@ -1747,7 +1980,7 @@ teBaseSelect.addEventListener("change", async () => {
     // Clear any inline overrides so computed style reflects the loaded CSS
     clearCustomTheme();
     _teWorkingVars = readCurrentVars();
-    _teWorkingAdv  = {};
+    _teWorkingAdv = {};
     // Restore the preview
     themeLink.href = saved;
   }
@@ -1758,8 +1991,8 @@ teBaseSelect.addEventListener("change", async () => {
 
 // Swatch and hex input changes — wire after DOM is ready (they're static in HTML)
 document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
-  const varName  = row.dataset.var!;
-  const swatch   = row.querySelector<HTMLInputElement>(".te-swatch")!;
+  const varName = row.dataset.var!;
+  const swatch = row.querySelector<HTMLInputElement>(".te-swatch")!;
   const hexInput = row.querySelector<HTMLInputElement>(".te-hex")!;
 
   // Swatch moved by colour picker: update vars + preview, and update the hex
@@ -1776,11 +2009,11 @@ document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
   // Hex input: only update the swatch + preview when the value is a valid full
   // hex. Never write back to hexInput here — let blur handle normalisation.
   hexInput.addEventListener("input", () => {
-    const raw        = hexInput.value.trim();
+    const raw = hexInput.value.trim();
     const normalised = raw.startsWith("#") ? raw : "#" + raw;
-    const hex        = cssColorToHex(normalised);
+    const hex = cssColorToHex(normalised);
     if (hex) {
-      swatch.value            = hex;
+      swatch.value = hex;
       _teWorkingVars[varName] = hex;
       teLivePreview();
     }
@@ -1809,31 +2042,39 @@ function teWireToggle(
 }
 
 teWireToggle(teHeaderGradientToggle, teHeaderGradientControls, () => {
-  if (!teHeaderColorA.value) teHeaderColorA.value = _teWorkingVars["--color-btn"] ?? "#2563eb";
+  if (!teHeaderColorA.value)
+    teHeaderColorA.value = _teWorkingVars["--color-btn"] ?? "#2563eb";
   teHeaderColorAHex.value = teHeaderColorA.value.toUpperCase();
-  if (!teHeaderColorB.value) teHeaderColorB.value = _teWorkingVars["--color-panel"] ?? "#0f172a";
+  if (!teHeaderColorB.value)
+    teHeaderColorB.value = _teWorkingVars["--color-panel"] ?? "#0f172a";
   teHeaderColorBHex.value = teHeaderColorB.value.toUpperCase();
 });
 teWireToggle(teHeaderGlowToggle, teHeaderGlowControls, () => {
-  if (!teHeaderGlowColor.value) teHeaderGlowColor.value = _teWorkingVars["--color-btn"] ?? "#2563eb";
+  if (!teHeaderGlowColor.value)
+    teHeaderGlowColor.value = _teWorkingVars["--color-btn"] ?? "#2563eb";
   teHeaderGlowColorHex.value = teHeaderGlowColor.value.toUpperCase();
 });
 teWireToggle(teBodyGradientToggle, teBodyGradientControls, () => {
-  if (!teBodyColorA.value) teBodyColorA.value = _teWorkingVars["--color-bg"] ?? "#0b1220";
+  if (!teBodyColorA.value)
+    teBodyColorA.value = _teWorkingVars["--color-bg"] ?? "#0b1220";
   teBodyColorAHex.value = teBodyColorA.value.toUpperCase();
-  if (!teBodyColorB.value) teBodyColorB.value = _teWorkingVars["--color-panel"] ?? "#0f172a";
+  if (!teBodyColorB.value)
+    teBodyColorB.value = _teWorkingVars["--color-panel"] ?? "#0f172a";
   teBodyColorBHex.value = teBodyColorB.value.toUpperCase();
 });
 teWireToggle(teModalGlowToggle, teModalGlowControls, () => {
-  if (!teModalGlowColor.value) teModalGlowColor.value = _teWorkingVars["--color-btn"] ?? "#2563eb";
+  if (!teModalGlowColor.value)
+    teModalGlowColor.value = _teWorkingVars["--color-btn"] ?? "#2563eb";
   teModalGlowColorHex.value = teModalGlowColor.value.toUpperCase();
 });
 teWireToggle(tePanelGlowToggle, tePanelGlowControls, () => {
-  if (!tePanelGlowColor.value) tePanelGlowColor.value = _teWorkingVars["--color-border"] ?? "#1f2937";
+  if (!tePanelGlowColor.value)
+    tePanelGlowColor.value = _teWorkingVars["--color-border"] ?? "#1f2937";
   tePanelGlowColorHex.value = tePanelGlowColor.value.toUpperCase();
 });
 teWireToggle(teButtonGlowToggle, teButtonGlowControls, () => {
-  if (!teButtonGlowColor.value) teButtonGlowColor.value = _teWorkingVars["--color-btn"] ?? "#2563eb";
+  if (!teButtonGlowColor.value)
+    teButtonGlowColor.value = _teWorkingVars["--color-btn"] ?? "#2563eb";
   teButtonGlowColorHex.value = teButtonGlowColor.value.toUpperCase();
 });
 
@@ -1842,7 +2083,10 @@ teWireToggle(teButtonGlowToggle, teButtonGlowControls, () => {
  *  Swatch changes update the hex input and trigger preview;
  *  hex input changes update the swatch and trigger preview;
  *  blur normalises the hex display. */
-function teWireGlowColor(swatch: HTMLInputElement, hexInput: HTMLInputElement): void {
+function teWireGlowColor(
+  swatch: HTMLInputElement,
+  hexInput: HTMLInputElement,
+): void {
   swatch.addEventListener("input", () => {
     hexInput.value = swatch.value.toUpperCase();
     teSyncAdvAndPreview();
@@ -1863,24 +2107,24 @@ function teWireGlowColor(swatch: HTMLInputElement, hexInput: HTMLInputElement): 
     if (e.key === "Enter") hexInput.blur();
   });
 }
-teWireGlowColor(teHeaderColorA,   teHeaderColorAHex);
-teWireGlowColor(teHeaderColorB,   teHeaderColorBHex);
+teWireGlowColor(teHeaderColorA, teHeaderColorAHex);
+teWireGlowColor(teHeaderColorB, teHeaderColorBHex);
 teWireGlowColor(teHeaderGlowColor, teHeaderGlowColorHex);
-teWireGlowColor(teBodyColorA,     teBodyColorAHex);
-teWireGlowColor(teBodyColorB,     teBodyColorBHex);
+teWireGlowColor(teBodyColorA, teBodyColorAHex);
+teWireGlowColor(teBodyColorB, teBodyColorBHex);
 teWireGlowColor(teModalGlowColor, teModalGlowColorHex);
 teWireGlowColor(tePanelGlowColor, tePanelGlowColorHex);
 teWireGlowColor(teButtonGlowColor, teButtonGlowColorHex);
 
 // Angle inputs
 teHeaderAngle.addEventListener("input", teSyncAdvAndPreview);
-teBodyAngle.addEventListener("input",   teSyncAdvAndPreview);
+teBodyAngle.addEventListener("input", teSyncAdvAndPreview);
 
 // Intensity buttons
 document.querySelectorAll<HTMLElement>(".te-intensity-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     const target = btn.dataset.target!;
-    const val    = btn.dataset.val!;
+    const val = btn.dataset.val!;
     teSetIntensity(target, val);
     teSyncAdvAndPreview();
   });
@@ -1901,17 +2145,20 @@ document.querySelectorAll<HTMLElement>(".te-label-text").forEach((text) => {
       requestAnimationFrame(() => teVarTooltip.classList.add("visible"));
       const rect = text.getBoundingClientRect();
       teVarTooltip.style.left = `${rect.left}px`;
-      teVarTooltip.style.top  = `${rect.bottom + 4}px`;
+      teVarTooltip.style.top = `${rect.bottom + 4}px`;
     }, 2000);
   });
   text.addEventListener("mousemove", (e) => {
     if (teVarTooltip.classList.contains("visible")) {
       teVarTooltip.style.left = `${(e as MouseEvent).clientX + 10}px`;
-      teVarTooltip.style.top  = `${(e as MouseEvent).clientY + 16}px`;
+      teVarTooltip.style.top = `${(e as MouseEvent).clientY + 16}px`;
     }
   });
   text.addEventListener("mouseleave", () => {
-    if (_teTooltipTimer) { clearTimeout(_teTooltipTimer); _teTooltipTimer = null; }
+    if (_teTooltipTimer) {
+      clearTimeout(_teTooltipTimer);
+      _teTooltipTimer = null;
+    }
     teVarTooltip.classList.remove("visible");
     teVarTooltip.style.display = "none";
   });
@@ -1922,9 +2169,9 @@ function teActivateTab(tab: "general" | "advanced"): void {
   document.querySelectorAll<HTMLElement>(".te-tab").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.teTab === tab);
   });
-  const general  = document.getElementById("teTabGeneral")!;
+  const general = document.getElementById("teTabGeneral")!;
   const advanced = document.getElementById("teTabAdvanced")!;
-  general.style.display  = tab === "general"  ? "" : "none";
+  general.style.display = tab === "general" ? "" : "none";
   advanced.style.display = tab === "advanced" ? "" : "none";
 }
 
@@ -1937,7 +2184,7 @@ document.querySelectorAll<HTMLElement>(".te-tab").forEach((btn) => {
 
 // Save
 teSave.addEventListener("click", async () => {
-  const raw  = teNameInput.value;
+  const raw = teNameInput.value;
   const name = sanitiseThemeName(raw);
   if (!name) {
     flash("Please enter a valid theme name.", "error");
@@ -1945,8 +2192,7 @@ teSave.addEventListener("click", async () => {
   }
   // Check for duplicate name (excluding self when editing)
   const duplicate = customThemes.find(
-    (t) => t.name.toLowerCase() === name.toLowerCase() &&
-           t.id !== _teEditId,
+    (t) => t.name.toLowerCase() === name.toLowerCase() && t.id !== _teEditId,
   );
   if (duplicate) {
     flash(`A theme named "${name}" already exists.`, "error");
@@ -1958,9 +2204,9 @@ teSave.addEventListener("click", async () => {
 
   if (_teMode === "create") {
     const newTheme: CustomTheme = {
-      id:       genThemeId(),
+      id: genThemeId(),
       name,
-      vars:     { ..._teWorkingVars },
+      vars: { ..._teWorkingVars },
       advanced: { ..._teWorkingAdv },
     };
     customThemes.push(newTheme);
@@ -1978,8 +2224,8 @@ teSave.addEventListener("click", async () => {
     flash(`Theme "${name}" created`, "success");
   } else {
     const theme = customThemes.find((t) => t.id === _teEditId)!;
-    theme.name     = name;
-    theme.vars     = { ..._teWorkingVars };
+    theme.name = name;
+    theme.vars = { ..._teWorkingVars };
     theme.advanced = { ..._teWorkingAdv };
     await saveCustomThemes();
     refreshCustomThemeSelect();
@@ -2029,8 +2275,7 @@ customThemeDeleteBtn.addEventListener("click", () => {
   const id = customThemeSelect.value;
   const theme = customThemes.find((t) => t.id === id);
   if (!theme) return;
-  customThemeDeleteMsg.textContent =
-    `Are you sure you want to delete "${theme.name}"? This cannot be undone.`;
+  customThemeDeleteMsg.textContent = `Are you sure you want to delete "${theme.name}"? This cannot be undone.`;
   settingsModal.close();
   customThemeDeleteModal.open();
 });
@@ -2038,7 +2283,11 @@ customThemeDeleteBtn.addEventListener("click", () => {
 customThemeDeleteConfirmBtn.addEventListener("click", async () => {
   const id = customThemeSelect.value;
   const theme = customThemes.find((t) => t.id === id);
-  if (!theme) { customThemeDeleteModal.close(); settingsModal.open(); return; }
+  if (!theme) {
+    customThemeDeleteModal.close();
+    settingsModal.open();
+    return;
+  }
   const wasActive = settings.theme === "custom" && _activeCustomId === id;
   customThemes = customThemes.filter((t) => t.id !== id);
   await saveCustomThemes();
@@ -2123,6 +2372,473 @@ function applyTheme(themeName: string): void {
 }
 
 /* =============================================================================
+   SEASONAL THEME EFFECTS  (Christmas snow / Halloween lightning)
+   -----------------------------------------------------------------------------
+   Canvas-based instead of CSS keyframes so each flake/bolt is genuinely
+   independent: no shared "loop" for the whole layer to visibly snap back on,
+   and shapes/timing can be randomized per-instance instead of picked from a
+   handful of fixed keyframe steps. One shared full-window canvas, appended as
+   the LAST child of <body> so it always paints above ordinary content
+   (including panels, which was the complaint with the old body::before/::after
+   version) while staying below the toast/lock-screen layer (z-index 9999+).
+   pointer-events stays off throughout, so nothing here can ever block a click.
+============================================================================= */
+
+interface Snowflake {
+  x: number;
+  y: number;
+  r: number;
+  speed: number;
+  drift: number;
+  driftPhase: number;
+  driftFreq: number;
+  wanderVel: number;
+}
+
+interface LightningStrike {
+  points: { x: number; y: number }[];
+  branches: { x: number; y: number }[][];
+  bornAt: number;
+  lifespanMs: number;
+}
+
+let seasonalCanvas: HTMLCanvasElement | null = null;
+let seasonalCtx: CanvasRenderingContext2D | null = null;
+let seasonalAnimationId: number | null = null;
+let seasonalResizeHandler: (() => void) | null = null;
+let seasonalActiveTheme: string | null = null;
+
+let snowflakes: Snowflake[] = [];
+let snowPile: number[] = [];
+const SNOW_PILE_COLUMN_WIDTH = 5; // px per accumulation bucket along the bottom edge
+const SNOW_PILE_MAX_HEIGHT = 100; // px cap — settles into a bank instead of swallowing the UI
+const SNOW_MAX_SLOPE = 1.5; // px — max height difference tolerated between adjacent columns before it slides
+const SNOW_RELAX_PASSES = 4; // relaxation sweeps per frame; alternates direction, see relaxSnowPile()
+const SNOW_WANDER_ACCEL = 55; // px/sec² — magnitude of the random gust nudges applied to wanderVel each frame
+const SNOW_WANDER_DAMPING = 0.86; // per-frame decay applied to wanderVel so gusts settle instead of accumulating forever
+
+let lightningStrikes: LightningStrike[] = [];
+let lightningTimeoutId: number | null = null;
+const LIGHTNING_DARKEN_STRENGTH = 0.4; // how far the screen dims at peak flash brightness, so bolts pop by contrast
+
+/** Creates (once) and returns the shared full-window canvas + context used by
+ *  both seasonal effects, resizing it to the current window/DPR each call. */
+function ensureSeasonalCanvas(): { ctx: CanvasRenderingContext2D } {
+  if (!seasonalCanvas) {
+    seasonalCanvas = document.createElement("canvas");
+    seasonalCanvas.id = "seasonalEffectsCanvas";
+    seasonalCanvas.style.position = "fixed";
+    seasonalCanvas.style.inset = "0";
+    seasonalCanvas.style.width = "100vw";
+    seasonalCanvas.style.height = "100vh";
+    seasonalCanvas.style.pointerEvents = "none";
+    seasonalCanvas.style.zIndex = "5000";
+    document.body.appendChild(seasonalCanvas);
+  }
+  const ctx = seasonalCanvas.getContext("2d");
+  if (!ctx)
+    throw new Error("2d canvas context unavailable for seasonal effects");
+  seasonalCtx = ctx;
+  resizeSeasonalCanvas();
+  return { ctx };
+}
+
+/** Sizes the canvas's backing store to the window at the current device pixel
+ *  ratio so flakes/bolts stay crisp on high-DPI displays, and re-applies the
+ *  DPR transform (resizing a canvas element always resets its context). */
+function resizeSeasonalCanvas(): void {
+  if (!seasonalCanvas || !seasonalCtx) return;
+  const dpr = window.devicePixelRatio || 1;
+  seasonalCanvas.width = Math.round(window.innerWidth * dpr);
+  seasonalCanvas.height = Math.round(window.innerHeight * dpr);
+  seasonalCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+/** Tears down whichever seasonal effect is currently running: cancels the
+ *  animation frame and any pending strike timers, drops the resize listener,
+ *  and removes the canvas entirely. Called before starting a new effect and
+ *  whenever the active theme stops being Christmas/Halloween. */
+function stopSeasonalEffect(): void {
+  if (seasonalAnimationId !== null) {
+    cancelAnimationFrame(seasonalAnimationId);
+    seasonalAnimationId = null;
+  }
+  if (lightningTimeoutId !== null) {
+    window.clearTimeout(lightningTimeoutId);
+    lightningTimeoutId = null;
+  }
+  if (seasonalResizeHandler) {
+    window.removeEventListener("resize", seasonalResizeHandler);
+    seasonalResizeHandler = null;
+  }
+  if (seasonalCanvas) {
+    seasonalCanvas.remove();
+    seasonalCanvas = null;
+    seasonalCtx = null;
+  }
+  snowflakes = [];
+  snowPile = [];
+  lightningStrikes = [];
+  seasonalActiveTheme = null;
+}
+
+/** Starts (or leaves running) the canvas effect matching the given theme
+ *  name, tearing down whatever was running before. No-ops if the requested
+ *  effect is already active. Called on startup and on every "themechange". */
+function applySeasonalEffect(themeName: string): void {
+  if (seasonalActiveTheme === themeName) return;
+  stopSeasonalEffect();
+  if (themeName === "christmas") {
+    seasonalActiveTheme = "christmas";
+    startChristmasSnow();
+  } else if (themeName === "halloween") {
+    seasonalActiveTheme = "halloween";
+    startHalloweenLightning();
+  }
+}
+
+/** Christmas snowfall. Each flake is an independent object that falls,
+ *  drifts side to side, and — once it reaches the accumulated snow line at
+ *  its x position — "lands" (adding a little height to that column of the
+ *  snowbank) and respawns at the top. Because every flake resets itself
+ *  individually there's no shared loop for the whole layer to visibly snap
+ *  back on; the snowfall is continuous for as long as the theme is active. */
+function startChristmasSnow(): void {
+  const { ctx } = ensureSeasonalCanvas();
+
+  const pileColumns = Math.ceil(window.innerWidth / SNOW_PILE_COLUMN_WIDTH) + 1;
+  snowPile = new Array(pileColumns).fill(0);
+
+  function spawnSnowflake(randomY: boolean): Snowflake {
+    return {
+      x: Math.random() * window.innerWidth,
+      y: randomY ? Math.random() * window.innerHeight : -10,
+      r: 1.5 + Math.random() * 2.5,
+      speed: 20 + Math.random() * 40, // px/sec
+      drift: 10 + Math.random() * 20, // sway amplitude
+      driftPhase: Math.random() * Math.PI * 2,
+      driftFreq: 0.25 + Math.random() * 0.9, // sway rate — varies per flake so they don't all swing in lockstep
+      wanderVel: 0, // slow random-walk "gust" velocity, built up frame to frame below
+    };
+  }
+
+  window.setTimeout(() => {
+    const flakeCount = Math.min(250, Math.round((window.innerWidth * window.innerHeight) / 1000),);
+    snowflakes = Array.from({ length: flakeCount }, () => spawnSnowflake(true));
+  }, 300); // give the window time to reach its final/restored size first
+
+  function pileHeightAt(x: number): number {
+    const col = Math.max(
+      0,
+      Math.min(snowPile.length - 1, Math.floor(x / SNOW_PILE_COLUMN_WIDTH)),
+    );
+    return snowPile[col] ?? 0;
+  }
+
+  function addToPile(x: number, amount: number): void {
+    const col = Math.max(
+      0,
+      Math.min(snowPile.length - 1, Math.floor(x / SNOW_PILE_COLUMN_WIDTH)),
+    );
+    const current = snowPile[col] ?? 0;
+    if (current < SNOW_PILE_MAX_HEIGHT) {
+      snowPile[col] = Math.min(SNOW_PILE_MAX_HEIGHT, current + amount);
+    }
+    // Spread a little into the immediate neighbours so the bank reads as a
+    // drift rather than a bar chart.
+    for (const neighbor of [col - 1, col + 1]) {
+      if (neighbor < 0 || neighbor >= snowPile.length) continue;
+      const neighborCurrent = snowPile[neighbor] ?? 0;
+      if (neighborCurrent < SNOW_PILE_MAX_HEIGHT) {
+        snowPile[neighbor] = Math.min(
+          SNOW_PILE_MAX_HEIGHT,
+          neighborCurrent + amount * 0.3,
+        );
+      }
+    }
+  }
+
+  /** Enforces a maximum height difference between adjacent columns — real
+   *  snow has an angle of repose; ours didn't, which is why a busy pile
+   *  turned into stalagmites instead of a level bank. Each pass nudges half
+   *  the excess from a too-tall column into its shorter neighbor. Run a few
+   *  passes a frame, alternating sweep direction, so tall spikes settle out
+   *  in a couple of frames even under a heavy snowfall rate, with no bias
+   *  toward one side from always relaxing left-to-right. */
+  function relaxSnowPile(): void {
+    for (let pass = 0; pass < SNOW_RELAX_PASSES; pass++) {
+      const forward = pass % 2 === 0;
+      const start = forward ? 0 : snowPile.length - 2;
+      const end = forward ? snowPile.length - 1 : -1;
+      const step = forward ? 1 : -1;
+      for (let i = start; i !== end; i += step) {
+        const a = snowPile[i] ?? 0;
+        const b = snowPile[i + 1] ?? 0;
+        const diff = a - b;
+        if (Math.abs(diff) <= SNOW_MAX_SLOPE) continue;
+        const move = (Math.abs(diff) - SNOW_MAX_SLOPE) * 0.5;
+        if (diff > 0) {
+          snowPile[i] = a - move;
+          snowPile[i + 1] = b + move;
+        } else {
+          snowPile[i] = a + move;
+          snowPile[i + 1] = b - move;
+        }
+      }
+    }
+  }
+
+  let lastFrame = performance.now();
+
+  function frame(now: number): void {
+    const dt = Math.min(0.05, (now - lastFrame) / 1000); // clamp so a stalled/background tab doesn't jump-cut
+    lastFrame = now;
+
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+    relaxSnowPile();
+
+    // Snowbank silhouette across the bottom edge.
+    if (snowPile.length > 0 && snowPile.some((h) => h > 0)) {
+      ctx.beginPath();
+      ctx.moveTo(0, window.innerHeight);
+      for (let i = 0; i < snowPile.length; i++) {
+        ctx.lineTo(
+          i * SNOW_PILE_COLUMN_WIDTH,
+          window.innerHeight - (snowPile[i] ?? 0),
+        );
+      }
+      ctx.lineTo(window.innerWidth, window.innerHeight);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+      ctx.fill();
+    }
+
+    for (const flake of snowflakes) {
+      flake.driftPhase += dt * flake.driftFreq;
+      // Smoothed random walk ("gusts"): nudge velocity randomly each frame,
+      // then decay it — an Ornstein-Uhlenbeck-style process. This is what
+      // actually breaks up the pure-sine look; the sine term alone just
+      // offsets in phase/amplitude, which still reads as "the same wave"
+      // repeating for every flake.
+      flake.wanderVel += (Math.random() - 0.5) * SNOW_WANDER_ACCEL * dt;
+      flake.wanderVel *= Math.pow(SNOW_WANDER_DAMPING, dt * 60);
+      flake.x +=
+        Math.sin(flake.driftPhase) * flake.drift * dt * 4 +
+        flake.wanderVel * dt;
+      flake.y += flake.speed * dt;
+      // Wrap horizontally so drift never permanently walks a flake off-screen.
+      if (flake.x < -10) flake.x = window.innerWidth + 10;
+      if (flake.x > window.innerWidth + 10) flake.x = -10;
+
+      const groundY = window.innerHeight - pileHeightAt(flake.x);
+      if (flake.y + flake.r >= groundY) {
+        addToPile(flake.x, 0.15 + Math.random() * 0.25);
+        Object.assign(flake, spawnSnowflake(false));
+        continue;
+      }
+
+      ctx.beginPath();
+      ctx.arc(flake.x, flake.y, flake.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+      ctx.fill();
+    }
+
+    seasonalAnimationId = requestAnimationFrame(frame);
+  }
+
+  seasonalAnimationId = requestAnimationFrame(frame);
+
+  seasonalResizeHandler = () => {
+    resizeSeasonalCanvas();
+    const newColumns =
+      Math.ceil(window.innerWidth / SNOW_PILE_COLUMN_WIDTH) + 1;
+    if (newColumns !== snowPile.length) {
+      const resized = new Array(newColumns).fill(0);
+      for (let i = 0; i < Math.min(newColumns, snowPile.length); i++) {
+        resized[i] = snowPile[i] ?? 0;
+      }
+      snowPile = resized;
+    }
+  };
+  window.addEventListener("resize", seasonalResizeHandler);
+}
+
+/** Halloween lightning. Each strike's shape is generated fresh via recursive
+ *  midpoint displacement (the standard fractal-lightning technique), so no
+ *  two bolts look alike, and strikes are scheduled on a randomized interval
+ *  rather than a fixed CSS loop, so the timing never falls into a rhythm. */
+function startHalloweenLightning(): void {
+  const { ctx } = ensureSeasonalCanvas();
+
+  /** Recursively displaces the midpoint of a line segment to build a jagged
+   *  bolt path from (x1,y1) to (x2,y2), pushing each final point into `points`. */
+  function midpointBolt(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    displace: number,
+    points: { x: number; y: number }[],
+  ): void {
+    if (displace < 6) {
+      points.push({ x: x2, y: y2 });
+      return;
+    }
+    const midX = (x1 + x2) / 2 + (Math.random() - 0.5) * displace;
+    const midY = (y1 + y2) / 2;
+    midpointBolt(x1, y1, midX, midY, displace / 1.9, points);
+    midpointBolt(midX, midY, x2, y2, displace / 1.9, points);
+  }
+
+  function spawnStrike(): void {
+    const startX = window.innerWidth * (0.1 + Math.random() * 0.8);
+    const startY = 0;
+    const endY = window.innerHeight * (0.55 + Math.random() * 0.4);
+    const endX = startX + (Math.random() - 0.5) * window.innerWidth * 0.18;
+
+    const points: { x: number; y: number }[] = [{ x: startX, y: startY }];
+    midpointBolt(startX, startY, endX, endY, window.innerWidth * 0.12, points);
+
+    const branches: { x: number; y: number }[][] = [];
+    const branchCount = Math.random() < 0.4 ? 0 : Math.random() < 0.75 ? 1 : 2;
+    for (let b = 0; b < branchCount; b++) {
+      const originIndex =
+        1 + Math.floor(Math.random() * Math.max(1, points.length - 2));
+      const origin = points[originIndex];
+      if (!origin) continue;
+      const branchEndY =
+        origin.y + (endY - origin.y) * (0.3 + Math.random() * 0.4);
+      const branchEndX =
+        origin.x + (Math.random() - 0.5) * window.innerWidth * 0.15;
+      const branchPoints: { x: number; y: number }[] = [
+        { x: origin.x, y: origin.y },
+      ];
+      midpointBolt(
+        origin.x,
+        origin.y,
+        branchEndX,
+        branchEndY,
+        window.innerWidth * 0.06,
+        branchPoints,
+      );
+      branches.push(branchPoints);
+    }
+
+    lightningStrikes.push({
+      points,
+      branches,
+      bornAt: performance.now(),
+      lifespanMs:
+        Math.random() < 0.10
+          ? 2500 + Math.random() * 2500 // occasional long, lingering flash
+          : 250 + Math.random() * 250, // normal quick flash
+    });
+
+    // Occasional quick double-strike, like real lightning restriking the same area.
+    if (Math.random() < 0.22) {
+      window.setTimeout(spawnStrike, 60 + Math.random() * 90);
+    }
+  }
+
+  function scheduleNextStrike(): void {
+    const delay = 1000 + Math.random() * 2500; // noticeably more active than the original 2.2-8.7s gaps
+    lightningTimeoutId = window.setTimeout(() => {
+      spawnStrike();
+      scheduleNextStrike();
+    }, delay);
+  }
+
+  /** Two-pulse Gaussian flicker curve — a quick bright flash, brief dip, a
+   *  fainter second pulse, then fade out — so each strike stutters like real
+   *  lightning instead of doing a simple linear fade. */
+  function flickerIntensity(elapsedMs: number, lifespanMs: number): number {
+    const t = elapsedMs / lifespanMs;
+    if (t >= 1) return 0;
+    const pulse1 = Math.exp(-Math.pow((t - 0.08) / 0.06, 2));
+    const pulse2 = Math.exp(-Math.pow((t - 0.32) / 0.1, 2)) * 0.55;
+    return Math.min(1, pulse1 + pulse2);
+  }
+
+  function strokeBolt(
+    points: { x: number; y: number }[],
+    alpha: number,
+    coreWidth: number,
+  ): void {
+    const [first, ...rest] = points;
+    if (!first || rest.length === 0) return;
+
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    // Wide soft purple glow pass.
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+    for (const p of rest) ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = `rgba(147, 112, 219, ${alpha * 0.5})`;
+    ctx.lineWidth = coreWidth * 5;
+    ctx.shadowColor = `rgba(147, 112, 219, ${alpha * 0.8})`;
+    ctx.shadowBlur = 22;
+    ctx.stroke();
+
+    // Bright white-purple core.
+    ctx.beginPath();
+    ctx.moveTo(first.x, first.y);
+    for (const p of rest) ctx.lineTo(p.x, p.y);
+    ctx.strokeStyle = `rgba(240, 235, 255, ${alpha})`;
+    ctx.lineWidth = coreWidth;
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function frame(now: number): void {
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    lightningStrikes = lightningStrikes.filter(
+      (strike) => now - strike.bornAt < strike.lifespanMs,
+    );
+
+    let maxAlpha = 0;
+    for (const strike of lightningStrikes) {
+      const alpha = flickerIntensity(now - strike.bornAt, strike.lifespanMs);
+      if (alpha > maxAlpha) maxAlpha = alpha;
+    }
+    if (maxAlpha > 0.01) {
+      ctx.fillStyle = `rgba(5, 0, 12, ${maxAlpha * LIGHTNING_DARKEN_STRENGTH})`;
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    }
+
+    for (const strike of lightningStrikes) {
+      const alpha = flickerIntensity(now - strike.bornAt, strike.lifespanMs);
+      if (alpha <= 0.01) continue;
+      strokeBolt(strike.points, alpha, 2.2);
+      for (const branch of strike.branches)
+        strokeBolt(branch, alpha * 0.6, 1.3);
+    }
+    seasonalAnimationId = requestAnimationFrame(frame);
+  }
+
+  seasonalAnimationId = requestAnimationFrame(frame);
+  lightningTimeoutId = window.setTimeout(
+    () => {
+      spawnStrike();
+      scheduleNextStrike();
+    },
+    400 + Math.random() * 800,
+  ); // first strike arrives quickly
+
+  seasonalResizeHandler = () => resizeSeasonalCanvas();
+  window.addEventListener("resize", seasonalResizeHandler);
+  document.addEventListener("click", () => spawnStrike());
+}
+
+window.addEventListener("themechange", () =>
+  applySeasonalEffect(settings.theme),
+);
+
+/* =============================================================================
    SETTINGS — LOAD / SAVE / APPLY
 ============================================================================= */
 
@@ -2153,6 +2869,7 @@ function applySettings(): void {
   const isCustom = settings.theme === "custom";
   randomSubsettings.style.maxHeight = isRandom ? "200px" : "0";
   rerollBtn.style.display = isRandom ? "inline-flex" : "none";
+  saveRandomBtn.style.display = isRandom ? "inline-flex" : "none";
   randomModeToggle.checked = settings.randomPersistent;
   randomModeLabel.textContent = settings.randomPersistent
     ? "Persistent"
@@ -2198,23 +2915,60 @@ async function loadSettings(): Promise<void> {
     // rather than propagating as-is into applySettings().
     const merged = { ...DEFAULT_SETTINGS, ...parsed };
     settings = {
-      fontScale:           typeof merged.fontScale === "number" ? merged.fontScale : DEFAULT_SETTINGS.fontScale,
-      hour12:              typeof merged.hour12 === "boolean" ? merged.hour12 : DEFAULT_SETTINGS.hour12,
-      americanDates:       typeof merged.americanDates === "boolean" ? merged.americanDates : DEFAULT_SETTINGS.americanDates,
-      solidModals:         typeof merged.solidModals === "boolean" ? merged.solidModals : DEFAULT_SETTINGS.solidModals,
-      startupTarget:       typeof merged.startupTarget === "string" ? merged.startupTarget : DEFAULT_SETTINGS.startupTarget,
-      theme:               typeof merged.theme === "string" ? merged.theme : DEFAULT_SETTINGS.theme,
-      randomPersistent:    typeof merged.randomPersistent === "boolean" ? merged.randomPersistent : DEFAULT_SETTINGS.randomPersistent,
-      randomHarmonized:    typeof merged.randomHarmonized === "boolean" ? merged.randomHarmonized : DEFAULT_SETTINGS.randomHarmonized,
-      appLock:             typeof merged.appLock === "boolean" ? merged.appLock : DEFAULT_SETTINGS.appLock,
-      lockCredentialType:  merged.lockCredentialType === "pin" || merged.lockCredentialType === "password"
-                             ? merged.lockCredentialType
-                             : DEFAULT_SETTINGS.lockCredentialType,
-      soundPack:           typeof merged.soundPack === "string" && SOUND_PACKS.some((p) => p.id === merged.soundPack)
-                             ? merged.soundPack
-                             : DEFAULT_SETTINGS.soundPack,
-      autoCheckUpdates:    typeof merged.autoCheckUpdates === "boolean" ? merged.autoCheckUpdates : DEFAULT_SETTINGS.autoCheckUpdates,
-      ignoredUpdateVersion: typeof merged.ignoredUpdateVersion === "string" ? merged.ignoredUpdateVersion : DEFAULT_SETTINGS.ignoredUpdateVersion,
+      fontScale:
+        typeof merged.fontScale === "number"
+          ? merged.fontScale
+          : DEFAULT_SETTINGS.fontScale,
+      hour12:
+        typeof merged.hour12 === "boolean"
+          ? merged.hour12
+          : DEFAULT_SETTINGS.hour12,
+      americanDates:
+        typeof merged.americanDates === "boolean"
+          ? merged.americanDates
+          : DEFAULT_SETTINGS.americanDates,
+      solidModals:
+        typeof merged.solidModals === "boolean"
+          ? merged.solidModals
+          : DEFAULT_SETTINGS.solidModals,
+      startupTarget:
+        typeof merged.startupTarget === "string"
+          ? merged.startupTarget
+          : DEFAULT_SETTINGS.startupTarget,
+      theme:
+        typeof merged.theme === "string"
+          ? merged.theme
+          : DEFAULT_SETTINGS.theme,
+      randomPersistent:
+        typeof merged.randomPersistent === "boolean"
+          ? merged.randomPersistent
+          : DEFAULT_SETTINGS.randomPersistent,
+      randomHarmonized:
+        typeof merged.randomHarmonized === "boolean"
+          ? merged.randomHarmonized
+          : DEFAULT_SETTINGS.randomHarmonized,
+      appLock:
+        typeof merged.appLock === "boolean"
+          ? merged.appLock
+          : DEFAULT_SETTINGS.appLock,
+      lockCredentialType:
+        merged.lockCredentialType === "pin" ||
+        merged.lockCredentialType === "password"
+          ? merged.lockCredentialType
+          : DEFAULT_SETTINGS.lockCredentialType,
+      soundPack:
+        typeof merged.soundPack === "string" &&
+        SOUND_PACKS.some((p) => p.id === merged.soundPack)
+          ? merged.soundPack
+          : DEFAULT_SETTINGS.soundPack,
+      autoCheckUpdates:
+        typeof merged.autoCheckUpdates === "boolean"
+          ? merged.autoCheckUpdates
+          : DEFAULT_SETTINGS.autoCheckUpdates,
+      ignoredUpdateVersion:
+        typeof merged.ignoredUpdateVersion === "string"
+          ? merged.ignoredUpdateVersion
+          : DEFAULT_SETTINGS.ignoredUpdateVersion,
     };
   } catch {
     settings = { ...DEFAULT_SETTINGS };
@@ -2288,6 +3042,50 @@ themeSelect.addEventListener("change", () => {
 rerollBtn.addEventListener("click", () => {
   localStorage.removeItem(PERSISTENT_RANDOM_KEY);
   applyTheme("random");
+});
+
+/* -----------------------------------------------------------------------------
+   Save-random-as-custom button — sits to the immediate LEFT of the reroll die
+   in index.html (both shown only while the Random theme is active; see
+   applySettings). Captures the palette CURRENTLY applied to :root — which works
+   for both persistent and chaotic modes, since applyPalette writes every
+   RANDOM_VAR as an inline property on :root — and stores it as a new custom
+   theme named "rng-<timestamp>". This lets a good roll be kept before chaotic
+   mode regenerates it on the next modal open.
+----------------------------------------------------------------------------- */
+const saveRandomBtn = document.getElementById(
+  "saveRandomBtn",
+) as HTMLButtonElement;
+
+saveRandomBtn.addEventListener("click", async () => {
+  // Read the live palette straight off :root's inline properties.
+  const root = document.documentElement;
+  const vars: Record<string, string> = {};
+  for (const v of RANDOM_VARS) {
+    const val = root.style.getPropertyValue(v).trim();
+    if (val) vars[v] = val;
+  }
+  if (Object.keys(vars).length === 0) {
+    flash("No random palette to save.", "error");
+    return;
+  }
+
+  // Human-readable timestamp: rng-YYYYMMDDHHMMSS (local, 24h, zero-padded).
+  const now = new Date();
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  const name = `rng-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const newTheme: CustomTheme = {
+    id: genThemeId(),
+    name,
+    vars,
+    advanced: {},
+  };
+  customThemes.push(newTheme);
+  // Pre-select the just-saved theme so choosing "Custom" later lands on it.
+  _activeCustomId = newTheme.id;
+  await saveCustomThemes();
+  refreshCustomThemeSelect();
+  flash(`Saved palette as "${name}"`, "success");
 });
 
 randomModeToggle.addEventListener("change", () => {
@@ -2406,17 +3204,21 @@ document.getElementById("contributingLink")!.addEventListener("click", (e) => {
    this is wired in the General Settings section.)
 ============================================================================= */
 
-const updateNotice      = document.getElementById("updateNotice")!;
-const updateNoticeLink   = document.getElementById("updateNoticeLink") as HTMLAnchorElement;
-const homeUpdateNotice   = document.getElementById("homeUpdateNotice")!;
-const homeUpdateLink     = document.getElementById("homeUpdateLink") as HTMLAnchorElement;
-const ignoreVersionBtn   = document.getElementById("ignoreVersionBtn")!;
+const updateNotice = document.getElementById("updateNotice")!;
+const updateNoticeLink = document.getElementById(
+  "updateNoticeLink",
+) as HTMLAnchorElement;
+const homeUpdateNotice = document.getElementById("homeUpdateNotice")!;
+const homeUpdateLink = document.getElementById(
+  "homeUpdateLink",
+) as HTMLAnchorElement;
+const ignoreVersionBtn = document.getElementById("ignoreVersionBtn")!;
 const ignoreVersionBackdrop = document.getElementById("ignoreVersionBackdrop")!;
-const ignoreVersionBack  = document.getElementById("ignoreVersionBack")!;
+const ignoreVersionBack = document.getElementById("ignoreVersionBack")!;
 const ignoreVersionClose = document.getElementById("ignoreVersionClose")!;
 const ignoreVersionCancel = document.getElementById("ignoreVersionCancel")!;
 const ignoreVersionConfirm = document.getElementById("ignoreVersionConfirm")!;
-const ignoreVersionTag   = document.getElementById("ignoreVersionTag")!;
+const ignoreVersionTag = document.getElementById("ignoreVersionTag")!;
 
 /** Compares two "vX.Y.Z" strings numerically. Leading 'v'/'V' and surrounding
  *  whitespace are ignored, missing trailing segments count as 0 (so "1.2" ==
@@ -2425,7 +3227,11 @@ const ignoreVersionTag   = document.getElementById("ignoreVersionTag")!;
  *  would rank "v0.10.0" below "v0.9.0" — this doesn't. */
 function compareVersions(a: string, b: string): number {
   const parse = (s: string): number[] =>
-    s.trim().replace(/^v/i, "").split(".").map((p) => parseInt(p, 10) || 0);
+    s
+      .trim()
+      .replace(/^v/i, "")
+      .split(".")
+      .map((p) => parseInt(p, 10) || 0);
   const pa = parse(a);
   const pb = parse(b);
   const len = Math.max(pa.length, pb.length);
@@ -2478,9 +3284,11 @@ homeUpdateLink.addEventListener("click", (e) => {
  *  Callers gate on settings.autoCheckUpdates; this function does not. */
 async function checkForUpdates(): Promise<void> {
   try {
-    const raw = await invoke<{ current: string; latest: string; html_url: string }>(
-      "check_for_updates",
-    );
+    const raw = await invoke<{
+      current: string;
+      latest: string;
+      html_url: string;
+    }>("check_for_updates");
     const newerThanCurrent = compareVersions(raw.latest, raw.current) > 0;
     const newerThanIgnored =
       compareVersions(raw.latest, settings.ignoredUpdateVersion) > 0;
@@ -2548,21 +3356,27 @@ ignoreVersionConfirm.addEventListener("click", async () => {
    Turning it OFF stops checks and clears any live signal at once.
 ----------------------------------------------------------------------------- */
 
-const newVersionToggle    = document.getElementById("newVersionToggle") as HTMLInputElement;
-const newVersionLabel     = document.getElementById("newVersionLabel")!;
+const newVersionToggle = document.getElementById(
+  "newVersionToggle",
+) as HTMLInputElement;
+const newVersionLabel = document.getElementById("newVersionLabel")!;
 const updateEnableBackdrop = document.getElementById("updateEnableBackdrop")!;
-const updateEnableBack    = document.getElementById("updateEnableBack")!;
-const updateEnableClose   = document.getElementById("updateEnableClose")!;
-const updateEnableCancel  = document.getElementById("updateEnableCancel")!;
+const updateEnableBack = document.getElementById("updateEnableBack")!;
+const updateEnableClose = document.getElementById("updateEnableClose")!;
+const updateEnableCancel = document.getElementById("updateEnableCancel")!;
 const updateEnableConfirm = document.getElementById("updateEnableConfirm")!;
 
-const updateEnableModal = new Modal(updateEnableBackdrop, { closeOnEsc: false });
+const updateEnableModal = new Modal(updateEnableBackdrop, {
+  closeOnEsc: false,
+});
 
 /** Syncs the toggle + its Enabled/Disabled label to the current setting.
  *  Called from applySettings() so load, reset, and reopen all stay in sync. */
 function applyUpdateSettings(): void {
   newVersionToggle.checked = settings.autoCheckUpdates;
-  newVersionLabel.textContent = settings.autoCheckUpdates ? "Enabled" : "Disabled";
+  newVersionLabel.textContent = settings.autoCheckUpdates
+    ? "Enabled"
+    : "Disabled";
 }
 
 /** Opens the enable-confirm modal and resolves true only if the user proceeds.
@@ -3237,18 +4051,58 @@ function renderMarkdown(md: string): string {
   // Void elements never carry a closing tag, so a line that opens one of
   // these is always "complete" on its own — no block-mode needed.
   const VOID_TAGS = new Set([
-    "img", "br", "hr", "input", "meta", "link",
-    "area", "base", "col", "embed", "source", "track", "wbr",
+    "img",
+    "br",
+    "hr",
+    "input",
+    "meta",
+    "link",
+    "area",
+    "base",
+    "col",
+    "embed",
+    "source",
+    "track",
+    "wbr",
   ]);
   // Non-void tags worth treating as raw HTML blocks. An allowlist (rather
   // than "any word that looks like a tag") avoids misfiring on Markdown's
   // own <https://example.com> angle-bracket autolink syntax, where "https"
   // would otherwise parse as a plausible-looking tag name.
   const HTML_BLOCK_TAGS = new Set([
-    "p", "div", "span", "a", "table", "thead", "tbody", "tr", "td", "th",
-    "figure", "figcaption", "picture", "video", "details", "summary",
-    "center", "blockquote", "ul", "ol", "li", "pre", "code",
-    "h1", "h2", "h3", "h4", "h5", "h6", "sub", "sup", "kbd", "samp",
+    "p",
+    "div",
+    "span",
+    "a",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "td",
+    "th",
+    "figure",
+    "figcaption",
+    "picture",
+    "video",
+    "details",
+    "summary",
+    "center",
+    "blockquote",
+    "ul",
+    "ol",
+    "li",
+    "pre",
+    "code",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "sub",
+    "sup",
+    "kbd",
+    "samp",
   ]);
   let inHtmlBlock = false;
   let htmlBlockTag = "";
@@ -3742,7 +4596,7 @@ async function saveWindowSize(): Promise<void> {
       await invoke("save_window_size", {
         data: JSON.stringify({
           maximized: true,
-          width:  _lastNonMaxSize?.width  ?? null,
+          width: _lastNonMaxSize?.width ?? null,
           height: _lastNonMaxSize?.height ?? null,
         }),
       });
@@ -3774,9 +4628,16 @@ async function restoreWindowSize(): Promise<void> {
   try {
     const raw = await invoke<string>("load_window_size");
     const parsed = JSON.parse(raw);
-    const width  = typeof parsed.width  === "number" && parsed.width  > 0 ? parsed.width  : null;
-    const height = typeof parsed.height === "number" && parsed.height > 0 ? parsed.height : null;
-    const maximized = typeof parsed.maximized === "boolean" ? parsed.maximized : false;
+    const width =
+      typeof parsed.width === "number" && parsed.width > 0
+        ? parsed.width
+        : null;
+    const height =
+      typeof parsed.height === "number" && parsed.height > 0
+        ? parsed.height
+        : null;
+    const maximized =
+      typeof parsed.maximized === "boolean" ? parsed.maximized : false;
     const win = getCurrentWindow();
     if (width && height) {
       // Always restore the saved dimensions first so Windows has the
@@ -3875,7 +4736,8 @@ function buildPinDots(filled: number, error = false): void {
   lockDots.innerHTML = "";
   for (let i = 0; i < PIN_LENGTH; i++) {
     const dot = document.createElement("div");
-    dot.className = "lock-dot" + (i < filled ? (error ? " error" : " filled") : "");
+    dot.className =
+      "lock-dot" + (i < filled ? (error ? " error" : " filled") : "");
     lockDots.appendChild(dot);
   }
 }
@@ -3928,7 +4790,9 @@ async function submitPassword(): Promise<void> {
 
 // PIN numpad interaction
 lockNumpad.addEventListener("click", async (e) => {
-  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-digit]");
+  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(
+    "[data-digit]",
+  );
   if (!btn || _pinBuffer.length >= PIN_LENGTH) return;
   _pinBuffer += btn.dataset.digit!;
   buildPinDots(_pinBuffer.length);
@@ -3948,7 +4812,8 @@ lockBackspace.addEventListener("click", () => {
 
 // Allow physical keyboard for PIN
 document.addEventListener("keydown", (e) => {
-  if (lockScreen.style.display === "none" || lockScreen.style.display === "") return;
+  if (lockScreen.style.display === "none" || lockScreen.style.display === "")
+    return;
   if (settings.lockCredentialType !== "pin") return;
   if (e.key >= "0" && e.key <= "9" && _pinBuffer.length < PIN_LENGTH) {
     _pinBuffer += e.key;
@@ -4015,7 +4880,11 @@ appLockToggle.addEventListener("change", async () => {
   } else {
     // Turning OFF
     settings.appLock = false;
-    try { await invoke("clear_lock_hash"); } catch { /* non-critical */ }
+    try {
+      await invoke("clear_lock_hash");
+    } catch {
+      /* non-critical */
+    }
     await saveSettings();
     applyLockSettings();
     flash("App lock disabled", "success");
@@ -4030,7 +4899,11 @@ lockChangeBtn.addEventListener("click", async () => {
 
 lockRemoveBtn.addEventListener("click", async () => {
   settings.appLock = false;
-  try { await invoke("clear_lock_hash"); } catch { /* non-critical */ }
+  try {
+    await invoke("clear_lock_hash");
+  } catch {
+    /* non-critical */
+  }
   await saveSettings();
   applyLockSettings();
   flash("App lock removed", "success");
@@ -4053,7 +4926,11 @@ function _resetSetLockEye(iconId: string): void {
 }
 
 /** Wires a show/hide toggle button to its paired password input. */
-function _wireSetLockShowBtn(btn: HTMLElement, input: HTMLInputElement, iconId: string): void {
+function _wireSetLockShowBtn(
+  btn: HTMLElement,
+  input: HTMLInputElement,
+  iconId: string,
+): void {
   btn.addEventListener("click", () => {
     const hidden = input.type === "password";
     input.type = hidden ? "text" : "password";
@@ -4067,12 +4944,15 @@ function _wireSetLockShowBtn(btn: HTMLElement, input: HTMLInputElement, iconId: 
 }
 
 // Wire the set-lock modal show/hide buttons once at startup (they persist across openings)
-_wireSetLockShowBtn(setLockShowInput,   setLockInput,   "setLockInputEye");
+_wireSetLockShowBtn(setLockShowInput, setLockInput, "setLockInputEye");
 _wireSetLockShowBtn(setLockShowConfirm, setLockConfirm, "setLockConfirmEye");
 
 /** Configures the set-lock modal inputs for the currently selected type.
  *  Called whenever the user switches type inside the modal picker. */
-function _applySetLockType(isPin: boolean, prevKeydownHandler?: (e: KeyboardEvent) => void): (e: KeyboardEvent) => void {
+function _applySetLockType(
+  isPin: boolean,
+  prevKeydownHandler?: (e: KeyboardEvent) => void,
+): (e: KeyboardEvent) => void {
   // Remove old handler if re-configuring
   if (prevKeydownHandler) {
     setLockInput.removeEventListener("keydown", prevKeydownHandler);
@@ -4112,7 +4992,14 @@ function _applySetLockType(isPin: boolean, prevKeydownHandler?: (e: KeyboardEven
   // Digit-only filter for PIN
   const onKeydown = (e: KeyboardEvent) => {
     if (!isPin) return;
-    const allowed = ["Backspace", "Delete", "Tab", "ArrowLeft", "ArrowRight", "Enter"];
+    const allowed = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "ArrowLeft",
+      "ArrowRight",
+      "Enter",
+    ];
     if (!allowed.includes(e.key) && !/^\d$/.test(e.key)) e.preventDefault();
   };
   setLockInput.addEventListener("keydown", onKeydown);
@@ -4133,7 +5020,8 @@ function openSetLockModal(mode: "enable" | "change"): Promise<boolean> {
     // Working type for the modal — user can switch before saving
     let modalType: "pin" | "password" = settings.lockCredentialType;
 
-    setLockTitle.textContent = mode === "enable" ? "Set App Lock" : "Change Credential";
+    setLockTitle.textContent =
+      mode === "enable" ? "Set App Lock" : "Change Credential";
 
     let currentKeydownHandler = _applySetLockType(modalType === "pin");
 
@@ -4212,7 +5100,9 @@ function openSetLockModal(mode: "enable" | "change"): Promise<boolean> {
     setLockClose.onclick = () => done(false);
 
     // Enter in confirm field saves
-    const onConfirmEnter = (e: KeyboardEvent) => { if (e.key === "Enter") onSave(); };
+    const onConfirmEnter = (e: KeyboardEvent) => {
+      if (e.key === "Enter") onSave();
+    };
     setLockConfirm.addEventListener("keydown", onConfirmEnter);
 
     setLockModal.open();

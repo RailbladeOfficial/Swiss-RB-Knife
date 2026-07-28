@@ -23,6 +23,12 @@
   --color-toggle-off:          #2d1f3d;
   --color-toggle-on:           #ff6600;
 
+  /* ── Changelog accents ── Features (orange) / Improvements (purple) / Bugfixes (blood red) / tool heading (yellow-gold) */
+  --color-changelog-features:     #ff6600;
+  --color-changelog-improvements: #9370db;
+  --color-changelog-bugfixes:     #cc0000;
+  --color-changelog-tool:         #ffcc00;
+
   --color-toast-success-bg:    #1a0f24;
   --color-toast-success-border:#9370db;
   --color-toast-success-text:  #e0d0f0;
@@ -40,6 +46,12 @@
   --color-chart-7:             #e6b800;
   --color-chart-8:             #990000;
 }
+
+/* Random-flash lightning is now handled in JS (see shell.ts — SEASONAL THEME
+   EFFECTS) as a canvas overlay: it renders in front of panels instead of
+   behind them, strikes are randomly timed and randomly shaped per-strike
+   instead of looping fixed keyframes, and bolts are longer/thinner with a
+   proper white-purple lightning color. */
 
 /* ── Time Tracker panels — orange / purple / yellow / red ── */
 .input-panel    {
@@ -198,6 +210,12 @@ body.solid-modals .modal {
 }
 
 
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #9370db; }
+
 /* ── Budget Tracker ── */
 
 /* Panel backgrounds — very dark with on-brand tints */
@@ -217,7 +235,12 @@ body.solid-modals .modal {
 }
 
 /* Summary tab active */
-.budget-summary-tab.active { color: #ff6600; border-bottom-color: #ff6600; }
+.budget-summary-tab.active {
+  color: #ff6600;
+  background: rgba(255, 102, 0, 0.12);
+  border-bottom-color: #ff6600;
+  text-shadow: 0 0 10px rgba(255, 102, 0, 0.45);
+}
 
 /* Stats table values */
 .budget-stats-table td.pos { color: #00FF00; }

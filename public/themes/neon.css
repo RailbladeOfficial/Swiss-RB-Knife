@@ -23,6 +23,12 @@
   --color-toggle-off:          #0a0a20;
   --color-toggle-on:           #00ffff;
 
+  /* ── Changelog accents ── Features (cyan) / Improvements (lime) / Bugfixes (magenta) / tool heading (orange) */
+  --color-changelog-features:     #00ffff;
+  --color-changelog-improvements: #39ff14;
+  --color-changelog-bugfixes:     #ff00ff;
+  --color-changelog-tool:         #ff8800;
+
   --color-toast-success-bg:    #001500;
   --color-toast-success-border:#39ff14;
   --color-toast-success-text:  #aaffaa;
@@ -220,6 +226,12 @@ body.solid-modals .modal {
 .result-preview-wrap { border-color: #39ff1455 !important; }
 
 
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #00ffff; }
+
 /* ── Budget Tracker ── */
 
 .finance-tool-budget .panel-accent-input  {
@@ -249,9 +261,10 @@ body.solid-modals .modal {
 }
 
 .budget-summary-tab.active {
-  color: #00ffff;
-  border-bottom-color: #00ffff;
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+  color: #ff00ff;
+  background: rgba(255, 0, 255, 0.14);
+  border-bottom-color: #ff00ff;
+  text-shadow: 0 0 10px rgba(255, 0, 255, 0.6);
 }
 
 .budget-stats-table td.pos { color: #00FF00; }

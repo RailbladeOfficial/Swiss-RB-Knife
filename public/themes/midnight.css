@@ -23,6 +23,12 @@
   --color-toggle-off:          #1f1f1f;
   --color-toggle-on:           #0000ff;
 
+  /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (red) / tool heading (yellow) */
+  --color-changelog-features:     #0000ff;
+  --color-changelog-improvements: #00ff00;
+  --color-changelog-bugfixes:     #ff0000;
+  --color-changelog-tool:         #ffff00;
+
   --color-toast-success-bg:    #001a00;
   --color-toast-success-border:#00ff00;
   --color-toast-success-text:  #ccffcc;
@@ -173,6 +179,12 @@ body:not(.solid-modals) .modal {
 .result-preview-wrap { border-color: rgba(0, 255, 0, 0.2) !important; }
 
 
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #00ccff; }
+
 /* ── Budget Tracker ── */
 
 .finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(0, 0, 255, 0.08) 0%, #050505 100%); }
@@ -186,7 +198,11 @@ body:not(.solid-modals) .modal {
 }
 .budget-annual-stats-title { color: #e5e7eb; }
 
-.budget-summary-tab.active { color: #e5e7eb; border-bottom-color: #0000ff; }
+.budget-summary-tab.active {
+  color: #e5e7eb;
+  background: rgba(0, 0, 255, 0.15);
+  border-bottom-color: #0000ff;
+}
 
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }
