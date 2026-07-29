@@ -11,13 +11,6 @@
   gap: 12px;
 }
 
-/* ── Header reset button ───────────────────────────────────────────────────── */
-
-.dfg-header-reset {
-  margin-left: auto;
-  font-size: 0.75rem;
-}
-
 /* ── Options row: Output Dir + Organize ─────────────────────────────────────── */
 
 .dfg-options-row {

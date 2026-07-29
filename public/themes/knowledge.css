@@ -209,10 +209,10 @@ body:not(.solid-modals) .modal {
 /* ── Budget Tracker ── */
 
 /* Panel backgrounds — dark forest with sage/amber tints */
-.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 196, 13, 0.07) 0%, #111e14 100%); }
-.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(104, 153, 111, 0.08) 0%, #111e14 100%); }
-.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(255, 196, 13, 0.07) 0%, #111e14 100%); }
-.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(18, 135, 111, 0.07) 0%, #111e14 100%); }
+#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 196, 13, 0.07) 0%, #111e14 100%); }
+#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(104, 153, 111, 0.08) 0%, #111e14 100%); }
+#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(255, 196, 13, 0.07) 0%, #111e14 100%); }
+#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(18, 135, 111, 0.07) 0%, #111e14 100%); }
 
 /* Annual Stats title panel — amber accent */
 .budget-annual-stats-title-panel {

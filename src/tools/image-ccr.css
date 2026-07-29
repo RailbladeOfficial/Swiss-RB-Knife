@@ -7,13 +7,14 @@
 
 /* =============================================================================
    TAB NAV  (Combine / Compress switcher inside the tool view header)
+   -----------------------------------------------------------------------------
+   Positioning (group + push-right) comes from .tool-view-header-actions
+   (landing.css) — the markup carries both classes. .tab-nav itself is kept
+   as an empty marker class only because image-ccr.ts queries
+   `.tab-nav .tab-btn` directly; removing it would silently break the tab
+   switcher. .tab-btn below is the actual tab look and stays tool-specific —
+   it's a different visual treatment than budget's underline-style tabs.
 ============================================================================= */
-
-.tab-nav {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
-}
 
 .tab-btn {
   font-size: 0.85rem;
@@ -312,19 +313,15 @@
   height: 22px;
   border-radius: 4px;
   border: 1px solid var(--color-border);
-  background: var(--color-btn);
-  color: var(--color-btn-text);
   font-size: 0.6rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   padding: 0;
 }
 
 .card-move-btn:hover {
   border-color: var(--color-btn-text);
-  background: var(--color-btn-hover);
 }
 
 .preview-card-remove {
@@ -978,67 +975,11 @@
   gap: 10px;
 }
 
-/* Info button — styled as a small primary button */
+/* Info button — size delta only; shared look (.info-trigger-btn) and hover
+   are in shell.css. */
 .resize-info-btn {
-  background: var(--color-btn);
-  border: 1px solid var(--color-btn);
-  color: var(--color-btn-text);
-  border-radius: 6px;
   padding: 3px 10px;
   font-size: 0.75rem;
-  font-weight: bold;
-  line-height: 1.4;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.resize-info-btn:hover {
-  background: var(--color-btn-hover);
-  border-color: var(--color-btn-text);
-}
-
-/* =============================================================================
-   RESIZE INFO MODAL
-============================================================================= */
-
-.resize-info-modal {
-  width: min(560px, 92vw);
-}
-
-.resize-info-body {
-  text-align: left;
-  gap: 0;
-}
-
-.resize-info-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 4px 0 12px;
-}
-
-.resize-info-heading {
-  font-size: 0.95rem;
-  font-weight: bold;
-  color: var(--color-btn-text);
-  margin: 0;
-}
-
-.resize-info-body p {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  line-height: 1.6;
-  margin: 0;
-}
-
-.resize-info-body strong {
-  color: var(--color-text);
-}
-
-.resize-info-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: 4px 0 12px;
 }
 
 /* =============================================================================

@@ -249,23 +249,14 @@
   gap: 6px;
 }
 
-/* Small ℹ button — sized to sit inline with the Copy Speed input row */
+/* Small ℹ button — size delta only; shared look (.info-trigger-btn) and hover
+   are in shell.css. Also serves as the query hook for the Setup modal's
+   click-to-toggle tooltip buttons (auto-backup.ts queries
+   .ab-info-btn[data-tooltip] directly) — kept as its own class for that
+   reason even though its own CSS is now just two properties. */
 .ab-info-btn {
-  background: var(--color-btn);
-  border: 1px solid var(--color-btn);
-  color: var(--color-btn-text);
-  border-radius: 6px;
   padding: 1px 8px;
   font-size: 0.72rem;
-  font-weight: bold;
-  line-height: 1.4;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.ab-info-btn:hover {
-  background: var(--color-btn-hover);
-  border-color: var(--color-btn-text);
 }
 
 .ab-setup-modal {
@@ -339,46 +330,6 @@
 .ab-info-tooltip.visible {
   opacity: 1;
   pointer-events: auto;
-}
-
-.ab-info-modal {
-  width: min(560px, 92vw);
-}
-
-.ab-info-body {
-  text-align: left;
-  gap: 0;
-}
-
-.ab-info-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 4px 0 12px;
-}
-
-.ab-info-heading {
-  font-size: 0.95rem;
-  font-weight: bold;
-  color: var(--color-btn-text);
-  margin: 0;
-}
-
-.ab-info-body p {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  line-height: 1.6;
-  margin: 0;
-}
-
-.ab-info-body strong {
-  color: var(--color-text);
-}
-
-.ab-info-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: 4px 0 12px;
 }
 
 .ab-summary-cell {
@@ -506,23 +457,8 @@
   margin-top: -8px;
 }
 
-/* Progress bar */
-.ab-progress-bar-track {
-  height: 6px;
-  background: var(--color-border);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.ab-progress-bar-fill {
-  height: 100%;
-  background: var(--color-btn);
-  border-radius: 3px;
-  width: 0%;
-  /* No width transition: the bar is driven per-frame by the animation engine
-     in auto-backup.ts, which supplies its own easing. A CSS transition layered
-     on top would add lag and mush to every frame update. */
-}
+/* Progress bar — base track/fill (.progress-bar-track/-fill) promoted to
+   shell.css; only Auto-Backup-specific modifiers stay here. */
 
 /* Indeterminate state — shown during the preflight "Calculating…" phase,
    before the plan (and therefore a meaningful percentage) exists. A short
@@ -532,7 +468,7 @@
   100% { margin-left: 100%; }
 }
 
-.ab-progress-bar-fill.ab-bar-indeterminate {
+.progress-bar-fill.ab-bar-indeterminate {
   width: 30% !important;
   animation: ab-bar-sweep 1.2s linear infinite;
 }
@@ -611,16 +547,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* =============================================================================
-   TOOL-VIEW HEADER NAV  (Presets button, mirrors image-ccr tab-btn style)
-============================================================================= */
-
-.ab-header-nav {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
 }
 
 /* =============================================================================

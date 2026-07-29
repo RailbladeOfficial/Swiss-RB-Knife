@@ -1,0 +1,377 @@
+/* =============================================================================
+   THEME EDITOR  — custom theme editor modal + CSS-var-name tooltip
+   -----------------------------------------------------------------------------
+   Split out of shell.css (Tier 6). Mirrors theme-editor.ts.
+============================================================================= */
+
+   THEME EDITOR MODAL
+============================================================================= */
+
+.theme-editor-modal {
+  width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.theme-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+/* Top row: name + base picker */
+.te-top-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.te-name-field,
+.te-base-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.te-name-field {
+  flex: 1;
+}
+.te-base-field {
+  flex-shrink: 0;
+}
+
+.te-field-label {
+  font-size: 0.68rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.te-name-input {
+  width: 100%;
+  font-size: 0.9rem;
+  padding: 5px 8px;
+  box-sizing: border-box;
+}
+
+/* Scrollable groups area — used by both tab panes */
+.te-groups {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 2px;
+  min-height: 0;
+}
+
+/* Tab bar */
+.te-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.te-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition:
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+  margin-bottom: -1px;
+}
+
+.te-tab:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+.te-tab.active {
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+  background: transparent;
+}
+
+/* Tab pane — each tab's scrollable content area */
+.te-tab-pane {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Individual group */
+.te-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.te-group-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Color row */
+.te-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.te-swatch-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.te-swatch {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  flex-shrink: 0;
+}
+
+.te-hex {
+  font-family: monospace;
+  font-size: 0.72rem;
+  width: 62px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: inherit;
+  opacity: 0.75;
+  padding: 1px 3px;
+  text-transform: uppercase;
+  cursor: text;
+  transition: border-color var(--hover-transition), opacity var(--hover-transition),
+              background var(--hover-transition);
+}
+
+.te-hex:hover {
+  opacity: 1;
+  border-color: var(--color-border);
+}
+
+.te-hex:focus {
+  outline: none;
+  opacity: 1;
+  border-color: var(--color-btn);
+  background: var(--color-input-bg);
+}
+
+.te-label {
+  font-size: 0.8rem;
+  flex: 1;
+}
+
+.te-label-text {
+  cursor: default;
+  display: inline;
+}
+
+/* Advanced sub-controls */
+.te-adv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0 3px 8px;
+}
+
+.te-adv-label {
+  font-size: 0.78rem;
+  flex: 1;
+  opacity: 0.8;
+}
+
+.te-adv-toggle {
+  flex-shrink: 0;
+}
+
+.te-adv-sub {
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.te-angle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.te-angle-input {
+  width: 52px;
+  text-align: center;
+  font-size: 0.82rem;
+  padding: 3px 5px;
+}
+
+.te-angle-deg {
+  font-size: 0.78rem;
+  opacity: 0.65;
+}
+
+/* Intensity buttons */
+.te-intensity-wrap {
+  display: flex;
+  gap: 3px;
+}
+
+.te-intensity-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.te-intensity-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.te-intensity-btn.te-intensity-active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+/* Footer */
+.te-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   THEME EDITOR — CSS VAR NAME TOOLTIP
+============================================================================= */
+
+.te-var-tooltip {
+  position: fixed;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-family: monospace;
+  font-size: 0.68rem;
+  padding: 3px 7px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 10000;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.te-var-tooltip.visible {
+  opacity: 1;
+}
+
+/* =============================================================================
+   CUSTOM THEME SUBSETTINGS  (Settings modal)
+   -----------------------------------------------------------------------------
+   The compact "which custom theme is active" row + create/edit/delete icon
+   buttons that sit inside the Settings modal (not the full Theme Editor
+   modal below) — moved here rather than into shell.css/docs.css because the
+   behaviour behind every one of these elements (customThemeSelect,
+   refreshCustomThemeSelect, the delete-confirm flow) lives in theme-editor.ts.
+============================================================================= */
+
+.custom-theme-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.custom-theme-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-theme-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.custom-theme-icon-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.custom-theme-icon-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.custom-theme-icon-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-btn);
+}
+
+.custom-theme-delete-btn:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+.custom-theme-empty {
+  font-size: 0.78rem;
+  opacity: 0.55;
+  font-style: italic;
+  margin: 4px 0 0;
+  padding: 0;
+}

@@ -7,6 +7,10 @@
   <meta name="description" content="A Multi-Tool Application." />
   <link rel="stylesheet" href="src/shell.css" />
   <link rel="stylesheet" href="src/modal.css" />
+  <link rel="stylesheet" href="src/docs.css" />
+  <link rel="stylesheet" href="src/landing.css" />
+  <link rel="stylesheet" href="src/lockscreen.css" />
+  <link rel="stylesheet" href="src/theme-editor.css" />
   <link rel="stylesheet" href="src/tools/time-tracker.css" />
   <link rel="stylesheet" href="src/tools/image-ccr.css" />
   <link rel="stylesheet" href="src/tools/file-gen.css" />
@@ -587,21 +591,21 @@
               <button id="exportBtn" class="export-btn">Export CSV</button>
             </div>
             <div class="controls-presets">
-              <button class="preset-btn" data-preset="today">Today</button>
-              <button class="preset-btn" data-preset="yesterday">Yesterday</button>
-              <button class="preset-btn" data-preset="week-to-date">Week to Date</button>
-              <button class="preset-btn" data-preset="last-7">Last 7 Days</button>
-              <button class="preset-btn" data-preset="last-14">Last 14 Days</button>
-              <button class="preset-btn" data-preset="month-to-date">Month to Date</button>
-              <button class="preset-btn" data-preset="last-30">Last 30 Days</button>
-              <button class="preset-btn" data-preset="last-month">Last Month</button>
-              <button class="preset-btn" data-preset="year-to-date">Year to Date</button>
-              <button class="preset-btn" data-preset="last-year">Last Year</button>
-              <button class="preset-btn" data-preset="all">All</button>
+              <button class="toggle-btn preset-btn" data-preset="today">Today</button>
+              <button class="toggle-btn preset-btn" data-preset="yesterday">Yesterday</button>
+              <button class="toggle-btn preset-btn" data-preset="week-to-date">Week to Date</button>
+              <button class="toggle-btn preset-btn" data-preset="last-7">Last 7 Days</button>
+              <button class="toggle-btn preset-btn" data-preset="last-14">Last 14 Days</button>
+              <button class="toggle-btn preset-btn" data-preset="month-to-date">Month to Date</button>
+              <button class="toggle-btn preset-btn" data-preset="last-30">Last 30 Days</button>
+              <button class="toggle-btn preset-btn" data-preset="last-month">Last Month</button>
+              <button class="toggle-btn preset-btn" data-preset="year-to-date">Year to Date</button>
+              <button class="toggle-btn preset-btn" data-preset="last-year">Last Year</button>
+              <button class="toggle-btn preset-btn" data-preset="all">All</button>
             </div>
             <div id="payPeriodPresets" style="display: none;">
-              <button class="preset-btn pay-period-preset-btn" data-preset="last-pay-period">Last Pay Period</button>
-              <button class="preset-btn pay-period-preset-btn" data-preset="this-pay-period">This Pay Period</button>
+              <button class="toggle-btn preset-btn pay-period-preset-btn" data-preset="last-pay-period">Last Pay Period</button>
+              <button class="toggle-btn preset-btn pay-period-preset-btn" data-preset="this-pay-period">This Pay Period</button>
             </div>
           </div>
 
@@ -684,7 +688,7 @@
               </svg>
             </button>
             <span class="tool-view-title">Dummy File Generator</span>
-            <button id="dfg-reset-btn" class="modal-cancel-btn dfg-header-reset" title="Reset all fields">Reset</button>
+            <button id="dfg-reset-btn" class="tool-view-header-action" title="Reset all fields">Reset</button>
           </div>
           <div class="dfg-body">
 
@@ -748,9 +752,9 @@
               </svg>
             </button>
             <span class="tool-view-title">Auto-Backup</span>
-            <nav id="ab-header-nav" class="ab-header-nav">
-              <button id="ab-presets-btn" class="tool-view-header-action">Presets</button>
-              <button id="ab-setup-btn" class="tool-view-header-action">Setup</button>
+            <nav id="ab-header-nav" class="tool-view-header-actions">
+              <button id="ab-presets-btn">Presets</button>
+              <button id="ab-setup-btn">Setup</button>
             </nav>
           </div>
 
@@ -887,7 +891,7 @@
                   <span id="ab-est-dirs">—</span>
                   <!-- Shown by renderEstimateCells() only when Dirs to Copy
                        exceeds Total Source Dirs — see the modal below. -->
-                  <button class="ab-info-btn" id="ab-dirs-info-btn" style="display:none;"
+                  <button class="info-trigger-btn ab-info-btn" id="ab-dirs-info-btn" style="display:none;"
                     title="Why is this higher than Total Source Dirs?">ℹ</button>
                 </div>
               </div>
@@ -922,7 +926,7 @@
                 <div class="ab-speed-row">
                   <input id="ab-speed-input" type="number" min="1" max="10000" value="30" />
                   <span class="ab-speed-unit">MB/s</span>
-                  <button class="ab-info-btn" id="ab-speed-info-btn" title="About Copy Speed">ℹ</button>
+                  <button class="info-trigger-btn ab-info-btn" id="ab-speed-info-btn" title="About Copy Speed">ℹ</button>
                 </div>
               </div>
 
@@ -978,8 +982,8 @@
                 <div class="ab-bar-label-row">
                   <span class="ab-bar-label">Backup Progress</span>
                 </div>
-                <div class="ab-progress-bar-track">
-                  <div id="ab-progress-bar-fill" class="ab-progress-bar-fill"></div>
+                <div class="progress-bar-track">
+                  <div id="ab-progress-bar-fill" class="progress-bar-fill"></div>
                 </div>
               </div>
 
@@ -1079,7 +1083,7 @@
               </svg>
             </button>
             <span class="tool-view-title">Image CCR</span>
-            <nav class="tab-nav">
+            <nav class="tool-view-header-actions tab-nav">
               <button class="tab-btn active" data-tab="combine">Combine</button>
               <button class="tab-btn" data-tab="compress">Compress</button>
               <button class="tab-btn" data-tab="resize">Resize</button>
@@ -1361,8 +1365,8 @@
                 <!-- Scan progress — shown while the source is being analysed -->
                 <div id="resize-scan-progress" class="resize-scan-progress" style="display:none">
                   <span class="scan-spinner"></span>
-                  <div class="ab-progress-bar-track">
-                    <div class="ab-progress-bar-fill" id="resize-scan-bar" style="width:0%"></div>
+                  <div class="progress-bar-track">
+                    <div class="progress-bar-fill" id="resize-scan-bar" style="width:0%"></div>
                   </div>
                   <span class="resize-scan-label" id="resize-scan-label">Scanning…</span>
                 </div>
@@ -1400,7 +1404,7 @@
               <div class="tool-panel-header">
                 <div class="resize-options-header-group">
                   <h2 class="tool-panel-title">2 · Resize &amp; Canvas Options</h2>
-                  <button class="resize-info-btn" id="resize-info-btn" title="How Resize and Canvas work">ℹ</button>
+                  <button class="info-trigger-btn resize-info-btn" id="resize-info-btn" title="How Resize and Canvas work">ℹ</button>
                 </div>
                 <span class="panel-lock-hint" id="resize-options-lock">Select a source folder or files first</span>
               </div>
@@ -1511,8 +1515,8 @@
                 <!-- Progress -->
                 <div id="resize-progress-section" style="display:none">
                   <div class="resize-progress-file" id="resize-progress-file"></div>
-                  <div class="ab-progress-bar-track">
-                    <div class="ab-progress-bar-fill" id="resize-progress-bar" style="width:0%"></div>
+                  <div class="progress-bar-track">
+                    <div class="progress-bar-fill" id="resize-progress-bar" style="width:0%"></div>
                   </div>
                   <div class="resize-progress-count" id="resize-progress-count"></div>
                 </div>
@@ -1656,19 +1660,19 @@
               </svg>
             </button>
             <span class="tool-view-title">Budget Tracker</span>
-            <div class="budget-header-actions">
-              <button id="budgetAnnualStatsBtn" class="tool-view-header-action" title="View annual statistics for the currently browsed year">View Annual Stats</button>
-              <button id="budgetSetupBtn" class="tool-view-header-action" title="Manage income sources, recurring bills, expense categories, and expense sources">Setup</button>
+            <div class="tool-view-header-actions">
+              <button id="budgetAnnualStatsBtn" title="View annual statistics for the currently browsed year">View Annual Stats</button>
+              <button id="budgetSetupBtn" title="Manage income sources, recurring bills, expense categories, and expense sources">Setup</button>
             </div>
           </div>
 
           <!-- View mode selector: Day / Week / Month / Year -->
           <div class="panel panel-accent-entries budget-view-mode-panel">
             <span class="budget-view-mode-label">View:</span>
-            <button id="budgetViewDay"   class="budget-view-mode-btn" data-view="day">Day</button>
-            <button id="budgetViewWeek"  class="budget-view-mode-btn" data-view="week">Week</button>
-            <button id="budgetViewMonth" class="budget-view-mode-btn active" data-view="month">Month</button>
-            <button id="budgetViewYear"  class="budget-view-mode-btn" data-view="year">Year</button>
+            <button id="budgetViewDay"   class="toggle-btn budget-view-mode-btn" data-view="day">Day</button>
+            <button id="budgetViewWeek"  class="toggle-btn budget-view-mode-btn" data-view="week">Week</button>
+            <button id="budgetViewMonth" class="toggle-btn budget-view-mode-btn active" data-view="month">Month</button>
+            <button id="budgetViewYear"  class="toggle-btn budget-view-mode-btn" data-view="year">Year</button>
           </div>
 
           <!-- View range navigation: [Snap to: Today] [←] [June 2026] [→] -->
@@ -1696,8 +1700,8 @@
               <div class="panel panel-accent-input budget-input-panel">
                 <div class="budget-type-toggle">
                   <span class="budget-type-toggle-label">Add Entry:</span>
-                  <button id="budgetTypeIncomeBtn" class="budget-type-btn active" data-entry-type="income">Income</button>
-                  <button id="budgetTypeExpenseBtn" class="budget-type-btn" data-entry-type="expense">Fluctuating Expense</button>
+                  <button id="budgetTypeIncomeBtn" class="toggle-btn budget-type-btn active" data-entry-type="income">Income</button>
+                  <button id="budgetTypeExpenseBtn" class="toggle-btn budget-type-btn" data-entry-type="expense">Fluctuating Expense</button>
                 </div>
 
                 <div id="budgetIncomeFields" class="inputs budget-entry-fields">
@@ -3455,7 +3459,7 @@
         <div class="settings-row">
           <span class="ab-setup-label-with-info">
             Show Tool Warning Page:
-            <button type="button" class="ab-info-btn" data-tooltip="Shows the &quot;Before you use Auto-Backup&quot; warning every time you enter this tool. Turning this off has the same effect as checking &quot;Never show this warning again&quot; on that page; turning it back on clears that, so the warning shows again next time you enter the tool.">ℹ</button>
+            <button type="button" class="info-trigger-btn ab-info-btn" data-tooltip="Shows the &quot;Before you use Auto-Backup&quot; warning every time you enter this tool. Turning this off has the same effect as checking &quot;Never show this warning again&quot; on that page; turning it back on clears that, so the warning shows again next time you enter the tool.">ℹ</button>
           </span>
           <div class="toggle-with-label">
             <span id="ab-setup-warning-label">On</span>
@@ -3488,7 +3492,7 @@
           <div class="settings-row">
             <span class="ab-setup-label-with-info">
               Mode:
-              <button type="button" class="ab-info-btn" data-tooltip="Gentle just shows a quiet toast notification. Aggressive shows a modal on startup that you have to dismiss, with a shortcut straight to the tool.">ℹ</button>
+              <button type="button" class="info-trigger-btn ab-info-btn" data-tooltip="Gentle just shows a quiet toast notification. Aggressive shows a modal on startup that you have to dismiss, with a shortcut straight to the tool.">ℹ</button>
             </span>
             <div class="toggle-with-label">
               <span id="ab-setup-reminder-mode-label">Gentle</span>
@@ -3571,7 +3575,7 @@
              AUTO-BACKUP — DIRS TO COPY INFO MODAL
         ================================================================ -->
   <div id="abDirsInfoBackdrop" class="modal-backdrop" style="display:none;">
-    <div id="abDirsInfoModal" class="modal ab-info-modal">
+    <div id="abDirsInfoModal" class="modal info-modal">
       <div class="modal-header">
         <span>Dirs to Copy</span>
         <button id="abDirsInfoClose" class="modal-close-btn modal-header-right">
@@ -3581,18 +3585,18 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body ab-info-body">
-        <div class="ab-info-section">
-          <p class="ab-info-heading">Why is this higher than Total Source Dirs?</p>
+      <div class="modal-body info-body">
+        <div class="info-section">
+          <p class="info-heading">Why is this higher than Total Source Dirs?</p>
           <p>Because the backup also creates <strong>each source folder itself</strong> at the
             destination. Backing up <strong>C:\Photos</strong> into <strong>D:\Backup</strong>
             produces <strong>D:\Backup\Photos</strong> — that root folder is one directory the
             run has to create, on top of everything inside it. One extra root is counted per
             source, per destination.</p>
         </div>
-        <div class="ab-info-divider"></div>
-        <div class="ab-info-section">
-          <p class="ab-info-heading">Why not just raise Total Source Dirs to match?</p>
+        <div class="info-divider"></div>
+        <div class="info-section">
+          <p class="info-heading">Why not just raise Total Source Dirs to match?</p>
           <p>Because the two numbers answer different questions. <strong>Total Source Dirs</strong>
             describes what exists <em>inside</em> your sources; <strong>Dirs to Copy</strong>
             describes the work the next run would do. Nudging the source stats to make the
@@ -3608,7 +3612,7 @@
              AUTO-BACKUP — COPY SPEED INFO MODAL
         ================================================================ -->
   <div id="abSpeedInfoBackdrop" class="modal-backdrop" style="display:none;">
-    <div id="abSpeedInfoModal" class="modal ab-info-modal">
+    <div id="abSpeedInfoModal" class="modal info-modal">
       <div class="modal-header">
         <span>Copy Speed</span>
         <button id="abSpeedInfoClose" class="modal-close-btn modal-header-right">
@@ -3618,24 +3622,24 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body ab-info-body">
-        <div class="ab-info-section">
-          <p class="ab-info-heading">What it does</p>
+      <div class="modal-body info-body">
+        <div class="info-section">
+          <p class="info-heading">What it does</p>
           <p>This value is an <strong>estimating aid, nothing more</strong>. It seeds the
             <strong>Estimated Time</strong> shown in the Summary panel, and gives a running backup's
             progress bar and ETA a starting speed to work with during the first moments of a run —
             before enough real data has flowed to measure the actual throughput.</p>
         </div>
-        <div class="ab-info-divider"></div>
-        <div class="ab-info-section">
-          <p class="ab-info-heading">What it does <em>not</em> do</p>
+        <div class="info-divider"></div>
+        <div class="info-section">
+          <p class="info-heading">What it does <em>not</em> do</p>
           <p>It does <strong>not</strong> limit, throttle, or control the speed of an actual backup in
             any way. Backups always run at whatever speed your drives can deliver. Setting this to 1
             or 10,000 changes only the predictions on this screen — never the backup itself.</p>
         </div>
-        <div class="ab-info-divider"></div>
-        <div class="ab-info-section">
-          <p class="ab-info-heading">It tunes itself</p>
+        <div class="info-divider"></div>
+        <div class="info-section">
+          <p class="info-heading">It tunes itself</p>
           <p>After every successful backup that copies a meaningful amount of data (at least 100 MB),
             the speed measured during that run is blended into this value — 70% old, 30% new — so the
             estimates steadily converge on your machine's real-world throughput. Small incremental
@@ -3766,7 +3770,7 @@
        RESIZE INFO MODAL
   ====================================================================== -->
   <div id="resizeInfoBackdrop" class="modal-backdrop" style="display:none;">
-    <div id="resizeInfoModal" class="modal resize-info-modal">
+    <div id="resizeInfoModal" class="modal info-modal">
       <div class="modal-header">
         <span>Resize &amp; Canvas</span>
         <button id="resizeInfoClose" class="modal-close-btn modal-header-right">
@@ -3776,18 +3780,18 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body resize-info-body">
-        <div class="resize-info-section">
-          <p class="resize-info-heading">Resize</p>
+      <div class="modal-body info-body">
+        <div class="info-section">
+          <p class="info-heading">Resize</p>
           <p>Scales each image to fit within the width and height you specify, preserving its aspect ratio. The output
             will be no larger than the box you define, but its exact dimensions depend on each image's proportions.</p>
           <p>If you set only <strong>W</strong>, images are scaled to that width and height follows proportionally. If
             you set only <strong>H</strong>, the opposite applies. If you set both, images fit within that box. Leave
             both blank to skip resizing entirely — you can still apply a canvas without resizing.</p>
         </div>
-        <div class="resize-info-divider"></div>
-        <div class="resize-info-section">
-          <p class="resize-info-heading">Canvas</p>
+        <div class="info-divider"></div>
+        <div class="info-section">
+          <p class="info-heading">Canvas</p>
           <p>Places each (optionally resized) image onto a fixed-size surface filled with the background color. Images
             smaller than the canvas are padded; images larger than the canvas are cropped.</p>
           <p>Use canvas when all output files must share identical dimensions — for example, a carousel where every

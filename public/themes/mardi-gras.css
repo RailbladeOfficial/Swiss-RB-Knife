@@ -203,10 +203,10 @@ body.solid-modals .modal {
 /* ── Budget Tracker ── */
 
 /* Panel backgrounds — very dark purple with the Mardi Gras trinity tints */
-.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, #180a30 100%); }
-.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(0, 165, 80, 0.07) 0%, #180a30 100%); }
-.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, #180a30 100%); }
-.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #180a30 100%); }
+#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, #180a30 100%); }
+#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(0, 165, 80, 0.07) 0%, #180a30 100%); }
+#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, #180a30 100%); }
+#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #180a30 100%); }
 
 /* Annual Stats title panel — gold with festive glow */
 .budget-annual-stats-title-panel {

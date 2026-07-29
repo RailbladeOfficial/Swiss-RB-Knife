@@ -1,13 +1,10 @@
 /* =============================================================================
    BUDGET TRACKER — COMPONENT STYLES
-   Shell-level styles (panels, inputs, buttons, modals, and the collapsible
-   .subsettings block used by the setup modals' expectation/threshold fields)
-   live in shell.css.
-   Ledger row primitives (.entry-row, .entry-date-subheader, .entry-field,
-   .entry-delete-btn) and toggle buttons (.preset-btn) are reused from
-   time-tracker.css, which is always loaded — keeps the budget ledger visually
-   consistent with the Time Tracker entries list without duplicating those
-   rules.
+   Shell-level styles (panels, inputs, buttons, modals, the collapsible
+   .subsettings block, and the ledger row primitives — .entry-row,
+   .entry-date-subheader, .entry-field, .entry-delete-btn, etc.) live in
+   shell.css. Budget's ledger uses those directly and adds only its own
+   column types (.entry-col-category/-name/-amount/-notes/-actions) below.
 ============================================================================= */
 
 /* Pay / Edit Payment modal — read-only bill details block (item 8) */
@@ -36,20 +33,6 @@
 
 
 /* =============================================================================
-   HEADER ACTIONS GROUP
-   Two-button group (View Annual Stats + Setup) sitting at the right of the
-   tool header without a gap between them — same visual weight as a single
-   button, but two discrete actions.
-============================================================================= */
-
-.budget-header-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-  margin-left: auto; /* push to right, matching single .tool-view-header-action behaviour */
-}
-
-/* =============================================================================
    SUMMARY PANEL TABS  (Overview / Expense by Category / Expense by Source)
 ============================================================================= */
 
@@ -65,35 +48,6 @@
   width: 100%;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
-}
-
-.budget-summary-tab {
-  flex: 1 1 0;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 7px 4px;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  text-align: center;
-  transition: color var(--hover-transition), border-color var(--hover-transition);
-  margin-bottom: -1px;
-}
-
-.budget-summary-tab:hover {
-  color: var(--color-text);
-  background: transparent;
-}
-
-.budget-summary-tab.active {
-  color: var(--color-btn);
-  border-bottom-color: var(--color-btn);
-  background: transparent;
 }
 
 .budget-summary-pane {
@@ -532,26 +486,10 @@
   margin-right: 2px;
 }
 
+/* Size delta only; shared look (.toggle-btn) is in shell.css. */
 .budget-view-mode-btn {
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
   padding: 3px 12px;
-  border-radius: 4px;
-  cursor: pointer;
   font-size: 0.8rem;
-  transition: background var(--hover-transition), color var(--hover-transition);
-}
-
-.budget-view-mode-btn:hover {
-  background: var(--color-hover);
-  color: var(--color-text);
-}
-
-.budget-view-mode-btn.active {
-  background: var(--color-btn);
-  color: var(--color-btn-text);
-  border-color: var(--color-btn);
 }
 
 /* =============================================================================
@@ -688,26 +626,10 @@
 /* Type toggle (Income / Fluctuating Expense) — own class so the Time Tracker's
    global document.querySelectorAll(".preset-btn") doesn't pick these up and
    clobber their active state when TT syncs its own preset selection. */
+/* Size delta only; shared look (.toggle-btn) is in shell.css. */
 .budget-type-btn {
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
   padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
   font-size: 0.7rem;
-  transition: background var(--hover-transition), color var(--hover-transition);
-}
-
-.budget-type-btn:hover {
-  background: var(--color-hover);
-  color: var(--color-text);
-}
-
-.budget-type-btn.active {
-  background: var(--color-btn);
-  color: var(--color-btn-text);
-  border-color: var(--color-btn);
 }
 
 
@@ -989,30 +911,48 @@ span.entry-col-category:not(.entry-field) {
   flex-shrink: 0;
 }
 
-.budget-tab {
+/* Shared "underline tab" idiom — was duplicated in full as .budget-tab
+   (Setup modal tabs) and .budget-summary-tab (summary panel tabs). Base
+   look + hover/active are common; only sizing/layout differ per context. */
+.budget-tab,
+.budget-summary-tab {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--color-text-muted);
-  font-size: 0.8rem;
   font-weight: 600;
-  padding: 6px 14px;
   cursor: pointer;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   transition: color var(--hover-transition), border-color var(--hover-transition);
   margin-bottom: -1px;
 }
 
-.budget-tab:hover {
+.budget-tab:hover,
+.budget-summary-tab:hover {
   color: var(--color-text);
   background: transparent;
 }
 
-.budget-tab.active {
+.budget-tab.active,
+.budget-summary-tab.active {
   color: var(--color-btn);
   border-bottom-color: var(--color-btn);
   background: transparent;
+}
+
+.budget-tab {
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  letter-spacing: 0.05em;
+}
+
+.budget-summary-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 0.75rem;
+  padding: 7px 4px;
+  letter-spacing: 0.04em;
+  text-align: center;
 }
 
 .budget-tab-pane {

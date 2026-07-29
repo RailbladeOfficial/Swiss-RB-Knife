@@ -163,10 +163,10 @@ body:not(.solid-modals) .modal {
 
 /* Panel backgrounds — near-black, minimal tint to preserve the dark theme's
    subdued aesthetic. Borders do the accent work. */
-.finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, #141414 100%); }
-.finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(13, 148, 136, 0.06) 0%, #141414 100%); }
-.finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(120, 113, 108, 0.08) 0%, #141414 100%); }
-.finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(185, 28, 28, 0.06) 0%, #141414 100%); }
+#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, #141414 100%); }
+#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(13, 148, 136, 0.06) 0%, #141414 100%); }
+#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(120, 113, 108, 0.08) 0%, #141414 100%); }
+#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(185, 28, 28, 0.06) 0%, #141414 100%); }
 
 /* Annual Stats title panel */
 .budget-annual-stats-title-panel { border-left: 4px solid #6366f1; }

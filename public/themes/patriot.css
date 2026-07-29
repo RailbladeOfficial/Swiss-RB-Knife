@@ -213,10 +213,10 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-.finance-tool-budget .panel-accent-input  { background: #fff4f4; }
-.finance-tool-budget .panel-accent-view   { background: #f4f4ff; }
-.finance-tool-budget .panel-accent-totals { background: #fff4f4; }
-.finance-tool-budget .panel-accent-entries{ background: #f4f4ff; }
+#finance-tool-budget .panel-accent-input  { background: #fff4f4; }
+#finance-tool-budget .panel-accent-view   { background: #f4f4ff; }
+#finance-tool-budget .panel-accent-totals { background: #fff4f4; }
+#finance-tool-budget .panel-accent-entries{ background: #f4f4ff; }
 
 .budget-annual-stats-title-panel {
   border-left: 4px solid #cc0000;

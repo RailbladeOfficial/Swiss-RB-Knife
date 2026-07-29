@@ -1,0 +1,385 @@
+/* =============================================================================
+   LOCK SCREEN  — app-lock PIN/password overlay + Settings/Security section
+   -----------------------------------------------------------------------------
+   Split out of shell.css (Tier 6). Mirrors lockscreen.ts.
+============================================================================= */
+
+   APP LOCK SCREEN
+   Full-window overlay shown before the app is usable. Not a Modal — no Escape,
+   no drag, no close button. Removed on correct credential entry.
+============================================================================= */
+
+#lockScreen {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  z-index: 9999; /* above everything including modals */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 3vh, 24px);
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  /* Scales contents down via vh/vw-based clamp()s below so everything stays
+     visible on small windows without raising the app's minimum window size.
+     overflow-y is a last-resort safety net for extreme aspect ratios. */
+  padding: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+#lockScreen.lock-fading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lock-icon {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.lock-icon svg {
+  width: clamp(30px, 7vh, 52px);
+  height: clamp(30px, 7vh, 52px);
+}
+
+.lock-title {
+  font-size: clamp(0.9rem, 2.4vh, 1.15rem);
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.lock-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: -16px;
+}
+
+/* Spacer elements — replace fixed inline-style heights so the gaps inside
+   the PIN/password views can scale down on short windows like everything
+   else here, instead of holding their full size and forcing an overflow. */
+.lock-spacer-sm {
+  height: clamp(2px, 1.5vh, 10px);
+  flex-shrink: 0;
+}
+
+.lock-spacer-md {
+  height: clamp(4px, 2vh, 14px);
+  flex-shrink: 0;
+}
+
+/* PIN dot display */
+#lockPinView,
+#lockPasswordView {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#lockPasswordView {
+  gap: clamp(6px, 1.5vh, 12px);
+}
+
+.lock-pin-dots {
+  display: flex;
+  gap: clamp(8px, 1.8vh, 14px);
+}
+
+.lock-dot {
+  width: clamp(10px, 1.8vh, 13px);
+  height: clamp(10px, 1.8vh, 13px);
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lock-dot.filled {
+  background: var(--color-btn);
+  border-color: var(--color-btn);
+}
+
+.lock-dot.error {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* PIN numpad */
+.lock-numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(6px, 1.5vh, 10px);
+  width: min(220px, 80vw);
+}
+
+.lock-numpad-btn {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: 8px;
+  font-size: clamp(0.85rem, 2vh, 1.1rem);
+  font-weight: 500;
+  height: clamp(34px, 6.5vh, 52px);
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition),
+    color var(--hover-transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-numpad-btn:hover {
+  background: var(--color-hover);
+  border-color: var(--color-btn);
+}
+
+.lock-numpad-btn:active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+/* The ⌫ backspace key spans the last column in its row — placed via auto-flow */
+.lock-numpad-btn.lock-backspace {
+  font-size: 1.3rem;
+}
+
+/* Password input variant */
+.lock-password-wrap {
+  position: relative;
+  width: min(260px, 84vw);
+}
+
+.lock-password-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  padding: clamp(6px, 1.4vh, 10px) 40px clamp(6px, 1.4vh, 10px) 14px;
+  outline: none;
+  transition: border-color var(--hover-transition);
+  text-align: center;
+}
+
+.lock-password-input:focus {
+  border-color: var(--color-btn);
+}
+
+.lock-password-input.lock-input-error {
+  border-color: var(--color-danger);
+}
+
+/* Hide the browser's built-in reveal so only our button shows */
+.lock-password-input::-ms-reveal { display: none; }
+.lock-password-input::-webkit-credentials-auto-fill-button { display: none; }
+
+.lock-show-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+.lock-show-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.lock-show-btn svg { width: 18px; height: 18px; }
+
+.lock-submit-btn {
+  width: min(260px, 84vw);
+  padding: clamp(6px, 1.4vh, 10px);
+  border-radius: 8px;
+  border: none;
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--hover-transition);
+}
+
+.lock-submit-btn:hover { background: var(--color-btn-hover); }
+
+/* Exit app button — muted danger style, sits in the numpad grid (PIN) or
+   below Unlock (password). Smaller and less prominent than Unlock. */
+.lock-exit-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.lock-exit-btn:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* Standalone version (password view — full width, fixed height like submit btn) */
+.lock-exit-standalone {
+  width: min(260px, 84vw);
+  padding: clamp(5px, 1.2vh, 8px);
+  font-size: 0.8rem;
+}
+
+.lock-error-msg {
+  font-size: 0.8rem;
+  color: var(--color-danger);
+  height: 1em;
+  text-align: center;
+}
+
+/* =============================================================================
+   SETTINGS — SECURITY SECTION
+============================================================================= */
+
+.lock-credential-type {
+  display: flex;
+  gap: 8px;
+}
+
+.lock-type-btn {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.lock-type-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.lock-type-btn.active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+/* Change/Remove credential link row */
+.lock-cred-actions {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.lock-cred-link {
+  background: transparent;
+  border: none;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: inherit;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+/* "Change" — accent-coloured text, hover gets a hover-bg tint */
+.lock-cred-link.change {
+  color: color-mix(in srgb, var(--color-btn) 80%, white);
+}
+
+.lock-cred-link.change:hover {
+  background: var(--color-hover);
+  color: var(--color-btn);
+}
+
+/* "Remove" — danger-coloured text, hover gets a subtle danger tint */
+.lock-cred-link.danger {
+  color: var(--color-danger);
+}
+
+.lock-cred-link.danger:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+/* Set-credential modal body */
+.set-lock-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.set-lock-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.set-lock-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  padding: 9px 36px 9px 12px;
+  outline: none;
+  transition: border-color var(--hover-transition);
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+/* Suppress browser built-in reveal/autofill buttons that break centering */
+.set-lock-input::-ms-reveal { display: none; }
+.set-lock-input::-webkit-credentials-auto-fill-button { display: none; }
+
+.set-lock-input:focus { border-color: var(--color-btn); }
+.set-lock-input.input-error { border-color: var(--color-danger); }
+
+.set-lock-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.set-lock-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.set-lock-actions button {
+  flex: 1;
+}

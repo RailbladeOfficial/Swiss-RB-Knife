@@ -120,25 +120,10 @@
   width: 100%;
 }
 
+/* Size delta only; shared look (.toggle-btn) is in shell.css. */
 .preset-btn {
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
   padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
   font-size: 0.7rem;
-}
-
-.preset-btn:hover {
-  background: var(--color-hover);
-  color: var(--color-text);
-}
-
-.preset-btn.active {
-  background: var(--color-btn);
-  color: var(--color-btn-text);
-  border-color: var(--color-btn);
 }
 
 .export-btn {
@@ -236,7 +221,13 @@
 }
 
 /* =============================================================================
-   ENTRIES LIST
+   ENTRIES LIST  (Time Tracker specific — column layout only)
+   -----------------------------------------------------------------------------
+   Shared ledger row primitives (.entries-header-row, .entry-date-subheader,
+   .entry-row, .entry-field, .entry-edit-input, .entry-cal-btn,
+   .entry-date-picker, .entry-delete-btn) are promoted to shell.css — Budget's
+   ledger uses them directly too. Only Time Tracker's own column types
+   (.entry-col-activity/-time/-duration) stay here.
 ============================================================================= */
 
 .entries-header-row {
@@ -255,33 +246,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-/* Date subheader */
-.entry-date-subheader {
-  font-size: 1.02rem;
-  font-weight: bold;
-  opacity: 0.6;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 18px 4px 4px 4px;
-  margin-top: 4px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.entry-date-subheader:first-child {
-  margin-top: 0;
-}
-
-/* Entry row */
-.entry-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 6px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
 }
 
 .entry-col-activity {
@@ -320,67 +284,6 @@
   opacity: 0.7;
   padding: 2px 4px;
   white-space: nowrap;
-}
-
-.entry-field {
-  cursor: default;
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-
-.entry-field:hover {
-  background: var(--color-hover);
-}
-
-.entry-edit-input {
-  background: var(--color-input-bg);
-  color: var(--color-text);
-  border: 1px solid var(--color-btn);
-  border-radius: 4px;
-  padding: 2px 4px;
-  font-size: inherit;
-  font-family: inherit;
-  width: auto;
-  min-width: 60px;
-}
-
-.entry-cal-btn {
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  flex-shrink: 0;
-  line-height: 1.4;
-  margin-right: 6px;
-}
-
-.entry-cal-btn:hover {
-  background: var(--color-hover);
-}
-
-.entry-date-picker {
-  width: 7rem;
-  font-size: 0.75rem;
-  padding: 2px 4px;
-  flex-shrink: 0;
-}
-
-.entry-delete-btn {
-  background: transparent;
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 0.7rem;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.entry-delete-btn:hover {
-  background: var(--color-danger-subtle);
 }
 
 /* =============================================================================

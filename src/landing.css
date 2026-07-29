@@ -1,0 +1,339 @@
+/* =============================================================================
+   LANDING  — Home dashboard, category landing pages, tool cards, and the
+              standardized tool-view title bar
+   -----------------------------------------------------------------------------
+   Split out of shell.css (Tier 6). Category-landing-page markup/CSS is kept
+   even though categories are currently retired (Home + sidebar link straight
+   to tools) — the archived category markup in index.html would "just work"
+   again if categories come back, and this is where that support lives.
+
+   Also includes the standardized .tool-view-header-actions group (Tier 6
+   consolidation — see file-end note) used by every tool's header for
+   multi-button action groups (Presets/Setup, View Annual Stats/Setup, etc.).
+============================================================================= */
+
+/* =============================================================================
+   HOME DASHBOARD
+============================================================================= */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--hover-transition);
+}
+
+.dashboard-card-header:hover {
+  background: var(--color-hover);
+}
+
+.dashboard-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--color-btn);
+}
+
+.dashboard-card-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.dashboard-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.dashboard-tool-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard-tool-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  border-radius: 0;
+  padding: 5px 14px;
+  font-size: 0.8rem;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+.dashboard-tool-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.dashboard-tool-placeholder {
+  display: block;
+  padding: 5px 14px;
+  font-size: 0.8rem;
+  opacity: 0.35;
+  font-style: italic;
+}
+
+/* "Coming Soon" badge — sits in a dashboard-card-header next to the title
+   for categories with no implemented tools yet. */
+.coming-soon-badge {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-input-bg);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   COMING SOON  — category landing placeholder (e.g. Music)
+============================================================================= */
+
+.coming-soon-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 60px 20px;
+  color: var(--color-text-muted);
+}
+
+.coming-soon-icon {
+  opacity: 0.4;
+}
+
+.coming-soon-icon svg {
+  width: 40px;
+  height: 40px;
+}
+
+.coming-soon-title {
+  font-size: 1rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.coming-soon-desc {
+  font-size: 0.82rem;
+  opacity: 0.5;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+/* =============================================================================
+   CATEGORY LANDING PAGES
+============================================================================= */
+
+.tool-landing {
+  display: block;
+}
+
+.tool-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.tool-card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 16px 14px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition);
+  user-select: none;
+}
+
+.tool-card:hover {
+  background: var(--color-hover);
+  border-color: var(--color-btn);
+}
+
+.tool-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-btn);
+}
+
+.tool-card-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.tool-card-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.tool-card-desc {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  line-height: 1.5;
+}
+
+/* =============================================================================
+   TOOL VIEWS  (individual tool within a category)
+============================================================================= */
+
+.tool-view {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tool-view-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 8px 8px 0 0;
+  flex-shrink: 0;
+}
+
+.tool-view-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* Optional right-aligned action button in a tool view header (e.g. "Setup").
+   For a single action button, use this alone. */
+.tool-view-header-action {
+  margin-left: auto;
+}
+
+/* Right-aligned GROUP of multiple action buttons in a tool view header (e.g.
+   "Presets" + "Setup", or "View Annual Stats" + "Setup") — the buttons sit
+   together at the header's right edge with a small gap between them.
+   Individual buttons inside this wrapper do NOT also need
+   .tool-view-header-action; the wrapper already handles the push-right, and
+   applying both creates a redundant second auto-margin.
+
+   Tier 6 consolidation: previously reimplemented three times as
+   .ab-header-nav (auto-backup.css), .budget-header-actions (budget.css),
+   and the wrapper role of .tab-nav (image-ccr.css) — all three were the same
+   `display: flex; gap: 6px; margin-left: auto;` under a different name.
+   image-ccr's markup keeps the empty .tab-nav class alongside this one since
+   image-ccr.ts queries `.tab-nav .tab-btn` directly. */
+.tool-view-header-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Shared back-arrow button used in tool view headers (.tool-back-btn) and
+   category landing page headers (.section-back-btn). Both are identical in
+   appearance; the two class names are kept in HTML for semantic clarity. */
+.tool-back-btn,
+.section-back-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+.tool-back-btn svg,
+.section-back-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.tool-back-btn:hover,
+.section-back-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* Home top-bar "Update Available - vX.Y.Z" line. Home section only (the element
+   lives solely in #section-home's header). Absolutely centred across the full
+   bar, coloured with --color-btn to match the About-icon pulse flash. Shown /
+   hidden by refreshUpdateUI() alongside the pulse and the About-modal notice. */
+.home-update-notice {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--color-btn);
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.home-update-notice a {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  /* Smooth colour fade on hover, matching modal-body links (which get their
+     transition from modal.css). Without this the hover snapped. It lives here
+     in the shared shell so every theme — including random and custom, which
+     have no per-theme hover rule of their own — fades smoothly. */
+  transition: color var(--hover-transition);
+}
+
+/* Base hover — lightens toward the palette's button-hover colour. Named themes
+   may override with their own accent; random and custom themes (which use
+   default.css as a base and set --color-btn-hover from their palette) pick this
+   up automatically, so the link still reacts under them. */
+.home-update-notice a:hover {
+  color: var(--color-btn-hover);
+}
+

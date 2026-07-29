@@ -1,5 +1,39 @@
 [
   {
+    "version": "0.5.0",
+    "date": "2026-07-29",
+    "changes": {
+      "features": {
+        "Auto-Backup": [
+          "Added Setup button/modal to the Auto-Backup tool.",
+          "Added setting to Show Tool Warning Page if you had previously asked for it to never show again.",
+          "Added setting Enable Backup Reminders, which lets you set an interval to be reminded after and a mode by which to get a reminder."
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "If a toast notification flashes while the screen is covered or unfocused, the notification will wait for you to come back and see it on its way.",
+          "Updated some wordings / verbiage app-wide to improve consistency.",
+          "Refactored all TS and CSS files to better organize and componentize them, where possible.",
+          "Ensured that styles that were being shared across tools are now coming from the shell files."
+        ],
+        "Budget Tracker": [
+          "Added totals to the Ledger subheaders for all three Ledger views."
+        ],
+        "Auto-Backup": [
+          "Added ability to create a preset from the currently selected paths listed in the tool.",
+          "Added validation to the Preset Name filed."
+
+        ]
+      },
+      "bugfixes": {
+        "Auto-Backup": [
+          "Fixed issues with styling for the tool header buttons and the Presets modal."
+        ]
+      }
+    }
+  },
+  {
     "version": "0.4.0",
     "date": "2026-07-28",
     "changes": {
