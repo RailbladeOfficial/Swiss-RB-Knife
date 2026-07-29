@@ -46,6 +46,19 @@ interface BackupConfig {
    *  robocopy on trees full of small files. When false, robocopy runs
    *  unmonitored and the bar/stats update per-folder instead — much faster. */
   showDetails: boolean;
+  /** Master switch for the "it's been a while" backup nudge, set up in the
+   *  Setup modal. */
+  reminderEnabled: boolean;
+  /** How many days may pass after the last completed backup before the
+   *  reminder is due. Integer, 1–366. */
+  reminderDays: number;
+  /** true = Aggressive (a modal on next launch), false = Gentle (a toast). */
+  reminderAggressive: boolean;
+  /** ISO timestamp of the last backup run that completed (success === true,
+   *  regardless of skipped files) — null if none has ever completed. Reset
+   *  by every completed run, whichever sources/destinations/preset it used;
+   *  there's no per-schedule tracking yet, so this is a single shared clock. */
+  lastBackupCompletedAt: string | null;
 }
 
 interface BackupFolderStartEvent {
@@ -177,6 +190,10 @@ let config: BackupConfig = {
   copySpeed: DEFAULT_COPY_SPEED,
   skipDisclaimer: false,
   showDetails: true, // on by default; users opt into fast mode
+  reminderEnabled: false,
+  reminderDays: 7,
+  reminderAggressive: false, // Gentle by default
+  lastBackupCompletedAt: null,
 };
 
 /** Cached folder sizes: path → bytes (or null = pending). */
@@ -330,10 +347,25 @@ let clearDestBtn: HTMLButtonElement;
 let presetsBtn: HTMLButtonElement;
 let presetsModal: Modal; // initialised in initPresetsModal once the DOM element exists
 
+/* Setup modal */
+let setupBtn: HTMLButtonElement;
+let setupModal: Modal; // initialised in initSetupModal once the DOM element exists
+let setupWarningToggle: HTMLInputElement;
+let setupWarningLabel: HTMLElement;
+let setupReminderToggle: HTMLInputElement;
+let setupReminderLabel: HTMLElement;
+let setupReminderSubsettings: HTMLElement;
+let setupReminderDaysInput: HTMLInputElement;
+let setupReminderModeToggle: HTMLInputElement;
+let setupReminderModeLabel: HTMLElement;
+
 /* Disclaimer face */
 let faceDisclaimer: HTMLElement;
 let faceTool: HTMLElement;
 let disclaimerSkipCheck: HTMLInputElement;
+/** Presets/Setup nav — hidden while the warning face is showing, since
+ *  neither is meaningful until the user has actually entered the tool. */
+let headerNav: HTMLElement;
 
 /* Run-confirmation modal */
 let runConfirmModal: Modal; // initialised in initRunConfirmModal
@@ -398,6 +430,19 @@ async function loadConfig(): Promise<void> {
     // Default ON when the key is missing (older configs) or malformed — only
     // an explicit stored `false` turns details off.
     config.showDetails    = parsed?.showDetails !== false;
+
+    config.reminderEnabled = parsed?.reminderEnabled === true;
+    config.reminderDays =
+      typeof parsed?.reminderDays === "number" &&
+      Number.isInteger(parsed.reminderDays) &&
+      parsed.reminderDays >= 1 && parsed.reminderDays <= 366
+        ? parsed.reminderDays
+        : 7;
+    config.reminderAggressive = parsed?.reminderAggressive === true;
+    config.lastBackupCompletedAt =
+      typeof parsed?.lastBackupCompletedAt === "string"
+        ? parsed.lastBackupCompletedAt
+        : null;
   } catch {
     // use defaults
   }
@@ -1558,6 +1603,12 @@ async function attachBackupListeners(): Promise<void> {
       syncSkippedFilesButton();
 
       if (payload.success) {
+        // Any completed run — regardless of which sources/destinations or
+        // preset it used — resets the "time since last backup" clock that
+        // the reminder feature watches.
+        config.lastBackupCompletedAt = new Date().toISOString();
+        saveConfig();
+
         const skipCount = lastSkippedFiles.length;
         if (skipCount > 0) {
           // Succeeded, but some files couldn't be copied — flag it with the
@@ -1832,6 +1883,7 @@ function setFaceInstant(which: "tool" | "disclaimer"): void {
   faceTool.classList.remove("ab-face-hiding", "ab-face-showing");
   faceDisclaimer.style.display = which === "disclaimer" ? "flex" : "none";
   faceTool.style.display = which === "tool" ? "flex" : "none";
+  headerNav.style.display = which === "tool" ? "" : "none";
   _faceSwitching = false;
 }
 
@@ -1873,6 +1925,7 @@ function fadeToToolFace(): void {
     faceDisclaimer.classList.remove("ab-face-hiding");
     faceDisclaimer.style.display = "none";
     faceTool.style.display = "flex";
+    headerNav.style.display = "";
 
     // Phase 2: fade in the tool face
     faceTool.classList.add("ab-face-showing");
@@ -1895,6 +1948,7 @@ function initDisclaimer(): void {
   faceDisclaimer      = document.getElementById("ab-face-disclaimer")!;
   faceTool            = document.getElementById("ab-face-tool")!;
   disclaimerSkipCheck = document.getElementById("ab-disclaimer-skip-check") as HTMLInputElement;
+  headerNav            = document.getElementById("ab-header-nav")!;
 
   document.getElementById("ab-disclaimer-continue-btn")!.addEventListener("click", () => {
     if (disclaimerSkipCheck.checked && !config.skipDisclaimer) {
@@ -1911,6 +1965,165 @@ function initDisclaimer(): void {
       .querySelector<HTMLElement>("#files-tool-auto-backup .tool-back-btn")
       ?.click();
   });
+}
+
+/* =============================================================================
+   SETUP MODAL
+   -----------------------------------------------------------------------------
+   "Show Tool Warning Page" is the inverse of config.skipDisclaimer. Checking
+   "Never show this warning again" on the disclaimer face turns this off;
+   turning it back on here clears skipDisclaimer so the warning resumes
+   showing on tool entry.
+
+   "Enable Backup Reminders" nudges the user on app startup if it's been a
+   while since the last completed backup — see getDueBackupReminder(), called
+   from shell.ts's startup sequence.
+============================================================================= */
+
+/** Syncs the toggle + its On/Off label to the current config state. */
+function renderSetupWarningToggle(): void {
+  const shown = !config.skipDisclaimer;
+  setupWarningToggle.checked = shown;
+  setupWarningLabel.textContent = shown ? "On" : "Off";
+}
+
+/** Syncs the reminder toggle, its On/Off label, and the subsettings
+ *  expand/collapse to config.reminderEnabled. */
+function renderSetupReminderToggle(): void {
+  setupReminderToggle.checked = config.reminderEnabled;
+  setupReminderLabel.textContent = config.reminderEnabled ? "On" : "Off";
+  setupReminderSubsettings.style.maxHeight = config.reminderEnabled ? "160px" : "0";
+}
+
+/** Syncs the Aggressive/Gentle mode toggle + label to config.reminderAggressive. */
+function renderSetupReminderMode(): void {
+  setupReminderModeToggle.checked = config.reminderAggressive;
+  setupReminderModeLabel.textContent = config.reminderAggressive ? "Aggressive" : "Gentle";
+}
+
+/* ── Info tooltips ─────────────────────────────────────────────────────────
+   Small click-to-toggle popovers for the (i) buttons in this modal — not
+   full modals, just a floating explanation anchored under whichever icon
+   was clicked. Single shared bubble element, repositioned per click. */
+let infoTooltipEl: HTMLDivElement | null = null;
+let infoTooltipOpenBtn: HTMLButtonElement | null = null;
+
+function closeInfoTooltip(): void {
+  infoTooltipEl?.classList.remove("visible");
+  infoTooltipOpenBtn = null;
+}
+
+function toggleInfoTooltip(btn: HTMLButtonElement, text: string): void {
+  if (infoTooltipOpenBtn === btn) {
+    closeInfoTooltip();
+    return;
+  }
+  if (!infoTooltipEl) {
+    infoTooltipEl = document.createElement("div");
+    infoTooltipEl.className = "ab-info-tooltip";
+    document.body.appendChild(infoTooltipEl);
+  }
+  infoTooltipEl.textContent = text;
+  infoTooltipEl.classList.add("visible");
+  // Position after adding to the DOM (and after the text is set) so its
+  // rendered width is known — anchored just below the icon, clamped so it
+  // can't run off the right edge of the window.
+  const rect = btn.getBoundingClientRect();
+  const bubbleWidth = infoTooltipEl.offsetWidth;
+  const left = Math.min(
+    Math.max(8, rect.left + rect.width / 2 - bubbleWidth / 2),
+    window.innerWidth - bubbleWidth - 8,
+  );
+  infoTooltipEl.style.top  = `${rect.bottom + 6}px`;
+  infoTooltipEl.style.left = `${left}px`;
+  infoTooltipOpenBtn = btn;
+}
+
+/** Wires every (i) button inside `container` to toggle the shared tooltip
+ *  bubble with its `data-tooltip` text. Also closes the bubble on any other
+ *  click in the document, so it behaves like a normal popover. */
+function initInfoTooltips(container: HTMLElement): void {
+  container.querySelectorAll<HTMLButtonElement>(".ab-info-btn[data-tooltip]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleInfoTooltip(btn, btn.dataset.tooltip ?? "");
+    });
+  });
+  document.addEventListener("click", () => closeInfoTooltip());
+}
+
+function initSetupModal(): void {
+  setupBtn           = document.getElementById("ab-setup-btn") as HTMLButtonElement;
+  setupWarningToggle = document.getElementById("ab-setup-warning-toggle") as HTMLInputElement;
+  setupWarningLabel  = document.getElementById("ab-setup-warning-label")!;
+
+  setupReminderToggle      = document.getElementById("ab-setup-reminder-toggle") as HTMLInputElement;
+  setupReminderLabel       = document.getElementById("ab-setup-reminder-label")!;
+  setupReminderSubsettings = document.getElementById("ab-setup-reminder-subsettings")!;
+  setupReminderDaysInput   = document.getElementById("ab-setup-reminder-days") as HTMLInputElement;
+  setupReminderModeToggle  = document.getElementById("ab-setup-reminder-mode-toggle") as HTMLInputElement;
+  setupReminderModeLabel   = document.getElementById("ab-setup-reminder-mode-label")!;
+
+  const setupModalEl = document.getElementById("abSetupModal")!;
+
+  setupModal = new Modal(document.getElementById("abSetupBackdrop")!, {
+    onOpen: () => {
+      renderSetupWarningToggle();
+      renderSetupReminderToggle();
+      renderSetupReminderMode();
+      setupReminderDaysInput.value = String(config.reminderDays);
+    },
+    onClosed: () => closeInfoTooltip(),
+  });
+
+  setupBtn.addEventListener("click", () => setupModal.open());
+  document.getElementById("abSetupClose")!.addEventListener("click", () => setupModal.close());
+
+  setupWarningToggle.addEventListener("change", () => {
+    config.skipDisclaimer = !setupWarningToggle.checked;
+    saveConfig();
+    renderSetupWarningToggle();
+  });
+
+  setupReminderToggle.addEventListener("change", () => {
+    config.reminderEnabled = setupReminderToggle.checked;
+    saveConfig();
+    renderSetupReminderToggle();
+  });
+
+  setupReminderDaysInput.addEventListener("change", () => {
+    const n = Math.round(parseFloat(setupReminderDaysInput.value));
+    const clamped = Number.isFinite(n) ? Math.min(366, Math.max(1, n)) : 7;
+    config.reminderDays = clamped;
+    setupReminderDaysInput.value = String(clamped); // reflect any clamping back into the field
+    saveConfig();
+  });
+
+  setupReminderModeToggle.addEventListener("change", () => {
+    config.reminderAggressive = setupReminderModeToggle.checked;
+    saveConfig();
+    renderSetupReminderMode();
+  });
+
+  initInfoTooltips(setupModalEl);
+}
+
+/** Reminder status returned when a nudge is due — null otherwise (reminders
+ *  off, no backup has ever completed, or it's simply not time yet). Read by
+ *  shell.ts's startup sequence, once, ~2s after the app is ready. */
+export interface BackupReminderStatus {
+  aggressive: boolean;
+  elapsedDays: number;
+}
+
+export function getDueBackupReminder(): BackupReminderStatus | null {
+  if (!config.reminderEnabled) return null;
+  if (!config.lastBackupCompletedAt) return null; // no baseline to measure from yet
+  const lastMs = new Date(config.lastBackupCompletedAt).getTime();
+  if (Number.isNaN(lastMs)) return null;
+  const elapsedDays = Math.floor((Date.now() - lastMs) / (24 * 60 * 60 * 1000));
+  if (elapsedDays < config.reminderDays) return null;
+  return { aggressive: config.reminderAggressive, elapsedDays };
 }
 
 /* =============================================================================
@@ -2050,17 +2263,18 @@ function initPresetsModal(): void {
   presetsBtn.addEventListener("click", () => presetsModal.open());
   document.getElementById("abPresetsClose")!.addEventListener("click", () => presetsModal.close());
 
-  // New preset
+  // Blank preset
   document.getElementById("ab-preset-new-btn")!.addEventListener("click", () => {
     const preset: BackupPreset = {
       id:           generateId(),
-      name:         "New Preset",
+      name:         generateUniquePresetName("BlankPreset"),
       sources:      [],
       destinations: [],
     };
     presets.push(preset);
     savePresets();
     selectPreset(preset.id);
+    flash(`Preset "${preset.name}" created.`, "success");
     // Focus name field so user can rename immediately
     setTimeout(() => {
       const input = document.getElementById("ab-preset-name-input") as HTMLInputElement;
@@ -2069,13 +2283,74 @@ function initPresetsModal(): void {
     }, 50);
   });
 
-  // Name input auto-save
-  document.getElementById("ab-preset-name-input")!.addEventListener("input", () => {
+  // From current — snapshots whatever Sources / Destinations are set in the
+  // main tool right now into a new preset.
+  document.getElementById("ab-preset-from-current-btn")!.addEventListener("click", () => {
+    if (config.sources.length === 0 && config.destinations.length === 0) {
+      flash("Nothing set in Sources / Destinations to snapshot yet.", "error");
+      return;
+    }
+    const preset: BackupPreset = {
+      id:           generateId(),
+      name:         generateUniquePresetName("FromCurrent"),
+      sources:      [...config.sources],
+      destinations: [...config.destinations],
+    };
+    presets.push(preset);
+    savePresets();
+    selectPreset(preset.id);
+    flash(`Preset "${preset.name}" created from current setup.`, "success");
+    // Focus name field so user can rename immediately, same as Blank Preset
+    setTimeout(() => {
+      const input = document.getElementById("ab-preset-name-input") as HTMLInputElement;
+      input.focus();
+      input.select();
+    }, 50);
+  });
+
+  // Name input auto-save — empty and duplicate names are rejected rather
+  // than saved, since presets are told apart by name everywhere in the UI.
+  const presetNameInput = document.getElementById("ab-preset-name-input") as HTMLInputElement;
+  // Snapshot of the name when the field was focused, so blur can tell
+  // whether an actual rename happened (and only then toast about it).
+  let presetNameAtFocus: string | null = null;
+
+  presetNameInput.addEventListener("focus", () => {
+    presetNameAtFocus = presetNameInput.value;
+  });
+
+  presetNameInput.addEventListener("input", () => {
     const preset = presets.find(p => p.id === activePresetId);
     if (!preset) return;
-    preset.name = (document.getElementById("ab-preset-name-input") as HTMLInputElement).value.trim() || "Unnamed";
+    const candidate = presetNameInput.value.trim();
+    if (!candidate || isPresetNameTaken(candidate, preset.id)) {
+      presetNameInput.classList.add("input-error");
+      return; // don't persist an empty name or one that collides with another preset
+    }
+    presetNameInput.classList.remove("input-error");
+    preset.name = candidate;
     savePresets();
     renderPresetList();
+  });
+
+  presetNameInput.addEventListener("blur", () => {
+    const preset = presets.find(p => p.id === activePresetId);
+    if (!preset) return;
+    const candidate = presetNameInput.value.trim();
+    if (!candidate) {
+      flash("Preset name can't be empty — reverted to the previous name.", "error");
+      presetNameInput.value = preset.name; // last saved, valid name
+      presetNameInput.classList.remove("input-error");
+    } else if (isPresetNameTaken(candidate, preset.id)) {
+      flash("A preset with that name already exists — choose a different name.", "error");
+      presetNameInput.value = preset.name; // revert to the last saved, unique name
+      presetNameInput.classList.remove("input-error");
+    } else if (presetNameAtFocus !== null && candidate !== presetNameAtFocus.trim()) {
+      // A genuine, valid rename went through — the "input" handler above
+      // already persisted it. Toast once, here, rather than per keystroke.
+      flash(`Preset renamed to "${candidate}".`, "success");
+    }
+    presetNameAtFocus = null;
   });
 
   // Source add
@@ -2136,11 +2411,15 @@ function initPresetsModal(): void {
 
   // Delete preset
   document.getElementById("ab-preset-delete-btn")!.addEventListener("click", () => {
-    const preset = presets.find(p => p.id === activePresetId);
-    if (!preset) return;
-    const name = preset.name;
-    presets = presets.filter(p => p.id !== activePresetId);
-    activePresetId = presets.length > 0 ? presets[0].id : null;
+    const idx = presets.findIndex(p => p.id === activePresetId);
+    if (idx === -1) return;
+    const name = presets[idx]!.name;
+    presets.splice(idx, 1);
+    // After removal, whatever now sits at `idx` is the preset that was
+    // directly below the one just deleted — select that. If the deleted
+    // preset was last in the list, fall back to the new last preset.
+    const next = presets[idx] ?? presets[presets.length - 1];
+    activePresetId = next ? next.id : null;
     savePresets();
     renderPresetList();
     renderPresetEditor();
@@ -2150,6 +2429,25 @@ function initPresetsModal(): void {
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+/** True if `name` (trimmed, case-insensitive) is already used by some OTHER
+ *  preset than `excludeId`. Pass `null` for excludeId to check against every
+ *  preset (e.g. when minting a brand-new name). */
+function isPresetNameTaken(name: string, excludeId: string | null): boolean {
+  const norm = name.trim().toLowerCase();
+  return presets.some(
+    (p) => p.id !== excludeId && p.name.trim().toLowerCase() === norm,
+  );
+}
+
+/** Returns `base` if it's free, otherwise `base 2`, `base 3`, … — the first
+ *  unused suffix. Used to seed new presets with a unique starting name. */
+function generateUniquePresetName(base: string): string {
+  if (!isPresetNameTaken(base, null)) return base;
+  let n = 2;
+  while (isPresetNameTaken(`${base} ${n}`, null)) n++;
+  return `${base} ${n}`;
 }
 
 function renderPresetList(): void {
@@ -2194,7 +2492,9 @@ function renderPresetEditor(): void {
   placeholder.style.display = "none";
   form.style.display = "flex";
 
-  (document.getElementById("ab-preset-name-input") as HTMLInputElement).value = preset.name;
+  const nameInput = document.getElementById("ab-preset-name-input") as HTMLInputElement;
+  nameInput.value = preset.name;
+  nameInput.classList.remove("input-error");
   renderPresetPathList("sources", preset);
   renderPresetPathList("destinations", preset);
 }
@@ -2416,6 +2716,7 @@ export async function initAutoBackup(): Promise<void> {
   });
 
   initPresetsModal();
+  initSetupModal();
   initRunConfirmModal();
   initSkippedFilesModal();
   initSpeedInfoModal();

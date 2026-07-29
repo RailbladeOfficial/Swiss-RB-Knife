@@ -1315,6 +1315,16 @@ button:hover {
 }
 
 /* =============================================================================
+   BACKUP REMINDER MODAL  (universal — owned by shell; Aggressive mode)
+   Reuses .exit-modal-body / .exit-modal-actions for the two-button layout,
+   same as the Exit modal — only the width is bespoke.
+============================================================================= */
+
+.backup-reminder-modal {
+  width: min(420px, 92vw);
+}
+
+/* =============================================================================
    LICENSING MODAL — TABS
 ============================================================================= */
 

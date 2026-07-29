@@ -643,7 +643,7 @@
 }
 
 /* Budget settings tab — reuse settings-row style from shell.css */
-.budget-settings-list {
+.budget-preferences-list {
   display: flex;
   flex-direction: column;
   gap: 2px;

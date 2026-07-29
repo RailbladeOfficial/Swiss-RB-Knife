@@ -29,7 +29,7 @@ import { Modal, setGlobalModalOpenHook } from "./modal";
 import { initTimeTracker } from "./tools/time-tracker";
 import { initImageCCR } from "./tools/image-ccr";
 import { initFileGen } from "./tools/file-gen";
-import { initAutoBackup, onAutoBackupToolEntry } from "./tools/auto-backup";
+import { initAutoBackup, onAutoBackupToolEntry, getDueBackupReminder } from "./tools/auto-backup";
 import {
   initBudget,
   setBudgetAmericanDates,
@@ -226,6 +226,12 @@ let fullLicenseLoaded = false;
 let lightboxSourceImg: HTMLImageElement | null = null;
 let activeTab = "license";
 
+// True only when the changelog auto-opened this session because the app
+// version changed (see runStartupGates). Consumed once, by changelogModal's
+// onClosed handler, to fire the backup-reminder check 2s after the user
+// dismisses it — a manual reopen from About later must NOT retrigger this.
+let _pendingReminderAfterChangelogClose = false;
+
 // In-memory shell state — kept in sync with disk so saveShellState never
 // needs to read back from Rust just to preserve fields it isn't changing.
 // Populated by loadShellState() on startup; updated incrementally thereafter.
@@ -325,6 +331,11 @@ const appVersionEl = document.getElementById("appVersion");
 const exitBackdrop = document.getElementById("exitBackdrop")!;
 const exitConfirmBtn = document.getElementById("exitConfirmBtn")!;
 const exitCancelBtn = document.getElementById("exitCancelBtn")!;
+
+const backupReminderBackdrop = document.getElementById("backupReminderBackdrop")!;
+const backupReminderDaysEl = document.getElementById("backupReminderDays")!;
+const backupReminderGoBtn = document.getElementById("backupReminderGoBtn")!;
+const backupReminderCancelBtn = document.getElementById("backupReminderCancelBtn")!;
 
 const changelogBackdrop = document.getElementById("changelogBackdrop")!;
 const changelogClose = document.getElementById("changelogClose")!;
@@ -3450,6 +3461,14 @@ const changelogModal = new Modal(changelogBackdrop, {
           btn?.classList.toggle("rotated", i > 0);
         });
     }
+    // This changelog open was the automatic new-version one — now that the
+    // user has dismissed it, start the 2s backup-reminder timer. A later
+    // manual reopen (e.g. from About) won't have the flag set, so it's a
+    // no-op then.
+    if (_pendingReminderAfterChangelogClose) {
+      _pendingReminderAfterChangelogClose = false;
+      window.setTimeout(() => maybeShowBackupReminder(), 2000);
+    }
   },
 });
 
@@ -4374,7 +4393,10 @@ licenseDeclineBtn.addEventListener("click", () => {
  *  2. License agreement — shown if never accepted or if LICENSE_VERSION changed.
  *     Decline quits the app; accept writes the accepted version to localStorage.
  *  3. Auto-changelog — opens automatically when the app version has changed
- *     since the last launch. Stores the seen version in localStorage. */
+ *     since the last launch. Stores the seen version in localStorage.
+ *  4. Backup reminder — fires ~2s after the app is actually ready to look at:
+ *     immediately if no changelog is shown this run, or 2s after the user
+ *     dismisses the auto-opened changelog if one is. */
 async function runStartupGates(appVersion: string): Promise<void> {
   // Gate 1: App lock — verify before anything else is visible
   if (settings.appLock) {
@@ -4400,9 +4422,44 @@ async function runStartupGates(appVersion: string): Promise<void> {
   const seenVersion = localStorage.getItem(CHANGELOG_SEEN_KEY);
   if (seenVersion !== appVersion) {
     localStorage.setItem(CHANGELOG_SEEN_KEY, appVersion);
+    _pendingReminderAfterChangelogClose = true;
     openChangelog();
+  } else {
+    window.setTimeout(() => maybeShowBackupReminder(), 2000);
   }
 }
+
+/* =============================================================================
+   BACKUP REMINDER MODAL  (universal — owned by shell; Aggressive mode)
+   -----------------------------------------------------------------------------
+   Gentle mode is just a flash() toast — no modal needed. Aggressive mode
+   uses this modal, shown once per startup (see runStartupGates / the
+   changelog onClosed hook above) when Auto-Backup's getDueBackupReminder()
+   says a reminder is due.
+============================================================================= */
+
+const backupReminderModal = new Modal(backupReminderBackdrop);
+
+function maybeShowBackupReminder(): void {
+  const status = getDueBackupReminder();
+  if (!status) return;
+
+  if (status.aggressive) {
+    backupReminderDaysEl.textContent = String(status.elapsedDays);
+    backupReminderModal.open();
+  } else {
+    flash("Time to backup your shit!", "success");
+  }
+}
+
+backupReminderGoBtn.addEventListener("click", () => {
+  backupReminderModal.close();
+  activateTool("files", "auto-backup");
+});
+
+backupReminderCancelBtn.addEventListener("click", () => {
+  backupReminderModal.close();
+});
 
 /* =============================================================================
    EXIT MODAL

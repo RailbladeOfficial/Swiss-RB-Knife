@@ -748,8 +748,9 @@
               </svg>
             </button>
             <span class="tool-view-title">Auto-Backup</span>
-            <nav class="ab-header-nav">
-              <button id="ab-presets-btn" class="ab-header-btn">Presets</button>
+            <nav id="ab-header-nav" class="ab-header-nav">
+              <button id="ab-presets-btn" class="tool-view-header-action">Presets</button>
+              <button id="ab-setup-btn" class="tool-view-header-action">Setup</button>
             </nav>
           </div>
 
@@ -2259,6 +2260,24 @@
   </div>
 
   <!-- =====================================================================
+       BACKUP REMINDER MODAL  (universal — owned by shell; Aggressive mode)
+  ====================================================================== -->
+  <div id="backupReminderBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="backupReminderModal" class="modal backup-reminder-modal">
+      <div class="modal-header">
+        <span>Backup Reminder</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p>It's been <strong id="backupReminderDays">—</strong> days since your last completed backup. Don't ya think it's time to take care of that?</p>
+        <div class="exit-modal-actions">
+          <button id="backupReminderGoBtn">Sure, take me there</button>
+          <button id="backupReminderCancelBtn" class="modal-cancel-btn">No, let's procrastinate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
        CONFIRM EXIT MODAL
   ====================================================================== -->
   <div id="exitBackdrop" class="modal-backdrop" style="display: none;">
@@ -2508,7 +2527,7 @@
     <div id="ttSettingsModal" class="modal">
       <div class="modal-header">
         <button id="ttSettingsReset" class="modal-header-left">Reset</button>
-        <span>Time Tracker Settings</span>
+        <span>Time Tracker Setup</span>
         <button id="ttSettingsClose" class="modal-close-btn modal-header-right">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -2601,7 +2620,7 @@
           <button class="budget-tab" data-budget-tab="bills">Recurring Bills</button>
           <button class="budget-tab" data-budget-tab="categories">Expense Categories</button>
           <button class="budget-tab" data-budget-tab="expenseSources">Expense Sources</button>
-          <button class="budget-tab" data-budget-tab="settings">Settings</button>
+          <button class="budget-tab" data-budget-tab="preferences">Preferences</button>
         </div>
 
         <!-- INCOME SOURCES -->
@@ -2629,8 +2648,8 @@
         </div>
 
         <!-- BUDGET SETTINGS -->
-        <div id="budgetTabSettings" class="budget-tab-pane" style="display:none;">
-          <div class="budget-settings-list">
+        <div id="budgetTabPreferences" class="budget-tab-pane" style="display:none;">
+          <div class="budget-preferences-list">
             <div class="settings-row">
               <span>Quick Delete Entries</span>
               <div class="toggle-with-label">
@@ -3356,7 +3375,11 @@
         <!-- Left column: preset list -->
         <div class="ab-presets-sidebar">
           <div id="ab-presets-list" class="ab-presets-list"></div>
-          <button id="ab-preset-new-btn" class="ab-preset-new-btn">+ New Preset</button>
+          <div class="ab-preset-new-actions">
+            <button id="ab-preset-new-btn" class="ab-preset-new-btn">+ Blank Preset</button>
+            <button id="ab-preset-from-current-btn" class="ab-preset-new-btn"
+              title="Create a preset from the Sources / Destinations currently set in the tool">+ From Current</button>
+          </div>
         </div>
 
         <!-- Right column: preset editor -->
@@ -3411,6 +3434,72 @@
         </div><!-- /ab-presets-editor -->
 
       </div><!-- /modal-body -->
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       AUTO-BACKUP — SETUP MODAL
+  ====================================================================== -->
+  <div id="abSetupBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="abSetupModal" class="modal ab-setup-modal">
+      <div class="modal-header">
+        <span>Auto-Backup Setup</span>
+        <button id="abSetupClose" class="modal-close-btn modal-header-right">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body ab-setup-body">
+        <div class="settings-row">
+          <span class="ab-setup-label-with-info">
+            Show Tool Warning Page:
+            <button type="button" class="ab-info-btn" data-tooltip="Shows the &quot;Before you use Auto-Backup&quot; warning every time you enter this tool. Turning this off has the same effect as checking &quot;Never show this warning again&quot; on that page; turning it back on clears that, so the warning shows again next time you enter the tool.">ℹ</button>
+          </span>
+          <div class="toggle-with-label">
+            <span id="ab-setup-warning-label">On</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="ab-setup-warning-toggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-row">
+          <span>Enable Backup Reminders:</span>
+          <div class="toggle-with-label">
+            <span id="ab-setup-reminder-label">Off</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="ab-setup-reminder-toggle" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div id="ab-setup-reminder-subsettings" class="subsettings" style="max-height: 0;">
+          <div class="settings-row">
+            <span>Remind after:</span>
+            <div class="ab-reminder-days-field">
+              <input type="number" id="ab-setup-reminder-days" min="1" max="366" step="1" value="7" />
+              <span>days</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <span class="ab-setup-label-with-info">
+              Mode:
+              <button type="button" class="ab-info-btn" data-tooltip="Gentle just shows a quiet toast notification. Aggressive shows a modal on startup that you have to dismiss, with a shortcut straight to the tool.">ℹ</button>
+            </span>
+            <div class="toggle-with-label">
+              <span id="ab-setup-reminder-mode-label">Gentle</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="ab-setup-reminder-mode-toggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

@@ -1258,6 +1258,21 @@ function getLedgerForRange(start: string, end: string): LedgerItem[] {
   return items;
 }
 
+/** Signed contribution of a single ledger item to a "net" subtotal — income
+ *  adds (money in), expenses and bill payments subtract (money out). Mirrors
+ *  the sign convention already used for ledger row coloring above. */
+function itemNetAmount(item: LedgerItem): number {
+  if (item.kind === "income") return item.entry.actual;
+  if (item.kind === "expense") return -item.entry.amount;
+  return -item.instance.actualAmount;
+}
+
+/** Net total across a list of ledger items — used for the totals shown next
+ *  to date/type/source subheadings in the ledger. */
+function sumNetAmount(items: LedgerItem[]): number {
+  return items.reduce((sum, item) => sum + itemNetAmount(item), 0);
+}
+
 /* =============================================================================
    DOM REFS & UI STATE  (resolved in initBudget)
 ============================================================================= */
@@ -3207,10 +3222,15 @@ function renderEntries(): void {
     return;
   }
 
-  function appendSubheader(text: string): void {
+  // `total` is optional so plain section labels (or any future subheader
+  // that has no meaningful sum) can still be rendered without one. When
+  // given, it's appended the same way Time Tracker appends its day total —
+  // trailing the label on the same line.
+  function appendSubheader(text: string, total?: number): void {
     const subheader = document.createElement("div");
     subheader.className = "entry-date-subheader";
-    subheader.textContent = text;
+    subheader.textContent =
+      total === undefined ? text : `${text} — ${formatCurrency(total)}`;
     entriesEl.appendChild(subheader);
   }
 
@@ -3218,17 +3238,30 @@ function renderEntries(): void {
     return item.kind === "bill" ? item.instance.paidDate : item.entry.date;
   }
 
+  /** Buckets an already-chronologically-sorted list of items by date,
+   *  preserving order — used so every date subheader can carry a total. */
+  function groupByDate(list: LedgerItem[]): Map<string, LedgerItem[]> {
+    const map = new Map<string, LedgerItem[]>();
+    for (const item of list) {
+      const d = itemDate(item);
+      if (!map.has(d)) map.set(d, []);
+      map.get(d)!.push(item);
+    }
+    return map;
+  }
+
+  /** Renders a date subheader (with net total) + rows for each date bucket
+   *  in `list`. Shared by all three ledger view modes below. */
+  function appendDateGroups(list: LedgerItem[]): void {
+    for (const [date, groupItems] of groupByDate(list)) {
+      appendSubheader(formatDate(date), sumNetAmount(groupItems));
+      for (const item of groupItems) entriesEl.appendChild(buildLedgerRow(item));
+    }
+  }
+
   if (ledgerSortMode === "chrono") {
     // Default: purely chronological with date subheaders
-    let currentDate = "";
-    for (const item of items) {
-      const d = itemDate(item);
-      if (d !== currentDate) {
-        currentDate = d;
-        appendSubheader(formatDate(currentDate));
-      }
-      entriesEl.appendChild(buildLedgerRow(item));
-    }
+    appendDateGroups(items);
 
   } else if (ledgerSortMode === "grouped") {
     // Income chronologically, then recurring bill payments chronologically,
@@ -3238,33 +3271,18 @@ function renderEntries(): void {
     const expenseItems = items.filter((i) => i.kind === "expense");
 
     if (incomeItems.length > 0) {
-      appendSubheader("─── Income ───");
-      let currentDate = "";
-      for (const item of incomeItems) {
-        const d = itemDate(item);
-        if (d !== currentDate) { currentDate = d; appendSubheader(formatDate(currentDate)); }
-        entriesEl.appendChild(buildLedgerRow(item));
-      }
+      appendSubheader("─── Income ───", sumNetAmount(incomeItems));
+      appendDateGroups(incomeItems);
     }
 
     if (billItems.length > 0) {
-      appendSubheader("─── Recurring Bills ───");
-      let currentDate = "";
-      for (const item of billItems) {
-        const d = itemDate(item);
-        if (d !== currentDate) { currentDate = d; appendSubheader(formatDate(currentDate)); }
-        entriesEl.appendChild(buildLedgerRow(item));
-      }
+      appendSubheader("─── Recurring Bills ───", sumNetAmount(billItems));
+      appendDateGroups(billItems);
     }
 
     if (expenseItems.length > 0) {
-      appendSubheader("─── Expenses ───");
-      let currentDate = "";
-      for (const item of expenseItems) {
-        const d = itemDate(item);
-        if (d !== currentDate) { currentDate = d; appendSubheader(formatDate(currentDate)); }
-        entriesEl.appendChild(buildLedgerRow(item));
-      }
+      appendSubheader("─── Expenses ───", sumNetAmount(expenseItems));
+      appendDateGroups(expenseItems);
     }
 
   } else {
@@ -3288,16 +3306,8 @@ function renderEntries(): void {
     );
 
     for (const [src, groupItems] of sortedGroups) {
-      appendSubheader(src);
-      let currentDate = "";
-      for (const item of groupItems) {
-        const d = itemDate(item);
-        if (d !== currentDate) {
-          currentDate = d;
-          appendSubheader(formatDate(currentDate));
-        }
-        entriesEl.appendChild(buildLedgerRow(item));
-      }
+      appendSubheader(src, sumNetAmount(groupItems));
+      appendDateGroups(groupItems);
     }
   }
 }
@@ -4839,7 +4849,7 @@ const SETUP_TABS = [
   "bills",
   "categories",
   "expenseSources",
-  "settings",
+  "preferences",
 ] as const;
 type SetupTab = (typeof SETUP_TABS)[number];
 
@@ -4858,7 +4868,7 @@ function activateSetupTab(tab: SetupTab): void {
     bills:          "budgetTabBills",
     categories:     "budgetTabCategories",
     expenseSources: "budgetTabExpenseSources",
-    settings:       "budgetTabSettings",
+    preferences:       "budgetTabPreferences",
   };
 
   for (const [key, id] of Object.entries(paneIds)) {
@@ -4917,7 +4927,7 @@ function getSetupModal(): Modal {
         _setupPanesToReset.add("budgetTabBills");
         _setupPanesToReset.add("budgetTabCategories");
         _setupPanesToReset.add("budgetTabExpenseSources");
-        _setupPanesToReset.add("budgetTabSettings");
+        _setupPanesToReset.add("budgetTabPreferences");
       },
     });
 
@@ -5727,7 +5737,7 @@ function getEncryptionEnableModal(): Modal {
     // Back + Cancel both return to Setup; X closes entirely
     const returnToSetup = () => {
       encryptionEnableModal!.close();
-      openSetupModalOnTab("settings");
+      openSetupModalOnTab("preferences");
     };
     backBtn.addEventListener("click", returnToSetup);
     cancelBtn.addEventListener("click", returnToSetup);
@@ -5769,7 +5779,7 @@ function getEncryptionEnableModal(): Modal {
         sessionPassword = pw;
         sessionUnlocked = true;
         encryptionEnableModal!.close();
-        openSetupModalOnTab("settings");
+        openSetupModalOnTab("preferences");
         _applyEncryptionSettingsUI();
         flash("Encryption enabled. Budget data is now encrypted on disk.", "success");
       } catch (e) {
@@ -5812,7 +5822,7 @@ function getEncryptionDisableModal(): Modal {
 
     const returnToSetup = () => {
       encryptionDisableModal!.close();
-      openSetupModalOnTab("settings");
+      openSetupModalOnTab("preferences");
     };
     backBtn.addEventListener("click", returnToSetup);
     cancelBtn.addEventListener("click", returnToSetup);
@@ -5833,7 +5843,7 @@ function getEncryptionDisableModal(): Modal {
         sessionPassword = "";
         sessionUnlocked = false;
         encryptionDisableModal!.close();
-        openSetupModalOnTab("settings");
+        openSetupModalOnTab("preferences");
         _applyEncryptionSettingsUI();
         flash("Encryption disabled. Budget data is now stored in plaintext.", "success");
       } catch (e) {
