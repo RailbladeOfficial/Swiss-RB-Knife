@@ -1037,3 +1037,176 @@ button:hover {
 .backup-reminder-modal {
   width: min(420px, 92vw);
 }
+
+/* =============================================================================
+   SETUP MODAL — shared tabbed list-editor chrome
+   -----------------------------------------------------------------------------
+   Promoted out of budget.css so Budget, Time Tracker, and the Theme Editor can
+   all share one definition rather than forking three copies. Every rule body
+   here is the exact look Budget shipped — moving it verbatim keeps the modals
+   pixel-identical. Tools scope their tab-switching querySelectorAll to their
+   own modal id (e.g. "#budgetSetupModal .setup-tab") so the shared class name
+   never cross-wires one modal's tabs to another's.
+
+   Budget keeps its own .budget-summary-tab (a different UI region — the
+   summary panel's tab strip) and .budget-setup-item-budget-badge
+   (Expectation/Threshold text, a budget-only concept) locally.
+============================================================================= */
+
+.setup-modal {
+  width: 720px;
+  max-width: 92vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.setup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.setup-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.setup-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color var(--hover-transition), border-color var(--hover-transition);
+  margin-bottom: -1px;
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  letter-spacing: 0.05em;
+  /* Grow to share the tab bar evenly so any tab count fills the modal width
+     (3 tabs in Time Tracker, 5 in Budget) rather than bunching to the left.
+     nowrap keeps long uppercase labels (e.g. "EXPENSE CATEGORIES") on one
+     line — without it, flex shrink lets them wrap and push the bar taller. */
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+
+.setup-tab:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+.setup-tab.active {
+  color: var(--color-btn) !important;
+  border-bottom-color: var(--color-btn) !important;
+  background: transparent !important;
+}
+
+.setup-tab-pane {
+  min-height: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.setup-new-btn {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.setup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setup-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--hover-transition);
+}
+
+.setup-item:hover {
+  background: var(--color-hover);
+}
+
+.setup-item.setup-item-retired {
+  opacity: 0.7;
+}
+
+.setup-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: inherit;
+  /* Explicit so it never inherits the modal's centered text-align if the
+     shared .setup-body rule is ever missing/overridden. */
+  text-align: left;
+}
+
+.setup-item-retired-badge {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+.setup-item-chevron {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setup-field label {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.setup-field input,
+.setup-field select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.setup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.setup-preferences-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

@@ -3807,16 +3807,16 @@ function buildSimpleItemRow(
   item: SimpleEntity,
 ): HTMLElement {
   const row = document.createElement("div");
-  row.className = "budget-setup-item";
-  if (item.status === "retired") row.classList.add("budget-setup-item-retired");
+  row.className = "setup-item";
+  if (item.status === "retired") row.classList.add("setup-item-retired");
 
   // Col 1: name (+ inline retired badge so it doesn't break column flow)
   const nameSpan = document.createElement("span");
-  nameSpan.className = "budget-setup-item-name";
+  nameSpan.className = "setup-item-name";
   nameSpan.textContent = item.name;
   if (item.status === "retired") {
     const retiredBadge = document.createElement("span");
-    retiredBadge.className = "budget-setup-item-retired-badge";
+    retiredBadge.className = "setup-item-retired-badge";
     retiredBadge.textContent = "Retired";
     retiredBadge.style.marginLeft = "8px";
     nameSpan.appendChild(retiredBadge);
@@ -3824,7 +3824,8 @@ function buildSimpleItemRow(
   row.appendChild(nameSpan);
 
   // Col 2: budget badge — always rendered so bars left-align consistently;
-  // empty when no expectation/threshold is set for this item.
+  // empty when no expectation/threshold is set for this item. Budget-only
+  // concept, so this class stays local to budget.css.
   const badge = document.createElement("span");
   badge.className = "budget-setup-item-budget-badge";
   const badgeText = buildBudgetBadgeText(kind, item);
@@ -3832,7 +3833,7 @@ function buildSimpleItemRow(
   row.appendChild(badge);
 
   const chevron = document.createElement("span");
-  chevron.className = "budget-setup-item-chevron";
+  chevron.className = "setup-item-chevron";
   chevron.textContent = "›";
   row.appendChild(chevron);
 
@@ -4858,7 +4859,7 @@ let activeSetupTab: SetupTab = "sources";
 function activateSetupTab(tab: SetupTab): void {
   activeSetupTab = tab;
   document
-    .querySelectorAll<HTMLButtonElement>("#budgetSetupModal .budget-tab")
+    .querySelectorAll<HTMLButtonElement>("#budgetSetupModal .setup-tab")
     .forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.budgetTab === tab);
     });
@@ -4932,7 +4933,7 @@ function getSetupModal(): Modal {
     });
 
     document
-      .querySelectorAll<HTMLButtonElement>("#budgetSetupModal .budget-tab")
+      .querySelectorAll<HTMLButtonElement>("#budgetSetupModal .setup-tab")
       .forEach((btn) => {
         btn.addEventListener("click", () =>
           activateSetupTab(btn.dataset.budgetTab as SetupTab),

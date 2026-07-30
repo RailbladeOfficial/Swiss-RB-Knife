@@ -580,12 +580,8 @@
   flex-shrink: 0;
 }
 
-/* Budget settings tab — reuse settings-row style from shell.css */
-.budget-preferences-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+/* Budget's Preferences tab list wrapper is the shared .setup-preferences-list
+   (shell.css) now. */
 
 /* Toggle inside a form field (Autopay, Cleared) */
 .budget-setup-field-row {
@@ -867,15 +863,19 @@ span.entry-col-category:not(.entry-field) {
 }
 
 /* =============================================================================
-   SETUP MODAL — shared chrome
-   Visually mirrors .te-tabs/.te-tab/.te-tab-pane (theme editor) but under new
-   class names — the theme editor wires its tab-switching with an unscoped
-   document.querySelectorAll(".te-tab"), which would otherwise pick these up
-   and fight over .active state.
+   SETUP MODAL — budget-specific bits
+   -----------------------------------------------------------------------------
+   The shared tabbed list-editor chrome (.setup-body, .setup-tabs, .setup-tab,
+   .setup-tab-pane, .setup-list, .setup-item*, .setup-new-btn, .setup-form,
+   .setup-field, .setup-actions) now lives in shell.css and is used directly by
+   the Budget Setup modal markup. Only genuinely budget-specific rules remain
+   here: modal sizing, the summary-panel tab strip, and form-field quirks tied
+   to the bill recurrence editor.
 ============================================================================= */
 
 .budget-setup-modal {
-  width: 640px;
+  width: 720px;
+  max-width: 92vw;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -895,26 +895,9 @@ span.entry-col-category:not(.entry-field) {
   flex-direction: column;
 }
 
-.budget-setup-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 0;
-  overflow-y: auto;
-  text-align: left;
-}
-
-.budget-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--color-border);
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-/* Shared "underline tab" idiom — was duplicated in full as .budget-tab
-   (Setup modal tabs) and .budget-summary-tab (summary panel tabs). Base
-   look + hover/active are common; only sizing/layout differ per context. */
-.budget-tab,
+/* Summary panel's own tab strip — a different UI region from the Setup modal,
+   so it keeps its own rule rather than sharing .setup-tab. Same underline
+   idiom, different sizing (equal-width, centered, smaller). */
 .budget-summary-tab {
   background: transparent;
   border: none;
@@ -925,28 +908,6 @@ span.entry-col-category:not(.entry-field) {
   text-transform: uppercase;
   transition: color var(--hover-transition), border-color var(--hover-transition);
   margin-bottom: -1px;
-}
-
-.budget-tab:hover,
-.budget-summary-tab:hover {
-  color: var(--color-text);
-  background: transparent;
-}
-
-.budget-tab.active,
-.budget-summary-tab.active {
-  color: var(--color-btn);
-  border-bottom-color: var(--color-btn);
-  background: transparent;
-}
-
-.budget-tab {
-  font-size: 0.8rem;
-  padding: 6px 14px;
-  letter-spacing: 0.05em;
-}
-
-.budget-summary-tab {
   flex: 1 1 0;
   min-width: 0;
   font-size: 0.75rem;
@@ -955,14 +916,20 @@ span.entry-col-category:not(.entry-field) {
   text-align: center;
 }
 
-.budget-tab-pane {
-  min-height: 0;
-  max-height: 60vh;
-  overflow-y: auto;
+.budget-summary-tab:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+.budget-summary-tab.active {
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+  background: transparent;
 }
 
 /* =============================================================================
-   SIMPLE LISTS — Categories / Income Sources / Descriptions
+   SIMPLE LISTS — budget-specific list extras
+   (row layout/item chrome is shared via .setup-list/.setup-item* in shell.css)
 ============================================================================= */
 
 .budget-setup-add-row {
@@ -973,35 +940,6 @@ span.entry-col-category:not(.entry-field) {
 
 .budget-setup-add-row input {
   flex: 1;
-}
-
-.budget-setup-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.budget-setup-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 8px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-}
-
-.budget-setup-item.budget-setup-item-retired {
-  opacity: 0.7;
-}
-
-.budget-setup-item-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .budget-setup-status-btn {
@@ -1043,11 +981,6 @@ span.entry-col-category:not(.entry-field) {
    RECURRING BILLS — clickable list rows
    Each row opens the Bill Editor modal (item 12) instead of expanding inline.
 ============================================================================= */
-
-.budget-setup-new-btn {
-  width: 100%;
-  margin-bottom: 8px;
-}
 
 .budget-setup-bill-list {
   display: flex;
@@ -1331,30 +1264,13 @@ span.entry-col-category:not(.entry-field) {
 }
 
 /* =============================================================================
-   SIMPLE ITEM ROWS — clickable (Income Sources / Categories / Expense Sources)
-   Inline editing removed; click opens the item editor modal instead.
+   SIMPLE ITEM ROWS — budget-specific badge only
+   -----------------------------------------------------------------------------
+   The clickable row itself (.setup-item + hover + cursor), the name column,
+   the retired badge, and the chevron are all shared now (shell.css). The one
+   budget-only piece is the Expectation/Threshold badge that sits as the second
+   flex:1 column between the name and the chevron.
 ============================================================================= */
-
-.budget-setup-item {
-  cursor: pointer;
-  transition: background var(--hover-transition);
-}
-
-.budget-setup-item:hover {
-  background: var(--color-hover);
-}
-
-/* Two-column layout: name (left col) | budget badge (right col) | chevron.
-   Both columns are flex:1 so they each occupy half the available space,
-   giving the badge a consistent left-edge alignment regardless of name length. */
-.budget-setup-item-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: inherit;
-}
 
 /* Expectation/Threshold text — flex:1 column, same weight/size as the name
    but faded so it reads as secondary. Left-aligned within its column. */
@@ -1368,22 +1284,4 @@ span.entry-col-category:not(.entry-field) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* "Retired" badge shown inline on retired items */
-.budget-setup-item-retired-badge {
-  flex-shrink: 0;
-  font-size: 0.7rem;
-  opacity: 0.7;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 1px 7px;
-}
-
-/* Chevron arrow on the right */
-.budget-setup-item-chevron {
-  flex-shrink: 0;
-  font-size: 1.1rem;
-  color: var(--color-text-muted);
-  line-height: 1;
 }

@@ -891,9 +891,11 @@ document.querySelectorAll<HTMLElement>(".te-label-text").forEach((text) => {
   });
 });
 
-// Theme editor tab switching
+// Theme editor tab switching. Scoped to #themeEditorModal because .setup-tab
+// is now shared across Budget/Time Tracker/Theme Editor — an unscoped query
+// would toggle every tool's tabs at once.
 function teActivateTab(tab: "general" | "advanced"): void {
-  document.querySelectorAll<HTMLElement>(".te-tab").forEach((btn) => {
+  document.querySelectorAll<HTMLElement>("#themeEditorModal .setup-tab").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.teTab === tab);
   });
   const general = document.getElementById("teTabGeneral")!;
@@ -902,7 +904,7 @@ function teActivateTab(tab: "general" | "advanced"): void {
   advanced.style.display = tab === "advanced" ? "" : "none";
 }
 
-document.querySelectorAll<HTMLElement>(".te-tab").forEach((btn) => {
+document.querySelectorAll<HTMLElement>("#themeEditorModal .setup-tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     const tab = btn.dataset.teTab as "general" | "advanced";
     if (tab) teActivateTab(tab);

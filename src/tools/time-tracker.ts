@@ -35,6 +35,14 @@ type Entry = {
   activity: string;
 };
 
+// A separate {id, name, status} list — same shape/spirit as Budget's
+// SimpleEntity — powering the Activity field's autocomplete (Phase 3) and the
+// Setup modal's Activities tab. Entries above keep storing `activity` as free
+// text; this list never rewrites history, it just remembers names that have
+// been used so they can be suggested/managed.
+type ActivityStatus = "active" | "retired";
+type Activity = { id: string; name: string; status: ActivityStatus };
+
 // TT-specific settings — shell owns fontScale, theme, hour12 at the app level,
 // but TT reads them back from disk so its render/format functions still work.
 type TTSettings = {
@@ -57,10 +65,15 @@ type TTSettings = {
 ============================================================================= */
 
 let entries: Entry[] = [];
+let activities: Activity[] = [];
 let lastActivity = "";
 let selectedDate: string = today();
 let viewStart: string = today();
 let viewEnd: string = today();
+
+function makeId(): string {
+  return crypto.randomUUID();
+}
 
 let settings: TTSettings = {
   fontScale: 0,
@@ -305,10 +318,13 @@ function saveSettings(): void {
     // TT's settings live in TT's OWN file (time-tracker-settings.json) —
     // settings.json belongs to the shell alone. Only the keys this tool
     // owns are written; shell-owned display prefs (fontScale, theme,
-    // hour12, americanDates) are read-only here.
+    // hour12, americanDates) are read-only here. Activities ride along in
+    // this same file — they're TT-owned user data, and keeping them out of
+    // the entries data file (save_data) avoids reshaping that atomic blob.
     const own = {
       quickDelete: settings.quickDelete,
       payPeriod: settings.payPeriod,
+      activities: activities,
     };
     try {
       await invoke("save_tool_settings", {
@@ -341,12 +357,15 @@ async function loadSettings(): Promise<void> {
     const own = JSON.parse(ownRaw || "{}");
     const hasOwnFile =
       own && typeof own === "object" &&
-      ("quickDelete" in own || "payPeriod" in own);
+      ("quickDelete" in own || "payPeriod" in own || "activities" in own);
 
     if (hasOwnFile) {
       if (typeof own.quickDelete === "boolean") settings.quickDelete = own.quickDelete;
       if (own.payPeriod && typeof own.payPeriod === "object") {
         settings.payPeriod = { ...settings.payPeriod, ...own.payPeriod };
+      }
+      if (Array.isArray(own.activities)) {
+        activities = own.activities.filter(isValidActivity);
       }
     } else if ("quickDelete" in shared || "payPeriod" in shared) {
       // Legacy keys found in settings.json and no own-file yet: migrate.
@@ -357,6 +376,17 @@ async function loadSettings(): Promise<void> {
   } catch (err) {
     devError("Settings load failed:", err);
   }
+}
+
+function isValidActivity(a: unknown): a is Activity {
+  return (
+    a !== null &&
+    typeof a === "object" &&
+    typeof (a as Activity).id === "string" &&
+    typeof (a as Activity).name === "string" &&
+    (a as Activity).name.length > 0 &&
+    ((a as Activity).status === "active" || (a as Activity).status === "retired")
+  );
 }
 
 /* =============================================================================
@@ -575,6 +605,142 @@ function updateDurationPreview(
  * Only needed for user-entered text (activity names); generated dates/times
  * can't contain either hazard, but passing them through is harmless.
  */
+/* =============================================================================
+   STATS COMPUTATION
+   -----------------------------------------------------------------------------
+   Shared by the Stats pane (renderStats) and the CSV export so the two can
+   never disagree. Operates on whatever slice of entries the caller passes in
+   — always the currently-visible (view-filtered) set — so the numbers track
+   the active view mode exactly like the Totals pane does.
+============================================================================= */
+
+type Stat = { label: string; value: string };
+
+function computeStats(visible: Entry[]): Stat[] {
+  if (visible.length === 0) return [];
+
+  const totalEntries = visible.length;
+  const totalMins = visible.reduce(
+    (sum, e) => sum + (parseTime(e.end) - parseTime(e.start)),
+    0,
+  );
+  const avgPerActivity = Math.round(totalMins / totalEntries);
+
+  // Group by activity name (case-insensitive), same convention render() and
+  // exportCSV() use for the Totals summary.
+  const byActivity = new Map<string, { display: string; count: number; mins: number }>();
+  visible.forEach((e) => {
+    const key = e.activity.toLowerCase();
+    const g = byActivity.get(key) ?? { display: e.activity, count: 0, mins: 0 };
+    g.count += 1;
+    g.mins += parseTime(e.end) - parseTime(e.start);
+    byActivity.set(key, g);
+  });
+
+  let mostEntries = { display: "", count: 0 };
+  let highestTime = { display: "", mins: 0 };
+  let highestAvg = { display: "", mins: 0 };
+  byActivity.forEach((g) => {
+    if (g.count > mostEntries.count) mostEntries = { display: g.display, count: g.count };
+    if (g.mins > highestTime.mins) highestTime = { display: g.display, mins: g.mins };
+    const avg = g.mins / g.count;
+    if (avg > highestAvg.mins) highestAvg = { display: g.display, mins: avg };
+  });
+
+  // Single entry with the highest duration.
+  let longestEntry = visible[0]!;
+  let longestMins = parseTime(longestEntry.end) - parseTime(longestEntry.start);
+  visible.forEach((e) => {
+    const mins = parseTime(e.end) - parseTime(e.start);
+    if (mins > longestMins) { longestEntry = e; longestMins = mins; }
+  });
+
+  // Earliest start / latest finish, compared by time-of-day (mod 1440) so an
+  // overnight entry's inflated end value (e.g. 25:30 for a 1:30am finish)
+  // still ranks and displays correctly against same-day times.
+  let earliestEntry = visible[0]!;
+  let earliestMins = parseTime(earliestEntry.start) % 1440;
+  let latestEntry = visible[0]!;
+  let latestMins = parseTime(latestEntry.end) % 1440;
+  visible.forEach((e) => {
+    const sMins = parseTime(e.start) % 1440;
+    if (sMins < earliestMins) { earliestEntry = e; earliestMins = sMins; }
+    const eMins = parseTime(e.end) % 1440;
+    if (eMins > latestMins) { latestEntry = e; latestMins = eMins; }
+  });
+
+  // Per-date grouping — "craziest" (most entries) and "busiest" (most time).
+  const byDate = new Map<string, { count: number; mins: number }>();
+  visible.forEach((e) => {
+    const g = byDate.get(e.date) ?? { count: 0, mins: 0 };
+    g.count += 1;
+    g.mins += parseTime(e.end) - parseTime(e.start);
+    byDate.set(e.date, g);
+  });
+
+  let craziestDate = "";
+  let craziestCount = 0;
+  let busiestDate = "";
+  let busiestMins = 0;
+  byDate.forEach((g, date) => {
+    if (g.count > craziestCount) { craziestCount = g.count; craziestDate = date; }
+    if (g.mins > busiestMins) { busiestMins = g.mins; busiestDate = date; }
+  });
+
+  const avgEntriesPerDay = totalEntries / byDate.size;
+
+  return [
+    {
+      label: "Total Activities Logged",
+      value: `${totalEntries} ${totalEntries === 1 ? "activity" : "activities"}`,
+    },
+    {
+      label: "Unique Activities Tracked",
+      value: `${byActivity.size} ${byActivity.size === 1 ? "activity" : "activities"}`,
+    },
+    {
+      label: "Average Time per Activity",
+      value: `${formatMinutes(avgPerActivity)} per activity`,
+    },
+    {
+      label: "Activity with Most Entries",
+      value: `${mostEntries.display} (${mostEntries.count} ${mostEntries.count === 1 ? "entry" : "entries"})`,
+    },
+    {
+      label: "Activity with Highest Time",
+      value: `${highestTime.display} (${formatMinutes(highestTime.mins)})`,
+    },
+    {
+      label: "Activity with Highest Average Time",
+      value: `${highestAvg.display} (${formatMinutes(Math.round(highestAvg.mins))})`,
+    },
+    {
+      label: "Entry with Highest Time",
+      value: `${longestEntry.activity} on ${formatDate(longestEntry.date)} (${formatMinutes(longestMins)})`,
+    },
+    {
+      label: "Earliest Start",
+      value: `${formatTime(minsToTimeString(earliestMins))} on ${formatDate(earliestEntry.date)} (${earliestEntry.activity})`,
+    },
+    {
+      label: "Latest Finish",
+      value: `${formatTime(minsToTimeString(latestMins))} on ${formatDate(latestEntry.date)} (${latestEntry.activity})`,
+    },
+    {
+      label: "Craziest Day",
+      value: `${formatDate(craziestDate)} (${craziestCount} ${craziestCount === 1 ? "entry" : "entries"})`,
+    },
+    {
+      label: "Busiest Day",
+      value: `${formatDate(busiestDate)} (${formatMinutes(busiestMins)})`,
+    },
+    {
+      label: "Avg Entries per Day",
+      value: `${avgEntriesPerDay.toFixed(1)} entries/day`,
+    },
+  ];
+}
+
 function csvField(value: string): string {
   let v = value;
   if (/^[=+\-@\t]/.test(v)) v = "'" + v;
@@ -646,6 +812,13 @@ async function exportCSV(): Promise<void> {
   lines.push(`"TOTAL","${formatMinutes(grandTotal)}"`);
   lines.push("");
 
+  lines.push("STATS");
+  lines.push("Stat,Value");
+  computeStats(visibleEntries).forEach((s) => {
+    lines.push(`${csvField(s.label)},${csvField(s.value)}`);
+  });
+  lines.push("");
+
   lines.push("ENTRIES");
   lines.push("Date,Start,End,Activity,Duration");
   visibleEntries
@@ -678,6 +851,7 @@ function render(
   entriesDiv: HTMLElement,
   dayTotalDiv: HTMLElement,
   groupTotalsDiv: HTMLElement,
+  statsDiv: HTMLElement,
 ): void {
   entriesDiv.innerHTML = "";
   groupTotalsDiv.innerHTML = "";
@@ -736,7 +910,7 @@ function render(
       activitySpan.textContent = entry.activity;
       activitySpan.title = "Double-click to edit";
       activitySpan.addEventListener("dblclick", () =>
-        makeEditable(activitySpan, entry, "activity", entriesDiv, dayTotalDiv, groupTotalsDiv),
+        makeEditable(activitySpan, entry, "activity", entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv),
       );
       row.appendChild(activitySpan);
 
@@ -745,7 +919,7 @@ function render(
       startSpan.textContent = formatTime(entry.start);
       startSpan.title = "Double-click to edit";
       startSpan.addEventListener("dblclick", () =>
-        makeEditable(startSpan, entry, "start", entriesDiv, dayTotalDiv, groupTotalsDiv),
+        makeEditable(startSpan, entry, "start", entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv),
       );
       row.appendChild(startSpan);
 
@@ -754,7 +928,7 @@ function render(
       endSpan.textContent = formatTime(entry.end);
       endSpan.title = "Double-click to edit";
       endSpan.addEventListener("dblclick", () =>
-        makeEditable(endSpan, entry, "end", entriesDiv, dayTotalDiv, groupTotalsDiv),
+        makeEditable(endSpan, entry, "end", entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv),
       );
       row.appendChild(endSpan);
 
@@ -783,11 +957,11 @@ function render(
             saveToDisk();
             flash("Date updated", "success");
           }
-          render(entriesDiv, dayTotalDiv, groupTotalsDiv);
+          render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
         }
 
         dateInput.addEventListener("change", commitDate);
-        dateInput.addEventListener("blur", () => render(entriesDiv, dayTotalDiv, groupTotalsDiv));
+        dateInput.addEventListener("blur", () => render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv));
       });
       row.appendChild(calBtn);
 
@@ -795,7 +969,7 @@ function render(
       deleteBtn.textContent = "🗑️";
       deleteBtn.className = "entry-delete-btn";
       deleteBtn.addEventListener("click", () =>
-        deleteEntry(entryIndex, entriesDiv, dayTotalDiv, groupTotalsDiv),
+        deleteEntry(entryIndex, entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv),
       );
       row.appendChild(deleteBtn);
 
@@ -812,6 +986,42 @@ function render(
       d.textContent = `${groupedDisplay[key]}: ${formatMinutes(mins)}`;
       groupTotalsDiv.appendChild(d);
     });
+
+  renderStats(statsDiv, visible);
+}
+
+/* =============================================================================
+   STATS PANE
+============================================================================= */
+
+function renderStats(statsDiv: HTMLElement, visible: Entry[]): void {
+  statsDiv.innerHTML = "";
+  const stats = computeStats(visible);
+
+  if (stats.length === 0) {
+    const p = document.createElement("p");
+    p.className = "placeholder-text";
+    p.textContent = "No entries in this view yet.";
+    statsDiv.appendChild(p);
+    return;
+  }
+
+  stats.forEach((stat) => {
+    const row = document.createElement("div");
+    row.className = "stat-row";
+
+    const label = document.createElement("span");
+    label.className = "stat-label";
+    label.textContent = stat.label;
+    row.appendChild(label);
+
+    const value = document.createElement("span");
+    value.className = "stat-value";
+    value.textContent = stat.value;
+    row.appendChild(value);
+
+    statsDiv.appendChild(row);
+  });
 }
 
 /* =============================================================================
@@ -825,6 +1035,7 @@ function makeEditable(
   entriesDiv: HTMLElement,
   dayTotalDiv: HTMLElement,
   groupTotalsDiv: HTMLElement,
+  statsDiv: HTMLElement,
 ): void {
   const original = span.textContent || "";
 
@@ -846,6 +1057,9 @@ function makeEditable(
       entry[field] = normalizeTime(raw) || original;
     } else {
       entry[field] = raw;
+      // Inline-editing the activity name should register it for autocomplete
+      // too, same as adding a fresh entry.
+      if (field === "activity") findOrCreateActivity(raw);
     }
 
     let startMins = parseTime(entry.start);
@@ -854,13 +1068,13 @@ function makeEditable(
     entry.end = minsToTimeString(endMins);
 
     sortEntries();
-    render(entriesDiv, dayTotalDiv, groupTotalsDiv);
+    render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
     saveToDisk();
     flash("Entry edited", "success");
   }
 
   function cancel() {
-    render(entriesDiv, dayTotalDiv, groupTotalsDiv);
+    render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
     flash("Edit discarded", "error");
   }
 
@@ -897,6 +1111,7 @@ async function addEntry(
   entriesDiv: HTMLElement,
   dayTotalDiv: HTMLElement,
   groupTotalsDiv: HTMLElement,
+  statsDiv: HTMLElement,
   durationPreview: HTMLElement,
 ): Promise<void> {
   let startMins = parseTime(normalizeTime(start));
@@ -912,8 +1127,11 @@ async function addEntry(
 
   sortEntries();
   lastActivity = activity;
+  // Remember this activity name for autocomplete — silent quick-add, mirrors
+  // Budget calling findOrCreateExpenseSource on entry commit.
+  findOrCreateActivity(activity);
 
-  render(entriesDiv, dayTotalDiv, groupTotalsDiv);
+  render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
   await saveToDisk();
   flash("Entry added", "success");
 
@@ -930,15 +1148,390 @@ async function deleteEntry(
   entriesDiv: HTMLElement,
   dayTotalDiv: HTMLElement,
   groupTotalsDiv: HTMLElement,
+  statsDiv: HTMLElement,
 ): Promise<void> {
   if (settings.quickDelete) {
     entries.splice(index, 1);
-    render(entriesDiv, dayTotalDiv, groupTotalsDiv);
+    render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
     await saveToDisk();
     flash("Entry deleted", "success");
   } else {
     openDeleteModal(index);
   }
+}
+
+/* =============================================================================
+   ACTIVITIES — SETUP LIST + AUTOCOMPLETE SOURCE
+   -----------------------------------------------------------------------------
+   Mirrors Budget's Expense Sources: a {id,name,status} list managed in the
+   Setup modal, used to populate the Activity field's datalist (Phase 3).
+============================================================================= */
+
+/**
+ * Silent quick-add used from the main entry form (typed Activity text, or an
+ * inline activity edit). Matches an existing ACTIVE activity case-insensitively
+ * and does nothing if found; otherwise creates a new active one. No toast, no
+ * reactivation of retired items — mirrors Budget's findOrCreate (active-only)
+ * as opposed to the explicit addOrReactivate path used by the Setup button.
+ */
+function findOrCreateActivity(name: string): void {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const existing = activities.find(
+    (a) => a.status === "active" && a.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (existing) return;
+  activities.push({ id: makeId(), name: trimmed, status: "active" });
+  saveSettings();
+  refreshActivityDatalist();
+  renderActivitiesList();
+}
+
+/**
+ * Explicit add from the Setup modal's "+ New Activity" button. Reactivates a
+ * matching retired activity instead of creating a duplicate. Mirrors Budget's
+ * addOrReactivateSimple.
+ */
+function addOrReactivateActivity(name: string): void {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+
+  const existing = activities.find(
+    (a) => a.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  const wasReactivated = !!existing && existing.status === "retired";
+  if (existing) {
+    existing.status = "active";
+  } else {
+    activities.push({ id: makeId(), name: trimmed, status: "active" });
+  }
+
+  flash(wasReactivated ? "Activity reactivated" : "Activity added", "success");
+  saveSettings();
+  refreshActivityDatalist();
+  renderActivitiesList();
+}
+
+/**
+ * Repopulates the Activity field's <datalist> from active activities.
+ * No-op until Phase 3 adds the datalist element — safe to call now.
+ */
+function refreshActivityDatalist(): void {
+  const datalist = document.getElementById("ttActivityList") as HTMLDataListElement | null;
+  if (!datalist) return;
+  datalist.innerHTML = "";
+  activities
+    .filter((a) => a.status === "active")
+    .map((a) => a.name)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((name) => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      datalist.appendChild(opt);
+    });
+}
+
+function buildActivityRow(item: Activity): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "setup-item";
+  if (item.status === "retired") row.classList.add("setup-item-retired");
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "setup-item-name";
+  nameSpan.textContent = item.name;
+  if (item.status === "retired") {
+    const retiredBadge = document.createElement("span");
+    retiredBadge.className = "setup-item-retired-badge";
+    retiredBadge.textContent = "Retired";
+    retiredBadge.style.marginLeft = "8px";
+    nameSpan.appendChild(retiredBadge);
+  }
+  row.appendChild(nameSpan);
+
+  const chevron = document.createElement("span");
+  chevron.className = "setup-item-chevron";
+  chevron.textContent = "›";
+  row.appendChild(chevron);
+
+  row.style.cursor = "pointer";
+  row.addEventListener("click", () => openActivityEdit(item));
+  return row;
+}
+
+function renderActivitiesList(): void {
+  const container = document.getElementById("ttActivitiesList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (activities.length === 0) {
+    const p = document.createElement("p");
+    p.className = "placeholder-text";
+    p.textContent = "No activities yet — add one above.";
+    container.appendChild(p);
+    return;
+  }
+
+  [...activities]
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "active" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    })
+    .forEach((item) => container.appendChild(buildActivityRow(item)));
+}
+
+/* =============================================================================
+   MODAL — TT SETUP (Projects / Activities / Preferences tabs)
+   -----------------------------------------------------------------------------
+   Module-level (like Budget's getSetupModal) so the Activity Add/Edit/Delete
+   modals can reopen Setup on the Activities tab after their actions.
+============================================================================= */
+
+type TTSetupTab = "projects" | "activities" | "preferences";
+let ttActiveSetupTab: TTSetupTab = "projects";
+let ttSetupModal: Modal | null = null;
+const _ttSetupPanesToReset = new Set<string>();
+
+// Set by initTimeTracker so module-level code (activity rename/delete, which
+// mutate entries) can re-render the ledger without threading DOM refs out here.
+let renderCurrentView: () => void = () => {};
+
+function activateTTSetupTab(tab: TTSetupTab): void {
+  ttActiveSetupTab = tab;
+  document
+    .querySelectorAll<HTMLButtonElement>("#ttSettingsModal .setup-tab")
+    .forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.ttTab === tab);
+    });
+
+  const paneIds: Record<TTSetupTab, string> = {
+    projects: "ttTabProjects",
+    activities: "ttTabActivities",
+    preferences: "ttTabPreferences",
+  };
+
+  for (const [key, id] of Object.entries(paneIds)) {
+    const pane = document.getElementById(id)!;
+    const isActive = key === tab;
+    pane.style.display = isActive ? "" : "none";
+    if (isActive && _ttSetupPanesToReset.has(id)) {
+      pane.scrollTop = 0;
+      _ttSetupPanesToReset.delete(id);
+    }
+  }
+}
+
+function openTTSetupOnTab(tab?: TTSetupTab): void {
+  if (tab) ttActiveSetupTab = tab;
+  getTTSetupModal().open();
+}
+
+function getTTSetupModal(): Modal {
+  if (!ttSetupModal) {
+    ttSetupModal = new Modal(document.getElementById("ttSettingsBackdrop")!, {
+      closeOnEsc: true,
+      onOpen: () => {
+        activateTTSetupTab(ttActiveSetupTab);
+        renderActivitiesList();
+        applyTTSettings();
+      },
+      onClosed: () => {
+        _ttSetupPanesToReset.add("ttTabProjects");
+        _ttSetupPanesToReset.add("ttTabActivities");
+        _ttSetupPanesToReset.add("ttTabPreferences");
+      },
+    });
+
+    document
+      .querySelectorAll<HTMLButtonElement>("#ttSettingsModal .setup-tab")
+      .forEach((btn) => {
+        btn.addEventListener("click", () =>
+          activateTTSetupTab(btn.dataset.ttTab as TTSetupTab),
+        );
+      });
+
+    document.getElementById("ttSettingsClose")!.addEventListener("click", () => ttSetupModal!.close());
+  }
+  return ttSetupModal;
+}
+
+/* =============================================================================
+   MODAL — ACTIVITY ADD / EDIT (fully independent, mirrors Budget's simple
+   source/category modals)
+============================================================================= */
+
+let ttActivityAddModal: Modal | null = null;
+let ttActivityEditModal: Modal | null = null;
+let ttActivityEditItem: Activity | null = null;
+
+function getActivityAddModal(): Modal {
+  if (!ttActivityAddModal) {
+    const nameInput = document.getElementById("ttActivityAddName") as HTMLInputElement;
+
+    ttActivityAddModal = new Modal(document.getElementById("ttActivityAddBackdrop")!, {
+      closeOnEsc: true,
+      onOpen: () => setTimeout(() => nameInput.focus(), 50),
+    });
+
+    function goBack() { ttActivityAddModal!.close(); openTTSetupOnTab("activities"); }
+    function doSave() {
+      const name = nameInput.value.trim();
+      if (!name) { flash("Name cannot be empty", "error"); return; }
+      addOrReactivateActivity(name);
+      ttActivityAddModal!.close();
+      openTTSetupOnTab("activities");
+    }
+
+    document.getElementById("ttActivityAddBack")!.addEventListener("click", goBack);
+    document.getElementById("ttActivityAddClose")!.addEventListener("click", () => ttActivityAddModal!.close());
+    document.getElementById("ttActivityAddCancel")!.addEventListener("click", goBack);
+    document.getElementById("ttActivityAddSave")!.addEventListener("click", doSave);
+    nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doSave(); } });
+  }
+  return ttActivityAddModal;
+}
+
+function openActivityAdd(): void {
+  getTTSetupModal().close();
+  (document.getElementById("ttActivityAddName") as HTMLInputElement).value = "";
+  getActivityAddModal().open();
+}
+
+function getActivityEditModal(): Modal {
+  if (!ttActivityEditModal) {
+    const nameInput = document.getElementById("ttActivityEditName") as HTMLInputElement;
+    const retireBtn = document.getElementById("ttActivityEditRetire") as HTMLButtonElement;
+    const deleteBtn = document.getElementById("ttActivityEditDelete") as HTMLButtonElement;
+
+    ttActivityEditModal = new Modal(document.getElementById("ttActivityEditBackdrop")!, {
+      closeOnEsc: true,
+      onOpen: () => setTimeout(() => nameInput.focus(), 50),
+      onClosed: () => { ttActivityEditItem = null; },
+    });
+
+    function goBack() { ttActivityEditModal!.close(); openTTSetupOnTab("activities"); }
+    function doSave() {
+      if (!ttActivityEditItem) return;
+      const name = nameInput.value.trim();
+      if (!name) { flash("Name cannot be empty", "error"); return; }
+      const oldName = ttActivityEditItem.name;
+      ttActivityEditItem.name = name;
+      // Entries store the activity as a free-text name (not an id), so a rename
+      // must rewrite every matching entry to keep history in sync. Match
+      // case-insensitively but write the new canonical casing.
+      if (oldName.toLowerCase() !== name.toLowerCase()) {
+        let changed = 0;
+        entries.forEach((e) => {
+          if (e.activity.toLowerCase() === oldName.toLowerCase()) {
+            e.activity = name;
+            changed++;
+          }
+        });
+        if (changed > 0) saveToDisk();
+      }
+      saveSettings();
+      refreshActivityDatalist();
+      renderCurrentView();
+      flash("Activity saved", "success");
+      goBack();
+    }
+
+    document.getElementById("ttActivityEditBack")!.addEventListener("click", goBack);
+    document.getElementById("ttActivityEditClose")!.addEventListener("click", () => ttActivityEditModal!.close());
+    document.getElementById("ttActivityEditCancel")!.addEventListener("click", goBack);
+    document.getElementById("ttActivityEditSave")!.addEventListener("click", doSave);
+    nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doSave(); } });
+
+    retireBtn.addEventListener("click", () => {
+      if (!ttActivityEditItem) return;
+      ttActivityEditItem.status = ttActivityEditItem.status === "active" ? "retired" : "active";
+      saveSettings();
+      refreshActivityDatalist();
+      flash(ttActivityEditItem.status === "retired" ? "Activity retired" : "Activity reactivated", "success");
+      goBack();
+    });
+
+    deleteBtn.addEventListener("click", () => {
+      if (!ttActivityEditItem) return;
+      const item = ttActivityEditItem;
+      ttActivityEditModal!.close();
+      openTTSetupDelete(item.id, item.name);
+    });
+  }
+  return ttActivityEditModal;
+}
+
+function openActivityEdit(item: Activity): void {
+  ttActivityEditItem = item;
+  getTTSetupModal().close();
+  getActivityEditModal(); // ensure wired
+  (document.getElementById("ttActivityEditName") as HTMLInputElement).value = item.name;
+  const retireBtn = document.getElementById("ttActivityEditRetire") as HTMLButtonElement;
+  const deleteBtn = document.getElementById("ttActivityEditDelete") as HTMLButtonElement;
+  retireBtn.textContent = item.status === "active" ? "Retire" : "Reactivate";
+  deleteBtn.style.display = item.status === "retired" ? "" : "none";
+  getActivityEditModal().open();
+}
+
+/* =============================================================================
+   MODAL — TT SETUP DELETE CONFIRM
+   Only reachable for an already-retired Activity (Delete is hidden until an
+   item is retired — mirrors Budget's setup delete flow).
+============================================================================= */
+
+let ttSetupDeleteModal: Modal | null = null;
+let pendingActivityDelete: { id: string; name: string } | null = null;
+
+function getTTSetupDeleteModal(): Modal {
+  if (!ttSetupDeleteModal) {
+    ttSetupDeleteModal = new Modal(document.getElementById("ttSetupDeleteBackdrop")!, {
+      closeOnEsc: true,
+      onClosed: () => { pendingActivityDelete = null; },
+    });
+
+    document.getElementById("ttSetupDeleteConfirmBtn")!.addEventListener("click", () => {
+      if (!pendingActivityDelete) return;
+      const { id, name } = pendingActivityDelete;
+      activities = activities.filter((a) => a.id !== id);
+      // Entries store the name, not an id — so orphaned entries would keep a
+      // name that no longer exists in the list. Reassign them to "Unknown"
+      // (the delete confirm already warned how many are affected). This is
+      // why Retire exists: it preserves the name on history without deletion.
+      let changed = 0;
+      entries.forEach((e) => {
+        if (e.activity.toLowerCase() === name.toLowerCase()) {
+          e.activity = "Unknown";
+          changed++;
+        }
+      });
+      pendingActivityDelete = null;
+      if (changed > 0) { saveToDisk(); renderCurrentView(); }
+      saveSettings();
+      refreshActivityDatalist();
+      ttSetupDeleteModal!.close();
+      openTTSetupOnTab("activities");
+      flash("Activity deleted", "success");
+    });
+
+    document.getElementById("ttSetupDeleteCancelBtn")!.addEventListener("click", () => {
+      pendingActivityDelete = null;
+      ttSetupDeleteModal!.close();
+      openTTSetupOnTab("activities");
+    });
+  }
+  return ttSetupDeleteModal;
+}
+
+function openTTSetupDelete(id: string, name: string): void {
+  pendingActivityDelete = { id, name };
+  const impactCount = entries.filter(
+    (e) => e.activity.toLowerCase() === name.toLowerCase(),
+  ).length;
+  const impactNote = impactCount > 0
+    ? ` ${impactCount} logged ${impactCount === 1 ? "entry" : "entries"} will be reassigned to "Unknown".`
+    : "";
+  document.getElementById("ttSetupDeleteMessage")!.textContent =
+    `Permanently delete "${name}"?${impactNote} This can't be undone.`;
+  getTTSetupDeleteModal().open();
 }
 
 /* =============================================================================
@@ -985,6 +1578,7 @@ function applyPreset(
   entriesDiv: HTMLElement,
   dayTotalDiv: HTMLElement,
   groupTotalsDiv: HTMLElement,
+  statsDiv: HTMLElement,
 ): void {
   const range = getPresetRange(preset);
   viewStart = range.start;
@@ -996,7 +1590,7 @@ function applyPreset(
     btn.classList.toggle("active", (btn as HTMLElement).dataset.preset === preset);
   });
 
-  render(entriesDiv, dayTotalDiv, groupTotalsDiv);
+  render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
 }
 
 function syncActivePreset(): void {
@@ -1042,10 +1636,11 @@ export function initTimeTracker(): void {
   const entriesDiv      = document.getElementById("entries")!;
   const dayTotalDiv     = document.getElementById("dayTotal")!;
   const groupTotalsDiv  = document.getElementById("groupTotals")!;
+  const statsDiv        = document.getElementById("statsPanel")!;
   const durationPreview = document.getElementById("durationPreview")!;
   // Convenience wrappers so inner functions don't have to pass DOM refs everywhere
   function doRender() {
-    render(entriesDiv, dayTotalDiv, groupTotalsDiv);
+    render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
   }
   function doSaveDraft() {
     saveDraft(datePicker, activityInput, startInput, endInput, quickInput);
@@ -1054,8 +1649,11 @@ export function initTimeTracker(): void {
     updateDurationPreview(startInput, endInput, durationPreview);
   }
   function doApplyPreset(preset: string) {
-    applyPreset(preset, viewStartInput, viewEndInput, entriesDiv, dayTotalDiv, groupTotalsDiv);
+    applyPreset(preset, viewStartInput, viewEndInput, entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
   }
+  // Module-level activity rename/delete mutate entries and need to refresh the
+  // ledger; expose doRender to them without leaking DOM refs out of init.
+  renderCurrentView = doRender;
 
   /* -------------------------------------------------------------------------
      EVENT LISTENERS — INPUT PANEL
@@ -1070,7 +1668,7 @@ export function initTimeTracker(): void {
     await addEntry(
       start, end, activity,
       datePicker, activityInput, startInput, endInput, quickInput,
-      entriesDiv, dayTotalDiv, groupTotalsDiv, durationPreview,
+      entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv, durationPreview,
     );
   });
 
@@ -1126,7 +1724,7 @@ export function initTimeTracker(): void {
     addEntry(
       start, end, activity,
       datePicker, activityInput, startInput, endInput, quickInput,
-      entriesDiv, dayTotalDiv, groupTotalsDiv, durationPreview,
+      entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv, durationPreview,
     );
     quickInput.value = "";
   });
@@ -1239,24 +1837,13 @@ export function initTimeTracker(): void {
   });
 
   /* -------------------------------------------------------------------------
-     EVENT LISTENERS — TT SETTINGS MODAL
+     EVENT LISTENERS — TT SETUP MODAL
+     Modal instantiation/tabs/Reset live at module level (getTTSetupModal) so
+     the Activity Add/Edit modals can reopen Setup on the Activities tab.
   -------------------------------------------------------------------------- */
 
-  const ttSettingsModal = new Modal(document.getElementById("ttSettingsBackdrop")!, {
-    closeOnEsc: true,
-  });
-
-  document.getElementById("ttSetupBtn")!.addEventListener("click", () => ttSettingsModal.open());
-  document.getElementById("ttSettingsClose")!.addEventListener("click", () => ttSettingsModal.close());
-
-  document.getElementById("ttSettingsReset")!.addEventListener("click", () => {
-    settings.quickDelete = false;
-    settings.payPeriod = { enabled: false, anchorDate: "", lengthDays: 14 };
-    applyTTSettings();
-    doRender();
-    saveSettings();
-    flash("Time Tracker settings reset", "success");
-  });
+  document.getElementById("ttSetupBtn")!.addEventListener("click", () => openTTSetupOnTab("projects"));
+  document.getElementById("ttActivityNewBtn")!.addEventListener("click", openActivityAdd);
 
   /* -------------------------------------------------------------------------
      EVENT LISTENERS — TT-OWNED MODALS (delete confirm only)
@@ -1289,6 +1876,10 @@ export function initTimeTracker(): void {
     } else {
       selectedDate = datePicker.value;
     }
+    // Activities are loaded by loadSettings(); reflect them in the Setup list
+    // and the autocomplete source now that they're in memory.
+    renderActivitiesList();
+    refreshActivityDatalist();
     doApplyPreset("today");
   });
 }

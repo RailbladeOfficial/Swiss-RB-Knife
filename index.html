@@ -545,13 +545,13 @@
               </svg>
             </button>
             <span class="tool-view-title">Time Tracker</span>
-            <button id="ttSetupBtn" class="tool-view-header-action" title="Time Tracker settings: quick delete, pay period">Setup</button>
+            <button id="ttSetupBtn" class="tool-view-header-action" title="Time Tracker setup: projects, activities, preferences">Setup</button>
           </div>
 
           <div class="panel input-panel">
             <div class="inputs">
               <input type="date" id="datePicker" autocomplete="off" tabindex="1" />
-              <input id="activity" placeholder="Activity" autocomplete="off" tabindex="2" />
+              <input id="activity" placeholder="Activity" autocomplete="off" list="ttActivityList" tabindex="2" />
               <button id="addBtn" tabindex="7">Add</button>
               <button id="clearBtn" class="danger-btn" tabindex="8">Clear</button>
             </div>
@@ -572,6 +572,7 @@
               <div class="label">Smart Entry</div>
               <input id="quickInput" placeholder="9:00-10:30 emails" autocomplete="off" tabindex="9" />
             </div>
+            <datalist id="ttActivityList"></datalist>
           </div>
 
           <div class="panel controls-panel">
@@ -610,9 +611,17 @@
           </div>
 
           <div class="panel totals-panel">
-            <div class="totals">
-              <div id="dayTotal"></div>
-              <div id="groupTotals"></div>
+            <div class="totals-columns">
+              <div class="totals-col">
+                <div class="totals">
+                  <div id="dayTotal"></div>
+                  <div id="groupTotals"></div>
+                </div>
+              </div>
+              <div class="totals-col totals-col-stats">
+                <div class="totals-col-header">Stats</div>
+                <div id="statsPanel" class="stats-list"></div>
+              </div>
             </div>
           </div>
 
@@ -2528,9 +2537,8 @@
        TIME TRACKER — SETTINGS MODAL
   ====================================================================== -->
   <div id="ttSettingsBackdrop" class="modal-backdrop" style="display: none;">
-    <div id="ttSettingsModal" class="modal">
+    <div id="ttSettingsModal" class="modal setup-modal">
       <div class="modal-header">
-        <button id="ttSettingsReset" class="modal-header-left">Reset</button>
         <span>Time Tracker Setup</span>
         <button id="ttSettingsClose" class="modal-close-btn modal-header-right">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -2539,44 +2547,146 @@
           </svg>
         </button>
       </div>
-      <div class="settings-section">
+      <div class="modal-body setup-body">
 
-        <div class="settings-row">
-          <span>Quick Delete:</span>
-          <div class="toggle-with-label">
-            <span id="quickDeleteLabel">Off</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="quickDeleteToggle" />
-              <span class="toggle-slider"></span>
-            </label>
+        <div class="setup-tabs">
+          <button class="setup-tab active" data-tt-tab="projects">Projects</button>
+          <button class="setup-tab" data-tt-tab="activities">Activities</button>
+          <button class="setup-tab" data-tt-tab="preferences">Preferences</button>
+        </div>
+
+        <!-- PROJECTS -->
+        <div id="ttTabProjects" class="setup-tab-pane">
+          <p class="placeholder-text">Projects are coming soon. This will let you group activities together for higher-level reporting.</p>
+        </div>
+
+        <!-- ACTIVITIES -->
+        <div id="ttTabActivities" class="setup-tab-pane" style="display:none;">
+          <button id="ttActivityNewBtn" class="setup-new-btn">+ New Activity</button>
+          <div id="ttActivitiesList" class="setup-list"></div>
+        </div>
+
+        <!-- PREFERENCES -->
+        <div id="ttTabPreferences" class="setup-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <span>Quick Delete:</span>
+              <div class="toggle-with-label">
+                <span id="quickDeleteLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="quickDeleteToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span>Pay Period:</span>
+              <div class="toggle-with-label">
+                <span id="payPeriodLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="payPeriodToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div id="payPeriodSubsettings" class="subsettings">
+              <div class="settings-row">
+                <span>Anchor Date:</span>
+                <input type="date" id="payPeriodAnchor" />
+              </div>
+              <div class="settings-row">
+                <span>Period Length:</span>
+                <select id="payPeriodLength">
+                  <option value="7">7 days</option>
+                  <option value="14" selected>14 days</option>
+                </select>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <div class="settings-row">
-          <span>Pay Period:</span>
-          <div class="toggle-with-label">
-            <span id="payPeriodLabel">Off</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="payPeriodToggle" />
-              <span class="toggle-slider"></span>
-            </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       TIME TRACKER — ADD ACTIVITY
+  ====================================================================== -->
+  <div id="ttActivityAddBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <button id="ttActivityAddBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Add Activity</span>
+        <button id="ttActivityAddClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label>Name</label>
+            <input id="ttActivityAddName" type="text" autocomplete="off" />
+          </div>
+          <div class="setup-actions">
+            <button id="ttActivityAddSave">Add</button>
+            <button id="ttActivityAddCancel" class="modal-cancel-btn">Cancel</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <div id="payPeriodSubsettings" class="subsettings">
-          <div class="settings-row">
-            <span>Anchor Date:</span>
-            <input type="date" id="payPeriodAnchor" />
+  <!-- =====================================================================
+       TIME TRACKER — EDIT ACTIVITY
+  ====================================================================== -->
+  <div id="ttActivityEditBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <button id="ttActivityEditBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Edit Activity</span>
+        <button id="ttActivityEditClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label>Name</label>
+            <input id="ttActivityEditName" type="text" autocomplete="off" />
           </div>
-          <div class="settings-row">
-            <span>Period Length:</span>
-            <select id="payPeriodLength">
-              <option value="7">7 days</option>
-              <option value="14" selected>14 days</option>
-            </select>
+          <div class="setup-actions">
+            <button id="ttActivityEditSave">Save</button>
+            <button id="ttActivityEditRetire" class="modal-cancel-btn">Retire</button>
+            <button id="ttActivityEditDelete" class="danger-btn" style="display:none;">Delete Permanently</button>
+            <button id="ttActivityEditCancel" class="modal-cancel-btn">Cancel</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
 
+  <!-- =====================================================================
+       TIME TRACKER — SETUP DELETE CONFIRM (Activities today; Projects later)
+  ====================================================================== -->
+  <div id="ttSetupDeleteBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Delete Permanently</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="ttSetupDeleteMessage">Permanently delete this item? This can't be undone.</p>
+        <div class="exit-modal-actions">
+          <button id="ttSetupDeleteConfirmBtn" class="danger-btn">Delete</button>
+          <button id="ttSetupDeleteCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2617,43 +2727,43 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body">
+      <div class="modal-body setup-body">
 
-        <div class="budget-tabs">
-          <button class="budget-tab active" data-budget-tab="sources">Income Sources</button>
-          <button class="budget-tab" data-budget-tab="bills">Recurring Bills</button>
-          <button class="budget-tab" data-budget-tab="categories">Expense Categories</button>
-          <button class="budget-tab" data-budget-tab="expenseSources">Expense Sources</button>
-          <button class="budget-tab" data-budget-tab="preferences">Preferences</button>
+        <div class="setup-tabs">
+          <button class="setup-tab active" data-budget-tab="sources">Income Sources</button>
+          <button class="setup-tab" data-budget-tab="bills">Recurring Bills</button>
+          <button class="setup-tab" data-budget-tab="categories">Expense Categories</button>
+          <button class="setup-tab" data-budget-tab="expenseSources">Expense Sources</button>
+          <button class="setup-tab" data-budget-tab="preferences">Preferences</button>
         </div>
 
         <!-- INCOME SOURCES -->
-        <div id="budgetTabSources" class="budget-tab-pane">
-          <button id="budgetSourceNewBtn" class="budget-setup-new-btn">+ New Income Source</button>
-          <div id="budgetSourcesList" class="budget-setup-list"></div>
+        <div id="budgetTabSources" class="setup-tab-pane">
+          <button id="budgetSourceNewBtn" class="setup-new-btn">+ New Income Source</button>
+          <div id="budgetSourcesList" class="setup-list"></div>
         </div>
 
         <!-- RECURRING BILLS -->
-        <div id="budgetTabBills" class="budget-tab-pane" style="display:none;">
-          <button id="budgetBillNewBtn" class="budget-setup-new-btn">+ New Recurring Bill</button>
+        <div id="budgetTabBills" class="setup-tab-pane" style="display:none;">
+          <button id="budgetBillNewBtn" class="setup-new-btn">+ New Recurring Bill</button>
           <div id="budgetBillsList" class="budget-setup-bill-list"></div>
         </div>
 
         <!-- CATEGORIES -->
-        <div id="budgetTabCategories" class="budget-tab-pane" style="display:none;">
-          <button id="budgetCategoryNewBtn" class="budget-setup-new-btn">+ New Expense Category</button>
-          <div id="budgetCategoriesList" class="budget-setup-list"></div>
+        <div id="budgetTabCategories" class="setup-tab-pane" style="display:none;">
+          <button id="budgetCategoryNewBtn" class="setup-new-btn">+ New Expense Category</button>
+          <div id="budgetCategoriesList" class="setup-list"></div>
         </div>
 
         <!-- EXPENSE SOURCES -->
-        <div id="budgetTabExpenseSources" class="budget-tab-pane" style="display:none;">
-          <button id="budgetExpenseSourceNewBtn" class="budget-setup-new-btn">+ New Expense Source</button>
-          <div id="budgetExpenseSourcesList" class="budget-setup-list"></div>
+        <div id="budgetTabExpenseSources" class="setup-tab-pane" style="display:none;">
+          <button id="budgetExpenseSourceNewBtn" class="setup-new-btn">+ New Expense Source</button>
+          <div id="budgetExpenseSourcesList" class="setup-list"></div>
         </div>
 
         <!-- BUDGET SETTINGS -->
-        <div id="budgetTabPreferences" class="budget-tab-pane" style="display:none;">
-          <div class="budget-preferences-list">
+        <div id="budgetTabPreferences" class="setup-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
             <div class="settings-row">
               <span>Quick Delete Entries</span>
               <div class="toggle-with-label">
@@ -2877,7 +2987,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body" style="text-align:left;">
+      <div class="modal-body setup-body" style="text-align:left;">
         <div class="budget-setup-form">
           <div class="budget-setup-field">
             <label>Name</label>
@@ -2920,7 +3030,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body" style="text-align:left;">
+      <div class="modal-body setup-body" style="text-align:left;">
         <div class="budget-setup-form">
           <div class="budget-setup-field">
             <label>Name</label>
@@ -2965,7 +3075,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body" style="text-align:left;">
+      <div class="modal-body setup-body" style="text-align:left;">
         <div class="budget-setup-form">
           <div class="budget-setup-field">
             <label>Name</label>
@@ -3024,7 +3134,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body" style="text-align:left;">
+      <div class="modal-body setup-body" style="text-align:left;">
         <div class="budget-setup-form">
           <div class="budget-setup-field">
             <label>Name</label>
@@ -3085,7 +3195,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body" style="text-align:left;">
+      <div class="modal-body setup-body" style="text-align:left;">
         <div class="budget-setup-form">
           <div class="budget-setup-field">
             <label>Name</label>
@@ -3144,7 +3254,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body" style="text-align:left;">
+      <div class="modal-body setup-body" style="text-align:left;">
         <div class="budget-setup-form">
           <div class="budget-setup-field">
             <label>Name</label>
@@ -3208,7 +3318,7 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body">
+      <div class="modal-body setup-body">
         <p id="budgetBillActionSubtitle" class="placeholder-text"></p>
         <!-- Read-only bill details (type, recurrence, pay method, etc.) -->
         <div id="budgetBillActionDetails" class="budget-bill-action-details"></div>
@@ -3284,7 +3394,7 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body budget-setup-body">
+      <div class="modal-body setup-body">
         <div class="budget-setup-form">
           <!-- Name spans full width -->
           <div class="budget-setup-field">
@@ -3857,9 +3967,9 @@
         </div>
 
         <!-- Tab bar -->
-        <div class="te-tabs">
-          <button class="te-tab active" data-te-tab="general">General</button>
-          <button class="te-tab" data-te-tab="advanced">Advanced</button>
+        <div class="setup-tabs">
+          <button class="setup-tab active" data-te-tab="general">General</button>
+          <button class="setup-tab" data-te-tab="advanced">Advanced</button>
         </div>
 
         <!-- GENERAL TAB — color swatches -->

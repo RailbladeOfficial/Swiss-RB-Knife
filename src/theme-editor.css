@@ -4,6 +4,7 @@
    Split out of shell.css (Tier 6). Mirrors theme-editor.ts.
 ============================================================================= */
 
+/* =============================================================================
    THEME EDITOR MODAL
 ============================================================================= */
 
@@ -70,41 +71,13 @@
   min-height: 0;
 }
 
-/* Tab bar */
-.te-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--color-border);
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.te-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 6px 14px;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition:
-    color var(--hover-transition),
-    border-color var(--hover-transition);
-  margin-bottom: -1px;
-}
-
-.te-tab:hover {
-  color: var(--color-text);
-  background: transparent;
-}
-
-.te-tab.active {
-  color: var(--color-btn);
-  border-bottom-color: var(--color-btn);
-  background: transparent;
-}
+/* Tab bar chrome is the shared .setup-tabs/.setup-tab (shell.css) now — same
+   as Budget's and Time Tracker's Setup modals. theme-editor.ts scopes its
+   querySelectorAll to "#themeEditorModal .setup-tab" so it only toggles its
+   own two tabs. Only the tab PANE keeps a local rule: unlike the Setup modal
+   panes (which scroll themselves via max-height + overflow-y), this pane needs
+   flex:1/min-height:0 so its .te-groups child does the scrolling instead — a
+   real behavioural difference, not duplication. */
 
 /* Tab pane — each tab's scrollable content area */
 .te-tab-pane {

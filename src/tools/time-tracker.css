@@ -221,6 +221,66 @@
 }
 
 /* =============================================================================
+   TOTALS PANEL — two-column layout (Totals | Stats)
+============================================================================= */
+
+.totals-columns {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  /* Wrap instead of forcing horizontal page-scroll on narrow windows, same
+     rationale as .time-fields above. */
+  flex-wrap: wrap;
+}
+
+.totals-col {
+  flex: 1;
+  min-width: 220px;
+}
+
+.totals-col-stats {
+  border-left: 1px solid var(--color-border);
+  padding-left: 14px;
+}
+
+.totals-col-header {
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin-bottom: 8px;
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.85rem;
+  padding: 3px 0;
+}
+
+.stat-label {
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.stat-value {
+  text-align: right;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =============================================================================
    ENTRIES LIST  (Time Tracker specific — column layout only)
    -----------------------------------------------------------------------------
    Shared ledger row primitives (.entries-header-row, .entry-date-subheader,
