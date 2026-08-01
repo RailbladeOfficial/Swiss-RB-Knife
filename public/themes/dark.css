@@ -9,11 +9,13 @@
   --color-hover:               #2a2a2a;
 
   --color-btn:                 #404040;
+  --color-accent:              #d1d5db;
   --color-btn-hover:           #525252;
   --color-btn-text:            #e5e7eb;
 
   --color-danger:              #b91c1c;
   --color-danger-subtle:       rgba(185, 28, 28, 0.1);
+  --color-success:             #374151;
 
   --color-accent-input:        #6366f1;
   --color-accent-view:         #0d9488;
@@ -57,42 +59,42 @@
 /* ── Tool / section header — very subtle, near-black ── */
 .tool-view-header,
 .section-header {
-  background: #1a1a1a !important;
-  border-bottom-color: #2a2a2a !important;
+  background: #1a1a1a;
+  border-bottom-color: #2a2a2a;
 }
 
 .tool-view-title,
 .section-title {
-  color: #d1d5db !important;
+  color: #d1d5db;
   opacity: 0.9;
 }
 
 /* ── Modal — solid: near-black panel ── */
 body.solid-modals .modal {
-  background: #141414 !important;
-  border-color: #2a2a2a !important;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6) !important;
+  background: #141414;
+  border-color: #2a2a2a;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
 /* ── Modal — translucent: deep frosted black ── */
 body:not(.solid-modals) .modal {
-  background: rgba(20, 20, 20, 0.25) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-color: rgba(42, 42, 42, 0.6) !important;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6) !important;
+  background: rgba(20, 20, 20, 0.25);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-color: rgba(42, 42, 42, 0.6);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
 /* ── Primary button ── */
 .primary-btn {
-  background: #404040 !important;
-  border-color: #525252 !important;
-  color: #e5e7eb !important;
+  background: #404040;
+  border-color: #525252;
+  color: #e5e7eb;
 }
 
 .primary-btn:hover {
-  background: #525252 !important;
-  border-color: #6b7280 !important;
+  background: #525252;
+  border-color: #6b7280;
 }
 
 /* ── Image CCR panels ── */
@@ -101,44 +103,44 @@ body:not(.solid-modals) .modal {
 }
 
 #media-tool-image-ccr .result-panel {
-  border-left: 3px solid #0d9488 !important;
+  border-left: 3px solid #0d9488;
 }
 
 /* ── Tab buttons ── */
 .tab-btn {
-  color: var(--color-text-muted) !important;
-  border-color: transparent !important;
-  background: transparent !important;
+  color: var(--color-text-muted);
+  border-color: transparent;
+  background: transparent;
 }
 
 .tab-btn:hover {
-  color: #d1d5db !important;
-  border-color: #3a3a3a !important;
-  background: #2a2a2a !important;
-  box-shadow: none !important;
+  color: #d1d5db;
+  border-color: #3a3a3a;
+  background: #2a2a2a;
+  box-shadow: none;
 }
 
 .tab-btn.active {
-  color: #e5e7eb !important;
-  border-color: #525252 !important;
-  background: #333333 !important;
-  box-shadow: none !important;
+  color: #e5e7eb;
+  border-color: #525252;
+  background: #333333;
+  box-shadow: none;
 }
 
 /* ── Dir buttons ── */
 .dir-btn.active, .prv-btn.active {
-  color: #e5e7eb !important;
-  border-color: #525252 !important;
-  background: #333333 !important;
+  color: #e5e7eb;
+  border-color: #525252;
+  background: #333333;
 }
 
 /* ── Slider ── */
-.slider-val   { color: #d1d5db !important; }
-.estimate-val { color: #d1d5db !important; }
+.slider-val   { color: #d1d5db; }
+.estimate-val { color: #d1d5db; }
 
 /* ── Preview card accents ── */
-.preview-card.anchor-card { border-color: #6366f1 !important; }
-.preview-card.drag-target  { border-color: #0d9488 !important; }
+.preview-card.anchor-card { border-color: #6366f1; }
+.preview-card.drag-target  { border-color: #0d9488; }
 
 
 /* ── Update-notifier accents ──
@@ -178,9 +180,9 @@ body:not(.solid-modals) .modal {
 /* View-mode toggle active — indigo accent (was missing; a grey fill wouldn't
    read as "selected" in an all-grey theme). */
 .budget-view-mode-btn.active {
-  background: #6366f1 !important;
-  color: #ffffff !important;
-  border-color: #6366f1 !important;
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
 }
 
 /* Stats table values */

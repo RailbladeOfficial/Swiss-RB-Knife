@@ -17,13 +17,11 @@
   font-weight: bold;
   color: var(--color-text-muted);
   min-width: 100px;
+  height: 38px;
   text-align: center;
   letter-spacing: 0.05em;
   opacity: 0;
   transition: opacity 0.2s ease;
-  margin-bottom: 30px;
-  margin-left: 15px;
-  margin-right: 15px;
 }
 
 #durationPreview.visible {
@@ -143,15 +141,76 @@
 }
 
 /* =============================================================================
+   INPUT PANEL — LAYOUT
+   -----------------------------------------------------------------------------
+   The form flows top-to-bottom as a single logical sequence: what/when (date +
+   activity) → time range → notes → smart entry shortcut → submit actions.
+   Each row is spaced with a consistent gap on .input-panel itself rather than
+   per-row margins, so the rhythm stays even regardless of which rows are
+   present.
+============================================================================= */
+
+.input-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tt-form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tt-field-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.tt-field input,
+.tt-field textarea {
+  box-sizing: border-box;
+}
+
+.tt-field-date {
+  width: 160px;
+  max-width: 100%;
+}
+
+.tt-field-date input {
+  width: 100%;
+}
+
+.tt-field-activity {
+  flex: 1;
+  min-width: 200px;
+}
+
+.tt-field-activity input {
+  width: 100%;
+}
+
+/* =============================================================================
    INPUT PANEL — TIME FIELDS
 ============================================================================= */
 
 .time-fields {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 16px;
   /* Wrap instead of forcing horizontal page-scroll when the panel is too
-     narrow to hold both 250px fields + the duration preview on one line
+     narrow to hold both time fields + the duration preview on one line
      (e.g. 800px window with the sidebar expanded). On wider layouts nothing
      wraps, so the row looks exactly as before. */
   flex-wrap: wrap;
@@ -160,42 +219,55 @@
 .time-field {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  /* Allow the column to shrink below its input's 250px so the max-width:100%
-     on the input can engage in the rare case a single field is still wider
-     than the available line. */
+  gap: 4px;
+  /* Allow the column to shrink below its input's natural width so
+     max-width:100% on the input can engage in the rare case a single field
+     is still wider than the available line. */
   min-width: 0;
 }
 
+.time-field-input-row {
+  display: flex;
+  gap: 6px;
+}
+
 .time-field input {
-  width: 250px;
+  width: 160px;
   max-width: 100%;
   box-sizing: border-box;
 }
 
-.time-field button {
-  width: 125px;
-  max-width: 100%;
-  box-sizing: border-box;
+/* Same look as .tt-add-btn (the base themed button) — just narrower, since
+   "Now" is a short label. */
+.tt-now-btn {
+  flex-shrink: 0;
 }
 
 /* =============================================================================
-   SMART ENTRY
+   NOTES FIELD
 ============================================================================= */
 
-.smart-entry {
-  margin-top: 6px;
-  padding: 10px;
-  border: 1px dashed var(--color-border-dashed);
-  border-radius: 10px;
-  background: var(--color-bg);
+.notes-field textarea {
+  width: 100%;
+  max-width: 100%;
+  resize: vertical;
 }
 
-.smart-entry .label {
-  font-size: 0.7rem;
-  opacity: 0.7;
-  margin-bottom: 6px;
+/* =============================================================================
+   FORM ACTIONS
+============================================================================= */
+
+.tt-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+.tt-add-btn {
+  padding: 6px 18px;
+  font-weight: 600;
 }
 
 /* =============================================================================
@@ -346,6 +418,24 @@
   white-space: nowrap;
 }
 
+.entry-col-notes {
+  flex: 1;
+  min-width: 0;
+  opacity: 0.7;
+  font-size: 0.85rem;
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: default;
+  padding: 2px 4px;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+
+.entry-col-notes:hover {
+  background: var(--color-hover);
+}
+
 /* =============================================================================
    SETTINGS — TIME TRACKER SPECIFIC
    (The collapsible .subsettings primitive used here lives in shell.css, since
@@ -361,5 +451,86 @@
   border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
+}
+
+/* =============================================================================
+   EDIT NOTES MODAL — CONTEXT SUBLINE
+============================================================================= */
+
+.tt-notes-edit-context {
+  margin: -10px 0 16px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* =============================================================================
+   SETTINGS — LABEL + STATUS BADGE ROW
+   Same look as Budget's encryption row (.budget-encrypt-label-col /
+   .budget-encrypt-status-badge in budget.css) — duplicated here rather than
+   shared across tool stylesheets to keep each tool's CSS self-contained.
+============================================================================= */
+
+.tt-settings-label-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tt-settings-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+/* =============================================================================
+   CSV IMPORT MODAL
+============================================================================= */
+
+.tt-csv-import-last {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  margin: 4px 0 14px;
+}
+
+.tt-csv-import-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tt-csv-import-filename {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tt-csv-import-result {
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.tt-csv-import-result.success {
+  background: var(--color-toast-success-bg);
+  border: 1px solid var(--color-toast-success-border);
+  color: var(--color-toast-success-text);
+}
+
+.tt-csv-import-result.error {
+  background: var(--color-toast-error-bg);
+  border: 1px solid var(--color-toast-error-border);
+  color: var(--color-toast-error-text);
 }
 

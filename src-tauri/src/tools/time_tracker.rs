@@ -55,8 +55,21 @@ pub fn save_draft(app: tauri::AppHandle, data: String) -> Result<(), String> {
 pub fn load_draft(app: tauri::AppHandle) -> Result<String, String> {
     match fs::read_to_string(crate::get_data_path(&app, "draft.json")) {
         Ok(content) => Ok(content),
-        Err(_) => Ok(r#"{"activity":"","start":"","end":"","quick":""}"#.to_string()),
+        Err(_) => Ok(r#"{"activity":"","start":"","end":"","notes":""}"#.to_string()),
     }
+}
+
+/* =============================================================================
+   CSV IMPORT
+============================================================================= */
+
+/// Reads the contents of a user-selected CSV file. The path comes from the
+/// OS-native file picker (plugin-dialog on the frontend), so no additional
+/// validation is needed here beyond what fs::read_to_string already gives —
+/// same trust boundary as the path-taking commands in the other tools.
+#[tauri::command]
+pub fn import_csv(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).map_err(|e| format!("Could not read file: {e}"))
 }
 
 /* =============================================================================

@@ -24,9 +24,11 @@ export const RANDOM_VARS = [
   "--color-hover",
   "--color-btn",
   "--color-btn-hover",
+  "--color-accent",
   "--color-btn-text",
   "--color-danger",
   "--color-danger-subtle",
+  "--color-success",
   "--color-accent-input",
   "--color-accent-view",
   "--color-accent-totals",
@@ -102,6 +104,13 @@ export function generateRandomPalette(): Record<string, string> {
     : hslToHex(baseHue, rInt(10, 25), rInt(82, 90));
   const btn = hslToHex(accentHue, rInt(65, 100), rInt(40, 60));
   const btnHover = hslToHex(accentHue, rInt(65, 100), rInt(30, 48));
+  // The bright highlight accent (active tabs, section titles, slider values):
+  // a same-hue shade of the button colour — lighter on dark themes, darker on
+  // light themes — mirroring how the static themes relate --color-accent to
+  // --color-btn (e.g. default #60a5fa vs #2563eb; light #1e40af vs #3b82f6).
+  const accent = isDark
+    ? hslToHex(accentHue, rInt(70, 95), rInt(62, 74))
+    : hslToHex(accentHue, rInt(70, 95), rInt(28, 40));
   const btnText = isDark ? "#ffffff" : "#111111";
   const danger = hslToHex(dangerHue, rInt(70, 100), rInt(45, 60));
   const dangerSub = hslToHex(dangerHue, rInt(70, 100), rInt(45, 60)) + "26";
@@ -170,9 +179,11 @@ export function generateRandomPalette(): Record<string, string> {
     "--color-hover": hover,
     "--color-btn": btn,
     "--color-btn-hover": btnHover,
+    "--color-accent": accent,
     "--color-btn-text": btnText,
     "--color-danger": danger,
     "--color-danger-subtle": dangerSub,
+    "--color-success": tSBord,
     "--color-accent-input": acIn,
     "--color-accent-view": acView,
     "--color-accent-totals": acTot,
@@ -206,9 +217,11 @@ export function generateChaoticPalette(): Record<string, string> {
     "--color-hover": rHex(),
     "--color-btn": rHex(),
     "--color-btn-hover": rHex(),
+    "--color-accent": rHex(),
     "--color-btn-text": rHex(),
     "--color-danger": rHex(),
     "--color-danger-subtle": rHex(),
+    "--color-success": rHex(),
     "--color-accent-input": rHex(),
     "--color-accent-view": rHex(),
     "--color-accent-totals": rHex(),
@@ -249,149 +262,15 @@ export function applyPalette(palette: Record<string, string>): void {
   window.dispatchEvent(new CustomEvent("themechange"));
 }
 
-/** Injects a <style> tag that overrides styles hardcoded in default.css with
- *  !important, making them respond to the random palette. Covers: modals,
- *  tool/section headers and titles, tab buttons, dir/prv buttons, slider vals. */
-export function applyRandomModalStyles(palette: Record<string, string>): void {
-  const panel = palette["--color-panel"] ?? "#0f172a";
-  const border = palette["--color-border"] ?? "#1f2937";
-  const btn = palette["--color-btn"] ?? "#2563eb";
-  const textMuted = palette["--color-text-muted"] ?? "#9ca3af";
-  const inputBg = palette["--color-input-bg"] ?? "#111827";
-  const text = palette["--color-text"] ?? "#e5e7eb";
-
-  // Panel → rgba components for translucent modal
-  const r = parseInt(panel.slice(1, 3), 16);
-  const g = parseInt(panel.slice(3, 5), 16);
-  const b = parseInt(panel.slice(5, 7), 16);
-  // Border → rgba components for translucent modal border
-  const br = parseInt(border.slice(1, 3), 16);
-  const bg2 = parseInt(border.slice(3, 5), 16);
-  const bb = parseInt(border.slice(5, 7), 16);
-  // Btn → rgba components for header gradient and tab tints
-  const btnR = parseInt(btn.slice(1, 3), 16);
-  const btnG = parseInt(btn.slice(3, 5), 16);
-  const btnB = parseInt(btn.slice(5, 7), 16);
-  const btnText = palette["--color-btn-text"] ?? "#ffffff";
-
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  const isDark = luminance < 0.5;
-
-  const translucentBg = `rgba(${r}, ${g}, ${b}, ${isDark ? "0.25" : "0.45"})`;
-  const translucentBorder = `rgba(${br}, ${bg2}, ${bb}, 0.6)`;
-  const headerGradient = `linear-gradient(90deg, rgba(${btnR}, ${btnG}, ${btnB}, 0.12), rgba(${btnR}, ${btnG}, ${btnB}, 0.04))`;
-  const headerBorderColor = `rgba(${btnR}, ${btnG}, ${btnB}, 0.3)`;
-  const tabActiveBg = `rgba(${btnR}, ${btnG}, ${btnB}, 0.12)`;
-  const tabActiveHoverBg = `rgba(${btnR}, ${btnG}, ${btnB}, 0.08)`;
-  const tabActiveHoverBorder = `rgba(${btnR}, ${btnG}, ${btnB}, 0.4)`;
-  const tabActiveBorder = `rgba(${btnR}, ${btnG}, ${btnB}, 0.5)`;
-
-  const solidRule = `
-    body.solid-modals .modal {
-      background: ${panel} !important;
-      border-color: ${border} !important;
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
-    }`;
-  const translucentRule = `
-    body:not(.solid-modals) .modal {
-      background: ${translucentBg} !important;
-      border-color: ${translucentBorder} !important;
-      backdrop-filter: blur(24px) !important;
-      -webkit-backdrop-filter: blur(24px) !important;
-    }`;
-  // Overrides the hardcoded blue gradient + #60a5fa title color in default.css
-  const headerRule = `
-    .tool-view-header, .section-header {
-      background: ${headerGradient} !important;
-      border-bottom-color: ${headerBorderColor} !important;
-      box-shadow: none !important;
-    }
-    .tool-view-title, .section-title {
-      color: ${btn} !important;
-      text-shadow: none !important;
-      opacity: 1 !important;
-    }`;
-  // Overrides hardcoded #60a5fa on tab/dir buttons and slider labels in default.css
-  const controlsRule = `
-    .tab-btn {
-      color: ${textMuted} !important;
-      border-color: transparent !important;
-      background: transparent !important;
-    }
-    .tab-btn:hover {
-      color: ${btn} !important;
-      border-color: ${tabActiveHoverBorder} !important;
-      background: ${tabActiveHoverBg} !important;
-      box-shadow: none !important;
-    }
-    .tab-btn.active {
-      color: ${btn} !important;
-      border-color: ${tabActiveBorder} !important;
-      background: ${tabActiveBg} !important;
-      box-shadow: none !important;
-    }
-    .dir-btn, .prv-btn {
-      background: ${inputBg} !important;
-      color: ${textMuted} !important;
-      border-color: ${border} !important;
-      box-shadow: none !important;
-    }
-    .dir-btn:hover, .prv-btn:hover {
-      color: ${text} !important;
-      border-color: ${btn} !important;
-      background: ${inputBg} !important;
-      box-shadow: none !important;
-    }
-    .dir-btn.active, .prv-btn.active {
-      color: ${btn} !important;
-      border-color: ${btn} !important;
-      background: ${tabActiveBg} !important;
-      box-shadow: none !important;
-    }
-    .slider-val, .estimate-val {
-      color: ${btn} !important;
-    }
-    .preview-card.anchor-card { border-color: ${btn} !important; }
-    .preview-card.drag-target  { border-color: ${btn} !important; }`;
-
-  // Newer budget accents (summary-tab active, view-mode toggle, annual-stats
-  // title) are hardcoded to default.css's blue and aren't touched by the rules
-  // above — so under random/custom they'd stay blue no matter the palette.
-  // Re-point them at the palette's button colour. Semantic status colours
-  // (good/late/overdue count badges) are intentionally left alone.
-  const budgetRule = `
-    .budget-summary-tab.active {
-      color: ${btn} !important;
-      background: ${tabActiveBg} !important;
-      border-bottom-color: ${btn} !important;
-      text-shadow: none !important;
-    }
-    .budget-view-mode-btn.active {
-      background: ${btn} !important;
-      color: ${btnText} !important;
-      border-color: ${btn} !important;
-      box-shadow: none !important;
-    }
-    .budget-annual-stats-title { color: ${btn} !important; }
-    .budget-annual-stats-title-panel { border-left-color: ${btn} !important; }
-    .budget-chart-cycle-btn:hover,
-    .budget-chart-expand-btn:hover,
-    .budget-chart-modal-cycle-btn:hover {
-      border-color: ${btn} !important;
-      color: ${btn} !important;
-    }`;
-
-  let tag = document.getElementById(
-    "random-modal-styles",
-  ) as HTMLStyleElement | null;
-  if (!tag) {
-    tag = document.createElement("style");
-    tag.id = "random-modal-styles";
-    document.head.appendChild(tag);
-  }
-  tag.textContent =
-    solidRule + translucentRule + headerRule + controlsRule + budgetRule;
+/** Legacy hook. The random/custom palette now flows entirely through CSS
+ *  variables: applyPalette() sets every var on :root (including --color-accent),
+ *  and default.css — loaded as the base for random/custom themes — reads those
+ *  vars directly (no hardcoded colours, no !important). So there is nothing left
+ *  to inject. This stub only clears any stale override tag left by an older
+ *  build/session, then no-ops. Kept (rather than deleted) so existing call sites
+ *  in applyPalette() and shell.ts stay valid. */
+export function applyRandomModalStyles(_palette: Record<string, string>): void {
+  document.getElementById("random-modal-styles")?.remove();
 }
 
 /** Removes all inline random palette properties from :root and removes the

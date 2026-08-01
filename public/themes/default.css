@@ -9,11 +9,13 @@
   --color-hover:               #1f2937;
 
   --color-btn:                 #2563eb;
+  --color-accent:              #60a5fa;
   --color-btn-hover:           #1d4ed8;
   --color-btn-text:            #ffffff;
 
   --color-danger:              #ef4444;
   --color-danger-subtle:       rgba(239, 68, 68, 0.1);
+  --color-success:             #22c55e;
 
   --color-accent-input:        #2563eb;
   --color-accent-view:         #10b981;
@@ -47,132 +49,132 @@
   --color-chart-8:             #34d399;
 }
 
-/* ── Time Tracker panels — blue / green / amber / red accent borders ── */
-.input-panel   { border-left: 4px solid #2563eb; }
-.controls-panel { border-left: 4px solid #10b981; }
-.totals-panel  { border-left: 4px solid #f59e0b; }
-.entries-panel { border-left: 4px solid #ef4444; }
+/* ── Time Tracker panels — accent borders drive off the panel-accent vars ── */
+.input-panel   { border-left: 4px solid var(--color-accent-input); }
+.controls-panel { border-left: 4px solid var(--color-accent-view); }
+.totals-panel  { border-left: 4px solid var(--color-accent-totals); }
+.entries-panel { border-left: 4px solid var(--color-accent-entries); }
 
 /* ── Tool / section header ── */
 .tool-view-header,
 .section-header {
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.12), rgba(16, 185, 129, 0.06)) !important;
-  border-bottom-color: rgba(37, 99, 235, 0.3) !important;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-btn) 12%, transparent), color-mix(in srgb, var(--color-accent-view) 6%, transparent));
+  border-bottom-color: color-mix(in srgb, var(--color-btn) 30%, transparent);
 }
 
 .tool-view-title,
 .section-title {
-  color: #60a5fa !important;
+  color: var(--color-accent);
 }
 
-/* ── Modal — solid: deep navy panel ── */
+/* ── Modal — solid: deep panel ── */
 body.solid-modals .modal {
-  background: #0f172a !important;
-  border-color: rgba(37, 99, 235, 0.25) !important;
-  box-shadow: 0 0 24px rgba(37, 99, 235, 0.08), 0 24px 48px rgba(0, 0, 0, 0.6) !important;
+  background: var(--color-panel);
+  border-color: color-mix(in srgb, var(--color-btn) 25%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--color-btn) 8%, transparent), 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Modal — translucent: frosted navy glass ── */
+/* ── Modal — translucent: frosted glass ── */
 body:not(.solid-modals) .modal {
-  background: rgba(15, 23, 42, 0.25) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-color: rgba(37, 99, 235, 0.2) !important;
-  box-shadow: 0 0 24px rgba(37, 99, 235, 0.08), 0 24px 48px rgba(0, 0, 0, 0.6) !important;
+  background: color-mix(in srgb, var(--color-panel) 25%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-color: color-mix(in srgb, var(--color-btn) 20%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--color-btn) 8%, transparent), 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Primary button — solid blue ── */
+/* ── Primary button — solid accent ── */
 .primary-btn {
-  background: #2563eb !important;
-  border-color: #2563eb !important;
-  color: #ffffff !important;
+  background: var(--color-btn);
+  border-color: var(--color-btn);
+  color: var(--color-btn-text);
 }
 
 .primary-btn:hover {
-  background: #1d4ed8 !important;
-  border-color: #1d4ed8 !important;
-  box-shadow: 0 0 12px rgba(37, 99, 235, 0.3) !important;
+  background: var(--color-btn-hover);
+  border-color: var(--color-btn-hover);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-btn) 30%, transparent);
 }
 
 /* ── Image CCR panels ── */
 #media-tool-image-ccr .panel {
-  border-left: 3px solid rgba(37, 99, 235, 0.4);
+  border-left: 3px solid color-mix(in srgb, var(--color-btn) 40%, transparent);
 }
 
 #media-tool-image-ccr .result-panel {
-  border-left: 3px solid rgba(16, 185, 129, 0.5) !important;
+  border-left: 3px solid color-mix(in srgb, var(--color-accent-view) 50%, transparent);
 }
 
 /* ── Tab buttons ── */
 .tab-btn {
-  color: var(--color-text-muted) !important;
-  border-color: transparent !important;
-  background: transparent !important;
+  color: var(--color-text-muted);
+  border-color: transparent;
+  background: transparent;
 }
 
 .tab-btn:hover {
-  color: #60a5fa !important;
-  border-color: rgba(37, 99, 235, 0.4) !important;
-  background: rgba(37, 99, 235, 0.08) !important;
-  box-shadow: none !important;
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-btn) 40%, transparent);
+  background: color-mix(in srgb, var(--color-btn) 8%, transparent);
+  box-shadow: none;
 }
 
 .tab-btn.active {
-  color: #60a5fa !important;
-  border-color: rgba(37, 99, 235, 0.5) !important;
-  background: rgba(37, 99, 235, 0.12) !important;
-  box-shadow: none !important;
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-btn) 50%, transparent);
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
+  box-shadow: none;
 }
 
 /* ── Dir buttons ── */
 .dir-btn.active, .prv-btn.active {
-  color: #60a5fa !important;
-  border-color: #2563eb !important;
-  background: rgba(37, 99, 235, 0.12) !important;
+  color: var(--color-accent);
+  border-color: var(--color-btn);
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
 }
 
 /* ── Slider ── */
-.slider-val    { color: #60a5fa !important; }
-.estimate-val  { color: #60a5fa !important; }
+.slider-val    { color: var(--color-accent); }
+.estimate-val  { color: var(--color-accent); }
 
 /* ── Preview card accents ── */
-.preview-card.anchor-card { border-color: #2563eb !important; }
-.preview-card.drag-target  { border-color: #10b981 !important; }
+.preview-card.anchor-card { border-color: var(--color-btn); }
+.preview-card.drag-target  { border-color: var(--color-accent-view); }
 
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
    (--color-btn); this gives its version link a hover colour so the
    clickable part reacts. */
-.home-update-notice a:hover { color: #60a5fa; }
+.home-update-notice a:hover { color: var(--color-accent); }
 
 /* ── Budget Tracker ── */
 
-/* Panel background tints — navy gradient matching default's deep-space feel */
-#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, #0f172a 100%); }
-#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, #0f172a 100%); }
-#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(245, 158, 11, 0.07) 0%, #0f172a 100%); }
-#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(239, 68, 68, 0.06) 0%, #0f172a 100%); }
+/* Panel background tints — gradient from an accent wash into the panel colour */
+#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-btn) 8%, transparent) 0%, var(--color-panel) 100%); }
+#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 7%, transparent) 0%, var(--color-panel) 100%); }
+#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 7%, transparent) 0%, var(--color-panel) 100%); }
+#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-entries) 6%, transparent) 0%, var(--color-panel) 100%); }
 
-/* Annual Stats title panel — blue accent left border */
-.budget-annual-stats-title-panel { border-left: 4px solid #2563eb; }
-.budget-annual-stats-title { color: #60a5fa; }
+/* Annual Stats title panel — accent left border */
+.budget-annual-stats-title-panel { border-left: 4px solid var(--color-btn); }
+.budget-annual-stats-title { color: var(--color-accent); }
 
 /* Summary tab active indicator */
-.budget-summary-tab.active { color: #60a5fa; background: rgba(37, 99, 235, 0.12); border-bottom-color: #2563eb; }
+.budget-summary-tab.active { color: var(--color-accent); background: color-mix(in srgb, var(--color-btn) 12%, transparent); border-bottom-color: var(--color-btn); }
 
-/* View-mode toggle active — solid blue (was missing; falls back to base otherwise) */
+/* View-mode toggle active — solid accent */
 .budget-view-mode-btn.active {
-  background: #2563eb !important;
-  color: #ffffff !important;
-  border-color: #2563eb !important;
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
 }
 
-/* Stats table positive/negative */
+/* Stats table positive/negative — semantic, intentionally literal */
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }
 
-/* Stats on-time / late / overdue count badges */
+/* Stats on-time / late / overdue count badges — semantic status, literal */
 .budget-stats-count-good    { color: #34d399; border-color: #34d399; }
 .budget-stats-count-late    { color: #fbbf24; border-color: #fbbf24; }
 .budget-stats-count-overdue { color: #f87171; border-color: #f87171; }
@@ -181,13 +183,13 @@ body:not(.solid-modals) .modal {
 .budget-chart-cycle-btn,
 .budget-chart-expand-btn,
 .budget-chart-modal-cycle-btn {
-  border-color: rgba(37, 99, 235, 0.35);
-  color: #9ca3af;
+  border-color: color-mix(in srgb, var(--color-btn) 35%, transparent);
+  color: var(--color-text-muted);
 }
 .budget-chart-cycle-btn:hover,
 .budget-chart-expand-btn:hover,
 .budget-chart-modal-cycle-btn:hover {
-  background: rgba(37, 99, 235, 0.1);
-  border-color: #2563eb;
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--color-btn) 10%, transparent);
+  border-color: var(--color-btn);
+  color: var(--color-accent);
 }

@@ -362,6 +362,10 @@ body {
   font-weight: 700;
   margin: 0;
   opacity: 0.85;
+  /* Default to the theme's highlight accent so a new tool's section titles
+     pick up the right colour with no per-theme rule. Themes may still override
+     if they want something other than --color-accent here. */
+  color: var(--color-accent);
 }
 
 /* =============================================================================
@@ -419,13 +423,15 @@ body {
 ============================================================================= */
 
 input,
-select {
+select,
+textarea {
   background: var(--color-input-bg);
   color: var(--color-text);
   border: 1px solid var(--color-border);
   padding: 6px 8px;
   border-radius: 6px;
   font-size: 1rem;
+  font-family: inherit;
 }
 
 input:-webkit-autofill {
@@ -1081,6 +1087,11 @@ button:hover {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
+  /* Own box-shadow explicitly: .setup-tab is a <button>, and some themes give
+     bare buttons a resting glow via a broad `button {}` rule. Declaring it here
+     keeps the flat underline-tab look self-contained so no theme's button glow
+     bleeds onto it. */
+  box-shadow: none;
   color: var(--color-text-muted);
   font-weight: 600;
   cursor: pointer;
@@ -1194,9 +1205,14 @@ button:hover {
 }
 
 .setup-field input,
-.setup-field select {
+.setup-field select,
+.setup-field textarea {
   width: 100%;
   box-sizing: border-box;
+}
+
+.setup-field textarea {
+  resize: vertical;
 }
 
 .setup-actions {

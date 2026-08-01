@@ -513,7 +513,7 @@
 .slider-val {
   font-size: 1.2rem;
   font-weight: bold;
-  color: var(--color-btn-text);
+  color: var(--color-accent);
 }
 
 .img-slider {
@@ -666,7 +666,7 @@
 }
 
 .estimate-val {
-  color: var(--color-btn-text);
+  color: var(--color-accent);
   font-weight: bold;
   font-variant-numeric: tabular-nums;
 }

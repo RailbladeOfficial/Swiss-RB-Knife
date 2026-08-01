@@ -9,11 +9,13 @@
   --color-hover:               #35354a;
 
   --color-btn:                 #3498db;
+  --color-accent:              #3498db;
   --color-btn-hover:           #ff44ff;
   --color-btn-text:            #ffffff;
 
   --color-danger:              #ff44ff;
   --color-danger-subtle:       rgba(255, 68, 255, 0.12);
+  --color-success:             #2ecc71;
 
   --color-accent-input:        #3498db;
   --color-accent-view:         #2ecc71;
@@ -55,43 +57,43 @@
 /* ── Tool / section header — flat blue-grey, no glow ── */
 .tool-view-header,
 .section-header {
-  background: #2a2a3b !important;
-  border-bottom-color: #3498db !important;
-  box-shadow: none !important;
+  background: #2a2a3b;
+  border-bottom-color: #3498db;
+  box-shadow: none;
 }
 .tool-view-title,
 .section-title {
-  color: #3498db !important;
-  opacity: 1 !important;
+  color: #3498db;
+  opacity: 1;
 }
 
 /* ── Modal — solid: flat panel (original look) ── */
 body.solid-modals .modal {
-  background: #2a2a3b !important;
-  border-color: #3a3a4b !important;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5) !important;
+  background: #2a2a3b;
+  border-color: #3a3a4b;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Modal — translucent: frosted dark glass ── */
 body:not(.solid-modals) .modal {
-  background: rgba(42, 42, 59, 0.25) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-color: rgba(58, 58, 75, 0.6) !important;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5) !important;
+  background: rgba(42, 42, 59, 0.25);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-color: rgba(58, 58, 75, 0.6);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Primary button ── */
 .primary-btn {
-  background: #3498db !important;
-  border-color: #3498db !important;
-  color: #ffffff !important;
+  background: #3498db;
+  border-color: #3498db;
+  color: #ffffff;
 }
 .primary-btn:hover {
-  background: #2980b9 !important;
-  border-color: #2980b9 !important;
-  box-shadow: none !important;
-  color: #ffffff !important;
+  background: #2980b9;
+  border-color: #2980b9;
+  box-shadow: none;
+  color: #ffffff;
 }
 
 /* ── Image CCR panels — flat with left border accent ── */
@@ -99,70 +101,70 @@ body:not(.solid-modals) .modal {
   border-left: 3px solid #3498db;
 }
 #media-tool-image-ccr .result-panel {
-  border-left: 3px solid #ff44ff !important;
+  border-left: 3px solid #ff44ff;
 }
 
 /* ── Drop zone ── */
-.drop-zone { border-color: #4e4e62 !important; }
+.drop-zone { border-color: #4e4e62; }
 
 /* ── Tab buttons ── */
 .tab-btn {
-  color: #9999bb !important;
-  border-color: transparent !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  color: #9999bb;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 .tab-btn:hover {
-  color: #ffffff !important;
-  border-color: #3a3a4b !important;
-  background: #35354a !important;
-  box-shadow: none !important;
+  color: #ffffff;
+  border-color: #3a3a4b;
+  background: #35354a;
+  box-shadow: none;
 }
 .tab-btn.active {
-  color: #3498db !important;
-  border-color: #3498db !important;
-  background: rgba(52, 152, 219, 0.12) !important;
-  box-shadow: none !important;
+  color: #3498db;
+  border-color: #3498db;
+  background: rgba(52, 152, 219, 0.12);
+  box-shadow: none;
 }
 
 /* ── Dir buttons ── */
 .dir-btn, .prv-btn {
-  background: #1f1f30 !important;
-  color: #9999bb !important;
-  border-color: #3a3a4b !important;
-  box-shadow: none !important;
+  background: #1f1f30;
+  color: #9999bb;
+  border-color: #3a3a4b;
+  box-shadow: none;
 }
 .dir-btn:hover, .prv-btn:hover {
-  color: #ffffff !important;
-  border-color: #3498db !important;
-  background: #1f1f30 !important;
-  box-shadow: none !important;
+  color: #ffffff;
+  border-color: #3498db;
+  background: #1f1f30;
+  box-shadow: none;
 }
 .dir-btn.active, .prv-btn.active {
-  color: #3498db !important;
-  border-color: #3498db !important;
-  background: rgba(52, 152, 219, 0.12) !important;
-  box-shadow: none !important;
+  color: #3498db;
+  border-color: #3498db;
+  background: rgba(52, 152, 219, 0.12);
+  box-shadow: none;
 }
 
 /* ── Anchor badge ── */
-.anchor-badge { background: #3498db !important; color: #ffffff !important; }
+.anchor-badge { background: #3498db; color: #ffffff; }
 
 /* ── Preview cards ── */
-.preview-card:hover     { border-color: #3498db !important; }
-.preview-card.anchor-card { border-color: #3498db !important; }
-.preview-card.drag-target  { border-color: #ff44ff !important; }
+.preview-card:hover     { border-color: #3498db; }
+.preview-card.anchor-card { border-color: #3498db; }
+.preview-card.drag-target  { border-color: #ff44ff; }
 
 /* ── Slider ── */
 .img-slider::-webkit-slider-thumb {
-  background: #3498db !important;
-  border-color: #14141f !important;
-  box-shadow: none !important;
+  background: #3498db;
+  border-color: #14141f;
+  box-shadow: none;
 }
-.img-slider::-webkit-slider-thumb:hover { background: #ff44ff !important; }
-.slider-val   { color: #3498db !important; }
-.estimate-val { color: #3498db !important; }
-.result-preview-wrap { border-color: rgba(255, 68, 255, 0.25) !important; }
+.img-slider::-webkit-slider-thumb:hover { background: #ff44ff; }
+.slider-val   { color: #3498db; }
+.estimate-val { color: #3498db; }
+.result-preview-wrap { border-color: rgba(255, 68, 255, 0.25); }
 
 
 /* ── Update-notifier accents ──
@@ -190,9 +192,9 @@ body:not(.solid-modals) .modal {
 /* View-mode toggle active — flat solid blue (matte deliberately avoids glows).
    Was missing entirely; every other theme styles this. */
 .budget-view-mode-btn.active {
-  background: #3498db !important;
-  color: #ffffff !important;
-  border-color: #3498db !important;
+  background: #3498db;
+  color: #ffffff;
+  border-color: #3498db;
 }
 
 .budget-stats-table td.pos { color: #00FF00; }

@@ -9,11 +9,13 @@
   --color-hover:               #e2e8f0;
 
   --color-btn:                 #3b82f6;
+  --color-accent:              #1e40af;
   --color-btn-hover:           #2563eb;
   --color-btn-text:            #ffffff;
 
   --color-danger:              #dc2626;
   --color-danger-subtle:       rgba(220, 38, 38, 0.1);
+  --color-success:             #16a34a;
 
   --color-accent-input:        #3b82f6;
   --color-accent-view:         #059669;
@@ -55,64 +57,64 @@
 
 /* ── Panel base — white cards with a soft shadow instead of glow ── */
 .panel {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Tool / section header — clean white with a blue bottom border ── */
 .tool-view-header,
 .section-header {
-  background: #ffffff !important;
-  border-bottom: 2px solid #3b82f6 !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+  background: #ffffff;
+  border-bottom: 2px solid #3b82f6;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .tool-view-title,
 .section-title {
-  color: #1e40af !important;
+  color: #1e40af;
 }
 
 /* ── Buttons — need explicit border since shell base has none ── */
 button {
-  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 button:hover {
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15) !important;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
 /* ── Primary button ── */
 .primary-btn {
-  background: #3b82f6 !important;
-  border-color: #3b82f6 !important;
-  color: #ffffff !important;
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
 }
 
 .primary-btn:hover {
-  background: #2563eb !important;
-  border-color: #2563eb !important;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+  background: #2563eb;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 /* ── Danger button ── */
 .danger-btn {
-  border-color: #dc2626 !important;
+  border-color: #dc2626;
 }
 
 /* ── Modal — solid: white card (original look) ── */
 body.solid-modals .modal {
-  background: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
 /* ── Modal — translucent: frosted white glass ── */
 body:not(.solid-modals) .modal {
-  background: rgba(255, 255, 255, 0.45) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-color: rgba(203, 213, 225, 0.7) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-color: rgba(203, 213, 225, 0.7);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
 /* ── Image CCR panels ── */
@@ -121,75 +123,75 @@ body:not(.solid-modals) .modal {
 }
 
 #media-tool-image-ccr .result-panel {
-  border-left: 3px solid rgba(5, 150, 105, 0.5) !important;
+  border-left: 3px solid rgba(5, 150, 105, 0.5);
 }
 
 /* ── Drop zone ── */
 .drop-zone {
-  border-color: #94a3b8 !important;
+  border-color: #94a3b8;
 }
 
 /* ── Tab buttons ── */
 .tab-btn {
-  color: #64748b !important;
-  border-color: transparent !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  color: #64748b;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .tab-btn:hover {
-  color: #1e40af !important;
-  border-color: rgba(59, 130, 246, 0.4) !important;
-  background: rgba(59, 130, 246, 0.07) !important;
-  box-shadow: none !important;
+  color: #1e40af;
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.07);
+  box-shadow: none;
 }
 
 .tab-btn.active {
-  color: #1e40af !important;
-  border-color: #3b82f6 !important;
-  background: rgba(59, 130, 246, 0.1) !important;
-  box-shadow: none !important;
+  color: #1e40af;
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow: none;
 }
 
 /* ── Dir buttons ── */
 .dir-btn, .prv-btn {
-  background: #f1f5f9 !important;
-  color: #64748b !important;
-  border-color: #cbd5e1 !important;
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #cbd5e1;
 }
 
 .dir-btn:hover, .prv-btn:hover {
-  color: #1e40af !important;
-  border-color: #3b82f6 !important;
-  background: rgba(59, 130, 246, 0.07) !important;
+  color: #1e40af;
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.07);
 }
 
 .dir-btn.active, .prv-btn.active {
-  color: #1e40af !important;
-  border-color: #3b82f6 !important;
-  background: rgba(59, 130, 246, 0.12) !important;
+  color: #1e40af;
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
 }
 
 /* ── Anchor badge ── */
 .anchor-badge {
-  background: #3b82f6 !important;
-  color: #ffffff !important;
+  background: #3b82f6;
+  color: #ffffff;
 }
 
 /* ── Slider ── */
-.slider-val   { color: #1e40af !important; }
-.estimate-val { color: #1e40af !important; }
+.slider-val   { color: #1e40af; }
+.estimate-val { color: #1e40af; }
 
 /* ── Size estimate box ── */
 .size-estimate {
-  background: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 /* ── Preview card accents ── */
-.preview-card:hover    { border-color: #3b82f6 !important; }
-.preview-card.anchor-card { border-color: #2563eb !important; box-shadow: 0 0 8px rgba(59, 130, 246, 0.2) !important; }
-.preview-card.drag-target  { border-color: #059669 !important; }
+.preview-card:hover    { border-color: #3b82f6; }
+.preview-card.anchor-card { border-color: #2563eb; box-shadow: 0 0 8px rgba(59, 130, 246, 0.2); }
+.preview-card.drag-target  { border-color: #059669; }
 
 
 /* ── Update-notifier accents ──
@@ -201,10 +203,10 @@ body:not(.solid-modals) .modal {
 /* ── Budget Tracker ── */
 
 /* Panel backgrounds — white/near-white with very subtle tints on white panels */
-#finance-tool-budget .panel-accent-input  { background: #ffffff; box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6 !important; }
-#finance-tool-budget .panel-accent-view   { background: #ffffff; box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669 !important; }
-#finance-tool-budget .panel-accent-totals { background: #ffffff; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706 !important; }
-#finance-tool-budget .panel-accent-entries{ background: #ffffff; box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08),  inset 3px 0 0 #dc2626 !important; }
+#finance-tool-budget .panel-accent-input  { background: #ffffff; box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6; }
+#finance-tool-budget .panel-accent-view   { background: #ffffff; box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669; }
+#finance-tool-budget .panel-accent-totals { background: #ffffff; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706; }
+#finance-tool-budget .panel-accent-entries{ background: #ffffff; box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08),  inset 3px 0 0 #dc2626; }
 
 /* Annual Stats title panel */
 .budget-annual-stats-title-panel { border-left: 4px solid #3b82f6; background: #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
@@ -239,9 +241,9 @@ body:not(.solid-modals) .modal {
 
 /* Budget view-mode active button — ensure blue on white reads well */
 .budget-view-mode-btn.active {
-  background: #2563eb !important;
-  color: #ffffff !important;
-  border-color: #2563eb !important;
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
 }
 
 /* Stats section headings — slightly darker on white */

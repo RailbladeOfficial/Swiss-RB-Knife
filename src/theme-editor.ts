@@ -26,7 +26,7 @@ import {
   type AdvancedOptions,
   type CustomTheme,
 } from "./shell";
-import { RANDOM_VARS, applyRandomModalStyles, clearRandomPalette } from "./random-theme";
+import { RANDOM_VARS, clearRandomPalette } from "./random-theme";
 import { applyTheme, themeLink, getActiveCustomId, setActiveCustomId } from "./theme-core";
 
 /* ── Element refs ────────────────────────────────────────────────────────── */
@@ -248,25 +248,21 @@ function hexToRgba(hex: string, opacity: number): string {
 }
 
 /** Builds and injects the <style> tag that applies a custom theme's advanced
- *  overrides (gradients, glows) on top of the CSS var values. Also applies the
- *  same !important cascade fixes used by the random theme so default.css rules
- *  don't bleed through. */
+ *  overrides (gradients, glows) on top of the CSS var values. These are injected
+ *  after the theme <link> in the cascade, so they win on source order without
+ *  !important now that the base layer (default.css) is variable-driven and
+ *  carries no !important of its own. */
 function applyCustomThemeStyles(theme: CustomTheme): void {
-  const vars = theme.vars;
   const adv = theme.advanced;
 
-  // Re-use the same palette-based overrides as the random theme so all the
-  // default.css !important rules are neutralised consistently.
-  applyRandomModalStyles(vars);
-
-  // Now build the advanced overrides on top.
+  // Build the advanced overrides.
   const rules: string[] = [];
 
   // Header gradient / title colour
   if (adv.headerGradient) {
     const { colorA, colorB, angle } = adv.headerGradient;
     rules.push(`.tool-view-header, .section-header {
-      background: linear-gradient(${angle}deg, ${colorA}, ${colorB}) !important;
+      background: linear-gradient(${angle}deg, ${colorA}, ${colorB});
     }`);
   }
 
@@ -275,7 +271,7 @@ function applyCustomThemeStyles(theme: CustomTheme): void {
     const { opacity, spread } = GLOW_INTENSITY[adv.headerGlow.intensity];
     const glow = hexToRgba(adv.headerGlow.color, opacity);
     rules.push(`.tool-view-header, .section-header {
-      box-shadow: 0 0 ${spread}px ${glow} !important;
+      box-shadow: 0 0 ${spread}px ${glow};
     }`);
   }
 
@@ -283,7 +279,7 @@ function applyCustomThemeStyles(theme: CustomTheme): void {
   if (adv.bodyGradient) {
     const { colorA, colorB, angle } = adv.bodyGradient;
     rules.push(`body {
-      background: linear-gradient(${angle}deg, ${colorA}, ${colorB}) fixed !important;
+      background: linear-gradient(${angle}deg, ${colorA}, ${colorB}) fixed;
     }`);
   }
 
@@ -292,7 +288,7 @@ function applyCustomThemeStyles(theme: CustomTheme): void {
     const { opacity, spread } = GLOW_INTENSITY[adv.modalGlow.intensity];
     const glow = hexToRgba(adv.modalGlow.color, opacity);
     rules.push(`body.solid-modals .modal, body:not(.solid-modals) .modal {
-      box-shadow: 0 0 ${spread}px ${glow}, 0 24px 48px rgba(0,0,0,0.6) !important;
+      box-shadow: 0 0 ${spread}px ${glow}, 0 24px 48px rgba(0,0,0,0.6);
     }`);
   }
 
@@ -301,7 +297,7 @@ function applyCustomThemeStyles(theme: CustomTheme): void {
     const { opacity, spread } = GLOW_INTENSITY[adv.panelGlow.intensity];
     const glow = hexToRgba(adv.panelGlow.color, opacity);
     rules.push(`.panel {
-      box-shadow: 0 0 ${spread}px ${glow} !important;
+      box-shadow: 0 0 ${spread}px ${glow};
     }`);
   }
 
@@ -310,7 +306,7 @@ function applyCustomThemeStyles(theme: CustomTheme): void {
     const { opacity, spread } = GLOW_INTENSITY[adv.buttonGlow.intensity];
     const glow = hexToRgba(adv.buttonGlow.color, opacity);
     rules.push(`button {
-      box-shadow: 0 0 ${spread}px ${glow} !important;
+      box-shadow: 0 0 ${spread}px ${glow};
     }`);
   }
 
@@ -344,7 +340,31 @@ export function applyCustomThemeById(id: string): void {
   for (const [key, value] of Object.entries(theme.vars)) {
     root.style.setProperty(key, value);
   }
+  // --color-accent (the bright highlight for active tabs/titles/slider values)
+  // isn't a custom-editor swatch. Derive it from --color-btn so custom themes —
+  // including ones saved before this var existed — get a sensible highlight
+  // without an extra picker. Only set if the theme didn't explicitly provide one.
+  if (!theme.vars["--color-accent"]) {
+    const btn = theme.vars["--color-btn"];
+    if (btn) root.style.setProperty("--color-accent", deriveAccent(btn));
+  }
   applyCustomThemeStyles(theme);
+}
+
+/** Lightens (or, for very light buttons, darkens) a hex colour to serve as the
+ *  highlight accent, mirroring how the built-in themes relate --color-accent to
+ *  --color-btn. Pure fallback for custom themes with no explicit accent. */
+function deriveAccent(hex: string): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m || !m[1]) return hex;
+  const n = parseInt(m[1], 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  // Dark button → lighten toward white; light button → darken toward black.
+  const t = lum < 0.6 ? 0.4 : -0.35;
+  const adj = (c: number) => Math.max(0, Math.min(255, Math.round(t >= 0 ? c + (255 - c) * t : c * (1 + t))));
+  r = adj(r); g = adj(g); b = adj(b);
+  return "#" + [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
 }
 
 /** Repopulates the customThemeSelect dropdown and shows/hides the action buttons

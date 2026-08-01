@@ -9,11 +9,13 @@
   --color-hover:               #2d1f3d;
 
   --color-btn:                 #ff6600;
+  --color-accent:              #ff6600;
   --color-btn-hover:           #e55c00;
   --color-btn-text:            #000000;
 
   --color-danger:              #ff4444;
   --color-danger-subtle:       rgba(255, 68, 68, 0.1);
+  --color-success:             #9370db;
 
   --color-accent-input:        #ff6600;
   --color-accent-view:         #9370db;
@@ -74,139 +76,139 @@
 /* ── Tool / section header — orange flicker ── */
 .tool-view-header,
 .section-header {
-  background: linear-gradient(90deg, rgba(255, 102, 0, 0.12), rgba(147, 112, 219, 0.08)) !important;
-  border-bottom-color: rgba(255, 102, 0, 0.4) !important;
-  box-shadow: 0 0 20px rgba(255, 102, 0, 0.12) !important;
+  background: linear-gradient(90deg, rgba(255, 102, 0, 0.12), rgba(147, 112, 219, 0.08));
+  border-bottom-color: rgba(255, 102, 0, 0.4);
+  box-shadow: 0 0 20px rgba(255, 102, 0, 0.12);
 }
 
 .tool-view-title,
 .section-title {
-  color: #ff6600 !important;
-  text-shadow: 0 0 16px rgba(255, 102, 0, 0.6) !important;
+  color: #ff6600;
+  text-shadow: 0 0 16px rgba(255, 102, 0, 0.6);
 }
 
 /* ── Modal — translucent: purple-tinted frosted glass (original look) ── */
 body:not(.solid-modals) .modal {
-  background: linear-gradient(135deg, rgba(147, 112, 219, 0.08) 0%, rgba(13, 0, 21, 0.55) 100%) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border-color: rgba(147, 112, 219, 0.35) !important;
-  box-shadow: 0 0 30px rgba(147, 112, 219, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7) !important;
+  background: linear-gradient(135deg, rgba(147, 112, 219, 0.08) 0%, rgba(13, 0, 21, 0.55) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(147, 112, 219, 0.35);
+  box-shadow: 0 0 30px rgba(147, 112, 219, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
 /* ── Modal — solid: deep black-purple panel ── */
 body.solid-modals .modal {
-  background: linear-gradient(135deg, #1e0a2e 0%, #0d0015 100%) !important;
-  border-color: rgba(147, 112, 219, 0.35) !important;
-  box-shadow: 0 0 30px rgba(147, 112, 219, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7) !important;
+  background: linear-gradient(135deg, #1e0a2e 0%, #0d0015 100%);
+  border-color: rgba(147, 112, 219, 0.35);
+  box-shadow: 0 0 30px rgba(147, 112, 219, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
 /* ── Primary button ── */
 .primary-btn {
-  background: rgba(255, 102, 0, 0.15) !important;
-  border-color: rgba(255, 102, 0, 0.5) !important;
-  color: #ff6600 !important;
+  background: rgba(255, 102, 0, 0.15);
+  border-color: rgba(255, 102, 0, 0.5);
+  color: #ff6600;
 }
 
 .primary-btn:hover {
-  background: rgba(255, 102, 0, 0.28) !important;
-  border-color: #ff6600 !important;
-  box-shadow: 0 0 16px rgba(255, 102, 0, 0.3) !important;
-  color: #ff6600 !important;
+  background: rgba(255, 102, 0, 0.28);
+  border-color: #ff6600;
+  box-shadow: 0 0 16px rgba(255, 102, 0, 0.3);
+  color: #ff6600;
 }
 
 /* ── Image CCR panels — orange glow ── */
 #media-tool-image-ccr .panel {
-  background: linear-gradient(135deg, rgba(255, 102, 0, 0.06) 0%, #0f0800 100%) !important;
-  border-color: rgba(255, 102, 0, 0.35) !important;
-  box-shadow: 0 0 16px rgba(255, 102, 0, 0.1) !important;
+  background: linear-gradient(135deg, rgba(255, 102, 0, 0.06) 0%, #0f0800 100%);
+  border-color: rgba(255, 102, 0, 0.35);
+  box-shadow: 0 0 16px rgba(255, 102, 0, 0.1);
 }
 
 #media-tool-image-ccr .result-panel {
-  background: linear-gradient(135deg, rgba(147, 112, 219, 0.07) 0%, #0d0015 100%) !important;
-  border-color: rgba(147, 112, 219, 0.4) !important;
-  border-left-color: rgba(147, 112, 219, 0.4) !important;
-  box-shadow: 0 0 16px rgba(147, 112, 219, 0.1) !important;
+  background: linear-gradient(135deg, rgba(147, 112, 219, 0.07) 0%, #0d0015 100%);
+  border-color: rgba(147, 112, 219, 0.4);
+  border-left-color: rgba(147, 112, 219, 0.4);
+  box-shadow: 0 0 16px rgba(147, 112, 219, 0.1);
 }
 
 /* ── Drop zone ── */
 .drop-zone {
-  border-color: rgba(255, 102, 0, 0.4) !important;
+  border-color: rgba(255, 102, 0, 0.4);
 }
 
 /* ── Tab buttons ── */
 .tab-btn {
-  color: var(--color-text-muted) !important;
-  border-color: transparent !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  color: var(--color-text-muted);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .tab-btn:hover {
-  color: #ff6600 !important;
-  border-color: rgba(255, 102, 0, 0.35) !important;
-  background: rgba(255, 102, 0, 0.08) !important;
-  box-shadow: none !important;
+  color: #ff6600;
+  border-color: rgba(255, 102, 0, 0.35);
+  background: rgba(255, 102, 0, 0.08);
+  box-shadow: none;
 }
 
 .tab-btn.active {
-  color: #ff6600 !important;
-  border-color: rgba(255, 102, 0, 0.5) !important;
-  background: rgba(255, 102, 0, 0.12) !important;
-  box-shadow: none !important;
+  color: #ff6600;
+  border-color: rgba(255, 102, 0, 0.5);
+  background: rgba(255, 102, 0, 0.12);
+  box-shadow: none;
 }
 
 /* ── Dir buttons ── */
 .dir-btn, .prv-btn {
-  background: #1a0f24 !important;
-  color: #9370db !important;
-  border-color: rgba(255, 102, 0, 0.2) !important;
-  box-shadow: none !important;
+  background: #1a0f24;
+  color: #9370db;
+  border-color: rgba(255, 102, 0, 0.2);
+  box-shadow: none;
 }
 
 .dir-btn:hover, .prv-btn:hover {
-  color: #ff6600 !important;
-  border-color: rgba(255, 102, 0, 0.4) !important;
-  background: #1a0f24 !important;
-  box-shadow: none !important;
+  color: #ff6600;
+  border-color: rgba(255, 102, 0, 0.4);
+  background: #1a0f24;
+  box-shadow: none;
 }
 
 .dir-btn.active, .prv-btn.active {
-  color: #ff6600 !important;
-  border-color: #ff6600 !important;
-  background: rgba(255, 102, 0, 0.12) !important;
-  box-shadow: none !important;
+  color: #ff6600;
+  border-color: #ff6600;
+  background: rgba(255, 102, 0, 0.12);
+  box-shadow: none;
 }
 
 /* ── Anchor badge ── */
 .anchor-badge {
-  background: rgba(255, 102, 0, 0.85) !important;
-  color: #000 !important;
+  background: rgba(255, 102, 0, 0.85);
+  color: #000;
 }
 
 /* ── Preview card accents ── */
-.preview-card:hover    { border-color: rgba(255, 102, 0, 0.6) !important; box-shadow: 0 0 10px rgba(255, 102, 0, 0.15) !important; }
-.preview-card.anchor-card { border-color: #ff6600 !important; box-shadow: 0 0 12px rgba(255, 102, 0, 0.3) !important; }
-.preview-card.drag-target  { border-color: #9370db !important; box-shadow: 0 0 12px rgba(147, 112, 219, 0.3) !important; }
+.preview-card:hover    { border-color: rgba(255, 102, 0, 0.6); box-shadow: 0 0 10px rgba(255, 102, 0, 0.15); }
+.preview-card.anchor-card { border-color: #ff6600; box-shadow: 0 0 12px rgba(255, 102, 0, 0.3); }
+.preview-card.drag-target  { border-color: #9370db; box-shadow: 0 0 12px rgba(147, 112, 219, 0.3); }
 
 /* ── Slider ── */
 .img-slider::-webkit-slider-thumb {
-  background: #ff6600 !important;
-  border-color: #0a0a0a !important;
-  box-shadow: 0 0 8px rgba(255, 102, 0, 0.5) !important;
+  background: #ff6600;
+  border-color: #0a0a0a;
+  box-shadow: 0 0 8px rgba(255, 102, 0, 0.5);
 }
 
 .img-slider::-webkit-slider-thumb:hover {
-  background: #9370db !important;
-  box-shadow: 0 0 12px rgba(147, 112, 219, 0.5) !important;
+  background: #9370db;
+  box-shadow: 0 0 12px rgba(147, 112, 219, 0.5);
 }
 
-.slider-val   { color: #ff6600 !important; }
-.estimate-val { color: #ff6600 !important; }
+.slider-val   { color: #ff6600; }
+.estimate-val { color: #ff6600; }
 
 /* ── Result preview border ── */
 .result-preview-wrap {
-  border-color: rgba(147, 112, 219, 0.3) !important;
+  border-color: rgba(147, 112, 219, 0.3);
 }
 
 
@@ -227,7 +229,7 @@ body.solid-modals .modal {
 /* Annual Stats title panel — orange glow accent */
 .budget-annual-stats-title-panel {
   border-left: 4px solid #ff6600;
-  box-shadow: 0 0 16px rgba(255, 102, 0, 0.12) !important;
+  box-shadow: 0 0 16px rgba(255, 102, 0, 0.12);
 }
 .budget-annual-stats-title {
   color: #ff6600;
@@ -268,9 +270,9 @@ body.solid-modals .modal {
 
 /* View-mode active button — orange */
 .budget-view-mode-btn.active {
-  background: #ff6600 !important;
-  color: #000000 !important;
-  border-color: #ff6600 !important;
+  background: #ff6600;
+  color: #000000;
+  border-color: #ff6600;
 }
 
 /* Stats headings */

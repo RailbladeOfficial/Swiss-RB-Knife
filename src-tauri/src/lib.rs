@@ -626,6 +626,7 @@ pub fn run() {
             tools::time_tracker::save_draft,
             tools::time_tracker::load_draft,
             tools::time_tracker::export_csv,
+            tools::time_tracker::import_csv,
             // Image CCR
             tools::image_ccr::get_image_info,
             tools::image_ccr::preview_combine,

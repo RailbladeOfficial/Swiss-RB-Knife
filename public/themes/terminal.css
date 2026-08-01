@@ -9,11 +9,13 @@
   --color-hover:               #001a00;
 
   --color-btn:                 #00cc00;
+  --color-accent:              #00ff00;
   --color-btn-hover:           #00ff00;
   --color-btn-text:            #000000;
 
   --color-danger:              #ff0000;
   --color-danger-subtle:       rgba(255, 0, 0, 0.12);
+  --color-success:             #00ff00;
 
   --color-accent-input:        #00ff00;
   --color-accent-view:         #00cc00;
@@ -70,158 +72,158 @@ body::after {
 /* ── Time Tracker panels — green shades, starkly left-bordered ── */
 .input-panel {
   border-left: 4px solid #00ff00;
-  border-color: rgba(0, 255, 0, 0.25) !important;
+  border-color: rgba(0, 255, 0, 0.25);
 }
 .controls-panel {
   border-left: 4px solid #00cc00;
-  border-color: rgba(0, 204, 0, 0.2) !important;
+  border-color: rgba(0, 204, 0, 0.2);
 }
 .totals-panel {
   border-left: 4px solid #00aa00;
-  border-color: rgba(0, 170, 0, 0.2) !important;
+  border-color: rgba(0, 170, 0, 0.2);
 }
 .entries-panel {
   border-left: 4px solid #007700;
-  border-color: rgba(0, 119, 0, 0.2) !important;
+  border-color: rgba(0, 119, 0, 0.2);
 }
 
 /* ── Glowing inputs ── */
 input:focus {
   outline: none;
-  border-color: #00ff00 !important;
-  box-shadow: 0 0 8px rgba(0, 255, 0, 0.4) !important;
+  border-color: #00ff00;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
 }
 
 /* ── Tool / section header ── */
 .tool-view-header,
 .section-header {
-  background: #000000 !important;
-  border-bottom-color: #00cc00 !important;
-  box-shadow: none !important;
+  background: #000000;
+  border-bottom-color: #00cc00;
+  box-shadow: none;
 }
 .tool-view-title,
 .section-title {
-  color: #00ff00 !important;
-  text-shadow: 0 0 8px rgba(0, 255, 0, 0.6) !important;
-  opacity: 1 !important;
+  color: #00ff00;
+  text-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+  opacity: 1;
 }
 
 /* ── Modal — solid: pure black with green border ── */
 body.solid-modals .modal {
-  background: #040a04 !important;
-  border-color: #0a2a0a !important;
-  box-shadow: 0 0 20px rgba(0, 255, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.9) !important;
+  background: #040a04;
+  border-color: #0a2a0a;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.9);
 }
 
 /* ── Modal — translucent: frosted black glass with green tint ── */
 body:not(.solid-modals) .modal {
-  background: rgba(4, 10, 4, 0.35) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-color: rgba(0, 204, 0, 0.2) !important;
-  box-shadow: 0 0 20px rgba(0, 255, 0, 0.06), 0 24px 48px rgba(0, 0, 0, 0.9) !important;
+  background: rgba(4, 10, 4, 0.35);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-color: rgba(0, 204, 0, 0.2);
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.06), 0 24px 48px rgba(0, 0, 0, 0.9);
 }
 
 /* ── Primary button ── */
 .primary-btn {
-  background: #001a00 !important;
-  border-color: #00cc00 !important;
-  color: #00ff00 !important;
+  background: #001a00;
+  border-color: #00cc00;
+  color: #00ff00;
 }
 .primary-btn:hover {
-  background: #002800 !important;
-  border-color: #00ff00 !important;
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3) !important;
-  color: #00ff00 !important;
+  background: #002800;
+  border-color: #00ff00;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  color: #00ff00;
 }
 
 /* ── Danger button — red ── */
 .danger-btn {
-  background: #1a0000 !important;
-  border-color: #cc0000 !important;
-  color: #ff0000 !important;
+  background: #1a0000;
+  border-color: #cc0000;
+  color: #ff0000;
 }
 .danger-btn:hover {
-  background: #280000 !important;
-  border-color: #ff0000 !important;
-  box-shadow: 0 0 10px rgba(255, 0, 0, 0.3) !important;
-  color: #ff0000 !important;
+  background: #280000;
+  border-color: #ff0000;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
+  color: #ff0000;
 }
 
 /* ── Image CCR panels ── */
 #media-tool-image-ccr .panel {
   border-left: 3px solid rgba(0, 204, 0, 0.4);
-  border-color: rgba(0, 204, 0, 0.15) !important;
+  border-color: rgba(0, 204, 0, 0.15);
 }
 #media-tool-image-ccr .result-panel {
-  border-left: 3px solid #00cc00 !important;
-  border-color: rgba(0, 204, 0, 0.2) !important;
+  border-left: 3px solid #00cc00;
+  border-color: rgba(0, 204, 0, 0.2);
 }
 
 /* ── Drop zone ── */
-.drop-zone { border-color: rgba(0, 204, 0, 0.4) !important; }
+.drop-zone { border-color: rgba(0, 204, 0, 0.4); }
 
 /* ── Tab buttons ── */
 .tab-btn {
-  color: #007700 !important;
-  border-color: transparent !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  color: #007700;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 .tab-btn:hover {
-  color: #00cc00 !important;
-  border-color: rgba(0, 204, 0, 0.3) !important;
-  background: rgba(0, 204, 0, 0.06) !important;
-  box-shadow: none !important;
+  color: #00cc00;
+  border-color: rgba(0, 204, 0, 0.3);
+  background: rgba(0, 204, 0, 0.06);
+  box-shadow: none;
 }
 .tab-btn.active {
-  color: #00ff00 !important;
-  border-color: #00cc00 !important;
-  background: rgba(0, 204, 0, 0.1) !important;
-  box-shadow: none !important;
+  color: #00ff00;
+  border-color: #00cc00;
+  background: rgba(0, 204, 0, 0.1);
+  box-shadow: none;
 }
 
 /* ── Dir buttons ── */
 .dir-btn, .prv-btn {
-  background: #081008 !important;
-  color: #007700 !important;
-  border-color: #0a2a0a !important;
-  box-shadow: none !important;
+  background: #081008;
+  color: #007700;
+  border-color: #0a2a0a;
+  box-shadow: none;
 }
 .dir-btn:hover, .prv-btn:hover {
-  color: #00cc00 !important;
-  border-color: rgba(0, 204, 0, 0.4) !important;
-  background: #081008 !important;
-  box-shadow: none !important;
+  color: #00cc00;
+  border-color: rgba(0, 204, 0, 0.4);
+  background: #081008;
+  box-shadow: none;
 }
 .dir-btn.active, .prv-btn.active {
-  color: #00ff00 !important;
-  border-color: #00cc00 !important;
-  background: rgba(0, 204, 0, 0.1) !important;
-  box-shadow: none !important;
+  color: #00ff00;
+  border-color: #00cc00;
+  background: rgba(0, 204, 0, 0.1);
+  box-shadow: none;
 }
 
 /* ── Anchor badge ── */
-.anchor-badge { background: #00cc00 !important; color: #000000 !important; }
+.anchor-badge { background: #00cc00; color: #000000; }
 
 /* ── Preview cards ── */
-.preview-card:hover      { border-color: #00cc00 !important; }
-.preview-card.anchor-card { border-color: #00ff00 !important; box-shadow: 0 0 8px rgba(0, 255, 0, 0.2) !important; }
-.preview-card.drag-target  { border-color: #ff0000 !important; box-shadow: 0 0 8px rgba(255, 0, 0, 0.2) !important; }
+.preview-card:hover      { border-color: #00cc00; }
+.preview-card.anchor-card { border-color: #00ff00; box-shadow: 0 0 8px rgba(0, 255, 0, 0.2); }
+.preview-card.drag-target  { border-color: #ff0000; box-shadow: 0 0 8px rgba(255, 0, 0, 0.2); }
 
 /* ── Slider ── */
 .img-slider::-webkit-slider-thumb {
-  background: #00cc00 !important;
-  border-color: #000000 !important;
-  box-shadow: none !important;
+  background: #00cc00;
+  border-color: #000000;
+  box-shadow: none;
 }
 .img-slider::-webkit-slider-thumb:hover {
-  background: #00ff00 !important;
-  box-shadow: 0 0 8px rgba(0, 255, 0, 0.5) !important;
+  background: #00ff00;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
 }
-.slider-val   { color: #00ff00 !important; }
-.estimate-val { color: #00cc00 !important; }
-.result-preview-wrap { border-color: rgba(0, 204, 0, 0.2) !important; }
+.slider-val   { color: #00ff00; }
+.estimate-val { color: #00cc00; }
+.result-preview-wrap { border-color: rgba(0, 204, 0, 0.2); }
 
 
 /* ── Update-notifier accents ──
@@ -239,7 +241,7 @@ body:not(.solid-modals) .modal {
 
 .budget-annual-stats-title-panel {
   border-left: 4px solid #00ff00;
-  box-shadow: 0 0 12px rgba(0, 255, 0, 0.1) !important;
+  box-shadow: 0 0 12px rgba(0, 255, 0, 0.1);
 }
 .budget-annual-stats-title {
   color: #00ff00;
@@ -275,8 +277,8 @@ body:not(.solid-modals) .modal {
 }
 
 .budget-view-mode-btn.active {
-  background: #00cc00 !important;
-  color: #000000 !important;
-  border-color: #00cc00 !important;
+  background: #00cc00;
+  color: #000000;
+  border-color: #00cc00;
 }
 .budget-stats-section-heading { color: #007700; }

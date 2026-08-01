@@ -21,6 +21,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { flash, devError } from "../shell";
 import { Modal } from "../modal";
 
@@ -33,6 +34,7 @@ type Entry = {
   start: string;   // HH:MM (may exceed 23:xx for overnight entries)
   end: string;     // HH:MM
   activity: string;
+  notes: string;
 };
 
 // A separate {id, name, status} list — same shape/spirit as Budget's
@@ -57,6 +59,8 @@ type TTSettings = {
     anchorDate: string;
     lengthDays: number;
   };
+  // ISO timestamp of the last successful CSV import, or "" if never.
+  lastCsvImportAt: string;
 };
 
 /* =============================================================================
@@ -87,6 +91,7 @@ let settings: TTSettings = {
     anchorDate: "",
     lengthDays: 14,
   },
+  lastCsvImportAt: "",
 };
 
 let settingsSaveTimer: number | null = null;
@@ -255,11 +260,19 @@ function formatPreviewDuration(totalSeconds: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/** Formats an ISO timestamp using TT's existing date/time display prefs. */
+function formatImportTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${formatDate(localDateString(d))} ${formatTime(timeStr)}`;
+}
+
 /* =============================================================================
    VALIDATION
 ============================================================================= */
 
-function validateEntry({ date, start, end, activity }: Entry): boolean {
+function validateEntry({ date, start, end, activity }: Pick<Entry, "date" | "start" | "end" | "activity">): boolean {
   if (!activity) { flash("Activity is required.", "error"); return false; }
   if (!start)    { flash("Start time is missing or invalid.", "error"); return false; }
   if (!end)      { flash("End time is missing or invalid.", "error"); return false; }
@@ -310,6 +323,7 @@ function applyTTSettings(): void {
 
   applyPayPeriodVisibility();
   applyPayPeriodButtons();
+  refreshCsvImportStatusUI();
 }
 
 function saveSettings(): void {
@@ -325,6 +339,7 @@ function saveSettings(): void {
       quickDelete: settings.quickDelete,
       payPeriod: settings.payPeriod,
       activities: activities,
+      lastCsvImportAt: settings.lastCsvImportAt,
     };
     try {
       await invoke("save_tool_settings", {
@@ -367,6 +382,7 @@ async function loadSettings(): Promise<void> {
       if (Array.isArray(own.activities)) {
         activities = own.activities.filter(isValidActivity);
       }
+      if (typeof own.lastCsvImportAt === "string") settings.lastCsvImportAt = own.lastCsvImportAt;
     } else if ("quickDelete" in shared || "payPeriod" in shared) {
       // Legacy keys found in settings.json and no own-file yet: migrate.
       saveSettings();
@@ -407,14 +423,18 @@ async function loadFromDisk(): Promise<void> {
     }
     // Validate each entry — drop any records with missing or wrong-typed required
     // fields so downstream render/sort logic never hits unexpected values.
-    entries = parsed.filter((e): e is Entry =>
-      e !== null &&
-      typeof e === "object" &&
-      typeof e.date     === "string" && e.date.length > 0 &&
-      typeof e.start    === "string" &&
-      typeof e.end      === "string" &&
-      typeof e.activity === "string"
-    );
+    entries = parsed
+      .filter((e): e is Entry =>
+        e !== null &&
+        typeof e === "object" &&
+        typeof e.date     === "string" && e.date.length > 0 &&
+        typeof e.start    === "string" &&
+        typeof e.end      === "string" &&
+        typeof e.activity === "string"
+      )
+      // notes is a later addition — older saved entries won't have it, so
+      // default to "" rather than dropping them.
+      .map((e) => ({ ...e, notes: typeof e.notes === "string" ? e.notes : "" }));
   } catch (err) {
     devError("Load failed:", err);
     entries = [];
@@ -430,7 +450,7 @@ function saveDraft(
   activityInput: HTMLInputElement,
   startInput: HTMLInputElement,
   endInput: HTMLInputElement,
-  quickInput: HTMLInputElement,
+  notesInput: HTMLTextAreaElement,
 ): void {
   if (draftSaveTimer) clearTimeout(draftSaveTimer);
   draftSaveTimer = window.setTimeout(async () => {
@@ -440,7 +460,7 @@ function saveDraft(
         activity: activityInput.value,
         start: startInput.value,
         end: endInput.value,
-        quick: quickInput.value,
+        notes: notesInput.value,
       }),
     });
   }, 500);
@@ -451,7 +471,7 @@ async function loadDraft(
   activityInput: HTMLInputElement,
   startInput: HTMLInputElement,
   endInput: HTMLInputElement,
-  quickInput: HTMLInputElement,
+  notesInput: HTMLTextAreaElement,
   onLoad: () => void,
 ): Promise<void> {
   try {
@@ -461,7 +481,7 @@ async function loadDraft(
     if (draft.activity)     activityInput.value = draft.activity;
     if (draft.start)        startInput.value = draft.start;
     if (draft.end)          endInput.value = draft.end;
-    if (draft.quick)        quickInput.value = draft.quick;
+    if (draft.notes)        notesInput.value = draft.notes;
     onLoad();
   } catch (err) {
     devError("Draft load failed:", err);
@@ -820,7 +840,7 @@ async function exportCSV(): Promise<void> {
   lines.push("");
 
   lines.push("ENTRIES");
-  lines.push("Date,Start,End,Activity,Duration");
+  lines.push("Date,Start,End,Activity,Duration,Notes");
   visibleEntries
     .slice()
     .sort((a, b) => {
@@ -830,7 +850,7 @@ async function exportCSV(): Promise<void> {
     .forEach((e) => {
       const mins = parseTime(e.end) - parseTime(e.start);
       lines.push(
-        `"${e.date}","${e.start}","${e.end}",${csvField(e.activity)},"${formatMinutes(mins)}"`,
+        `"${e.date}","${e.start}","${e.end}",${csvField(e.activity)},"${formatMinutes(mins)}",${csvField(e.notes)}`,
       );
     });
 
@@ -840,6 +860,147 @@ async function exportCSV(): Promise<void> {
   } catch (err) {
     devError("Export failed:", err);
     flash("Export failed.", "error");
+  }
+}
+
+/* =============================================================================
+   CSV IMPORT
+   -----------------------------------------------------------------------------
+   Adds new entries from a user-provided CSV; never edits existing ones. All
+   rows are validated before anything is added — if any row is missing a
+   required field, the whole import is rejected and nothing changes.
+============================================================================= */
+
+const CSV_IMPORT_REQUIRED_COLUMNS = ["date", "start time", "end time", "activity"] as const;
+
+/** Splits raw CSV text into rows of cells, honoring RFC4180 quoting (quoted
+ *  fields may contain commas, newlines, and doubled "" as an escaped quote). */
+function parseCsvText(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+
+    if (ch === '"') { inQuotes = true; }
+    else if (ch === ",") { row.push(field); field = ""; }
+    else if (ch === "\r") { /* skip — \n (below) closes the row */ }
+    else if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else { field += ch; }
+  }
+  // A file that doesn't end with a newline still has a trailing row to flush.
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function capitalizeHeader(h: string): string {
+  return h.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+type CsvImportResult =
+  | { ok: true; entries: Entry[] }
+  | { ok: false; message: string };
+
+function parseCsvImport(raw: string): CsvImportResult {
+  const rows = parseCsvText(raw).filter((r) => r.some((c) => c.trim() !== ""));
+  if (rows.length === 0) {
+    return { ok: false, message: "The file is empty." };
+  }
+
+  const header = rows[0]!.map((h) => h.trim().toLowerCase());
+  const colIndex: Record<string, number> = {};
+  header.forEach((h, i) => { colIndex[h] = i; });
+
+  const missingCols = CSV_IMPORT_REQUIRED_COLUMNS.filter((c) => !(c in colIndex));
+  if (missingCols.length > 0) {
+    return {
+      ok: false,
+      message: `Missing required column${missingCols.length > 1 ? "s" : ""}: ${missingCols.map(capitalizeHeader).join(", ")}.`,
+    };
+  }
+  const notesIdx = colIndex["notes"];
+
+  const errors: string[] = [];
+  const parsed: Entry[] = [];
+
+  rows.slice(1).forEach((row, i) => {
+    const lineNum = i + 2; // +1 for the header row, +1 for 1-indexing
+    const dateRaw     = (row[colIndex["date"]!] ?? "").trim();
+    const startRaw    = (row[colIndex["start time"]!] ?? "").trim();
+    const endRaw      = (row[colIndex["end time"]!] ?? "").trim();
+    const activityRaw = (row[colIndex["activity"]!] ?? "").trim();
+    const notesRaw     = notesIdx !== undefined ? (row[notesIdx] ?? "").trim() : "";
+
+    const missing: string[] = [];
+    if (!dateRaw) missing.push("Date");
+    if (!startRaw) missing.push("Start Time");
+    if (!endRaw) missing.push("End Time");
+    if (!activityRaw) missing.push("Activity");
+    if (missing.length > 0) {
+      errors.push(`Line ${lineNum}: missing ${missing.join(", ")}.`);
+      return;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
+      errors.push(`Line ${lineNum}: Date "${dateRaw}" isn't in YYYY-MM-DD format.`);
+      return;
+    }
+    const start = normalizeTime(startRaw);
+    const end = normalizeTime(endRaw);
+    if (!start) { errors.push(`Line ${lineNum}: Start Time "${startRaw}" isn't a recognizable time.`); return; }
+    if (!end)   { errors.push(`Line ${lineNum}: End Time "${endRaw}" isn't a recognizable time.`); return; }
+
+    let startMins = parseTime(start);
+    let endMins = parseTime(end);
+    if (endMins <= startMins) endMins += 1440;
+
+    parsed.push({
+      date: dateRaw,
+      start: minsToTimeString(startMins),
+      end: minsToTimeString(endMins),
+      activity: activityRaw,
+      notes: notesRaw,
+    });
+  });
+
+  if (errors.length > 0) {
+    return {
+      ok: false,
+      message: `Import cancelled — ${errors.length} row${errors.length > 1 ? "s" : ""} failed validation:\n${errors.join("\n")}`,
+    };
+  }
+  if (parsed.length === 0) {
+    return { ok: false, message: "No data rows found in the file." };
+  }
+
+  return { ok: true, entries: parsed };
+}
+
+async function downloadCsvTemplate(): Promise<void> {
+  try {
+    await invoke("export_csv", {
+      filename: "time-tracker-import-template.csv",
+      data: "Date,Start Time,End Time,Activity,Notes",
+    });
+    flash("Template downloaded to Downloads!", "success");
+  } catch (err) {
+    devError("Template download failed:", err);
+    flash("Template download failed.", "error");
   }
 }
 
@@ -936,6 +1097,15 @@ function render(
       durSpan.className = "entry-col-duration";
       durSpan.textContent = formatMinutes(mins);
       row.appendChild(durSpan);
+
+      const notesSpan = document.createElement("span");
+      notesSpan.className = "entry-field entry-col-notes";
+      notesSpan.textContent = entry.notes;
+      notesSpan.title = "Double-click to edit";
+      notesSpan.addEventListener("dblclick", () =>
+        openNotesEditModal(entry, () => render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv)),
+      );
+      row.appendChild(notesSpan);
 
       const calBtn = document.createElement("button");
       calBtn.className = "entry-cal-btn";
@@ -1103,11 +1273,12 @@ async function addEntry(
   start: string,
   end: string,
   activity: string,
+  notes: string,
   datePicker: HTMLInputElement,
   activityInput: HTMLInputElement,
   startInput: HTMLInputElement,
   endInput: HTMLInputElement,
-  quickInput: HTMLInputElement,
+  notesInput: HTMLTextAreaElement,
   entriesDiv: HTMLElement,
   dayTotalDiv: HTMLElement,
   groupTotalsDiv: HTMLElement,
@@ -1123,6 +1294,7 @@ async function addEntry(
     start: minsToTimeString(startMins),
     end: minsToTimeString(endMins),
     activity,
+    notes,
   });
 
   sortEntries();
@@ -1138,8 +1310,8 @@ async function addEntry(
   activityInput.value = "";
   startInput.value = "";
   endInput.value = "";
-  quickInput.value = "";
-  saveDraft(datePicker, activityInput, startInput, endInput, quickInput);
+  notesInput.value = "";
+  saveDraft(datePicker, activityInput, startInput, endInput, notesInput);
   updateDurationPreview(startInput, endInput, durationPreview);
 }
 
@@ -1535,6 +1707,129 @@ function openTTSetupDelete(id: string, name: string): void {
 }
 
 /* =============================================================================
+   MODAL — CSV IMPORT
+   Mirrors the Activity Add/Edit modals' "leaves Setup, returns to Setup on
+   close" pattern — Back, the header X, and Cancel all return to the
+   Preferences tab rather than closing to the underlying tool view.
+============================================================================= */
+
+function refreshCsvImportStatusUI(): void {
+  const text = settings.lastCsvImportAt
+    ? `Last import: ${formatImportTimestamp(settings.lastCsvImportAt)}`
+    : "Never imported";
+  const badge = document.getElementById("ttCsvImportStatus");
+  if (badge) badge.textContent = text;
+  const modalLine = document.getElementById("ttCsvImportLastRow");
+  if (modalLine) modalLine.textContent = text;
+}
+
+function showCsvImportResult(kind: "success" | "error", message: string): void {
+  const el = document.getElementById("ttCsvImportResult") as HTMLElement;
+  el.textContent = message;
+  el.className = `tt-csv-import-result ${kind}`;
+  el.style.display = "";
+}
+
+function hideCsvImportResult(): void {
+  const el = document.getElementById("ttCsvImportResult") as HTMLElement;
+  el.style.display = "none";
+  el.textContent = "";
+  el.className = "tt-csv-import-result";
+}
+
+let csvImportModal: Modal | null = null;
+let csvImportSelectedPath: string | null = null;
+
+function resetCsvImportModalState(): void {
+  csvImportSelectedPath = null;
+  document.getElementById("ttCsvImportFileName")!.textContent = "No file selected";
+  (document.getElementById("ttCsvImportRunBtn") as HTMLButtonElement).disabled = true;
+  hideCsvImportResult();
+}
+
+async function runCsvImport(): Promise<void> {
+  if (!csvImportSelectedPath) return;
+  const runBtn = document.getElementById("ttCsvImportRunBtn") as HTMLButtonElement;
+  runBtn.disabled = true;
+
+  let raw: string;
+  try {
+    raw = await invoke<string>("import_csv", { path: csvImportSelectedPath });
+  } catch (err) {
+    devError("CSV read failed:", err);
+    showCsvImportResult("error", `Could not read the file: ${err}`);
+    runBtn.disabled = false;
+    return;
+  }
+
+  const result = parseCsvImport(raw);
+  if (!result.ok) {
+    showCsvImportResult("error", result.message);
+    runBtn.disabled = false;
+    return;
+  }
+
+  result.entries.forEach((e) => {
+    entries.push(e);
+    findOrCreateActivity(e.activity);
+  });
+  sortEntries();
+  await saveToDisk();
+  refreshActivityDatalist();
+  renderCurrentView();
+
+  settings.lastCsvImportAt = new Date().toISOString();
+  saveSettings();
+  refreshCsvImportStatusUI();
+
+  showCsvImportResult(
+    "success",
+    `Imported ${result.entries.length} ${result.entries.length === 1 ? "entry" : "entries"}.`,
+  );
+  flash("CSV import complete", "success");
+}
+
+function getCsvImportModal(): Modal {
+  if (!csvImportModal) {
+    csvImportModal = new Modal(document.getElementById("ttCsvImportBackdrop")!, {
+      closeOnEsc: true,
+      onOpen: () => refreshCsvImportStatusUI(),
+      onClosed: () => resetCsvImportModalState(),
+    });
+
+    function goBack() { csvImportModal!.close(); openTTSetupOnTab("preferences"); }
+
+    document.getElementById("ttCsvImportBack")!.addEventListener("click", goBack);
+    document.getElementById("ttCsvImportClose")!.addEventListener("click", goBack);
+    document.getElementById("ttCsvImportCancelBtn")!.addEventListener("click", goBack);
+
+    document.getElementById("ttCsvImportTemplateBtn")!.addEventListener("click", downloadCsvTemplate);
+
+    document.getElementById("ttCsvImportChooseBtn")!.addEventListener("click", async () => {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+      });
+      if (!selected || Array.isArray(selected)) return;
+      csvImportSelectedPath = selected;
+      document.getElementById("ttCsvImportFileName")!.textContent =
+        selected.split(/[\\/]/).pop() || selected;
+      (document.getElementById("ttCsvImportRunBtn") as HTMLButtonElement).disabled = false;
+      hideCsvImportResult();
+    });
+
+    document.getElementById("ttCsvImportRunBtn")!.addEventListener("click", runCsvImport);
+  }
+  return csvImportModal;
+}
+
+function openCsvImportModal(): void {
+  getTTSetupModal().close();
+  resetCsvImportModalState();
+  getCsvImportModal().open();
+}
+
+/* =============================================================================
    MODAL HELPERS — TT-OWNED (delete confirm only)
    Shell owns: settings, about, exit, changelog.
 ============================================================================= */
@@ -1565,6 +1860,52 @@ function openDeleteModal(index: number): void {
 function closeDeleteModal(): void {
   getDeleteModal().close();
   // pendingDeleteIndex is cleared by onClosed after the fade completes.
+}
+
+/* =============================================================================
+   MODAL — EDIT NOTES
+   Notes get a dedicated modal (a plain multi-line textarea) rather than the
+   inline entry-edit-input used by the other columns — multi-line text
+   doesn't fit a single-line inline editor.
+============================================================================= */
+
+let notesEditModal: Modal | null = null;
+let notesEditEntry: Entry | null = null;
+let notesEditRerender: () => void = () => {};
+
+function getNotesEditModal(): Modal {
+  if (!notesEditModal) {
+    const textarea = document.getElementById("ttNotesEditTextarea") as HTMLTextAreaElement;
+
+    notesEditModal = new Modal(document.getElementById("ttNotesEditBackdrop")!, {
+      closeOnEsc: true,
+      onOpen: () => setTimeout(() => textarea.focus(), 50),
+      onClosed: () => { notesEditEntry = null; },
+    });
+
+    function doSave() {
+      if (!notesEditEntry) return;
+      notesEditEntry.notes = textarea.value;
+      saveToDisk();
+      notesEditRerender();
+      flash("Notes updated", "success");
+      notesEditModal!.close();
+    }
+
+    document.getElementById("ttNotesEditClose")!.addEventListener("click", () => notesEditModal!.close());
+    document.getElementById("ttNotesEditCancel")!.addEventListener("click", () => notesEditModal!.close());
+    document.getElementById("ttNotesEditSave")!.addEventListener("click", doSave);
+  }
+  return notesEditModal;
+}
+
+function openNotesEditModal(entry: Entry, rerender: () => void): void {
+  notesEditEntry = entry;
+  notesEditRerender = rerender;
+  (document.getElementById("ttNotesEditTextarea") as HTMLTextAreaElement).value = entry.notes;
+  document.getElementById("ttNotesEditContext")!.textContent =
+    `${formatDate(entry.date)} · ${entry.activity} · ${formatTime(entry.start)}–${formatTime(entry.end)}`;
+  getNotesEditModal().open();
 }
 
 /* =============================================================================
@@ -1629,7 +1970,7 @@ export function initTimeTracker(): void {
   const startInput      = document.getElementById("startTime") as HTMLInputElement;
   const endInput        = document.getElementById("endTime") as HTMLInputElement;
   const activityInput   = document.getElementById("activity") as HTMLInputElement;
-  const quickInput      = document.getElementById("quickInput") as HTMLInputElement;
+  const notesInput      = document.getElementById("notesInput") as HTMLTextAreaElement;
   const datePicker      = document.getElementById("datePicker") as HTMLInputElement;
   const viewStartInput  = document.getElementById("viewStart") as HTMLInputElement;
   const viewEndInput    = document.getElementById("viewEnd") as HTMLInputElement;
@@ -1643,7 +1984,7 @@ export function initTimeTracker(): void {
     render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
   }
   function doSaveDraft() {
-    saveDraft(datePicker, activityInput, startInput, endInput, quickInput);
+    saveDraft(datePicker, activityInput, startInput, endInput, notesInput);
   }
   function doUpdateDurationPreview() {
     updateDurationPreview(startInput, endInput, durationPreview);
@@ -1666,8 +2007,8 @@ export function initTimeTracker(): void {
     const activity = (activityInput.value || lastActivity).trim();
     if (!validateEntry({ date: selectedDate, start, end, activity })) return;
     await addEntry(
-      start, end, activity,
-      datePicker, activityInput, startInput, endInput, quickInput,
+      start, end, activity, notesInput.value.trim(),
+      datePicker, activityInput, startInput, endInput, notesInput,
       entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv, durationPreview,
     );
   });
@@ -1677,6 +2018,7 @@ export function initTimeTracker(): void {
     activityInput.value = "";
     startInput.value = "";
     endInput.value = "";
+    notesInput.value = "";
     datePicker.value = today();
     selectedDate = today();
     doUpdateDurationPreview();
@@ -1702,34 +2044,7 @@ export function initTimeTracker(): void {
     doRender();
   });
 
-  quickInput.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-
-    const match = quickInput.value.match(
-      /^(midnight|midday|noon|\d{1,4}(?::\d{2})?\s*(?:[ap]\.?m\.?)?)\s*[-\s]\s*(midnight|midday|noon|\d{1,4}(?::\d{2})?\s*(?:[ap]\.?m\.?)?)\s+(.+)/i,
-    );
-
-    if (!match) {
-      flash("Bad format. Use: 900-1030 emails", "error");
-      return;
-    }
-
-    const start = normalizeTime(match[1]);
-    const end = normalizeTime(match[2]);
-    const activity = match[3].trim();
-
-    if (!validateEntry({ date: selectedDate, start, end, activity })) return;
-
-    addEntry(
-      start, end, activity,
-      datePicker, activityInput, startInput, endInput, quickInput,
-      entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv, durationPreview,
-    );
-    quickInput.value = "";
-  });
-
-  [activityInput, startInput, endInput, quickInput].forEach((input) => {
+  [activityInput, startInput, endInput, notesInput].forEach((input) => {
     input.addEventListener("input", doSaveDraft);
   });
   startInput.addEventListener("input", doUpdateDurationPreview);
@@ -1844,6 +2159,7 @@ export function initTimeTracker(): void {
 
   document.getElementById("ttSetupBtn")!.addEventListener("click", () => openTTSetupOnTab("projects"));
   document.getElementById("ttActivityNewBtn")!.addEventListener("click", openActivityAdd);
+  document.getElementById("ttCsvImportBtn")!.addEventListener("click", openCsvImportModal);
 
   /* -------------------------------------------------------------------------
      EVENT LISTENERS — TT-OWNED MODALS (delete confirm only)
@@ -1867,9 +2183,9 @@ export function initTimeTracker(): void {
   Promise.all([
     loadFromDisk(),
     loadSettings(),
-    loadDraft(datePicker, activityInput, startInput, endInput, quickInput, doUpdateDurationPreview),
+    loadDraft(datePicker, activityInput, startInput, endInput, notesInput, doUpdateDurationPreview),
   ]).then(() => {
-    const draftHasData = activityInput.value || startInput.value || endInput.value;
+    const draftHasData = activityInput.value || startInput.value || endInput.value || notesInput.value;
     if (!draftHasData) {
       datePicker.value = today();
       selectedDate = today();

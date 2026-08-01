@@ -428,7 +428,7 @@
   font-size: 0.82rem;
 }
 
-.dfg-result-card--success { border-color: var(--color-success, #4caf50); }
+.dfg-result-card--success { border-color: var(--color-success); }
 .dfg-result-card--error   { border-color: var(--color-danger); }
 
 .dfg-result-card .dfg-status-icon {
@@ -439,7 +439,7 @@
   text-align: center;
 }
 
-.dfg-result-card--success .dfg-status-icon { color: var(--color-success, #4caf50); }
+.dfg-result-card--success .dfg-status-icon { color: var(--color-success); }
 .dfg-result-card--error   .dfg-status-icon { color: var(--color-danger); }
 
 .dfg-result-card .dfg-status-text {
