@@ -1,9 +1,28 @@
 [
   {
     "version": "0.5.0",
-    "date": "2026-07-29",
+    "date": "2026-08-01",
     "changes": {
       "features": {
+        "App Overall": [
+          "Added ability in General Settings to Customize the Sidebar.",
+          "Clicking 'Customize' launches the Edit Sidebar modal, which allows you to reorder and hide tools from the sidebar and home dashboard you don't want to see.",
+
+        ],
+        "Time Tracker": [
+          "Added full CSV entry import. Dates must be entered in YYYY-MM-DD format.",
+          "Added a Notes box to capture more information about a particular activity.",
+          "Added tabs to the Setup modal for Projects, Activities, and Preferences.",
+          "Added Projects, which can be used to help better organize / categorize Activities",
+          "Projects and Activities are now saved in the Setup modal, and can be edited, which changes the name for all entries using that Project / Activity",
+          "If you manually type a new Project / Activity name into its field, it'll automatically be saved as a known Project / Activity in the Setup modal",
+          "Previously used / 'known' Projects / Activities show under their fields as you type, allowing quick selection for repeat events.",
+          "Added an End Date field to the Input panel, allowing for multi-day events.",
+          "Added Support for timestamps being captured to the exact second.",
+          "Added setting under Preferences to 'Round 'Now' to Whole Minute'.",
+          "When enabled, hitting the Now button next to Start/End Time only inputs the Hour/Minute. When disabled, seconds are included.",
+          "Added Stats/Averages next to the Totals box in the Summary Panel."
+        ],
         "Auto-Backup": [
           "Added Setup button/modal to the Auto-Backup tool.",
           "Added setting to Show Tool Warning Page if you had previously asked for it to never show again.",
@@ -15,10 +34,15 @@
           "If a toast notification flashes while the screen is covered or unfocused, the notification will wait for you to come back and see it on its way.",
           "Updated some wordings / verbiage app-wide to improve consistency.",
           "Refactored all TS and CSS files to better organize and componentize them, where possible.",
-          "Ensured that styles that were being shared across tools are now coming from the shell files."
+          "Ensured that styles that were being shared across tools are now coming from the shell files.",
+          "Changed Theme Select from a dropdown select to its own modal, with previews of the themes.",
+          "Changed Sound Pack Select from a dropdown select to its own modal, with previes of the sound packs."
         ],
         "Budget Tracker": [
           "Added totals to the Ledger subheaders for all three Ledger views."
+        ],
+        "Time Tracker": [
+          "When editing dates for entries in the Entries panel, a modal now pops up, letting you change either the Start or End date for the Activity."
         ],
         "Auto-Backup": [
           "Added ability to create a preset from the currently selected paths listed in the tool.",
@@ -27,6 +51,9 @@
         ]
       },
       "bugfixes": {
+        "Time Tracker": [
+          "Fixed issues with time parsing of three digit times with an AM / PM suffix."
+        ],
         "Auto-Backup": [
           "Fixed issues with styling for the tool header buttons and the Presets modal."
         ]

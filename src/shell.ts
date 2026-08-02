@@ -61,8 +61,9 @@ import {
   loadCustomThemes,
   applyCustomThemeById,
   clearCustomTheme,
-  refreshCustomThemeSelect,
   customThemes,
+  openThemeEditor,
+  requestDeleteCustomTheme,
 } from "./theme-editor";
 import {
   applyLockSettings,
@@ -91,6 +92,24 @@ type ToastMeta = {
 type NavEntry = {
   section: string;
   tool?: string;
+};
+
+/** Static metadata for a real, navigable tool — one entry per sidebar/Home
+ *  item. `key` is "section/tool", matching the format switchSection() already
+ *  uses for _activeViewKey, so pin-state lookups can compare directly. */
+type ToolMeta = {
+  key: string;
+  section: string;
+  tool: string;
+  label: string;
+};
+
+/** One row of the persisted sidebar order/pin state (settings.sidebarItems).
+ *  Array order IS the display order for pinned items; unpinned items are
+ *  hidden and their relative order is never shown or editable. */
+type SidebarItemState = {
+  key: string;
+  pinned: boolean;
 };
 
 /** Advanced visual overrides stored per custom theme. All fields optional —
@@ -144,6 +163,11 @@ type ShellSettings = {
    *  NEWER than this re-surfaces the notice; this exact one stays silent.
    *  Empty string = nothing ignored. */
   ignoredUpdateVersion: string;
+  /** Sidebar/Home-dashboard tool order + pin state, edited via the "Edit
+   *  Sidebar" modal. Pinned items (in this array order) appear on the
+   *  sidebar and Home dashboard; unpinned items are hidden from both but
+   *  keep all their own data/settings untouched. */
+  sidebarItems: SidebarItemState[];
 };
 
 /** Result of a successful update check, shared by the sidebar pulse and the
@@ -223,6 +247,28 @@ const SOUND_PACKS: SoundPack[] = [
   },
 ];
 
+/* Every real, navigable tool in the app, in the app's original/default
+   order. This is the single source of truth for the Edit Sidebar modal, the
+   Home dashboard, and the "Specific Tool" options in the On Startup select —
+   add a tool here (matching its data-section/data-tool attributes in
+   index.html) and it's automatically pinnable/reorderable/hideable. */
+const ALL_TOOLS: ToolMeta[] = [
+  { key: "finance/budget", section: "finance", tool: "budget", label: "Budget Tracker" },
+  { key: "utility/time-tracker", section: "utility", tool: "time-tracker", label: "Time Tracker" },
+  { key: "files/auto-backup", section: "files", tool: "auto-backup", label: "Auto-Backup" },
+  { key: "media/image-ccr", section: "media", tool: "image-ccr", label: "Image CCR" },
+  { key: "files/dummy-file-generator", section: "files", tool: "dummy-file-generator", label: "Dummy File Generator" },
+];
+
+/** A fresh default sidebarItems array — all tools pinned, in ALL_TOOLS order.
+ *  Always call this rather than referencing a shared array literal: settings
+ *  resets (`{...DEFAULT_SETTINGS}`) are shallow copies, so a single shared
+ *  array instance would let a later reorder/pin mutation silently corrupt
+ *  what "default" means for every future reset. */
+function freshSidebarItems(): SidebarItemState[] {
+  return ALL_TOOLS.map((t) => ({ key: t.key, pinned: true }));
+}
+
 const DEFAULT_SETTINGS: ShellSettings = {
   fontScale: 0,
   hour12: false,
@@ -237,13 +283,16 @@ const DEFAULT_SETTINGS: ShellSettings = {
   soundPack: "default",
   autoCheckUpdates: false,
   ignoredUpdateVersion: "",
+  // Placeholder — always overridden with freshSidebarItems() wherever settings
+  // get reset to defaults (see the comment on that function for why).
+  sidebarItems: [],
 };
 
 /* =============================================================================
    STATE
 ============================================================================= */
 
-export let settings: ShellSettings = { ...DEFAULT_SETTINGS };
+export let settings: ShellSettings = { ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() };
 let toastMetas: ToastMeta[] = [];
 let toastCounter = 0;
 
@@ -294,7 +343,6 @@ const timeFormatLabel = document.getElementById("timeFormatLabel")!;
 export const themeSelect = document.getElementById(
   "themeSelect",
 ) as HTMLSelectElement;
-const customSubsettings = document.getElementById("customSubsettings")!;
 const rerollBtn = document.getElementById("rerollBtn") as HTMLButtonElement;
 const randomSubsettings = document.getElementById("randomSubsettings")!;
 const randomModeToggle = document.getElementById(
@@ -316,9 +364,33 @@ const dateFormatLabel = document.getElementById("dateFormatLabel")!;
 const startupSelect = document.getElementById(
   "startupSelect",
 ) as HTMLSelectElement;
-const soundPackSelect = document.getElementById(
-  "soundPackSelect",
-) as HTMLSelectElement;
+const soundPackEditBtn = document.getElementById("soundPackEditBtn")!;
+const soundPackCurrentBadge = document.getElementById("soundPackCurrentBadge")!;
+const soundPackPickerBackdrop = document.getElementById("soundPackPickerBackdrop")!;
+const soundPackPickerBack = document.getElementById("soundPackPickerBack")!;
+const soundPackPickerClose = document.getElementById("soundPackPickerClose")!;
+const soundPackPickerGrid = document.getElementById("soundPackPickerGrid")!;
+
+const sidebarEditBtn = document.getElementById("sidebarEditBtn")!;
+const sidebarEditBackdrop = document.getElementById("sidebarEditBackdrop")!;
+const sidebarEditBack = document.getElementById("sidebarEditBack")!;
+const sidebarEditClose = document.getElementById("sidebarEditClose")!;
+const sidebarEditResetBtn = document.getElementById("sidebarEditResetBtn")!;
+const sidebarEditShownList = document.getElementById("sidebarEditShownList")!;
+const sidebarEditHiddenList = document.getElementById("sidebarEditHiddenList")!;
+const sidebarEditHiddenSection = document.getElementById("sidebarEditHiddenSection")!;
+const sidebarHiddenBadge = document.getElementById("sidebarHiddenBadge")!;
+const navListEl = document.getElementById("navList")!;
+const toolCardGrid = document.querySelector<HTMLElement>(".tool-card-grid");
+
+const themeEditBtn = document.getElementById("themeEditBtn")!;
+const themeCurrentBadge = document.getElementById("themeCurrentBadge")!;
+const themePickerBackdrop = document.getElementById("themePickerBackdrop")!;
+const themePickerBack = document.getElementById("themePickerBack")!;
+const themePickerClose = document.getElementById("themePickerClose")!;
+const themePickerGrid = document.getElementById("themePickerGrid")!;
+const themePickerRandomPane = document.getElementById("themePickerRandomPane")!;
+const themePickerRandomTileWrap = document.getElementById("themePickerRandomTileWrap")!;
 
 const appVersionEl = document.getElementById("appVersion");
 
@@ -638,6 +710,20 @@ async function saveShellState(
  *  navigates to the appropriate view based on the startupTarget setting.
  *  Target modes: "lastView" (exact restore), "lastTool", "lastCategory", "home",
  *  "section:tool-id" (specific tool), or a bare section key. */
+/** Activates a tool, unless it's currently hidden (unpinned) — in which case
+ *  Home is shown instead. Every startup-navigation path in loadShellState()
+ *  routes through this rather than calling activateTool() directly, so a
+ *  tool hidden via the Edit Sidebar modal is never landed on at launch, per
+ *  spec. Relies on settings.sidebarItems already being loaded — init() awaits
+ *  loadSettings() before loadShellState() runs. */
+function activateToolIfPinned(section: string, tool: string): void {
+  if (isToolPinned(`${section}/${tool}`)) {
+    activateTool(section, tool);
+  } else {
+    activateSection("home");
+  }
+}
+
 async function loadShellState(): Promise<void> {
   try {
     const raw = await invoke<string>("load_shell_state");
@@ -654,7 +740,7 @@ async function loadShellState(): Promise<void> {
     if (target === "lastView") {
       // Restore exactly where the user left off — tool, landing, or home
       if (state.activeTool && state.activeSection) {
-        activateTool(state.activeSection, state.activeTool);
+        activateToolIfPinned(state.activeSection, state.activeTool);
       } else if (state.activeSection) {
         activateSection(state.activeSection);
       } else {
@@ -663,7 +749,7 @@ async function loadShellState(): Promise<void> {
     } else if (target === "lastTool") {
       // Restore the last tool opened, regardless of where the user closed from
       if (state.lastTool && state.lastToolSection) {
-        activateTool(state.lastToolSection, state.lastTool);
+        activateToolIfPinned(state.lastToolSection, state.lastTool);
       } else {
         activateSection("home");
       }
@@ -679,7 +765,7 @@ async function loadShellState(): Promise<void> {
     } else if (target.includes(":")) {
       // Specific tool — format is "section:tool-id"
       const [section, tool] = target.split(":");
-      activateTool(section, tool);
+      activateToolIfPinned(section, tool);
     } else {
       // Specific category — value matches a section key (e.g. "utility", "music")
       activateSection(target);
@@ -772,16 +858,15 @@ export function applySettings(): void {
     ? "MM-DD-YYYY"
     : "YYYY-MM-DD";
   startupSelect.value = settings.startupTarget;
-  soundPackSelect.value = settings.soundPack;
   loadSoundPack(settings.soundPack);
+  refreshSoundPackCurrentBadge();
   themeSelect.value = settings.theme;
+  refreshThemeCurrentBadge();
 
-  // Show/hide random subsettings and reroll button
-  const isRandom = settings.theme === "random";
-  const isCustom = settings.theme === "custom";
-  randomSubsettings.style.maxHeight = isRandom ? "200px" : "0";
-  rerollBtn.style.display = isRandom ? "inline-flex" : "none";
-  saveRandomBtn.style.display = isRandom ? "inline-flex" : "none";
+  // The Random tab's settings panel (visibility + enabled/greyed state) is
+  // managed by renderThemePickerTab(), not here — just keep the control
+  // values themselves in sync so they're correct whenever that panel is
+  // shown/enabled.
   randomModeToggle.checked = settings.randomPersistent;
   randomModeLabel.textContent = settings.randomPersistent
     ? "Persistent"
@@ -791,12 +876,10 @@ export function applySettings(): void {
     ? "Harmonized"
     : "Chaotic";
 
-  customSubsettings.style.maxHeight = isCustom ? "200px" : "0";
-  if (isCustom) refreshCustomThemeSelect();
-
   applyLockSettings();
   applyUpdateSettings();
   applyTheme(settings.theme);
+  applySidebarOrder();
   updateClock();
 }
 
@@ -814,6 +897,36 @@ export async function saveSettings(): Promise<void> {
   } catch {
     flash("Failed to save settings", "error");
   }
+}
+
+/** Validates a loaded sidebarItems value against ALL_TOOLS: drops entries
+ *  with the wrong shape or an unknown key (e.g. a tool removed since this was
+ *  saved), de-dupes repeated keys, and appends any ALL_TOOLS entry missing
+ *  from the loaded array (e.g. a tool added since this was saved) as pinned
+ *  at the end — so a fresh install and an upgrade both always cover every
+ *  known tool exactly once. */
+function normalizeSidebarItems(raw: unknown): SidebarItemState[] {
+  const candidates: SidebarItemState[] = Array.isArray(raw)
+    ? raw.filter(
+        (it): it is SidebarItemState =>
+          it !== null &&
+          typeof it === "object" &&
+          typeof (it as SidebarItemState).key === "string" &&
+          typeof (it as SidebarItemState).pinned === "boolean" &&
+          ALL_TOOLS.some((t) => t.key === (it as SidebarItemState).key),
+      )
+    : [];
+
+  const deduped: SidebarItemState[] = [];
+  const seen = new Set<string>();
+  for (const it of candidates) {
+    if (seen.has(it.key)) continue;
+    seen.add(it.key);
+    deduped.push(it);
+  }
+
+  const missing = ALL_TOOLS.filter((t) => !seen.has(t.key)).map((t) => ({ key: t.key, pinned: true }));
+  return [...deduped, ...missing];
 }
 
 /** Loads settings from disk, merges over defaults (so new settings get their
@@ -881,14 +994,718 @@ async function loadSettings(): Promise<void> {
         typeof merged.ignoredUpdateVersion === "string"
           ? merged.ignoredUpdateVersion
           : DEFAULT_SETTINGS.ignoredUpdateVersion,
+      sidebarItems: normalizeSidebarItems(merged.sidebarItems),
     };
   } catch {
-    settings = { ...DEFAULT_SETTINGS };
+    settings = { ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() };
   }
   // Note: applySettings() is deferred to after loadCustomThemes() in init()
   // so that custom theme application has the themes array available.
   applySettings();
 }
+
+/* =============================================================================
+   SIDEBAR ORDER / VISIBILITY  (Edit Sidebar modal)
+   -----------------------------------------------------------------------------
+   Drives three surfaces from a single source of truth (settings.sidebarItems):
+   the sidebar nav-items, the Home dashboard's .tool-card-grid, and the
+   "Specific Tool" options in the On Startup select. Reordering/hiding here
+   only ever moves/hides existing DOM nodes — it never touches a tool's own
+   data or settings, so a re-shown tool picks up exactly where it left off.
+============================================================================= */
+
+const SIDEBAR_DRAG_HANDLE_SVG = `
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <circle cx="8" cy="6" r="1.6" /><circle cx="16" cy="6" r="1.6" />
+    <circle cx="8" cy="12" r="1.6" /><circle cx="16" cy="12" r="1.6" />
+    <circle cx="8" cy="18" r="1.6" /><circle cx="16" cy="18" r="1.6" />
+  </svg>`;
+
+// Same open-eye / eye-with-slash pair used elsewhere in the app to mark a
+// visible vs. hidden item — the slashed version here is Budget's exact
+// "Excluded from Charts" icon (see budget.ts's summary-row builder), reused
+// verbatim so "hidden" reads identically everywhere in the app.
+const EYE_SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const EYE_SHOWN_SVG = `<svg ${EYE_SVG_ATTRS}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_HIDDEN_SVG = `<svg ${EYE_SVG_ATTRS}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
+/** Whether the given "section/tool" key is currently shown. Defaults to true
+ *  for a key with no recorded state — normalizeSidebarItems() should always
+ *  have added one for every known tool, so this is just a safety net. */
+function isToolPinned(key: string): boolean {
+  return settings.sidebarItems.find((it) => it.key === key)?.pinned ?? true;
+}
+
+/** Re-syncs the "Specific Tool" options in the On Startup select with the
+ *  current visibility state: hides/disables options for hidden tools so a
+ *  user never sees (or can pick) a tool that isn't on the sidebar. If the
+ *  currently-selected startup target IS one of those now-hidden options,
+ *  falls back to "lastView" and persists the change — otherwise the select
+ *  would be silently pointed at an option the user can no longer choose. */
+function refreshStartupSelectOptions(): void {
+  let selectedNowHidden = false;
+  ALL_TOOLS.forEach((meta) => {
+    const optValue = `${meta.section}:${meta.tool}`;
+    const opt = startupSelect.querySelector<HTMLOptionElement>(
+      `option[value="${optValue}"]`,
+    );
+    if (!opt) return;
+    const shown = isToolPinned(meta.key);
+    opt.hidden = !shown;
+    opt.disabled = !shown;
+    if (!shown && settings.startupTarget === optValue) selectedNowHidden = true;
+  });
+
+  if (selectedNowHidden) {
+    settings.startupTarget = "lastView";
+    saveSettings();
+  }
+  startupSelect.value = settings.startupTarget;
+}
+
+/** Updates the "Sidebar:" row's status badge in General Settings — hidden
+ *  entirely when nothing is hidden, "N tools hidden" otherwise. Mirrors Time
+ *  Tracker's CSV import status badge pattern. */
+function refreshSidebarHiddenBadge(): void {
+  const hiddenCount = settings.sidebarItems.filter((it) => !it.pinned).length;
+  if (hiddenCount === 0) {
+    sidebarHiddenBadge.style.display = "none";
+    return;
+  }
+  sidebarHiddenBadge.textContent =
+    hiddenCount === ALL_TOOLS.length
+      ? "All tools hidden"
+      : `${hiddenCount} ${hiddenCount === 1 ? "tool" : "tools"} hidden`;
+  sidebarHiddenBadge.style.display = "";
+}
+
+/** Reorders and shows/hides the sidebar nav-items and Home dashboard
+ *  tool-cards to match settings.sidebarItems, then re-syncs the On Startup
+ *  select and the Settings-row status badge. Call after ANY change to
+ *  settings.sidebarItems (drag, show/hide toggle, reset, or a fresh
+ *  settings load). */
+function applySidebarOrder(): void {
+  const shownKeys = settings.sidebarItems.filter((it) => it.pinned).map((it) => it.key);
+  const shownSet = new Set(shownKeys);
+
+  // Move shown items into order (appendChild on an already-attached node
+  // relocates it — repeated in desired order, this leaves everything in that
+  // order without disturbing the fixed, non-reorderable nav-items around it:
+  // the sidebar-toggle control and Home always stay first).
+  shownKeys.forEach((key) => {
+    const meta = ALL_TOOLS.find((t) => t.key === key);
+    if (!meta) return;
+    const li = document.querySelector<HTMLElement>(
+      `.nav-item[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
+    );
+    if (li) {
+      li.style.display = "";
+      navListEl.appendChild(li);
+    }
+    const card = toolCardGrid?.querySelector<HTMLElement>(
+      `.tool-card[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
+    );
+    if (card) {
+      card.style.display = "";
+      toolCardGrid!.appendChild(card);
+    }
+  });
+
+  ALL_TOOLS.forEach((meta) => {
+    if (shownSet.has(meta.key)) return;
+    const li = document.querySelector<HTMLElement>(
+      `.nav-item[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
+    );
+    if (li) li.style.display = "none";
+    const card = toolCardGrid?.querySelector<HTMLElement>(
+      `.tool-card[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
+    );
+    if (card) card.style.display = "none";
+  });
+
+  refreshStartupSelectOptions();
+  refreshSidebarHiddenBadge();
+}
+
+/** Shows or hides a tool, moving it to the end of its new group (shown
+ *  entries stay a flat, freely-reorderable list; hidden entries have no
+ *  meaningful order of their own). Persists immediately, re-renders both the
+ *  live sidebar/Home and (if open) the Edit Sidebar modal, and — per spec —
+ *  redirects to Home if the tool being hidden is the one currently open. */
+function setPinned(key: string, shown: boolean): void {
+  const item = settings.sidebarItems.find((it) => it.key === key);
+  if (!item || item.pinned === shown) return;
+  item.pinned = shown;
+
+  const withoutItem = settings.sidebarItems.filter((it) => it.key !== key);
+  const shownItems = withoutItem.filter((it) => it.pinned);
+  const hiddenItems = withoutItem.filter((it) => !it.pinned);
+  settings.sidebarItems = shown
+    ? [...shownItems, item, ...hiddenItems]
+    : [...shownItems, ...hiddenItems, item];
+
+  applySidebarOrder();
+  saveSettings();
+  renderSidebarEditModal();
+
+  if (!shown && _activeViewKey === key) {
+    activateSection("home");
+  }
+}
+
+// Tracks which shown row is mid-drag, shared by every row's dragover
+// handler so a row can find (and move) the node actually being dragged.
+let sidebarDragKey: string | null = null;
+
+function attachSidebarDragHandlers(row: HTMLElement, key: string): void {
+  row.draggable = true;
+
+  row.addEventListener("dragstart", (e) => {
+    sidebarDragKey = key;
+    row.classList.add("dragging");
+    e.dataTransfer?.setData("text/plain", key);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  });
+
+  // dragend fires unconditionally — whether or not the drag ended over a
+  // valid drop target — so the commit belongs here, not in "drop". Relying
+  // on "drop" alone would leave the live (already-reordered) DOM out of
+  // sync with settings.sidebarItems whenever the user releases outside any
+  // row (e.g. drops on the modal's padding or off the modal entirely).
+  row.addEventListener("dragend", () => {
+    row.classList.remove("dragging");
+    sidebarDragKey = null;
+    commitShownOrderFromDom();
+  });
+
+  row.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    if (!sidebarDragKey || sidebarDragKey === key) return;
+    const draggedEl = sidebarEditShownList.querySelector<HTMLElement>(
+      `[data-key="${CSS.escape(sidebarDragKey)}"]`,
+    );
+    if (!draggedEl) return;
+    const rect = row.getBoundingClientRect();
+    const before = e.clientY - rect.top < rect.height / 2;
+    row.parentElement?.insertBefore(draggedEl, before ? row : row.nextSibling);
+  });
+
+  // Still needed so the browser allows the drop to occur at all (without
+  // this, some drop targets reject it and the row snaps back).
+  row.addEventListener("drop", (e) => e.preventDefault());
+}
+
+/** Reads the shown list's current DOM order (post-drag) and writes it back
+ *  into settings.sidebarItems, leaving the hidden group's order untouched. */
+function commitShownOrderFromDom(): void {
+  const orderedKeys = Array.from(
+    sidebarEditShownList.querySelectorAll<HTMLElement>("[data-key]"),
+  ).map((el) => el.dataset.key!);
+  const hiddenItems = settings.sidebarItems.filter((it) => !it.pinned);
+  settings.sidebarItems = [
+    ...orderedKeys.map((key) => settings.sidebarItems.find((it) => it.key === key)!),
+    ...hiddenItems,
+  ];
+  applySidebarOrder();
+  saveSettings();
+}
+
+function buildSidebarEditRow(item: SidebarItemState, draggable: boolean): HTMLElement {
+  const row = document.createElement("div");
+  row.className = draggable ? "sidebar-edit-item" : "sidebar-edit-item sidebar-edit-item-hidden";
+  row.dataset.key = item.key;
+
+  const meta = ALL_TOOLS.find((t) => t.key === item.key);
+  if (!meta) return row; // defensive — normalizeSidebarItems() guarantees a match
+
+  const handle = document.createElement("span");
+  handle.className = draggable
+    ? "sidebar-edit-drag-handle"
+    : "sidebar-edit-drag-handle sidebar-edit-drag-handle-disabled";
+  handle.innerHTML = SIDEBAR_DRAG_HANDLE_SVG;
+  handle.title = "Drag to reorder";
+  row.appendChild(handle);
+
+  const iconWrap = document.createElement("span");
+  iconWrap.className = "sidebar-edit-icon";
+  const sourceIcon = document.querySelector(
+    `.nav-item[data-section="${meta.section}"][data-tool="${meta.tool}"] .nav-icon`,
+  );
+  if (sourceIcon) iconWrap.appendChild(sourceIcon.cloneNode(true));
+  row.appendChild(iconWrap);
+
+  const name = document.createElement("span");
+  name.className = "sidebar-edit-name";
+  name.textContent = meta.label;
+  row.appendChild(name);
+
+  const visibilityBtn = document.createElement("button");
+  visibilityBtn.className = item.pinned
+    ? "sidebar-edit-visibility-btn"
+    : "sidebar-edit-visibility-btn is-hidden";
+  visibilityBtn.innerHTML = item.pinned ? EYE_SHOWN_SVG : EYE_HIDDEN_SVG;
+  visibilityBtn.title = item.pinned
+    ? "Hide from sidebar and Home"
+    : "Show on sidebar and Home";
+  visibilityBtn.addEventListener("click", () => setPinned(item.key, !item.pinned));
+  row.appendChild(visibilityBtn);
+
+  if (draggable) attachSidebarDragHandlers(row, item.key);
+
+  return row;
+}
+
+function renderSidebarEditModal(): void {
+  sidebarEditShownList.innerHTML = "";
+  sidebarEditHiddenList.innerHTML = "";
+
+  const shown = settings.sidebarItems.filter((it) => it.pinned);
+  const hidden = settings.sidebarItems.filter((it) => !it.pinned);
+
+  shown.forEach((it) => sidebarEditShownList.appendChild(buildSidebarEditRow(it, true)));
+  hidden.forEach((it) => sidebarEditHiddenList.appendChild(buildSidebarEditRow(it, false)));
+
+  sidebarEditHiddenSection.style.display = hidden.length > 0 ? "" : "none";
+}
+
+// Replaces (rather than stacks on) the General Settings modal — same pattern
+// Time Tracker's Setup → Add/Edit Activity / CSV Import modals use: opening
+// closes the parent first, and a back-arrow (not the X) is what reopens it.
+const sidebarEditModal = new Modal(sidebarEditBackdrop, {
+  closeOnEsc: true,
+  onOpen: () => renderSidebarEditModal(),
+});
+
+sidebarEditBtn.addEventListener("click", () => {
+  settingsModal.close();
+  sidebarEditModal.open();
+});
+
+sidebarEditBack.addEventListener("click", () => {
+  sidebarEditModal.close();
+  settingsModal.open();
+});
+
+sidebarEditClose.addEventListener("click", () => sidebarEditModal.close());
+
+sidebarEditResetBtn.addEventListener("click", () => {
+  settings.sidebarItems = freshSidebarItems();
+  applySidebarOrder();
+  saveSettings();
+  renderSidebarEditModal();
+  flash("Sidebar reset to default", "success");
+});
+
+/* =============================================================================
+   CHOOSE THEME MODAL
+   -----------------------------------------------------------------------------
+   Replaces the old <select id="themeSelect"> dropdown with a tabbed grid of
+   preview tiles (Main/Holiday/Special/Custom, matching the old optgroups).
+   themeSelect itself still exists in the DOM (hidden) — theme-editor.ts reads
+   and writes its .value directly, so it stays the one place that mapping is
+   defined, but it no longer drives anything by firing "change".
+
+   Built-in themes are previewed by fetching their CSS file and pulling a
+   handful of --color-* values out with a regex (cheap, cached per theme id —
+   these are small static files). Custom themes use their already-in-memory
+   `vars` directly, no fetch needed. Random has no fixed palette to preview,
+   so it gets a die icon instead; the Custom tab's "add" tile gets a palette
+   icon for the same reason.
+============================================================================= */
+
+type ThemePickerTab = "main" | "holiday" | "special" | "random" | "custom";
+
+const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: string }[] }[] = [
+  {
+    tab: "main",
+    themes: [
+      { id: "default", label: "Default" },
+      { id: "light", label: "Light" },
+      { id: "dark", label: "Dark" },
+      { id: "matte", label: "Matte" },
+      { id: "midnight", label: "Midnight" },
+      { id: "terminal", label: "Terminal" },
+    ],
+  },
+  {
+    tab: "holiday",
+    themes: [
+      { id: "mardi-gras", label: "Mardi Gras" },
+      { id: "rainbow", label: "Rainbow" },
+      { id: "patriot", label: "Patriot" },
+      { id: "halloween", label: "Halloween" },
+      { id: "christmas", label: "Christmas" },
+    ],
+  },
+  {
+    tab: "special",
+    themes: [
+      { id: "cake", label: "Cake" },
+      { id: "knowledge", label: "Knowledge" },
+      { id: "neon", label: "Neon" },
+      { id: "retro-electric", label: "Retro-Electric" },
+    ],
+  },
+];
+
+const DIE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="16" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg>`;
+const PALETTE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a9.5 9.5 0 1 1 0-19c4.7 0 9 3.5 9 8 0 2.5-2 4-4.5 4H15a2 2 0 0 0-1.5 3.3c.4.5.5 1.2.1 1.7-.4.6-1 1-1.6 1z"/><circle cx="7.5" cy="10.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="17" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>`;
+const EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>`;
+const TRASH_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>`;
+
+/** Returns the display name for whatever theme is currently active — a
+ *  built-in theme's label, "Random", or the active custom theme's own name
+ *  (falling back to "Custom" if none is resolvable). Drives both the
+ *  Settings-row badge and (indirectly, via re-render) the picker's active
+ *  tile highlight. */
+function getThemeDisplayName(themeId: string): string {
+  if (themeId === "random") return "Random";
+  if (themeId === "custom") {
+    const activeId = getActiveCustomId();
+    const active = activeId ? customThemes.find((t) => t.id === activeId) : undefined;
+    return active ? active.name : "Custom";
+  }
+  for (const group of THEME_GROUPS) {
+    const match = group.themes.find((t) => t.id === themeId);
+    if (match) return match.label;
+  }
+  return themeId;
+}
+
+function refreshThemeCurrentBadge(): void {
+  themeCurrentBadge.textContent = getThemeDisplayName(settings.theme);
+}
+
+const THEME_PREVIEW_VAR_NAMES = [
+  "--color-bg",
+  "--color-panel",
+  "--color-text",
+  "--color-text-muted",
+  "--color-btn",
+  "--color-accent",
+  // Budget's 8-color chart palette — deliberately vivid/distinct per theme
+  // (see the "Blue / emerald / amber / red / violet / cyan / orange / mint"
+  // comment in each theme's own CSS), so it doubles as a rich "fingerprint"
+  // strip for the preview tile. Present in every built-in theme's CSS file
+  // AND in RANDOM_VARS (so custom themes carry it too) — safe for both tile
+  // kinds.
+  "--color-chart-1",
+  "--color-chart-2",
+  "--color-chart-3",
+  "--color-chart-4",
+  "--color-chart-5",
+  "--color-chart-6",
+  "--color-chart-7",
+  "--color-chart-8",
+] as const;
+
+const CHART_VAR_NAMES = [
+  "--color-chart-1",
+  "--color-chart-2",
+  "--color-chart-3",
+  "--color-chart-4",
+  "--color-chart-5",
+  "--color-chart-6",
+  "--color-chart-7",
+  "--color-chart-8",
+] as const;
+
+// Keyed by theme id — these are small static files under /themes/, so a
+// per-id fetch is cheap and only ever happens once per session.
+const themePreviewCache = new Map<string, Record<string, string>>();
+
+async function fetchThemePreviewVars(themeId: string): Promise<Record<string, string>> {
+  const cached = themePreviewCache.get(themeId);
+  if (cached) return cached;
+  const vars: Record<string, string> = {};
+  try {
+    const res = await fetch(`/themes/${themeId}.css`);
+    const text = await res.text();
+    for (const name of THEME_PREVIEW_VAR_NAMES) {
+      const match = text.match(new RegExp(`${name}:\\s*([^;]+);`));
+      if (match) vars[name] = match[1]!.trim();
+    }
+  } catch {
+    // Preview tile just keeps its CSS-default colours if the fetch fails.
+  }
+  themePreviewCache.set(themeId, vars);
+  return vars;
+}
+
+/** Paints a set of preview vars onto a tile's .theme-tile-preview markup. */
+function applyPreviewVars(preview: HTMLElement, vars: Record<string, string>): void {
+  if (vars["--color-bg"]) preview.style.background = vars["--color-bg"]!;
+
+  const header = preview.querySelector<HTMLElement>(".theme-tile-preview-header");
+  if (header && vars["--color-panel"]) header.style.background = vars["--color-panel"]!;
+
+  const dot = preview.querySelector<HTMLElement>(".theme-tile-preview-dot");
+  if (dot && vars["--color-btn"]) dot.style.background = vars["--color-btn"]!;
+
+  const bar = preview.querySelector<HTMLElement>(".theme-tile-preview-bar");
+  if (bar && vars["--color-accent"]) bar.style.background = vars["--color-accent"]!;
+
+  const chips = preview.querySelectorAll<HTMLElement>(".theme-tile-preview-chips span");
+  CHART_VAR_NAMES.forEach((name, i) => {
+    const chip = chips[i];
+    if (chip && vars[name]) chip.style.background = vars[name]!;
+  });
+
+  const lines = preview.querySelectorAll<HTMLElement>(".theme-tile-preview-lines span");
+  if (lines[0] && vars["--color-text"]) lines[0].style.background = vars["--color-text"]!;
+  if (lines[1] && vars["--color-text-muted"]) lines[1].style.background = vars["--color-text-muted"]!;
+}
+
+function buildPreviewSwatchMarkup(): string {
+  const chips = CHART_VAR_NAMES.map(() => "<span></span>").join("");
+  return (
+    '<div class="theme-tile-preview-header"><span class="theme-tile-preview-dot"></span><span class="theme-tile-preview-bar"></span></div>' +
+    `<div class="theme-tile-preview-chips">${chips}</div>` +
+    '<div class="theme-tile-preview-lines"><span></span><span></span></div>'
+  );
+}
+
+// Tiles are plain divs, not <button> — the global `button { color:
+// var(--color-btn-text) }` rule (meant for solid-colored buttons) made tile
+// names unreadable against a transparent tile background on themes where
+// --color-btn-text is light (e.g. Light/Patriot), and custom theme tiles
+// need real nested <button>s for their edit/delete icons, which HTML doesn't
+// allow inside a <button> ancestor. Click handling + hover cursor are
+// replicated via CSS/JS instead of relying on native button semantics.
+function buildThemeTile(id: string, label: string): HTMLElement {
+  const tile = document.createElement("div");
+  tile.className = settings.theme === id ? "theme-tile active" : "theme-tile";
+  tile.dataset.themeId = id;
+
+  const preview = document.createElement("div");
+  preview.className = "theme-tile-preview";
+  preview.innerHTML = buildPreviewSwatchMarkup();
+  tile.appendChild(preview);
+  fetchThemePreviewVars(id).then((vars) => applyPreviewVars(preview, vars));
+
+  const name = document.createElement("span");
+  name.className = "theme-tile-name";
+  name.textContent = label;
+  tile.appendChild(name);
+
+  tile.addEventListener("click", () => selectTheme(id));
+  return tile;
+}
+
+function buildRandomTile(): HTMLElement {
+  const tile = document.createElement("div");
+  tile.className = settings.theme === "random" ? "theme-tile active" : "theme-tile";
+  tile.dataset.themeId = "random";
+
+  const preview = document.createElement("div");
+  preview.className = "theme-tile-preview";
+  const iconWrap = document.createElement("div");
+  iconWrap.className = "theme-tile-preview-icon";
+  iconWrap.innerHTML = DIE_SVG;
+  preview.appendChild(iconWrap);
+  tile.appendChild(preview);
+
+  const name = document.createElement("span");
+  name.className = "theme-tile-name";
+  name.textContent = "Random";
+  tile.appendChild(name);
+
+  tile.addEventListener("click", () => selectTheme("random"));
+  return tile;
+}
+
+function buildCustomThemeTile(theme: CustomTheme): HTMLElement {
+  const isActive = settings.theme === "custom" && getActiveCustomId() === theme.id;
+  const tile = document.createElement("div");
+  tile.className = isActive ? "theme-tile active" : "theme-tile";
+  tile.dataset.themeId = theme.id;
+
+  const preview = document.createElement("div");
+  preview.className = "theme-tile-preview";
+  preview.innerHTML = buildPreviewSwatchMarkup();
+  tile.appendChild(preview);
+  applyPreviewVars(preview, theme.vars);
+
+  const footer = document.createElement("div");
+  footer.className = "theme-tile-footer";
+
+  const name = document.createElement("span");
+  name.className = "theme-tile-name";
+  name.textContent = theme.name;
+  footer.appendChild(name);
+
+  const actions = document.createElement("div");
+  actions.className = "theme-tile-custom-actions";
+
+  const editBtn = document.createElement("button");
+  editBtn.className = "theme-tile-icon-btn";
+  editBtn.title = "Edit theme";
+  editBtn.innerHTML = EDIT_SVG;
+  editBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    themePickerModal.close();
+    openThemeEditor("edit", theme.id);
+  });
+  actions.appendChild(editBtn);
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "theme-tile-icon-btn theme-tile-icon-btn-danger";
+  deleteBtn.title = "Delete theme";
+  deleteBtn.innerHTML = TRASH_SVG;
+  deleteBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    requestDeleteCustomTheme(theme.id);
+  });
+  actions.appendChild(deleteBtn);
+
+  footer.appendChild(actions);
+  tile.appendChild(footer);
+
+  tile.addEventListener("click", () => selectCustomTheme(theme.id));
+  return tile;
+}
+
+function buildNewCustomThemeTile(): HTMLElement {
+  const tile = document.createElement("div");
+  tile.className = "theme-tile";
+
+  const preview = document.createElement("div");
+  preview.className = "theme-tile-preview";
+  const iconWrap = document.createElement("div");
+  iconWrap.className = "theme-tile-preview-icon";
+  iconWrap.innerHTML = PALETTE_SVG;
+  preview.appendChild(iconWrap);
+  tile.appendChild(preview);
+
+  const name = document.createElement("span");
+  name.className = "theme-tile-name";
+  name.textContent = "New Custom Theme";
+  tile.appendChild(name);
+
+  tile.addEventListener("click", () => {
+    themePickerModal.close();
+    openThemeEditor("create");
+  });
+  return tile;
+}
+
+let themePickerActiveTab: ThemePickerTab = "main";
+
+/** Which tab houses the currently active theme — main/holiday/special for a
+ *  built-in theme, "random" or "custom" for those (regardless, for custom,
+ *  of which saved one). */
+function tabForCurrentTheme(): ThemePickerTab {
+  if (settings.theme === "custom") return "custom";
+  if (settings.theme === "random") return "random";
+  for (const group of THEME_GROUPS) {
+    if (group.themes.some((t) => t.id === settings.theme)) return group.tab;
+  }
+  return "main";
+}
+
+function renderThemePickerTab(tab: ThemePickerTab): void {
+  themePickerActiveTab = tab;
+  document.querySelectorAll<HTMLElement>(".theme-picker-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.themeTab === tab);
+  });
+
+  if (tab === "random") {
+    themePickerGrid.style.display = "none";
+    themePickerRandomPane.style.display = "";
+    themePickerRandomTileWrap.innerHTML = "";
+    themePickerRandomTileWrap.appendChild(buildRandomTile());
+    // Settings are visible either way, but only interactive once Random is
+    // actually the active theme — not just being looked at.
+    randomSubsettings.classList.toggle("inactive", settings.theme !== "random");
+    return;
+  }
+  themePickerGrid.style.display = "";
+  themePickerRandomPane.style.display = "none";
+
+  themePickerGrid.innerHTML = "";
+
+  if (tab === "custom") {
+    customThemes.forEach((ct) => themePickerGrid.appendChild(buildCustomThemeTile(ct)));
+    themePickerGrid.appendChild(buildNewCustomThemeTile());
+    return;
+  }
+
+  const group = THEME_GROUPS.find((g) => g.tab === tab);
+  group?.themes.forEach((t) => themePickerGrid.appendChild(buildThemeTile(t.id, t.label)));
+}
+
+document.querySelectorAll<HTMLElement>(".theme-picker-tab").forEach((btn) => {
+  btn.addEventListener("click", () => renderThemePickerTab(btn.dataset.themeTab as ThemePickerTab));
+});
+
+/** Selects a built-in theme or "random"/"custom" by id — same logic the old
+ *  themeSelect "change" handler used to run. Re-renders the picker's active
+ *  tab afterward so the active-tile highlight tracks the new selection
+ *  without closing the modal (letting you flip through a few before leaving). */
+function selectTheme(themeId: string): void {
+  if (settings.theme === "random" && themeId !== "random") {
+    localStorage.removeItem(PERSISTENT_RANDOM_KEY);
+  }
+  if (settings.theme === "custom" && themeId !== "custom") {
+    clearCustomTheme();
+  }
+  settings.theme = themeId;
+  themeSelect.value = themeId;
+  applySettings();
+  saveSettings();
+  renderThemePickerTab(themePickerActiveTab);
+}
+
+/** Selects a specific saved custom theme by id, then applies it via
+ *  selectTheme("custom"). */
+function selectCustomTheme(customId: string): void {
+  setActiveCustomId(customId);
+  selectTheme("custom");
+}
+
+// Set just before calling themePickerModal.open() to force a specific tab on
+// the next open, bypassing tabForCurrentTheme(). Consumed (and cleared) by
+// onOpen below. Needed because tabForCurrentTheme() tracks settings.theme,
+// which the Create/Edit/Delete Custom Theme flows don't necessarily change
+// (e.g. editing or deleting a custom theme that isn't the active one) — so
+// it alone can't be trusted to land back on the Custom tab for those flows.
+let themePickerForceTab: ThemePickerTab | null = null;
+
+// Replaces (rather than stacks on) the General Settings modal, same pattern
+// as the Edit Sidebar modal above. Exported: theme-editor.ts's Create/Edit
+// Custom Theme flow returns here (not to Settings) when done, since it's now
+// only ever reached from this modal.
+export const themePickerModal = new Modal(themePickerBackdrop, {
+  closeOnEsc: true,
+  // Lands on the tab that houses whatever theme is currently active by
+  // default, unless a specific tab was requested (see themePickerForceTab).
+  onOpen: () => {
+    const tab = themePickerForceTab ?? tabForCurrentTheme();
+    themePickerForceTab = null;
+    renderThemePickerTab(tab);
+  },
+});
+
+/** Reopens Choose Theme forced to the Custom tab. Exported for theme-editor.ts
+ *  to call when returning from Create/Edit/Delete Custom Theme — see
+ *  themePickerForceTab's doc comment for why tabForCurrentTheme() alone
+ *  isn't reliable for those flows. */
+export function reopenThemePickerOnCustomTab(): void {
+  themePickerForceTab = "custom";
+  themePickerModal.open();
+}
+
+themeEditBtn.addEventListener("click", () => {
+  settingsModal.close();
+  themePickerModal.open();
+});
+
+themePickerBack.addEventListener("click", () => {
+  themePickerModal.close();
+  settingsModal.open();
+});
+
+themePickerClose.addEventListener("click", () => themePickerModal.close());
 
 /* =============================================================================
    SETTINGS MODAL
@@ -902,7 +1719,7 @@ settingsBtn.addEventListener("click", () => settingsModal.open());
 settingsClose.addEventListener("click", () => settingsModal.close());
 
 settingsReset.addEventListener("click", () => {
-  settings = { ...DEFAULT_SETTINGS };
+  settings = { ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() };
   applySettings();
   saveSettings();
   flash("Settings reset to defaults", "success");
@@ -937,19 +1754,10 @@ solidModalsToggle.addEventListener("change", () => {
   saveSettings();
 });
 
-themeSelect.addEventListener("change", () => {
-  // Switching away from random clears stored palette so returning generates fresh
-  if (settings.theme === "random" && themeSelect.value !== "random") {
-    localStorage.removeItem(PERSISTENT_RANDOM_KEY);
-  }
-  // Switching away from custom clears inline overrides
-  if (settings.theme === "custom" && themeSelect.value !== "custom") {
-    clearCustomTheme();
-  }
-  settings.theme = themeSelect.value;
-  applySettings();
-  saveSettings();
-});
+// themeSelect no longer has a visible UI of its own to fire "change" — theme
+// selection now happens via the Choose Theme modal's tiles, which call
+// selectTheme()/selectCustomTheme() (see the CHOOSE THEME MODAL section
+// below) instead of relying on this element's change event.
 
 rerollBtn.addEventListener("click", () => {
   localStorage.removeItem(PERSISTENT_RANDOM_KEY);
@@ -996,7 +1804,10 @@ saveRandomBtn.addEventListener("click", async () => {
   // Pre-select the just-saved theme so choosing "Custom" later lands on it.
   setActiveCustomId(newTheme.id);
   await saveCustomThemes();
-  refreshCustomThemeSelect();
+  // The Random settings panel (and this button) stays visible regardless of
+  // which tab is open — if that happens to be Custom, refresh it so the new
+  // tile shows up immediately instead of only on the next tab switch.
+  if (themePickerActiveTab === "custom") renderThemePickerTab("custom");
   flash(`Saved palette as "${name}"`, "success");
 });
 
@@ -1038,14 +1849,105 @@ startupSelect.addEventListener("change", () => {
   saveSettings();
 });
 
-soundPackSelect.addEventListener("change", () => {
-  settings.soundPack = soundPackSelect.value;
+/* =============================================================================
+   CHOOSE SOUND PACK MODAL
+   -----------------------------------------------------------------------------
+   Tile cards, same modal-replaces-Settings pattern as Sidebar/Theme. Unlike
+   Theme's tiles, these don't preview a different palette — a sound pack has
+   no visuals of its own, so the cards just render in the app's own current
+   theme. Each card has two icon buttons that play that pack's success/error
+   cue directly (independent of the currently *active* pack, and without
+   selecting it) — selecting the pack itself happens by clicking the tile.
+============================================================================= */
+
+const SPEAKER_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+
+function refreshSoundPackCurrentBadge(): void {
+  const pack = SOUND_PACKS.find((p) => p.id === settings.soundPack);
+  soundPackCurrentBadge.textContent = pack ? pack.name : settings.soundPack;
+}
+
+/** Plays one specific pack's cue directly — a standalone preview, not tied
+ *  to the active successAudio/errorAudio elements used by flash(). */
+function previewSoundPackCue(pack: SoundPack, kind: "success" | "error"): void {
+  const src = kind === "success" ? pack.success : pack.error;
+  if (!src) return;
+  new Audio(src).play().catch(() => {});
+}
+
+/** Selects a sound pack — same effect the old dropdown's "change" handler
+ *  had: applies it, persists it, and flashes a success toast (which, using
+ *  the newly-loaded pack, doubles as an audible confirmation). */
+function selectSoundPack(id: string): void {
+  settings.soundPack = id;
   loadSoundPack(settings.soundPack);
   saveSettings();
-  // Preview the new pack immediately so the choice is audible without
-  // needing to trigger a real toast elsewhere in the app.
+  refreshSoundPackCurrentBadge();
+  renderSoundPackPickerGrid();
   flash("Sound pack updated", "success");
+}
+
+function buildSoundPackTile(pack: SoundPack): HTMLElement {
+  const tile = document.createElement("div");
+  tile.className = pack.id === settings.soundPack ? "sound-pack-tile active" : "sound-pack-tile";
+
+  const name = document.createElement("span");
+  name.className = "sound-pack-tile-name";
+  name.textContent = pack.name;
+  tile.appendChild(name);
+
+  const actions = document.createElement("div");
+  actions.className = "sound-pack-tile-actions";
+
+  const successBtn = document.createElement("button");
+  successBtn.className = "sound-pack-preview-btn success";
+  successBtn.title = "Preview success sound";
+  successBtn.innerHTML = SPEAKER_SVG;
+  successBtn.disabled = !pack.success;
+  successBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    previewSoundPackCue(pack, "success");
+  });
+  actions.appendChild(successBtn);
+
+  const errorBtn = document.createElement("button");
+  errorBtn.className = "sound-pack-preview-btn error";
+  errorBtn.title = "Preview error sound";
+  errorBtn.innerHTML = SPEAKER_SVG;
+  errorBtn.disabled = !pack.error;
+  errorBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    previewSoundPackCue(pack, "error");
+  });
+  actions.appendChild(errorBtn);
+
+  tile.appendChild(actions);
+
+  tile.addEventListener("click", () => selectSoundPack(pack.id));
+  return tile;
+}
+
+function renderSoundPackPickerGrid(): void {
+  soundPackPickerGrid.innerHTML = "";
+  SOUND_PACKS.forEach((pack) => soundPackPickerGrid.appendChild(buildSoundPackTile(pack)));
+}
+
+const soundPackPickerModal = new Modal(soundPackPickerBackdrop, {
+  closeOnEsc: true,
+  onOpen: () => renderSoundPackPickerGrid(),
 });
+
+soundPackEditBtn.addEventListener("click", () => {
+  settingsModal.close();
+  soundPackPickerModal.open();
+});
+
+soundPackPickerBack.addEventListener("click", () => {
+  soundPackPickerModal.close();
+  settingsModal.open();
+});
+
+soundPackPickerClose.addEventListener("click", () => soundPackPickerModal.close());
 
 /* =============================================================================
    BACKUP REMINDER MODAL  (universal — owned by shell; Aggressive mode)
@@ -1155,19 +2057,6 @@ window.addEventListener("beforeunload", () => {
 // Sound Pack setting changes. Null means that cue is muted for this pack.
 let successAudio: HTMLAudioElement | null = null;
 let errorAudio: HTMLAudioElement | null = null;
-
-/** Populates the Sound Pack dropdown from SOUND_PACKS. Called once at module
- *  init — the pack list is static, unlike the user-editable custom themes. */
-function populateSoundPackSelect(): void {
-  soundPackSelect.innerHTML = "";
-  for (const pack of SOUND_PACKS) {
-    const opt = document.createElement("option");
-    opt.value = pack.id;
-    opt.textContent = pack.name;
-    soundPackSelect.appendChild(opt);
-  }
-}
-populateSoundPackSelect();
 
 /** Swaps the active success/error Audio elements to the given pack. Falls
  *  back to the first registered pack if the id is unknown (e.g. a pack was
@@ -1333,8 +2222,12 @@ async function restoreWindowSize(): Promise<void> {
 ============================================================================= */
 
 async function init(): Promise<void> {
+  // loadSettings() must finish before loadShellState() runs — the latter
+  // uses settings.sidebarItems (via activateToolIfPinned) to decide whether
+  // the saved startup target is still valid, so it can't race against the
+  // settings load that populates it.
+  await loadSettings();
   await Promise.all([
-    loadSettings(),
     restoreWindowSize(),
     loadShellState(),
     loadCustomThemes(),
@@ -1342,9 +2235,14 @@ async function init(): Promise<void> {
 
   // If the saved theme is "custom", seed the active custom theme (theme-core.ts)
   // from the first stored theme and re-apply now that customThemes is loaded.
+  // Falls back to the first saved custom theme if the previously-active id is
+  // missing or no longer exists (e.g. deleted from another install).
   if (settings.theme === "custom") {
-    refreshCustomThemeSelect();
-    const activeId = getActiveCustomId();
+    let activeId = getActiveCustomId();
+    if (!activeId || !customThemes.some((t) => t.id === activeId)) {
+      activeId = customThemes.length > 0 ? customThemes[0]!.id : null;
+      setActiveCustomId(activeId);
+    }
     if (activeId) applyCustomThemeById(activeId);
   }
 

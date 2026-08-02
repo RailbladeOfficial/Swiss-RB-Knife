@@ -30,10 +30,12 @@ import { Modal } from "../modal";
 ============================================================================= */
 
 type Entry = {
-  date: string;    // YYYY-MM-DD
-  start: string;   // HH:MM (may exceed 23:xx for overnight entries)
-  end: string;     // HH:MM
+  date: string;     // start date, YYYY-MM-DD
+  start: string;    // start time, real HH:MM:SS (00:00:00-23:59:59)
+  endDate: string;  // end date, YYYY-MM-DD — always >= date
+  end: string;      // end time, real HH:MM:SS (00:00:00-23:59:59)
   activity: string;
+  project: string;  // free-text project name, "" if unset — optional grouping
   notes: string;
 };
 
@@ -45,6 +47,11 @@ type Entry = {
 type ActivityStatus = "active" | "retired";
 type Activity = { id: string; name: string; status: ActivityStatus };
 
+// Same shape/spirit as Activity, plus a user-assigned integer ID (unique
+// across all projects) used to categorize groups of related entries.
+// Entries store `project` as free text (like `activity`), not this id.
+type Project = { id: string; projectNumber: number; name: string; status: ActivityStatus };
+
 // TT-specific settings — shell owns fontScale, theme, hour12 at the app level,
 // but TT reads them back from disk so its render/format functions still work.
 type TTSettings = {
@@ -54,6 +61,10 @@ type TTSettings = {
   theme: string;
   randomColors: Record<string, string>;
   quickDelete: boolean;
+  // When true (default), the Start/End "Now" buttons drop seconds and fill
+  // whole-minute times. When false, they fill the exact current time
+  // including seconds.
+  roundNowToMinute: boolean;
   payPeriod: {
     enabled: boolean;
     anchorDate: string;
@@ -70,8 +81,13 @@ type TTSettings = {
 
 let entries: Entry[] = [];
 let activities: Activity[] = [];
+let projects: Project[] = [];
 let lastActivity = "";
 let selectedDate: string = today();
+// True once the user has directly touched the End Date field on the entry
+// form — after that, End Date no longer auto-follows Start Date, and the
+// overnight-rollover convenience (see addEntry) stops applying.
+let endDateManuallySet = false;
 let viewStart: string = today();
 let viewEnd: string = today();
 
@@ -86,6 +102,7 @@ let settings: TTSettings = {
   theme: "default",
   randomColors: {},
   quickDelete: false,
+  roundNowToMinute: true,
   payPeriod: {
     enabled: false,
     anchorDate: "",
@@ -116,6 +133,26 @@ function formatDate(dateStr: string): string {
   if (!settings.americanDates) return dateStr;
   const [y, m, d] = dateStr.split("-");
   return `${m}-${d}-${y}`;
+}
+
+/** Returns a YYYY-MM-DD date offset by `days` (may be negative). Uses local
+ *  midnight so it's immune to DST shifts affecting the date component. */
+function addDaysToDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return localDateString(d);
+}
+
+/** Whole-day index for a YYYY-MM-DD string, for duration math across dates.
+ *  UTC-based so it's just a day count, unaffected by local DST transitions. */
+function dateToDayIndex(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return Math.floor(Date.UTC(y!, m! - 1, d!) / 86400000);
+}
+
+/** Number of calendar days between two YYYY-MM-DD strings (b - a). */
+function daysBetween(a: string, b: string): number {
+  return dateToDayIndex(b) - dateToDayIndex(a);
 }
 
 function getPresetRange(preset: string): { start: string; end: string } {
@@ -202,62 +239,215 @@ function getPresetRange(preset: string): { start: string; end: string } {
    TIME HELPERS
 ============================================================================= */
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Parses a canonical "HH:MM" or "HH:MM:SS" string into total seconds since
+ *  midnight. A missing seconds component (legacy data, or a caller that only
+ *  ever dealt in minutes) is treated as :00. */
 function parseTime(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
+  const [h, m, s] = t.split(":").map(Number);
+  return (h ?? 0) * 3600 + (m ?? 0) * 60 + (s ?? 0);
 }
 
-function formatMinutes(mins: number): string {
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-}
-
-function normalizeTime(input: string): string {
-  const trimmed = input.trim().toLowerCase();
-
-  if (trimmed === "midnight") return "00:00";
-  if (trimmed === "midday" || trimmed === "noon") return "12:00";
-
-  const suffixMatch = trimmed.match(
-    /^(\d{1,4})(?::(\d{2}))?\s*([ap]\.?m?\.?)$/,
-  );
-  if (suffixMatch) {
-    let hours = parseInt(suffixMatch[1], 10);
-    const minutes = parseInt(suffixMatch[2] || "0", 10);
-    const suffix = suffixMatch[3].replace(/\./g, "");
-    const isAm = suffix.startsWith("a");
-    const isPm = suffix.startsWith("p");
-    if (isAm && hours === 12) hours = 0;
-    if (isPm && hours !== 12) hours += 12;
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  }
-
-  const cleaned = trimmed.replace(/[^0-9]/g, "");
-  if (!cleaned) return "";
-  if (cleaned.length <= 2) return `${cleaned.padStart(2, "0")}:00`;
-  if (cleaned.length === 3) return `0${cleaned[0]}:${cleaned.slice(1)}`;
-  const padded = cleaned.padStart(4, "0");
-  return `${padded.slice(0, 2)}:${padded.slice(2, 4)}`;
-}
-
-/** Converts a total-minutes value to a zero-padded "HH:MM" string. */
-function minsToTimeString(mins: number): string {
-  return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
-}
-
-function formatTime(timeStr: string): string {
-  if (!settings.hour12) return timeStr;
-  let [h, m] = timeStr.split(":").map(Number);
-  const suffix = h >= 12 ? "pm" : "am";
-  if (h === 0) h = 12;
-  else if (h > 12) h -= 12;
-  return `${h}:${String(m).padStart(2, "0")}${suffix}`;
-}
-
-function formatPreviewDuration(totalSeconds: number): string {
+/** Formats a duration in total seconds as "Xh Ym Zs" — minutes and seconds
+ *  are always shown, even at :00, the same way a time typed as just an hour
+ *  still normalizes (and displays) with ":00" minutes. */
+function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${h}h ${m}m ${s}s`;
+}
+
+/** Splits a bare digit run (no separators) into an {h,m,s} triple using
+ *  positional convention: minutes and seconds are always 2 digits, so
+ *  whatever's left at the front is the hour.
+ *    1-2 digits -> H(H)      (hour only)
+ *    3 digits   -> H MM      (single-digit hour + minutes)
+ *    4 digits   -> HH MM
+ *    5 digits   -> H MM SS   (single-digit hour + minutes + seconds)
+ *    6 digits   -> HH MM SS
+ *  Returns null for any other length (including 0) — never silently
+ *  truncates or guesses at a reading. */
+function splitDigitsToClock(digits: string): { h: number; m: number; s: number } | null {
+  switch (digits.length) {
+    case 1:
+    case 2:
+      return { h: parseInt(digits, 10), m: 0, s: 0 };
+    case 3:
+      return { h: parseInt(digits.slice(0, 1), 10), m: parseInt(digits.slice(1), 10), s: 0 };
+    case 4:
+      return { h: parseInt(digits.slice(0, 2), 10), m: parseInt(digits.slice(2), 10), s: 0 };
+    case 5:
+      return {
+        h: parseInt(digits.slice(0, 1), 10),
+        m: parseInt(digits.slice(1, 3), 10),
+        s: parseInt(digits.slice(3), 10),
+      };
+    case 6:
+      return {
+        h: parseInt(digits.slice(0, 2), 10),
+        m: parseInt(digits.slice(2, 4), 10),
+        s: parseInt(digits.slice(4), 10),
+      };
+    default:
+      return null;
+  }
+}
+
+/** Whether h/m/s fall in valid clock ranges. minHour/maxHour let callers
+ *  distinguish a 24h reading (0-23) from a still-unshifted 12h reading
+ *  (1-12 — a 12-hour clock never reads 0, and never exceeds 12). */
+function isValidClock(h: number, m: number, s: number, minHour: number, maxHour: number): boolean {
+  return h >= minHour && h <= maxHour && m >= 0 && m <= 59 && s >= 0 && s <= 59;
+}
+
+/** Normalizes a user-typed time (12h or 24h, with or without seconds) into a
+ *  canonical "HH:MM:SS" string, or "" if unparseable OR out of range — every
+ *  branch below validates before returning, so a caller can trust that a
+ *  non-empty result is always a real, in-range time. There is no "hour ≥24
+ *  rolls to the next day" reading anywhere here: with Start/End Date now
+ *  explicit fields, an inflated hour is just invalid input, not a shorthand
+ *  for tomorrow. */
+function normalizeTime(input: string): string {
+  const trimmed = input.trim().toLowerCase();
+
+  // Explicit colon-delimited 24h time, with optional seconds — matched
+  // verbatim (and validated) before the digit-only heuristics below, which
+  // would otherwise strip the colons and misread a 5-6 digit HH:MM:SS as a
+  // bare HHMMSS value.
+  const colonMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (colonMatch) {
+    const hours = parseInt(colonMatch[1]!, 10);
+    const minutes = parseInt(colonMatch[2]!, 10);
+    const seconds = parseInt(colonMatch[3] || "0", 10);
+    if (!isValidClock(hours, minutes, seconds, 0, 23)) return "";
+    return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  }
+
+  // Colon-delimited 12h time with an am/pm suffix — "9:30pm", "9:30:15pm".
+  const colonSuffixMatch = trimmed.match(
+    /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap]\.?m?\.?)$/,
+  );
+  if (colonSuffixMatch) {
+    let hours = parseInt(colonSuffixMatch[1]!, 10);
+    const minutes = parseInt(colonSuffixMatch[2]!, 10);
+    const seconds = parseInt(colonSuffixMatch[3] || "0", 10);
+    if (!isValidClock(hours, minutes, seconds, 1, 12)) return "";
+    const suffix = colonSuffixMatch[4]!.replace(/\./g, "");
+    if (suffix.startsWith("a") && hours === 12) hours = 0;
+    if (suffix.startsWith("p") && hours !== 12) hours += 12;
+    return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  }
+
+  // Bare digit run with an am/pm suffix and no separators — "930pm",
+  // "0930pm", "93045pm" — split by the digit-length convention above rather
+  // than misreading the whole run as an hour (e.g. "930pm" used to parse as
+  // hour 930, which "+12"'d into a nonsense value like "942:00:00").
+  const bareSuffixMatch = trimmed.match(/^(\d{1,6})\s*([ap]\.?m?\.?)$/);
+  if (bareSuffixMatch) {
+    const parts = splitDigitsToClock(bareSuffixMatch[1]!);
+    if (!parts || !isValidClock(parts.h, parts.m, parts.s, 1, 12)) return "";
+    let hours = parts.h;
+    const suffix = bareSuffixMatch[2]!.replace(/\./g, "");
+    if (suffix.startsWith("a") && hours === 12) hours = 0;
+    if (suffix.startsWith("p") && hours !== 12) hours += 12;
+    return `${pad2(hours)}:${pad2(parts.m)}:${pad2(parts.s)}`;
+  }
+
+  // Bare digit run, no suffix at all — 24h reading via the same split.
+  const cleaned = trimmed.replace(/[^0-9]/g, "");
+  if (!cleaned) return "";
+  const parts = splitDigitsToClock(cleaned);
+  if (!parts || !isValidClock(parts.h, parts.m, parts.s, 0, 23)) return "";
+  return `${pad2(parts.h)}:${pad2(parts.m)}:${pad2(parts.s)}`;
+}
+
+// Every character normalizeTime() can ever make sense of — digits, the
+// separators, and am/pm (with or without periods), either case.
+const TIME_INPUT_CHARS = /[^0-9:. apmAPM]/g;
+
+/** Live keystroke guard for a Start/End time field: strips any character
+ *  that couldn't possibly be part of a valid time as the user types, so
+ *  garbage letters/symbols can't even be entered. This is a UX filter only —
+ *  it doesn't validate the VALUE (e.g. "99:99" still passes it fine); that's
+ *  normalizeTime()'s job at commit time. Preserves caret position so typing
+ *  mid-string doesn't jump the cursor around. */
+function restrictToTimeChars(input: HTMLInputElement): void {
+  input.addEventListener("input", () => {
+    const raw = input.value;
+    const cleaned = raw.replace(TIME_INPUT_CHARS, "");
+    if (cleaned === raw) return;
+    const caret = input.selectionStart ?? raw.length;
+    const caretAfterClean = raw.slice(0, caret).replace(TIME_INPUT_CHARS, "").length;
+    input.value = cleaned;
+    input.setSelectionRange(caretAfterClean, caretAfterClean);
+  });
+}
+
+/** The current wall-clock time as "HH:MM" or "HH:MM:SS", per the "Round Now
+ *  to Whole Minute" preference — used by the Start/End "Now" buttons. */
+function nowTimeString(): string {
+  const raw = new Date().toTimeString(); // "HH:MM:SS GMT+..."
+  return settings.roundNowToMinute ? raw.slice(0, 5) : raw.slice(0, 8);
+}
+
+/** Converts a total-seconds value to a zero-padded "HH:MM:SS" string. */
+function secondsToTimeString(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+}
+
+/** Duration in seconds between an entry's start (date+start) and end
+ *  (endDate+end), correctly spanning midnight or multiple days. Negative if
+ *  end is before start — callers must reject that rather than display it. */
+function entryDurationSeconds(e: Pick<Entry, "date" | "start" | "endDate" | "end">): number {
+  const startTotal = dateToDayIndex(e.date) * 86400 + parseTime(e.start);
+  const endTotal = dateToDayIndex(e.endDate) * 86400 + parseTime(e.end);
+  return endTotal - startTotal;
+}
+
+/** Formats a canonical "HH:MM:SS" time-of-day for display. Seconds are only
+ *  shown when non-zero, so entries logged without second-level precision
+ *  keep the plain "HH:MM" look. */
+function formatTime(timeStr: string): string {
+  const [hStr, mStr, sStr] = timeStr.split(":");
+  const seconds = Number(sStr ?? 0);
+  const secPart = seconds ? `:${pad2(seconds)}` : "";
+
+  if (!settings.hour12) return `${hStr}:${mStr}${secPart}`;
+
+  let h = Number(hStr);
+  const suffix = h >= 12 ? "pm" : "am";
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${mStr}${secPart}${suffix}`;
+}
+
+/** Splits a duration into a 24h-wrapped clock string plus a whole-days count,
+ *  so the live preview can show "05:30:00" with a separate "+1d" badge
+ *  instead of one ever-growing hour count. */
+function formatPreviewDuration(totalSeconds: number): { time: string; days: number } {
+  const days = Math.floor(totalSeconds / 86400);
+  const rem = totalSeconds % 86400;
+  const h = Math.floor(rem / 3600);
+  const m = Math.floor((rem % 3600) / 60);
+  const s = rem % 60;
+  const time = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return { time, days };
+}
+
+/** Renders a formatPreviewDuration() result into the preview element: the
+ *  clock time always, plus a "+Nd" badge only when the span crosses a
+ *  day boundary. */
+function renderDurationPreview(el: HTMLElement, totalSeconds: number): void {
+  const { time, days } = formatPreviewDuration(totalSeconds);
+  el.innerHTML = `<span class="tt-duration-time">${time}</span>` +
+    (days > 0 ? `<span class="tt-duration-days">+${days}d</span>` : "");
 }
 
 /** Formats an ISO timestamp using TT's existing date/time display prefs. */
@@ -276,7 +466,7 @@ function validateEntry({ date, start, end, activity }: Pick<Entry, "date" | "sta
   if (!activity) { flash("Activity is required.", "error"); return false; }
   if (!start)    { flash("Start time is missing or invalid.", "error"); return false; }
   if (!end)      { flash("End time is missing or invalid.", "error"); return false; }
-  if (!date)     { flash("Date is required.", "error"); return false; }
+  if (!date)     { flash("Start date is required.", "error"); return false; }
   return true;
 }
 
@@ -311,6 +501,10 @@ function applyTTSettings(): void {
   document.getElementById("quickDeleteLabel")!.textContent =
     settings.quickDelete ? "On" : "Off";
 
+  (document.getElementById("roundNowToggle") as HTMLInputElement).checked = settings.roundNowToMinute;
+  document.getElementById("roundNowLabel")!.textContent =
+    settings.roundNowToMinute ? "On" : "Off";
+
   (document.getElementById("payPeriodToggle") as HTMLInputElement).checked =
     settings.payPeriod.enabled;
   document.getElementById("payPeriodLabel")!.textContent =
@@ -337,8 +531,10 @@ function saveSettings(): void {
     // the entries data file (save_data) avoids reshaping that atomic blob.
     const own = {
       quickDelete: settings.quickDelete,
+      roundNowToMinute: settings.roundNowToMinute,
       payPeriod: settings.payPeriod,
       activities: activities,
+      projects: projects,
       lastCsvImportAt: settings.lastCsvImportAt,
     };
     try {
@@ -372,15 +568,19 @@ async function loadSettings(): Promise<void> {
     const own = JSON.parse(ownRaw || "{}");
     const hasOwnFile =
       own && typeof own === "object" &&
-      ("quickDelete" in own || "payPeriod" in own || "activities" in own);
+      ("quickDelete" in own || "payPeriod" in own || "activities" in own || "projects" in own);
 
     if (hasOwnFile) {
       if (typeof own.quickDelete === "boolean") settings.quickDelete = own.quickDelete;
+      if (typeof own.roundNowToMinute === "boolean") settings.roundNowToMinute = own.roundNowToMinute;
       if (own.payPeriod && typeof own.payPeriod === "object") {
         settings.payPeriod = { ...settings.payPeriod, ...own.payPeriod };
       }
       if (Array.isArray(own.activities)) {
         activities = own.activities.filter(isValidActivity);
+      }
+      if (Array.isArray(own.projects)) {
+        projects = own.projects.filter(isValidProject);
       }
       if (typeof own.lastCsvImportAt === "string") settings.lastCsvImportAt = own.lastCsvImportAt;
     } else if ("quickDelete" in shared || "payPeriod" in shared) {
@@ -405,6 +605,18 @@ function isValidActivity(a: unknown): a is Activity {
   );
 }
 
+function isValidProject(p: unknown): p is Project {
+  return (
+    p !== null &&
+    typeof p === "object" &&
+    typeof (p as Project).id === "string" &&
+    typeof (p as Project).name === "string" &&
+    (p as Project).name.length > 0 &&
+    Number.isInteger((p as Project).projectNumber) &&
+    ((p as Project).status === "active" || (p as Project).status === "retired")
+  );
+}
+
 /* =============================================================================
    PERSISTENCE — ENTRIES
 ============================================================================= */
@@ -424,7 +636,7 @@ async function loadFromDisk(): Promise<void> {
     // Validate each entry — drop any records with missing or wrong-typed required
     // fields so downstream render/sort logic never hits unexpected values.
     entries = parsed
-      .filter((e): e is Entry =>
+      .filter((e): e is Entry & { endDate?: unknown } =>
         e !== null &&
         typeof e === "object" &&
         typeof e.date     === "string" && e.date.length > 0 &&
@@ -434,7 +646,36 @@ async function loadFromDisk(): Promise<void> {
       )
       // notes is a later addition — older saved entries won't have it, so
       // default to "" rather than dropping them.
-      .map((e) => ({ ...e, notes: typeof e.notes === "string" ? e.notes : "" }));
+      // endDate is a later addition too. Pre-migration entries encoded an
+      // overnight span by inflating `end` past 24:00 (e.g. "26:00" for
+      // 2am next day) — split that back into a real time-of-day plus a
+      // rolled-forward endDate so old data reads correctly under the new
+      // explicit-date model.
+      // start/end are reformatted through parseTime+secondsToTimeString
+      // either way, since both migration paths above may carry legacy
+      // "HH:MM" (no seconds) values that need a ":00" appended to match
+      // the current HH:MM:SS storage format.
+      .map((e) => {
+        const notes = typeof e.notes === "string" ? e.notes : "";
+        // project is a later addition — older saved entries won't have it.
+        const project = typeof e.project === "string" ? e.project : "";
+        if (typeof e.endDate === "string" && e.endDate) {
+          return {
+            ...e,
+            notes,
+            project,
+            endDate: e.endDate,
+            start: secondsToTimeString(parseTime(e.start)),
+            end: secondsToTimeString(parseTime(e.end)),
+          } as Entry;
+        }
+        const endSecs = parseTime(e.end);
+        const daysForward = Math.floor(endSecs / 86400);
+        const endDate = daysForward > 0 ? addDaysToDate(e.date, daysForward) : e.date;
+        const end = secondsToTimeString(endSecs - daysForward * 86400);
+        const start = secondsToTimeString(parseTime(e.start));
+        return { ...e, notes, project, endDate, start, end } as Entry;
+      });
   } catch (err) {
     devError("Load failed:", err);
     entries = [];
@@ -447,6 +688,8 @@ async function loadFromDisk(): Promise<void> {
 
 function saveDraft(
   datePicker: HTMLInputElement,
+  endDatePicker: HTMLInputElement,
+  projectInput: HTMLInputElement,
   activityInput: HTMLInputElement,
   startInput: HTMLInputElement,
   endInput: HTMLInputElement,
@@ -457,6 +700,9 @@ function saveDraft(
     await invoke("save_draft", {
       data: JSON.stringify({
         selectedDate: datePicker.value,
+        endDate: endDatePicker.value,
+        endDateManuallySet,
+        project: projectInput.value,
         activity: activityInput.value,
         start: startInput.value,
         end: endInput.value,
@@ -468,6 +714,8 @@ function saveDraft(
 
 async function loadDraft(
   datePicker: HTMLInputElement,
+  endDatePicker: HTMLInputElement,
+  projectInput: HTMLInputElement,
   activityInput: HTMLInputElement,
   startInput: HTMLInputElement,
   endInput: HTMLInputElement,
@@ -478,6 +726,9 @@ async function loadDraft(
     const raw = await invoke<string>("load_draft");
     const draft = JSON.parse(raw);
     if (draft.selectedDate) datePicker.value = draft.selectedDate;
+    if (draft.endDate)      endDatePicker.value = draft.endDate;
+    endDateManuallySet = draft.endDateManuallySet === true;
+    if (draft.project)      projectInput.value = draft.project;
     if (draft.activity)     activityInput.value = draft.activity;
     if (draft.start)        startInput.value = draft.start;
     if (draft.end)          endInput.value = draft.end;
@@ -551,6 +802,8 @@ function updateDurationPreview(
   startInput: HTMLInputElement,
   endInput: HTMLInputElement,
   durationPreview: HTMLElement,
+  startDatePicker: HTMLInputElement,
+  endDatePicker: HTMLInputElement,
 ): void {
   const rawStart = startInput.value.trim();
   const rawEnd = endInput.value.trim();
@@ -588,18 +841,27 @@ function updateDurationPreview(
   const normalizedEnd = rawEnd ? normalizeTime(rawEnd) : "";
 
   if (normalizedEnd) {
-    let diffSeconds =
-      (parseTime(normalizedEnd) - parseTime(normalizedStart)) * 60;
-    if (diffSeconds < 0) diffSeconds += 1440 * 60;
-    durationPreview.textContent = formatPreviewDuration(diffSeconds);
+    const startDate = startDatePicker.value || today();
+    let endDate = endDateManuallySet ? (endDatePicker.value || startDate) : startDate;
+    if (!endDateManuallySet && parseTime(normalizedEnd) < parseTime(normalizedStart)) {
+      endDate = addDaysToDate(startDate, 1);
+    }
+    const diffSeconds = Math.max(0, entryDurationSeconds({ date: startDate, start: normalizedStart, endDate, end: normalizedEnd }));
+    renderDurationPreview(durationPreview, diffSeconds);
   } else {
+    // Still-running preview: elapsed time from the real Start Date+Time to
+    // now, using full date arithmetic (not just a same-day clock diff) so a
+    // Start Date in the past correctly shows elapsed days via the "+Nd"
+    // badge instead of silently wrapping to a same-day reading.
     function tick() {
       const now = new Date();
-      const nowMins = now.getHours() * 60 + now.getMinutes();
-      const nowSecs = now.getSeconds();
-      let diffSeconds = (nowMins - parseTime(normalizedStart)) * 60 + nowSecs;
-      if (diffSeconds < 0) diffSeconds += 1440 * 60;
-      durationPreview.textContent = formatPreviewDuration(diffSeconds);
+      const startDate = startDatePicker.value || today();
+      const startTotalSeconds = dateToDayIndex(startDate) * 86400 + parseTime(normalizedStart);
+      const nowTotalSeconds =
+        dateToDayIndex(localDateString(now)) * 86400 +
+        now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const diffSeconds = Math.max(0, nowTotalSeconds - startTotalSeconds);
+      renderDurationPreview(durationPreview, diffSeconds);
     }
     tick();
     durationPreviewTimer = window.setInterval(tick, 1000);
@@ -640,71 +902,70 @@ function computeStats(visible: Entry[]): Stat[] {
   if (visible.length === 0) return [];
 
   const totalEntries = visible.length;
-  const totalMins = visible.reduce(
-    (sum, e) => sum + (parseTime(e.end) - parseTime(e.start)),
+  const totalSecs = visible.reduce(
+    (sum, e) => sum + entryDurationSeconds(e),
     0,
   );
-  const avgPerActivity = Math.round(totalMins / totalEntries);
+  const avgPerActivity = Math.round(totalSecs / totalEntries);
 
   // Group by activity name (case-insensitive), same convention render() and
   // exportCSV() use for the Totals summary.
-  const byActivity = new Map<string, { display: string; count: number; mins: number }>();
+  const byActivity = new Map<string, { display: string; count: number; secs: number }>();
   visible.forEach((e) => {
     const key = e.activity.toLowerCase();
-    const g = byActivity.get(key) ?? { display: e.activity, count: 0, mins: 0 };
+    const g = byActivity.get(key) ?? { display: e.activity, count: 0, secs: 0 };
     g.count += 1;
-    g.mins += parseTime(e.end) - parseTime(e.start);
+    g.secs += entryDurationSeconds(e);
     byActivity.set(key, g);
   });
 
   let mostEntries = { display: "", count: 0 };
-  let highestTime = { display: "", mins: 0 };
-  let highestAvg = { display: "", mins: 0 };
+  let highestTime = { display: "", secs: 0 };
+  let highestAvg = { display: "", secs: 0 };
   byActivity.forEach((g) => {
     if (g.count > mostEntries.count) mostEntries = { display: g.display, count: g.count };
-    if (g.mins > highestTime.mins) highestTime = { display: g.display, mins: g.mins };
-    const avg = g.mins / g.count;
-    if (avg > highestAvg.mins) highestAvg = { display: g.display, mins: avg };
+    if (g.secs > highestTime.secs) highestTime = { display: g.display, secs: g.secs };
+    const avg = g.secs / g.count;
+    if (avg > highestAvg.secs) highestAvg = { display: g.display, secs: avg };
   });
 
   // Single entry with the highest duration.
   let longestEntry = visible[0]!;
-  let longestMins = parseTime(longestEntry.end) - parseTime(longestEntry.start);
+  let longestSecs = entryDurationSeconds(longestEntry);
   visible.forEach((e) => {
-    const mins = parseTime(e.end) - parseTime(e.start);
-    if (mins > longestMins) { longestEntry = e; longestMins = mins; }
+    const secs = entryDurationSeconds(e);
+    if (secs > longestSecs) { longestEntry = e; longestSecs = secs; }
   });
 
-  // Earliest start / latest finish, compared by time-of-day (mod 1440) so an
-  // overnight entry's inflated end value (e.g. 25:30 for a 1:30am finish)
-  // still ranks and displays correctly against same-day times.
+  // Earliest start / latest finish, compared by real time-of-day.
   let earliestEntry = visible[0]!;
-  let earliestMins = parseTime(earliestEntry.start) % 1440;
+  let earliestSecs = parseTime(earliestEntry.start);
   let latestEntry = visible[0]!;
-  let latestMins = parseTime(latestEntry.end) % 1440;
+  let latestSecs = parseTime(latestEntry.end);
   visible.forEach((e) => {
-    const sMins = parseTime(e.start) % 1440;
-    if (sMins < earliestMins) { earliestEntry = e; earliestMins = sMins; }
-    const eMins = parseTime(e.end) % 1440;
-    if (eMins > latestMins) { latestEntry = e; latestMins = eMins; }
+    const s = parseTime(e.start);
+    if (s < earliestSecs) { earliestEntry = e; earliestSecs = s; }
+    const e2 = parseTime(e.end);
+    if (e2 > latestSecs) { latestEntry = e; latestSecs = e2; }
   });
 
   // Per-date grouping — "craziest" (most entries) and "busiest" (most time).
-  const byDate = new Map<string, { count: number; mins: number }>();
+  // Grouped by start date, same as the ledger's per-day subheaders.
+  const byDate = new Map<string, { count: number; secs: number }>();
   visible.forEach((e) => {
-    const g = byDate.get(e.date) ?? { count: 0, mins: 0 };
+    const g = byDate.get(e.date) ?? { count: 0, secs: 0 };
     g.count += 1;
-    g.mins += parseTime(e.end) - parseTime(e.start);
+    g.secs += entryDurationSeconds(e);
     byDate.set(e.date, g);
   });
 
   let craziestDate = "";
   let craziestCount = 0;
   let busiestDate = "";
-  let busiestMins = 0;
+  let busiestSecs = 0;
   byDate.forEach((g, date) => {
     if (g.count > craziestCount) { craziestCount = g.count; craziestDate = date; }
-    if (g.mins > busiestMins) { busiestMins = g.mins; busiestDate = date; }
+    if (g.secs > busiestSecs) { busiestSecs = g.secs; busiestDate = date; }
   });
 
   const avgEntriesPerDay = totalEntries / byDate.size;
@@ -720,7 +981,7 @@ function computeStats(visible: Entry[]): Stat[] {
     },
     {
       label: "Average Time per Activity",
-      value: `${formatMinutes(avgPerActivity)} per activity`,
+      value: `${formatDuration(avgPerActivity)} per activity`,
     },
     {
       label: "Activity with Most Entries",
@@ -728,23 +989,23 @@ function computeStats(visible: Entry[]): Stat[] {
     },
     {
       label: "Activity with Highest Time",
-      value: `${highestTime.display} (${formatMinutes(highestTime.mins)})`,
+      value: `${highestTime.display} (${formatDuration(highestTime.secs)})`,
     },
     {
       label: "Activity with Highest Average Time",
-      value: `${highestAvg.display} (${formatMinutes(Math.round(highestAvg.mins))})`,
+      value: `${highestAvg.display} (${formatDuration(Math.round(highestAvg.secs))})`,
     },
     {
       label: "Entry with Highest Time",
-      value: `${longestEntry.activity} on ${formatDate(longestEntry.date)} (${formatMinutes(longestMins)})`,
+      value: `${longestEntry.activity} on ${formatDate(longestEntry.date)} (${formatDuration(longestSecs)})`,
     },
     {
       label: "Earliest Start",
-      value: `${formatTime(minsToTimeString(earliestMins))} on ${formatDate(earliestEntry.date)} (${earliestEntry.activity})`,
+      value: `${formatTime(secondsToTimeString(earliestSecs))} on ${formatDate(earliestEntry.date)} (${earliestEntry.activity})`,
     },
     {
       label: "Latest Finish",
-      value: `${formatTime(minsToTimeString(latestMins))} on ${formatDate(latestEntry.date)} (${latestEntry.activity})`,
+      value: `${formatTime(secondsToTimeString(latestSecs))} on ${formatDate(latestEntry.date)} (${latestEntry.activity})`,
     },
     {
       label: "Craziest Day",
@@ -752,7 +1013,7 @@ function computeStats(visible: Entry[]): Stat[] {
     },
     {
       label: "Busiest Day",
-      value: `${formatDate(busiestDate)} (${formatMinutes(busiestMins)})`,
+      value: `${formatDate(busiestDate)} (${formatDuration(busiestSecs)})`,
     },
     {
       label: "Avg Entries per Day",
@@ -790,9 +1051,9 @@ async function exportCSV(): Promise<void> {
   const grouped: Record<string, number> = {};
   const groupedDisplay: Record<string, string> = {};
   visibleEntries.forEach((e) => {
-    const mins = parseTime(e.end) - parseTime(e.start);
+    const secs = entryDurationSeconds(e);
     const key = e.activity.toLowerCase();
-    grouped[key] = (grouped[key] || 0) + mins;
+    grouped[key] = (grouped[key] || 0) + secs;
     if (!groupedDisplay[key]) groupedDisplay[key] = e.activity;
   });
 
@@ -825,11 +1086,11 @@ async function exportCSV(): Promise<void> {
   let grandTotal = 0;
   Object.entries(grouped)
     .sort(([a], [b]) => a.localeCompare(b))
-    .forEach(([key, mins]) => {
-      lines.push(`${csvField(groupedDisplay[key])},"${formatMinutes(mins)}"`);
-      grandTotal += mins;
+    .forEach(([key, secs]) => {
+      lines.push(`${csvField(groupedDisplay[key])},"${formatDuration(secs)}"`);
+      grandTotal += secs;
     });
-  lines.push(`"TOTAL","${formatMinutes(grandTotal)}"`);
+  lines.push(`"TOTAL","${formatDuration(grandTotal)}"`);
   lines.push("");
 
   lines.push("STATS");
@@ -840,7 +1101,7 @@ async function exportCSV(): Promise<void> {
   lines.push("");
 
   lines.push("ENTRIES");
-  lines.push("Date,Start,End,Activity,Duration,Notes");
+  lines.push("Date,Start,End Date,End,Project,Activity,Duration,Notes");
   visibleEntries
     .slice()
     .sort((a, b) => {
@@ -848,9 +1109,9 @@ async function exportCSV(): Promise<void> {
       return d !== 0 ? d : parseTime(a.start) - parseTime(b.start);
     })
     .forEach((e) => {
-      const mins = parseTime(e.end) - parseTime(e.start);
+      const secs = entryDurationSeconds(e);
       lines.push(
-        `"${e.date}","${e.start}","${e.end}",${csvField(e.activity)},"${formatMinutes(mins)}",${csvField(e.notes)}`,
+        `"${e.date}","${e.start}","${e.endDate}","${e.end}",${csvField(e.project)},${csvField(e.activity)},"${formatDuration(secs)}",${csvField(e.notes)}`,
       );
     });
 
@@ -934,6 +1195,8 @@ function parseCsvImport(raw: string): CsvImportResult {
     };
   }
   const notesIdx = colIndex["notes"];
+  const endDateIdx = colIndex["end date"];
+  const projectIdx = colIndex["project"];
 
   const errors: string[] = [];
   const parsed: Entry[] = [];
@@ -945,6 +1208,8 @@ function parseCsvImport(raw: string): CsvImportResult {
     const endRaw      = (row[colIndex["end time"]!] ?? "").trim();
     const activityRaw = (row[colIndex["activity"]!] ?? "").trim();
     const notesRaw     = notesIdx !== undefined ? (row[notesIdx] ?? "").trim() : "";
+    const endDateRaw    = endDateIdx !== undefined ? (row[endDateIdx] ?? "").trim() : "";
+    const projectRaw    = projectIdx !== undefined ? (row[projectIdx] ?? "").trim() : "";
 
     const missing: string[] = [];
     if (!dateRaw) missing.push("Date");
@@ -965,15 +1230,36 @@ function parseCsvImport(raw: string): CsvImportResult {
     if (!start) { errors.push(`Line ${lineNum}: Start Time "${startRaw}" isn't a recognizable time.`); return; }
     if (!end)   { errors.push(`Line ${lineNum}: End Time "${endRaw}" isn't a recognizable time.`); return; }
 
-    let startMins = parseTime(start);
-    let endMins = parseTime(end);
-    if (endMins <= startMins) endMins += 1440;
+    // End Date is optional — when absent, mirror the manual-entry convenience:
+    // same day unless the end time is at/before the start time, in which case
+    // it rolls forward one day.
+    let endDate: string;
+    if (endDateRaw) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(endDateRaw)) {
+        errors.push(`Line ${lineNum}: End Date "${endDateRaw}" isn't in YYYY-MM-DD format.`);
+        return;
+      }
+      endDate = endDateRaw;
+    } else {
+      endDate = parseTime(end) < parseTime(start) ? addDaysToDate(dateRaw, 1) : dateRaw;
+    }
+
+    if (endDate < dateRaw) {
+      errors.push(`Line ${lineNum}: End Date "${endDate}" is before Date "${dateRaw}".`);
+      return;
+    }
+    if (entryDurationSeconds({ date: dateRaw, start, endDate, end }) < 0) {
+      errors.push(`Line ${lineNum}: End Time "${endRaw}" is before Start Time "${startRaw}" on the given dates.`);
+      return;
+    }
 
     parsed.push({
       date: dateRaw,
-      start: minsToTimeString(startMins),
-      end: minsToTimeString(endMins),
+      start,
+      endDate,
+      end,
       activity: activityRaw,
+      project: projectRaw,
       notes: notesRaw,
     });
   });
@@ -995,7 +1281,7 @@ async function downloadCsvTemplate(): Promise<void> {
   try {
     await invoke("export_csv", {
       filename: "time-tracker-import-template.csv",
-      data: "Date,Start Time,End Time,Activity,Notes",
+      data: "Date,Start Time,End Date,End Time,Project,Activity,Notes",
     });
     flash("Template downloaded to Downloads!", "success");
   } catch (err) {
@@ -1035,10 +1321,10 @@ function render(
     });
 
   visible.forEach((entry) => {
-    const mins = parseTime(entry.end) - parseTime(entry.start);
-    total += mins;
+    const secs = entryDurationSeconds(entry);
+    total += secs;
     const key = entry.activity.toLowerCase();
-    grouped[key] = (grouped[key] || 0) + mins;
+    grouped[key] = (grouped[key] || 0) + secs;
     if (!groupedDisplay[key]) groupedDisplay[key] = entry.activity;
   });
 
@@ -1049,22 +1335,31 @@ function render(
   });
 
   byDate.forEach((dateEntries, date) => {
-    const dayMins = dateEntries.reduce(
-      (sum, e) => sum + parseTime(e.end) - parseTime(e.start),
+    const daySecs = dateEntries.reduce(
+      (sum, e) => sum + entryDurationSeconds(e),
       0,
     );
 
     const subheader = document.createElement("div");
     subheader.className = "entry-date-subheader";
-    subheader.textContent = `${formatDate(date)} — ${formatMinutes(dayMins)}`;
+    subheader.textContent = `${formatDate(date)} — ${formatDuration(daySecs)}`;
     entriesDiv.appendChild(subheader);
 
     dateEntries.forEach((entry) => {
       const entryIndex = entries.indexOf(entry);
-      const mins = parseTime(entry.end) - parseTime(entry.start);
+      const secs = entryDurationSeconds(entry);
 
       const row = document.createElement("div");
       row.className = "entry-row";
+
+      const projectSpan = document.createElement("span");
+      projectSpan.className = "entry-field entry-col-project";
+      projectSpan.textContent = entry.project;
+      projectSpan.title = "Double-click to edit";
+      projectSpan.addEventListener("dblclick", () =>
+        makeEditable(projectSpan, entry, "project", entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv),
+      );
+      row.appendChild(projectSpan);
 
       const activitySpan = document.createElement("span");
       activitySpan.className = "entry-field entry-col-activity";
@@ -1085,9 +1380,14 @@ function render(
       row.appendChild(startSpan);
 
       const endSpan = document.createElement("span");
-      endSpan.className = "entry-field entry-col-time";
-      endSpan.textContent = formatTime(entry.end);
-      endSpan.title = "Double-click to edit";
+      const dayDiff = daysBetween(entry.date, entry.endDate);
+      endSpan.className = dayDiff > 0
+        ? "entry-field entry-col-time entry-col-time--spans"
+        : "entry-field entry-col-time";
+      endSpan.textContent = dayDiff > 0 ? `${formatTime(entry.end)} (+${dayDiff}d)` : formatTime(entry.end);
+      endSpan.title = dayDiff > 0
+        ? `Ends ${formatDate(entry.endDate)} — double-click to edit the time, use the calendar icon to edit dates`
+        : "Double-click to edit";
       endSpan.addEventListener("dblclick", () =>
         makeEditable(endSpan, entry, "end", entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv),
       );
@@ -1095,7 +1395,7 @@ function render(
 
       const durSpan = document.createElement("span");
       durSpan.className = "entry-col-duration";
-      durSpan.textContent = formatMinutes(mins);
+      durSpan.textContent = formatDuration(secs);
       row.appendChild(durSpan);
 
       const notesSpan = document.createElement("span");
@@ -1110,29 +1410,10 @@ function render(
       const calBtn = document.createElement("button");
       calBtn.className = "entry-cal-btn";
       calBtn.textContent = "📅";
-      calBtn.title = "Edit date";
-      calBtn.addEventListener("click", () => {
-        const dateInput = document.createElement("input");
-        dateInput.type = "date";
-        dateInput.value = entry.date;
-        dateInput.className = "entry-date-picker";
-        calBtn.replaceWith(dateInput);
-        dateInput.focus();
-        dateInput.showPicker?.();
-
-        function commitDate() {
-          if (dateInput.value && dateInput.value !== entry.date) {
-            entry.date = dateInput.value;
-            sortEntries();
-            saveToDisk();
-            flash("Date updated", "success");
-          }
-          render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
-        }
-
-        dateInput.addEventListener("change", commitDate);
-        dateInput.addEventListener("blur", () => render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv));
-      });
+      calBtn.title = "Edit dates";
+      calBtn.addEventListener("click", () =>
+        openDateEditModal(entry, () => render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv)),
+      );
       row.appendChild(calBtn);
 
       const deleteBtn = document.createElement("button");
@@ -1147,13 +1428,13 @@ function render(
     });
   });
 
-  dayTotalDiv.textContent = `Total: ${formatMinutes(total)}`;
+  dayTotalDiv.textContent = `Total: ${formatDuration(total)}`;
 
   Object.entries(grouped)
     .sort(([a], [b]) => a.localeCompare(b))
-    .forEach(([key, mins]) => {
+    .forEach(([key, secs]) => {
       const d = document.createElement("div");
-      d.textContent = `${groupedDisplay[key]}: ${formatMinutes(mins)}`;
+      d.textContent = `${groupedDisplay[key]}: ${formatDuration(secs)}`;
       groupTotalsDiv.appendChild(d);
     });
 
@@ -1207,12 +1488,17 @@ function makeEditable(
   groupTotalsDiv: HTMLElement,
   statsDiv: HTMLElement,
 ): void {
-  const original = span.textContent || "";
+  // For start/end, edit the raw formatted time rather than the row's display
+  // text — the end column may carry a "(+1d)" suffix that normalizeTime
+  // can't parse.
+  const original =
+    field === "start" || field === "end" ? formatTime(entry[field]) : (span.textContent || "");
 
   const input = document.createElement("input");
   input.className = "entry-edit-input";
   input.value = original;
   input.style.width = span.offsetWidth + "px";
+  if (field === "start" || field === "end") restrictToTimeChars(input);
   span.replaceWith(input);
   input.focus();
   input.select();
@@ -1221,21 +1507,37 @@ function makeEditable(
 
   function commit() {
     const raw = input.value.trim();
-    if (!raw) { cancel(); return; }
+    // Project is optional — clearing it to empty is a valid edit (removes
+    // the entry from any project), unlike the other inline-editable fields
+    // where empty means "discard this edit".
+    if (!raw && field !== "project") { cancel(); return; }
 
     if (field === "start" || field === "end") {
-      entry[field] = normalizeTime(raw) || original;
+      const normalized = normalizeTime(raw);
+      if (!normalized) { cancel(); return; }
+      const prevValue = entry[field];
+      entry[field] = normalized;
+
+      // No auto-roll here, unlike Add Entry — this is editing an EXISTING
+      // entry's dates are already fixed, so a start/end time edit that would
+      // make the span negative is simply rejected. If the entry is already
+      // multi-day (date !== endDate), entryDurationSeconds() correctly
+      // accounts for that and won't reject a same-day-looking time-of-day
+      // comparison that's actually fine across the date boundary.
+      if (entryDurationSeconds(entry) < 0) {
+        entry[field] = prevValue;
+        flash("End time can't be before start time — use the calendar icon to edit dates if this should span multiple days.", "error");
+        render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
+        return;
+      }
     } else {
       entry[field] = raw;
-      // Inline-editing the activity name should register it for autocomplete
-      // too, same as adding a fresh entry.
+      // Inline-editing the activity/project name should register it for
+      // autocomplete too, same as adding a fresh entry. Project is optional,
+      // so an empty value is skipped rather than creating a nameless project.
       if (field === "activity") findOrCreateActivity(raw);
+      if (field === "project" && raw) findOrCreateProject(raw);
     }
-
-    let startMins = parseTime(entry.start);
-    let endMins = parseTime(entry.end);
-    if (endMins <= startMins) endMins += 1440;
-    entry.end = minsToTimeString(endMins);
 
     sortEntries();
     render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
@@ -1272,9 +1574,13 @@ function makeEditable(
 async function addEntry(
   start: string,
   end: string,
+  project: string,
   activity: string,
   notes: string,
+  endDateInputValue: string,
   datePicker: HTMLInputElement,
+  endDatePicker: HTMLInputElement,
+  projectInput: HTMLInputElement,
   activityInput: HTMLInputElement,
   startInput: HTMLInputElement,
   endInput: HTMLInputElement,
@@ -1284,35 +1590,52 @@ async function addEntry(
   groupTotalsDiv: HTMLElement,
   statsDiv: HTMLElement,
   durationPreview: HTMLElement,
-): Promise<void> {
-  let startMins = parseTime(normalizeTime(start));
-  let endMins   = parseTime(normalizeTime(end));
-  if (endMins <= startMins) endMins += 1440;
+): Promise<boolean> {
+  const startDate = selectedDate;
 
-  entries.push({
-    date: selectedDate,
-    start: minsToTimeString(startMins),
-    end: minsToTimeString(endMins),
-    activity,
-    notes,
-  });
+  // Same-day auto-roll (see endDateManuallySet doc comment): a same-day
+  // end-strictly-before-start reading rolls End Date forward a day, unless
+  // the user has directly set End Date themselves. Equal start/end is a
+  // legitimate zero-duration entry, not an overnight span.
+  let endDate = endDateManuallySet ? (endDateInputValue || startDate) : startDate;
+  if (!endDateManuallySet && parseTime(end) < parseTime(start)) {
+    endDate = addDaysToDate(startDate, 1);
+  }
+
+  if (endDate < startDate) {
+    flash("End date cannot be before Start date.", "error");
+    return false;
+  }
+  if (entryDurationSeconds({ date: startDate, start, endDate, end }) < 0) {
+    flash("End time must be after Start time — check the dates.", "error");
+    return false;
+  }
+
+  entries.push({ date: startDate, start, endDate, end, activity, project, notes });
 
   sortEntries();
   lastActivity = activity;
-  // Remember this activity name for autocomplete — silent quick-add, mirrors
-  // Budget calling findOrCreateExpenseSource on entry commit.
+  // Remember this activity/project name for autocomplete — silent quick-add,
+  // mirrors Budget calling findOrCreateExpenseSource on entry commit. Project
+  // is optional, so an empty value is skipped rather than creating a
+  // nameless project.
   findOrCreateActivity(activity);
+  if (project) findOrCreateProject(project);
 
   render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
   await saveToDisk();
   flash("Entry added", "success");
 
+  projectInput.value = "";
   activityInput.value = "";
   startInput.value = "";
   endInput.value = "";
   notesInput.value = "";
-  saveDraft(datePicker, activityInput, startInput, endInput, notesInput);
-  updateDurationPreview(startInput, endInput, durationPreview);
+  endDateManuallySet = false;
+  endDatePicker.value = datePicker.value;
+  saveDraft(datePicker, endDatePicker, projectInput, activityInput, startInput, endInput, notesInput);
+  updateDurationPreview(startInput, endInput, durationPreview, datePicker, endDatePicker);
+  return true;
 }
 
 async function deleteEntry(
@@ -1452,6 +1775,175 @@ function renderActivitiesList(): void {
 }
 
 /* =============================================================================
+   PROJECTS — SETUP LIST + AUTOCOMPLETE SOURCE
+   -----------------------------------------------------------------------------
+   Mirrors the Activities list above, plus a user-assigned integer ID
+   (projectNumber) that must stay unique across all projects. Entries keep
+   storing `project` as free text (like `activity`); Project is optional
+   grouping, so unlike Activity an empty Project field is valid.
+============================================================================= */
+
+/** Smallest integer not currently in use as a projectNumber. Used only for
+ *  the quick-add path (typing a new name directly in the Input panel) —
+ *  the Setup "+ New Project" form lets the user pick the number explicitly. */
+function nextProjectNumber(): number {
+  return projects.reduce((max, p) => Math.max(max, p.projectNumber), 0) + 1;
+}
+
+/**
+ * Silent quick-add used from the main entry form (typed Project text).
+ * Matches an existing ACTIVE project case-insensitively and does nothing if
+ * found; otherwise creates a new active one with the next free ID number.
+ * Mirrors findOrCreateActivity — no toast, no reactivation of retired items.
+ */
+function findOrCreateProject(name: string): void {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const existing = projects.find(
+    (p) => p.status === "active" && p.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (existing) return;
+  projects.push({ id: makeId(), projectNumber: nextProjectNumber(), name: trimmed, status: "active" });
+  saveSettings();
+  refreshProjectDatalist();
+  renderProjectsList();
+}
+
+/**
+ * Explicit add from the Setup modal's "+ New Project" button, with a
+ * user-chosen ID number. Reactivating a matching retired project (by name)
+ * keeps its existing number rather than adopting the typed one, mirroring
+ * addOrReactivateActivity's name-match convenience. Returns false (and
+ * flashes the reason) on validation failure, so the modal can stay open.
+ */
+function addOrReactivateProject(name: string, projectNumber: number): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) { flash("Name cannot be empty", "error"); return false; }
+
+  const existingByName = projects.find((p) => p.name.toLowerCase() === trimmed.toLowerCase());
+  if (existingByName) {
+    const wasReactivated = existingByName.status === "retired";
+    existingByName.status = "active";
+    flash(wasReactivated ? "Project reactivated" : "Project added", "success");
+    saveSettings();
+    refreshProjectDatalist();
+    renderProjectsList();
+    return true;
+  }
+
+  if (!Number.isInteger(projectNumber)) { flash("ID Number must be a whole number.", "error"); return false; }
+  if (projects.some((p) => p.projectNumber === projectNumber)) {
+    flash(`ID Number ${projectNumber} is already in use.`, "error");
+    return false;
+  }
+
+  projects.push({ id: makeId(), projectNumber, name: trimmed, status: "active" });
+  flash("Project added", "success");
+  saveSettings();
+  refreshProjectDatalist();
+  renderProjectsList();
+  return true;
+}
+
+/**
+ * Save handler for the Edit Project modal: renames, renumbers, and — like
+ * activity rename — rewrites every matching entry's `project` text so
+ * history stays in sync. Returns false (and flashes the reason) on
+ * validation failure, so the modal can stay open.
+ */
+function saveProjectEdit(item: Project, name: string, projectNumber: number): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) { flash("Name cannot be empty", "error"); return false; }
+  if (!Number.isInteger(projectNumber)) { flash("ID Number must be a whole number.", "error"); return false; }
+  if (projects.some((p) => p.id !== item.id && p.projectNumber === projectNumber)) {
+    flash(`ID Number ${projectNumber} is already in use.`, "error");
+    return false;
+  }
+
+  const oldName = item.name;
+  item.name = trimmed;
+  item.projectNumber = projectNumber;
+  if (oldName.toLowerCase() !== trimmed.toLowerCase()) {
+    let changed = 0;
+    entries.forEach((e) => {
+      if (e.project.toLowerCase() === oldName.toLowerCase()) {
+        e.project = trimmed;
+        changed++;
+      }
+    });
+    if (changed > 0) saveToDisk();
+  }
+  saveSettings();
+  refreshProjectDatalist();
+  renderCurrentView();
+  flash("Project saved", "success");
+  return true;
+}
+
+/** Repopulates the Project field's <datalist> from active projects. */
+function refreshProjectDatalist(): void {
+  const datalist = document.getElementById("ttProjectList") as HTMLDataListElement | null;
+  if (!datalist) return;
+  datalist.innerHTML = "";
+  projects
+    .filter((p) => p.status === "active")
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p.name;
+      datalist.appendChild(opt);
+    });
+}
+
+function buildProjectRow(item: Project): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "setup-item";
+  if (item.status === "retired") row.classList.add("setup-item-retired");
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "setup-item-name";
+  nameSpan.textContent = `#${item.projectNumber} — ${item.name}`;
+  if (item.status === "retired") {
+    const retiredBadge = document.createElement("span");
+    retiredBadge.className = "setup-item-retired-badge";
+    retiredBadge.textContent = "Retired";
+    retiredBadge.style.marginLeft = "8px";
+    nameSpan.appendChild(retiredBadge);
+  }
+  row.appendChild(nameSpan);
+
+  const chevron = document.createElement("span");
+  chevron.className = "setup-item-chevron";
+  chevron.textContent = "›";
+  row.appendChild(chevron);
+
+  row.style.cursor = "pointer";
+  row.addEventListener("click", () => openProjectEdit(item));
+  return row;
+}
+
+function renderProjectsList(): void {
+  const container = document.getElementById("ttProjectsList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (projects.length === 0) {
+    const p = document.createElement("p");
+    p.className = "placeholder-text";
+    p.textContent = "No projects yet — add one above.";
+    container.appendChild(p);
+    return;
+  }
+
+  [...projects]
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "active" ? -1 : 1;
+      return a.projectNumber - b.projectNumber;
+    })
+    .forEach((item) => container.appendChild(buildProjectRow(item)));
+}
+
+/* =============================================================================
    MODAL — TT SETUP (Projects / Activities / Preferences tabs)
    -----------------------------------------------------------------------------
    Module-level (like Budget's getSetupModal) so the Activity Add/Edit/Delete
@@ -1504,6 +1996,7 @@ function getTTSetupModal(): Modal {
       onOpen: () => {
         activateTTSetupTab(ttActiveSetupTab);
         renderActivitiesList();
+        renderProjectsList();
         applyTTSettings();
       },
       onClosed: () => {
@@ -1626,7 +2119,7 @@ function getActivityEditModal(): Modal {
       if (!ttActivityEditItem) return;
       const item = ttActivityEditItem;
       ttActivityEditModal!.close();
-      openTTSetupDelete(item.id, item.name);
+      openTTSetupDelete("activity", item.id, item.name);
     });
   }
   return ttActivityEditModal;
@@ -1645,59 +2138,174 @@ function openActivityEdit(item: Activity): void {
 }
 
 /* =============================================================================
-   MODAL — TT SETUP DELETE CONFIRM
-   Only reachable for an already-retired Activity (Delete is hidden until an
-   item is retired — mirrors Budget's setup delete flow).
+   MODAL — PROJECT ADD / EDIT (mirrors the Activity Add/Edit modals, plus a
+   required, unique integer ID Number field)
 ============================================================================= */
 
+let ttProjectAddModal: Modal | null = null;
+let ttProjectEditModal: Modal | null = null;
+let ttProjectEditItem: Project | null = null;
+
+function getProjectAddModal(): Modal {
+  if (!ttProjectAddModal) {
+    const nameInput = document.getElementById("ttProjectAddName") as HTMLInputElement;
+    const numberInput = document.getElementById("ttProjectAddNumber") as HTMLInputElement;
+
+    ttProjectAddModal = new Modal(document.getElementById("ttProjectAddBackdrop")!, {
+      closeOnEsc: true,
+      onOpen: () => setTimeout(() => nameInput.focus(), 50),
+    });
+
+    function goBack() { ttProjectAddModal!.close(); openTTSetupOnTab("projects"); }
+    function doSave() {
+      const name = nameInput.value.trim();
+      const projectNumber = parseInt(numberInput.value, 10);
+      if (!addOrReactivateProject(name, projectNumber)) return;
+      ttProjectAddModal!.close();
+      openTTSetupOnTab("projects");
+    }
+
+    document.getElementById("ttProjectAddBack")!.addEventListener("click", goBack);
+    document.getElementById("ttProjectAddClose")!.addEventListener("click", () => ttProjectAddModal!.close());
+    document.getElementById("ttProjectAddCancel")!.addEventListener("click", goBack);
+    document.getElementById("ttProjectAddSave")!.addEventListener("click", doSave);
+    [nameInput, numberInput].forEach((input) => {
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doSave(); } });
+    });
+  }
+  return ttProjectAddModal;
+}
+
+function openProjectAdd(): void {
+  getTTSetupModal().close();
+  (document.getElementById("ttProjectAddName") as HTMLInputElement).value = "";
+  (document.getElementById("ttProjectAddNumber") as HTMLInputElement).value = String(nextProjectNumber());
+  getProjectAddModal().open();
+}
+
+function getProjectEditModal(): Modal {
+  if (!ttProjectEditModal) {
+    const nameInput = document.getElementById("ttProjectEditName") as HTMLInputElement;
+    const numberInput = document.getElementById("ttProjectEditNumber") as HTMLInputElement;
+    const retireBtn = document.getElementById("ttProjectEditRetire") as HTMLButtonElement;
+    const deleteBtn = document.getElementById("ttProjectEditDelete") as HTMLButtonElement;
+
+    ttProjectEditModal = new Modal(document.getElementById("ttProjectEditBackdrop")!, {
+      closeOnEsc: true,
+      onOpen: () => setTimeout(() => nameInput.focus(), 50),
+      onClosed: () => { ttProjectEditItem = null; },
+    });
+
+    function goBack() { ttProjectEditModal!.close(); openTTSetupOnTab("projects"); }
+    function doSave() {
+      if (!ttProjectEditItem) return;
+      const name = nameInput.value.trim();
+      const projectNumber = parseInt(numberInput.value, 10);
+      if (!saveProjectEdit(ttProjectEditItem, name, projectNumber)) return;
+      goBack();
+    }
+
+    document.getElementById("ttProjectEditBack")!.addEventListener("click", goBack);
+    document.getElementById("ttProjectEditClose")!.addEventListener("click", () => ttProjectEditModal!.close());
+    document.getElementById("ttProjectEditCancel")!.addEventListener("click", goBack);
+    document.getElementById("ttProjectEditSave")!.addEventListener("click", doSave);
+    [nameInput, numberInput].forEach((input) => {
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doSave(); } });
+    });
+
+    retireBtn.addEventListener("click", () => {
+      if (!ttProjectEditItem) return;
+      ttProjectEditItem.status = ttProjectEditItem.status === "active" ? "retired" : "active";
+      saveSettings();
+      refreshProjectDatalist();
+      flash(ttProjectEditItem.status === "retired" ? "Project retired" : "Project reactivated", "success");
+      goBack();
+    });
+
+    deleteBtn.addEventListener("click", () => {
+      if (!ttProjectEditItem) return;
+      const item = ttProjectEditItem;
+      ttProjectEditModal!.close();
+      openTTSetupDelete("project", item.id, item.name);
+    });
+  }
+  return ttProjectEditModal;
+}
+
+function openProjectEdit(item: Project): void {
+  ttProjectEditItem = item;
+  getTTSetupModal().close();
+  getProjectEditModal(); // ensure wired
+  (document.getElementById("ttProjectEditName") as HTMLInputElement).value = item.name;
+  (document.getElementById("ttProjectEditNumber") as HTMLInputElement).value = String(item.projectNumber);
+  const retireBtn = document.getElementById("ttProjectEditRetire") as HTMLButtonElement;
+  const deleteBtn = document.getElementById("ttProjectEditDelete") as HTMLButtonElement;
+  retireBtn.textContent = item.status === "active" ? "Retire" : "Reactivate";
+  deleteBtn.style.display = item.status === "retired" ? "" : "none";
+  getProjectEditModal().open();
+}
+
+/* =============================================================================
+   MODAL — TT SETUP DELETE CONFIRM
+   Shared by Activities and Projects — only reachable for an already-retired
+   item (Delete is hidden until an item is retired — mirrors Budget's setup
+   delete flow).
+============================================================================= */
+
+type TTDeleteKind = "activity" | "project";
 let ttSetupDeleteModal: Modal | null = null;
-let pendingActivityDelete: { id: string; name: string } | null = null;
+let pendingSetupDelete: { kind: TTDeleteKind; id: string; name: string } | null = null;
 
 function getTTSetupDeleteModal(): Modal {
   if (!ttSetupDeleteModal) {
     ttSetupDeleteModal = new Modal(document.getElementById("ttSetupDeleteBackdrop")!, {
       closeOnEsc: true,
-      onClosed: () => { pendingActivityDelete = null; },
+      onClosed: () => { pendingSetupDelete = null; },
     });
 
     document.getElementById("ttSetupDeleteConfirmBtn")!.addEventListener("click", () => {
-      if (!pendingActivityDelete) return;
-      const { id, name } = pendingActivityDelete;
-      activities = activities.filter((a) => a.id !== id);
+      if (!pendingSetupDelete) return;
+      const { kind, id, name } = pendingSetupDelete;
       // Entries store the name, not an id — so orphaned entries would keep a
       // name that no longer exists in the list. Reassign them to "Unknown"
       // (the delete confirm already warned how many are affected). This is
       // why Retire exists: it preserves the name on history without deletion.
       let changed = 0;
-      entries.forEach((e) => {
-        if (e.activity.toLowerCase() === name.toLowerCase()) {
-          e.activity = "Unknown";
-          changed++;
-        }
-      });
-      pendingActivityDelete = null;
+      if (kind === "activity") {
+        activities = activities.filter((a) => a.id !== id);
+        entries.forEach((e) => {
+          if (e.activity.toLowerCase() === name.toLowerCase()) { e.activity = "Unknown"; changed++; }
+        });
+      } else {
+        projects = projects.filter((p) => p.id !== id);
+        entries.forEach((e) => {
+          if (e.project.toLowerCase() === name.toLowerCase()) { e.project = "Unknown"; changed++; }
+        });
+      }
+      pendingSetupDelete = null;
       if (changed > 0) { saveToDisk(); renderCurrentView(); }
       saveSettings();
-      refreshActivityDatalist();
+      if (kind === "activity") refreshActivityDatalist(); else refreshProjectDatalist();
       ttSetupDeleteModal!.close();
-      openTTSetupOnTab("activities");
-      flash("Activity deleted", "success");
+      openTTSetupOnTab(kind === "activity" ? "activities" : "projects");
+      flash(kind === "activity" ? "Activity deleted" : "Project deleted", "success");
     });
 
     document.getElementById("ttSetupDeleteCancelBtn")!.addEventListener("click", () => {
-      pendingActivityDelete = null;
+      const kind = pendingSetupDelete?.kind;
+      pendingSetupDelete = null;
       ttSetupDeleteModal!.close();
-      openTTSetupOnTab("activities");
+      openTTSetupOnTab(kind === "project" ? "projects" : "activities");
     });
   }
   return ttSetupDeleteModal;
 }
 
-function openTTSetupDelete(id: string, name: string): void {
-  pendingActivityDelete = { id, name };
-  const impactCount = entries.filter(
-    (e) => e.activity.toLowerCase() === name.toLowerCase(),
-  ).length;
+function openTTSetupDelete(kind: TTDeleteKind, id: string, name: string): void {
+  pendingSetupDelete = { kind, id, name };
+  const impactCount = kind === "activity"
+    ? entries.filter((e) => e.activity.toLowerCase() === name.toLowerCase()).length
+    : entries.filter((e) => e.project.toLowerCase() === name.toLowerCase()).length;
   const impactNote = impactCount > 0
     ? ` ${impactCount} logged ${impactCount === 1 ? "entry" : "entries"} will be reassigned to "Unknown".`
     : "";
@@ -1772,10 +2380,12 @@ async function runCsvImport(): Promise<void> {
   result.entries.forEach((e) => {
     entries.push(e);
     findOrCreateActivity(e.activity);
+    if (e.project) findOrCreateProject(e.project);
   });
   sortEntries();
   await saveToDisk();
   refreshActivityDatalist();
+  refreshProjectDatalist();
   renderCurrentView();
 
   settings.lastCsvImportAt = new Date().toISOString();
@@ -1899,13 +2509,181 @@ function getNotesEditModal(): Modal {
   return notesEditModal;
 }
 
+/** Fills a modal's context block with one line per string — built via
+ *  createElement/textContent (not innerHTML) since these lines carry
+ *  free-text user data (project/activity names) that must never be parsed
+ *  as HTML. */
+function setContextLines(container: HTMLElement, lines: string[]): void {
+  container.innerHTML = "";
+  lines.forEach((text) => {
+    const line = document.createElement("div");
+    line.className = "tt-context-line";
+    line.textContent = text;
+    container.appendChild(line);
+  });
+}
+
 function openNotesEditModal(entry: Entry, rerender: () => void): void {
   notesEditEntry = entry;
   notesEditRerender = rerender;
   (document.getElementById("ttNotesEditTextarea") as HTMLTextAreaElement).value = entry.notes;
-  document.getElementById("ttNotesEditContext")!.textContent =
-    `${formatDate(entry.date)} · ${entry.activity} · ${formatTime(entry.start)}–${formatTime(entry.end)}`;
+  setContextLines(document.getElementById("ttNotesEditContext")!, [
+    `${entry.project || "—"} · ${entry.activity}`,
+    `${formatDate(entry.date)} ${formatTime(entry.start)} → ${formatDate(entry.endDate)} ${formatTime(entry.end)}`,
+  ]);
   getNotesEditModal().open();
+}
+
+/* =============================================================================
+   MODAL — EDIT DATES
+   Launched from each row's calendar icon. Lets Start Date and End Date be
+   edited independently — End Date must be on or after Start Date, and the
+   resulting span must still be a positive duration given the entry's times.
+============================================================================= */
+
+let dateEditModal: Modal | null = null;
+let dateEditEntry: Entry | null = null;
+let dateEditRerender: () => void = () => {};
+
+/** Double-click-to-edit for the Start/End Time values shown (read-only,
+ *  until now) in the Edit Dates modal. It's a bit silly to show them next to
+ *  editable dates and not let you fix them too — especially since a date
+ *  change can put them in conflict. Mirrors the Entries panel's inline time
+ *  edit (same normalizeTime() + entryDurationSeconds() validation, no
+ *  auto-roll — an edit that would make the span negative is just rejected),
+ *  but commits against dateEditEntry directly and refreshes this modal's own
+ *  span rather than the Entries panel's row markup. */
+function makeDateEditTimeEditable(span: HTMLElement, field: "start" | "end"): void {
+  const entry = dateEditEntry;
+  if (!entry) return;
+  const spanId = span.id;
+
+  const input = document.createElement("input");
+  input.className = "entry-edit-input";
+  input.value = formatTime(entry[field]);
+  input.style.width = span.offsetWidth + "px";
+  restrictToTimeChars(input);
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let handledByKeydown = false;
+
+  function rebuildSpan(): void {
+    const fresh = document.createElement("span");
+    fresh.id = spanId;
+    fresh.className = "tt-date-edit-time-value";
+    fresh.title = "Double-click to edit";
+    fresh.textContent = formatTime(entry![field]);
+    fresh.addEventListener("dblclick", () => makeDateEditTimeEditable(fresh, field));
+    input.replaceWith(fresh);
+  }
+
+  function commit(): void {
+    const raw = input.value.trim();
+    if (!raw) { rebuildSpan(); return; }
+    const normalized = normalizeTime(raw);
+    if (!normalized) { rebuildSpan(); return; }
+
+    const prevValue = entry![field];
+    entry![field] = normalized;
+
+    if (entryDurationSeconds(entry!) < 0) {
+      entry![field] = prevValue;
+      flash("End time can't be before start time — check the dates above if this should span multiple days.", "error");
+      rebuildSpan();
+      return;
+    }
+
+    sortEntries();
+    saveToDisk();
+    dateEditRerender();
+    rebuildSpan();
+    flash("Entry edited", "success");
+  }
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      handledByKeydown = true;
+      commit();
+    } else if (e.key === "Escape") {
+      handledByKeydown = true;
+      rebuildSpan();
+    }
+  });
+
+  input.addEventListener("blur", () => {
+    if (handledByKeydown) return;
+    commit();
+  });
+}
+
+function getDateEditModal(): Modal {
+  if (!dateEditModal) {
+    const startInput = document.getElementById("ttDateEditStart") as HTMLInputElement;
+    const endInput = document.getElementById("ttDateEditEnd") as HTMLInputElement;
+    const startTimeSpan = document.getElementById("ttDateEditStartTime")!;
+    const endTimeSpan = document.getElementById("ttDateEditEndTime")!;
+
+    dateEditModal = new Modal(document.getElementById("ttDateEditBackdrop")!, {
+      closeOnEsc: true,
+      onOpen: () => setTimeout(() => startInput.focus(), 50),
+      onClosed: () => { dateEditEntry = null; },
+    });
+
+    startTimeSpan.addEventListener("dblclick", () => makeDateEditTimeEditable(startTimeSpan, "start"));
+    endTimeSpan.addEventListener("dblclick", () => makeDateEditTimeEditable(endTimeSpan, "end"));
+
+    // Keep the native picker's own min constraint in sync as Start Date
+    // changes, in addition to the explicit validation in doSave.
+    startInput.addEventListener("change", () => {
+      endInput.min = startInput.value;
+      if (startInput.value && endInput.value < startInput.value) {
+        endInput.value = startInput.value;
+      }
+    });
+
+    function doSave() {
+      if (!dateEditEntry) return;
+      const newStart = startInput.value;
+      const newEnd = endInput.value;
+      if (!newStart || !newEnd) { flash("Both dates are required.", "error"); return; }
+      if (newEnd < newStart) { flash("End date cannot be before Start date.", "error"); return; }
+      if (entryDurationSeconds({ date: newStart, start: dateEditEntry.start, endDate: newEnd, end: dateEditEntry.end }) < 0) {
+        flash("End time must be after Start time — check the dates.", "error");
+        return;
+      }
+      dateEditEntry.date = newStart;
+      dateEditEntry.endDate = newEnd;
+      sortEntries();
+      saveToDisk();
+      dateEditRerender();
+      flash("Dates updated", "success");
+      dateEditModal!.close();
+    }
+
+    document.getElementById("ttDateEditClose")!.addEventListener("click", () => dateEditModal!.close());
+    document.getElementById("ttDateEditCancel")!.addEventListener("click", () => dateEditModal!.close());
+    document.getElementById("ttDateEditSave")!.addEventListener("click", doSave);
+  }
+  return dateEditModal;
+}
+
+function openDateEditModal(entry: Entry, rerender: () => void): void {
+  dateEditEntry = entry;
+  dateEditRerender = rerender;
+  const startInput = document.getElementById("ttDateEditStart") as HTMLInputElement;
+  const endInput = document.getElementById("ttDateEditEnd") as HTMLInputElement;
+  startInput.value = entry.date;
+  endInput.min = entry.date;
+  endInput.value = entry.endDate;
+  document.getElementById("ttDateEditStartTime")!.textContent = formatTime(entry.start);
+  document.getElementById("ttDateEditEndTime")!.textContent = formatTime(entry.end);
+  setContextLines(document.getElementById("ttDateEditContext")!, [
+    `${entry.project || "—"} · ${entry.activity}`,
+  ]);
+  getDateEditModal().open();
 }
 
 /* =============================================================================
@@ -1969,9 +2747,11 @@ export function initTimeTracker(): void {
   // DOM refs (resolved here so they're guaranteed to exist when TT section loads)
   const startInput      = document.getElementById("startTime") as HTMLInputElement;
   const endInput        = document.getElementById("endTime") as HTMLInputElement;
+  const projectInput    = document.getElementById("project") as HTMLInputElement;
   const activityInput   = document.getElementById("activity") as HTMLInputElement;
   const notesInput      = document.getElementById("notesInput") as HTMLTextAreaElement;
-  const datePicker      = document.getElementById("datePicker") as HTMLInputElement;
+  const datePicker      = document.getElementById("startDatePicker") as HTMLInputElement;
+  const endDatePicker   = document.getElementById("endDatePicker") as HTMLInputElement;
   const viewStartInput  = document.getElementById("viewStart") as HTMLInputElement;
   const viewEndInput    = document.getElementById("viewEnd") as HTMLInputElement;
   const entriesDiv      = document.getElementById("entries")!;
@@ -1979,18 +2759,54 @@ export function initTimeTracker(): void {
   const groupTotalsDiv  = document.getElementById("groupTotals")!;
   const statsDiv        = document.getElementById("statsPanel")!;
   const durationPreview = document.getElementById("durationPreview")!;
+
+  // Block keystrokes that could never be part of a valid time — letters
+  // other than a/p/m, symbols, etc. Doesn't validate the VALUE typed, just
+  // the characters (see normalizeTime() for the actual range validation).
+  restrictToTimeChars(startInput);
+  restrictToTimeChars(endInput);
+
   // Convenience wrappers so inner functions don't have to pass DOM refs everywhere
   function doRender() {
     render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
   }
   function doSaveDraft() {
-    saveDraft(datePicker, activityInput, startInput, endInput, notesInput);
+    saveDraft(datePicker, endDatePicker, projectInput, activityInput, startInput, endInput, notesInput);
   }
   function doUpdateDurationPreview() {
-    updateDurationPreview(startInput, endInput, durationPreview);
+    updateDurationPreview(startInput, endInput, durationPreview, datePicker, endDatePicker);
   }
   function doApplyPreset(preset: string) {
     applyPreset(preset, viewStartInput, viewEndInput, entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
+  }
+  // Keeps the visible End Date field in sync with the same overnight-roll
+  // convenience Add Entry applies (see endDateManuallySet doc comment), so
+  // the form shows the date the entry will actually get before you submit.
+  // No-ops once End Date has been touched directly. Called whenever Start
+  // Date changes and whenever the user leaves a time field (see the blur
+  // listeners below) — the same moments the draft gets saved.
+  function syncEndDateFromTimes() {
+    if (endDateManuallySet) return;
+    const startDate = datePicker.value || today();
+    const start = normalizeTime(startInput.value.trim());
+    const end = normalizeTime(endInput.value.trim());
+    const rolls = !!start && !!end && parseTime(end) < parseTime(start);
+    const newEndDate = rolls ? addDaysToDate(startDate, 1) : startDate;
+    endDatePicker.min = startDate;
+    if (endDatePicker.value !== newEndDate) endDatePicker.value = newEndDate;
+  }
+  // Shared by the Start Date picker's own change event and the Start-time
+  // "Now" button (which also sets Start Date to today) — keeps both paths
+  // in sync with End Date/selectedDate/the ledger the same way.
+  function applyStartDateChange() {
+    selectedDate = datePicker.value;
+    if (endDateManuallySet && endDatePicker.value < datePicker.value) {
+      endDatePicker.value = datePicker.value;
+    }
+    syncEndDateFromTimes();
+    doUpdateDurationPreview();
+    doSaveDraft();
+    doRender();
   }
   // Module-level activity rename/delete mutate entries and need to refresh the
   // ledger; expose doRender to them without leaking DOM refs out of init.
@@ -2005,21 +2821,26 @@ export function initTimeTracker(): void {
     const start = normalizeTime(startInput.value.trim());
     const end   = normalizeTime(endInput.value.trim());
     const activity = (activityInput.value || lastActivity).trim();
+    const project = projectInput.value.trim();
     if (!validateEntry({ date: selectedDate, start, end, activity })) return;
     await addEntry(
-      start, end, activity, notesInput.value.trim(),
-      datePicker, activityInput, startInput, endInput, notesInput,
+      start, end, project, activity, notesInput.value.trim(), endDatePicker.value,
+      datePicker, endDatePicker, projectInput, activityInput, startInput, endInput, notesInput,
       entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv, durationPreview,
     );
   });
 
   document.getElementById("clearBtn")!.addEventListener("click", (e) => {
     e.preventDefault();
+    projectInput.value = "";
     activityInput.value = "";
     startInput.value = "";
     endInput.value = "";
     notesInput.value = "";
     datePicker.value = today();
+    endDatePicker.value = today();
+    endDatePicker.min = "";
+    endDateManuallySet = false;
     selectedDate = today();
     doUpdateDurationPreview();
     doSaveDraft();
@@ -2027,28 +2848,47 @@ export function initTimeTracker(): void {
 
   document.getElementById("startBtn")!.addEventListener("click", (e) => {
     e.preventDefault();
-    startInput.value = new Date().toTimeString().slice(0, 5);
-    doUpdateDurationPreview();
-    doSaveDraft();
+    startInput.value = nowTimeString();
+    datePicker.value = today();
+    applyStartDateChange();
   });
 
   document.getElementById("stopBtn")!.addEventListener("click", (e) => {
     e.preventDefault();
-    endInput.value = new Date().toTimeString().slice(0, 5);
+    endInput.value = nowTimeString();
+    // "Now" is an explicit, real end date — treat it like the user picked
+    // End Date directly rather than letting a later Start Date change (or
+    // the overnight auto-roll) silently move it.
+    endDatePicker.value = today();
+    endDateManuallySet = true;
+    endDatePicker.min = datePicker.value;
     doUpdateDurationPreview();
     doSaveDraft();
   });
 
-  datePicker.addEventListener("change", () => {
-    selectedDate = datePicker.value;
-    doRender();
+  datePicker.addEventListener("change", applyStartDateChange);
+
+  endDatePicker.addEventListener("change", () => {
+    endDateManuallySet = true;
+    doUpdateDurationPreview();
+    doSaveDraft();
   });
 
-  [activityInput, startInput, endInput, notesInput].forEach((input) => {
+  [projectInput, activityInput, startInput, endInput, notesInput].forEach((input) => {
     input.addEventListener("input", doSaveDraft);
   });
   startInput.addEventListener("input", doUpdateDurationPreview);
   endInput.addEventListener("input", doUpdateDurationPreview);
+
+  // Apply the overnight End Date roll-forward once the user leaves whichever
+  // time field they were editing, rather than only at Add Entry time.
+  [startInput, endInput].forEach((input) => {
+    input.addEventListener("blur", () => {
+      syncEndDateFromTimes();
+      doUpdateDurationPreview();
+      doSaveDraft();
+    });
+  });
 
   /* -------------------------------------------------------------------------
      EVENT LISTENERS — CONTROLS PANEL
@@ -2119,10 +2959,25 @@ export function initTimeTracker(): void {
     doRender();
   });
 
+  // Same story for Time Format (12h/24h) — shell.ts owns the toggle/label and
+  // saves the setting; TT just needs to know so formatTime() stops using a
+  // stale value and the Entries panel re-renders without a relaunch.
+  document.getElementById("timeFormatToggle")!.addEventListener("change", (e) => {
+    settings.hour12 = (e.target as HTMLInputElement).checked;
+    doRender();
+  });
+
   document.getElementById("quickDeleteToggle")!.addEventListener("change", (e) => {
     settings.quickDelete = (e.target as HTMLInputElement).checked;
     document.getElementById("quickDeleteLabel")!.textContent =
       settings.quickDelete ? "On" : "Off";
+    saveSettings();
+  });
+
+  document.getElementById("roundNowToggle")!.addEventListener("change", (e) => {
+    settings.roundNowToMinute = (e.target as HTMLInputElement).checked;
+    document.getElementById("roundNowLabel")!.textContent =
+      settings.roundNowToMinute ? "On" : "Off";
     saveSettings();
   });
 
@@ -2159,6 +3014,7 @@ export function initTimeTracker(): void {
 
   document.getElementById("ttSetupBtn")!.addEventListener("click", () => openTTSetupOnTab("projects"));
   document.getElementById("ttActivityNewBtn")!.addEventListener("click", openActivityAdd);
+  document.getElementById("ttProjectNewBtn")!.addEventListener("click", openProjectAdd);
   document.getElementById("ttCsvImportBtn")!.addEventListener("click", openCsvImportModal);
 
   /* -------------------------------------------------------------------------
@@ -2183,19 +3039,25 @@ export function initTimeTracker(): void {
   Promise.all([
     loadFromDisk(),
     loadSettings(),
-    loadDraft(datePicker, activityInput, startInput, endInput, notesInput, doUpdateDurationPreview),
+    loadDraft(datePicker, endDatePicker, projectInput, activityInput, startInput, endInput, notesInput, doUpdateDurationPreview),
   ]).then(() => {
-    const draftHasData = activityInput.value || startInput.value || endInput.value || notesInput.value;
+    const draftHasData = activityInput.value || startInput.value || endInput.value || notesInput.value || projectInput.value;
     if (!draftHasData) {
       datePicker.value = today();
+      endDatePicker.value = today();
+      endDateManuallySet = false;
       selectedDate = today();
     } else {
       selectedDate = datePicker.value;
+      if (!endDatePicker.value) endDatePicker.value = datePicker.value;
     }
-    // Activities are loaded by loadSettings(); reflect them in the Setup list
-    // and the autocomplete source now that they're in memory.
+    endDatePicker.min = datePicker.value;
+    // Activities/Projects are loaded by loadSettings(); reflect them in the
+    // Setup list and the autocomplete source now that they're in memory.
     renderActivitiesList();
     refreshActivityDatalist();
+    renderProjectsList();
+    refreshProjectDatalist();
     doApplyPreset("today");
   });
 }

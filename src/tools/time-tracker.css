@@ -9,23 +9,52 @@
    DURATION PREVIEW
 ============================================================================= */
 
-#durationPreview {
+/* Takes up the free space to the right of the Start/End rows and centers
+   the (fixed-size) duration box within it — the box itself doesn't stretch,
+   it just floats mid-way through whatever room is left. */
+.duration-preview-wrap {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-  font-weight: bold;
+  min-width: 150px;
+  align-self: stretch;
+}
+
+#durationPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   color: var(--color-text-muted);
-  min-width: 100px;
-  height: 38px;
+  min-width: 150px;
+  padding: 10px 20px;
+  margin: 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
   text-align: center;
-  letter-spacing: 0.05em;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 
 #durationPreview.visible {
   opacity: 1;
+}
+
+.tt-duration-time {
+  font-size: 1.5rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.tt-duration-days {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
 }
 
 /* =============================================================================
@@ -200,6 +229,15 @@
   width: 100%;
 }
 
+.tt-field-project {
+  width: 200px;
+  max-width: 100%;
+}
+
+.tt-field-project input {
+  width: 100%;
+}
+
 /* =============================================================================
    INPUT PANEL — TIME FIELDS
 ============================================================================= */
@@ -207,12 +245,33 @@
 .time-fields {
   display: flex;
   flex-direction: row;
-  align-items: flex-end;
+  align-items: center;
   gap: 16px;
+  /* Without an explicit width, this flex item (the sole child of
+     .tt-form-row) shrinks to fit its content instead of filling the row —
+     which would leave .duration-preview-wrap's flex:1 with no actual free
+     space to center within. */
+  width: 100%;
   /* Wrap instead of forcing horizontal page-scroll when the panel is too
      narrow to hold both time fields + the duration preview on one line
      (e.g. 800px window with the sidebar expanded). On wider layouts nothing
      wraps, so the row looks exactly as before. */
+  flex-wrap: wrap;
+}
+
+/* Start Date/Time and End Date/Time stack as two parallel rows, with the
+   live duration box (a sibling of this element) centered vertically
+   alongside both. */
+.time-fields-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.time-fields-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
@@ -359,7 +418,7 @@
    .entry-row, .entry-field, .entry-edit-input, .entry-cal-btn,
    .entry-date-picker, .entry-delete-btn) are promoted to shell.css — Budget's
    ledger uses them directly too. Only Time Tracker's own column types
-   (.entry-col-activity/-time/-duration) stay here.
+   (.entry-col-project/-activity/-time/-duration) stay here.
 ============================================================================= */
 
 .entries-header-row {
@@ -378,6 +437,30 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.entry-col-project {
+  flex-shrink: 0;
+  width: 8rem;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.85;
+}
+
+.entry-col-project:hover {
+  background: var(--color-hover);
+}
+
+/* Project is optional — an empty value still needs a visible, clickable
+   target rather than a blank gap in the row. */
+.entry-col-project:empty::before {
+  content: "—";
+  opacity: 0.4;
 }
 
 .entry-col-activity {
@@ -403,6 +486,13 @@
   padding: 2px 4px;
   border-radius: 4px;
   white-space: nowrap;
+}
+
+/* End time carrying a "(+1d)" / "(+2d)" span indicator needs more room than
+   the fixed 4.5rem start/end column width. */
+.entry-col-time--spans {
+  width: auto;
+  min-width: 4.5rem;
 }
 
 .entry-col-time:hover {
@@ -436,6 +526,13 @@
   background: var(--color-hover);
 }
 
+/* Notes is optional — an empty value still needs a normal-height, visible
+   clickable target rather than collapsing to a thin blank strip. */
+.entry-col-notes:empty::before {
+  content: "—";
+  opacity: 0.4;
+}
+
 /* =============================================================================
    SETTINGS — TIME TRACKER SPECIFIC
    (The collapsible .subsettings primitive used here lives in shell.css, since
@@ -458,10 +555,34 @@
 ============================================================================= */
 
 .tt-notes-edit-context {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   margin: -10px 0 16px;
   color: var(--color-text-muted);
   font-size: 0.78rem;
   text-align: center;
+}
+
+.tt-context-line {
+  color: inherit;
+}
+
+/* =============================================================================
+   EDIT DATES MODAL — TIME VALUES (Input Panel layout: Date+Time per row)
+============================================================================= */
+
+.tt-date-edit-time-value {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: default;
+  box-sizing: border-box;
+  min-width: 120px;
+}
+
+.tt-date-edit-time-value:hover {
+  background: var(--color-hover);
 }
 
 /* =============================================================================

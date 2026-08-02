@@ -21,7 +21,8 @@ import {
   flash,
   applySettings,
   saveSettings,
-  settingsModal,
+  themePickerModal,
+  reopenThemePickerOnCustomTab,
   themeSelect,
   type AdvancedOptions,
   type CustomTheme,
@@ -30,14 +31,6 @@ import { RANDOM_VARS, clearRandomPalette } from "./random-theme";
 import { applyTheme, themeLink, getActiveCustomId, setActiveCustomId } from "./theme-core";
 
 /* ── Element refs ────────────────────────────────────────────────────────── */
-
-const customThemeSelect = document.getElementById(
-  "customThemeSelect",
-) as HTMLSelectElement;
-const customThemeCreateBtn = document.getElementById("customThemeCreateBtn")!;
-const customThemeEditBtn = document.getElementById("customThemeEditBtn")!;
-const customThemeDeleteBtn = document.getElementById("customThemeDeleteBtn")!;
-const customThemeEmpty = document.getElementById("customThemeEmpty")!;
 
 // ── Theme editor modal refs ────────────────────────────────────────────────
 const themeEditorBackdrop = document.getElementById("themeEditorBackdrop")!;
@@ -367,33 +360,6 @@ function deriveAccent(hex: string): string {
   return "#" + [r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("");
 }
 
-/** Repopulates the customThemeSelect dropdown and shows/hides the action buttons
- *  and the empty-state message. Call whenever customThemes changes. */
-export function refreshCustomThemeSelect(): void {
-  const hasThemes = customThemes.length > 0;
-  customThemeEmpty.style.display = hasThemes ? "none" : "block";
-  customThemeSelect.style.display = hasThemes ? "" : "none";
-  customThemeEditBtn.style.display = hasThemes ? "" : "none";
-  customThemeDeleteBtn.style.display = hasThemes ? "" : "none";
-
-  // Rebuild options
-  customThemeSelect.innerHTML = "";
-  for (const t of customThemes) {
-    const opt = document.createElement("option");
-    opt.value = t.id;
-    opt.textContent = t.name;
-    customThemeSelect.appendChild(opt);
-  }
-
-  // Restore selection to the active theme if possible
-  const activeId = getActiveCustomId();
-  if (activeId && customThemes.find((t) => t.id === activeId)) {
-    customThemeSelect.value = activeId;
-  } else if (customThemes.length > 0) {
-    customThemeSelect.value = customThemes[0].id;
-    setActiveCustomId(customThemes[0].id);
-  }
-}
 
 /** Reads the current computed CSS variable values from the document. Used to
  *  seed the editor with whatever the currently-active theme looks like. */
@@ -630,9 +596,10 @@ const themeEditorModal = new Modal(themeEditorBackdrop, {
   },
   onClosed: () => {
     if (!_teSaveCompleted) {
-      // Cancel / Escape / X / back — revert the preview and return to Settings
+      // Cancel / Escape / X / back — revert the preview and return to Choose
+      // Theme (this modal is only ever reached from there now).
       teRevertPreview();
-      settingsModal.open();
+      reopenThemePickerOnCustomTab();
     }
     _teSaveCompleted = false;
   },
@@ -640,9 +607,9 @@ const themeEditorModal = new Modal(themeEditorBackdrop, {
 
 /** Opens the theme editor. mode = "create" seeds from the currently active
  *  theme; mode = "edit" loads the specific custom theme by id. */
-function openThemeEditor(mode: "create", id?: undefined): void;
-function openThemeEditor(mode: "edit", id: string): void;
-function openThemeEditor(mode: "create" | "edit", id?: string): void {
+export function openThemeEditor(mode: "create", id?: undefined): void;
+export function openThemeEditor(mode: "edit", id: string): void;
+export function openThemeEditor(mode: "create" | "edit", id?: string): void {
   _teMode = mode;
   _teEditId = id ?? null;
   _tePrevTheme = settings.theme;
@@ -651,7 +618,7 @@ function openThemeEditor(mode: "create" | "edit", id?: string): void {
   teActivateTab("general");
 
   if (mode === "create") {
-    themeEditorTitle.textContent = "Create Theme";
+    themeEditorTitle.textContent = "Create Custom Theme";
     teNameInput.value = "";
     // Seed from whatever's currently rendered (the active theme's colours)
     _teWorkingVars = readCurrentVars();
@@ -659,7 +626,7 @@ function openThemeEditor(mode: "create" | "edit", id?: string): void {
     tePopulateSwatches(_teWorkingVars);
     tePopulateAdvanced({});
   } else {
-    themeEditorTitle.textContent = "Edit Theme";
+    themeEditorTitle.textContent = "Edit Custom Theme";
     const theme = customThemes.find((t) => t.id === id)!;
     teNameInput.value = theme.name;
     _teWorkingVars = { ...theme.vars };
@@ -961,7 +928,6 @@ teSave.addEventListener("click", async () => {
     customThemes.push(newTheme);
     setActiveCustomId(newTheme.id);
     await saveCustomThemes();
-    refreshCustomThemeSelect();
     // Create → becomes the active theme
     settings.theme = "custom";
     themeSelect.value = "custom";
@@ -969,7 +935,7 @@ teSave.addEventListener("click", async () => {
     await saveSettings();
     _teSaveCompleted = true;
     themeEditorModal.close();
-    settingsModal.open();
+    reopenThemePickerOnCustomTab();
     flash(`Theme "${name}" created`, "success");
   } else {
     const theme = customThemes.find((t) => t.id === _teEditId)!;
@@ -977,65 +943,52 @@ teSave.addEventListener("click", async () => {
     theme.vars = { ..._teWorkingVars };
     theme.advanced = { ..._teWorkingAdv };
     await saveCustomThemes();
-    refreshCustomThemeSelect();
     // Edit → revert to previously active theme (user must choose it themselves)
     teRevertPreview();
     _teSaveCompleted = true;
     themeEditorModal.close();
-    settingsModal.open();
+    reopenThemePickerOnCustomTab();
     flash(`Theme "${name}" saved`, "success");
   }
 });
 
-// ── Custom subsettings wiring ───────────────────────────────────────────────
+// ── Custom theme delete confirm modal ───────────────────────────────────────
+// Reached from a delete icon on a theme tile in the Choose Theme modal (see
+// requestDeleteCustomTheme, exported below) — there's no dropdown anymore to
+// read a selection from, so the pending id is tracked here instead.
 
-customThemeSelect.addEventListener("change", () => {
-  const id = customThemeSelect.value;
-  setActiveCustomId(id);
-  if (settings.theme === "custom") {
-    applyCustomThemeById(id);
-  }
+let _pendingCustomThemeDeleteId: string | null = null;
+
+const customThemeDeleteModal = new Modal(customThemeDeleteBackdrop, {
+  onClosed: () => { _pendingCustomThemeDeleteId = null; },
 });
 
-customThemeCreateBtn.addEventListener("click", () => {
-  settingsModal.close();
-  openThemeEditor("create");
-});
+/** Opens the delete-confirm modal for a specific custom theme. Called from
+ *  the Choose Theme modal's per-tile delete icon (shell.ts). */
+export function requestDeleteCustomTheme(id: string): void {
+  const theme = customThemes.find((t) => t.id === id);
+  if (!theme) return;
+  _pendingCustomThemeDeleteId = id;
+  customThemeDeleteMsg.textContent = `Are you sure you want to delete "${theme.name}"? This cannot be undone.`;
+  themePickerModal.close();
+  customThemeDeleteModal.open();
+}
 
-customThemeEditBtn.addEventListener("click", () => {
-  const id = customThemeSelect.value;
-  if (id) {
-    settingsModal.close();
-    openThemeEditor("edit", id);
-  }
-});
-
-// Delete confirm modal
-const customThemeDeleteModal = new Modal(customThemeDeleteBackdrop);
 customThemeDeleteBack.addEventListener("click", () => {
   customThemeDeleteModal.close();
-  settingsModal.open();
+  reopenThemePickerOnCustomTab();
 });
 customThemeDeleteCancelBtn.addEventListener("click", () => {
   customThemeDeleteModal.close();
-  settingsModal.open();
-});
-
-customThemeDeleteBtn.addEventListener("click", () => {
-  const id = customThemeSelect.value;
-  const theme = customThemes.find((t) => t.id === id);
-  if (!theme) return;
-  customThemeDeleteMsg.textContent = `Are you sure you want to delete "${theme.name}"? This cannot be undone.`;
-  settingsModal.close();
-  customThemeDeleteModal.open();
+  reopenThemePickerOnCustomTab();
 });
 
 customThemeDeleteConfirmBtn.addEventListener("click", async () => {
-  const id = customThemeSelect.value;
-  const theme = customThemes.find((t) => t.id === id);
-  if (!theme) {
+  const id = _pendingCustomThemeDeleteId;
+  const theme = id ? customThemes.find((t) => t.id === id) : undefined;
+  if (!id || !theme) {
     customThemeDeleteModal.close();
-    settingsModal.open();
+    reopenThemePickerOnCustomTab();
     return;
   }
   const wasActive = settings.theme === "custom" && getActiveCustomId() === id;
@@ -1050,7 +1003,6 @@ customThemeDeleteConfirmBtn.addEventListener("click", async () => {
     applySettings();
     await saveSettings();
   }
-  refreshCustomThemeSelect();
-  settingsModal.open();
+  reopenThemePickerOnCustomTab();
   flash(`Theme "${theme.name}" deleted`, "success");
 });

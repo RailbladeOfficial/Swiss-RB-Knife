@@ -638,6 +638,27 @@ button:hover {
   gap: 10px;
 }
 
+/* Label + status badge pair within a settings row — same look as Time
+   Tracker's CSV import status (.tt-settings-label-col/-status-badge in
+   time-tracker.css), duplicated here rather than shared across owning
+   files, matching this codebase's convention for small per-file UI bits. */
+.settings-label-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
 /* Collapsible sub-block that expands/collapses beneath a settings row (its
    max-height is toggled from JS). Shared app-wide — not tool-specific: the
    General Settings modal (App Lock / Random / Custom-theme sub-options), the
@@ -746,36 +767,26 @@ button:hover {
   gap: 8px;
 }
 
-.theme-select-wrap {
+.random-roll-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 #rerollBtn,
 #saveRandomBtn {
+  flex: 1;
   background: transparent;
   color: var(--color-text-muted);
   border: 1px solid var(--color-border);
   border-radius: 6px;
-  padding: 3px 7px;
-  font-size: 1rem;
-  line-height: 1;
+  padding: 6px 10px;
+  font-size: 0.85rem;
   cursor: pointer;
   transition:
     color var(--hover-transition),
     border-color var(--hover-transition),
     background var(--hover-transition);
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Floppy-disc save-random icon, sized to sit level with the die glyph. */
-#saveRandomBtn svg {
-  width: 15px;
-  height: 15px;
-  display: block;
 }
 
 #rerollBtn:hover,
@@ -1225,4 +1236,551 @@ button:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* =============================================================================
+   EDIT SIDEBAR MODAL
+============================================================================= */
+
+/* Bottom-left footer row, separate from the header's back arrow so the two
+   don't compete for the same corner. Reset itself uses the default <button>
+   look (no extra class), same as General Settings' own Reset button. */
+.sidebar-edit-footer {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sidebar-edit-hint {
+  font-size: 0.78rem;
+  opacity: 0.65;
+  text-align: left;
+  margin: 0 0 10px;
+}
+
+.sidebar-edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-edit-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.sidebar-edit-item.dragging {
+  opacity: 0.4;
+}
+
+.sidebar-edit-item-hidden {
+  opacity: 0.65;
+}
+
+.sidebar-edit-drag-handle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-edit-drag-handle:active {
+  cursor: grabbing;
+}
+
+.sidebar-edit-drag-handle svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-edit-drag-handle-disabled {
+  visibility: hidden;
+  cursor: default;
+}
+
+.sidebar-edit-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.sidebar-edit-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-edit-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.sidebar-edit-visibility-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background var(--hover-transition), color var(--hover-transition), opacity var(--hover-transition);
+}
+
+.sidebar-edit-visibility-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-edit-visibility-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.sidebar-edit-visibility-btn.is-hidden {
+  opacity: 0.55;
+}
+
+.sidebar-edit-section-divider {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin: 14px 0 6px;
+  text-align: left;
+}
+
+/* =============================================================================
+   CHOOSE THEME MODAL
+============================================================================= */
+
+/* Combined-class selector (not just .theme-picker-modal) so this reliably
+   beats .modal's own width:500px regardless of stylesheet load order —
+   modal.css loads after shell.css, so a same-specificity single-class rule
+   here would otherwise lose the cascade and silently render at 500px. */
+.modal.theme-picker-modal {
+  width: 1000px;
+  max-width: 94vw;
+}
+
+.theme-picker-body {
+  gap: 12px;
+}
+
+.theme-picker-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+}
+
+.theme-picker-tab {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.theme-picker-tab:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.theme-picker-tab.active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+}
+
+.theme-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  max-height: 58vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.theme-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 6px;
+  cursor: pointer;
+  transition: border-color var(--hover-transition), background var(--hover-transition);
+}
+
+.theme-tile:hover {
+  background: var(--color-hover);
+}
+
+.theme-tile.active {
+  border-color: var(--color-btn);
+}
+
+.theme-tile-preview {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.theme-tile-preview-header {
+  flex-shrink: 0;
+  height: 20%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--color-panel);
+}
+
+.theme-tile-preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.theme-tile-preview-bar {
+  height: 7px;
+  width: 45%;
+  border-radius: 3px;
+}
+
+/* The 8-color chart palette — the richest, most theme-distinctive set of
+   colors available, so it's the main "show off the theme" element. */
+.theme-tile-preview-chips {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 10px;
+}
+
+.theme-tile-preview-chips span {
+  flex: 1;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  min-width: 0;
+}
+
+.theme-tile-preview-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px 10px;
+}
+
+.theme-tile-preview-lines span {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.theme-tile-preview-lines span:first-child { width: 70%; }
+.theme-tile-preview-lines span:last-child  { width: 45%; }
+
+/* Random / Custom-add tiles have no fixed palette to preview — an icon
+   centered on a neutral panel stands in for the swatch preview. */
+.theme-tile-preview-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-panel);
+  color: var(--color-text-muted);
+}
+
+.theme-tile-preview-icon svg {
+  width: 30%;
+  height: 30%;
+}
+
+/* Positioned so the name (in-flow, centered) and the actions (absolutely
+   positioned over the right edge) can overlap at rest and separate on
+   hover, rather than sharing flex space and never truly centering. */
+.theme-tile-footer {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* Explicitly set rather than left to inherit — the tile sits on a
+   transparent/panel background whose readable foreground is --color-text,
+   not whatever button/accent color happens to cascade in. Needed so the
+   name stays legible across every theme (e.g. Light, Patriot). */
+.theme-tile-name {
+  color: var(--color-text);
+  font-size: 0.8rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  transition: transform var(--hover-transition);
+}
+
+/* Scoped through .theme-tile-footer so this only affects custom theme
+   tiles (the only ones with edit/delete icons to make room for) — plain
+   theme tiles' names live outside a footer and stay put on hover. */
+.theme-tile:hover .theme-tile-footer .theme-tile-name {
+  transform: translateX(-16px);
+}
+
+/* Edit/delete icons on a custom theme tile — absolutely positioned over the
+   right edge and hidden until the tile (or an icon itself, for keyboard/
+   touch) is focused/hovered, so the tile reads as a clean, centered preview
+   the rest of the time and the name doesn't have to share space with them. */
+.theme-tile-custom-actions {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transform: translate(6px, -50%);
+  pointer-events: none;
+  transition: opacity var(--hover-transition), transform var(--hover-transition);
+}
+
+.theme-tile:hover .theme-tile-custom-actions,
+.theme-tile-custom-actions:focus-within {
+  opacity: 1;
+  transform: translate(0, -50%);
+  pointer-events: auto;
+}
+
+.theme-tile-icon-btn {
+  width: 20px;
+  height: 20px;
+  padding: 3px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--hover-transition), color var(--hover-transition);
+}
+
+.theme-tile-icon-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.theme-tile-icon-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.theme-tile-icon-btn-danger:hover {
+  color: var(--color-danger);
+}
+
+.theme-picker-empty {
+  grid-column: 1 / -1;
+  opacity: 0.6;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* Random tab: the tile on the left, its settings to the right — not a grid,
+   just the one tile plus a settings panel sized to fill the rest of the row. */
+.theme-picker-random-pane {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  min-height: 0;
+}
+
+.theme-picker-random-tile-wrap {
+  flex-shrink: 0;
+  width: 200px;
+}
+
+.theme-picker-random-settings {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+  transition: opacity var(--hover-transition);
+}
+
+/* Visible but inert until Random is actually the active theme, not just
+   being previewed on this tab. */
+.theme-picker-random-settings.inactive {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.theme-picker-random-hint {
+  display: none;
+  font-size: 0.78rem;
+  opacity: 0.8;
+  font-style: italic;
+  margin: 2px 0 0;
+}
+
+.theme-picker-random-settings.inactive .theme-picker-random-hint {
+  display: block;
+}
+
+.theme-picker-section-divider {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+/* =============================================================================
+   CHOOSE SOUND PACK MODAL
+   -----------------------------------------------------------------------------
+   Tile cards styled like the Theme picker's, but plainer — a sound pack has
+   no palette to preview, so each card just uses the ambient (currently
+   active) theme's own colors rather than fetching/rendering another one's.
+============================================================================= */
+
+.sound-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.sound-pack-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  padding: 16px 10px;
+  cursor: pointer;
+  transition: border-color var(--hover-transition), background var(--hover-transition);
+}
+
+.sound-pack-tile:hover {
+  background: var(--color-hover);
+}
+
+.sound-pack-tile.active {
+  border-color: var(--color-btn);
+}
+
+.sound-pack-tile-name {
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.sound-pack-tile-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sound-pack-preview-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  padding: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--hover-transition), border-color var(--hover-transition), transform 0.1s ease;
+}
+
+.sound-pack-preview-btn svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sound-pack-preview-btn:active {
+  transform: scale(0.92);
+}
+
+.sound-pack-preview-btn.success {
+  color: var(--color-success);
+}
+
+.sound-pack-preview-btn.success:hover {
+  background: var(--color-toast-success-bg);
+  border-color: var(--color-success);
+}
+
+.sound-pack-preview-btn.error {
+  color: var(--color-danger);
+}
+
+.sound-pack-preview-btn.error:hover {
+  background: var(--color-toast-error-bg);
+  border-color: var(--color-danger);
+}
+
+.sound-pack-preview-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
 }
