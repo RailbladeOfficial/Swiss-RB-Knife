@@ -2129,10 +2129,12 @@
             <option value="terminal">Terminal</option>
           </optgroup>
           <optgroup label="Holiday">
+            <option value="valentine">Valentine</option>
             <option value="mardi-gras">Mardi Gras</option>
             <option value="rainbow">Rainbow</option>
             <option value="patriot">Patriot</option>
             <option value="halloween">Halloween</option>
+            <option value="thanksgiving">Thanksgiving</option>
             <option value="christmas">Christmas</option>
           </optgroup>
           <optgroup label="Special">
@@ -2140,6 +2142,7 @@
             <option value="knowledge">Knowledge</option>
             <option value="neon">Neon</option>
             <option value="retro-electric">Retro-Electric</option>
+            <option value="halo">Halo</option>
             <option value="random">Random</option>
             <option value="custom">Custom</option>
           </optgroup>
@@ -2205,6 +2208,7 @@
           <button class="theme-picker-tab active" data-theme-tab="main">Main</button>
           <button class="theme-picker-tab" data-theme-tab="holiday">Holiday</button>
           <button class="theme-picker-tab" data-theme-tab="special">Special</button>
+          <button class="theme-picker-tab" data-theme-tab="cycle">Cycle</button>
           <button class="theme-picker-tab" data-theme-tab="random">Random</button>
           <button class="theme-picker-tab" data-theme-tab="custom">Custom</button>
         </div>
@@ -2245,6 +2249,101 @@
             <p class="theme-picker-random-hint">Select the Random tile to enable these settings.</p>
           </div>
         </div>
+
+        <!-- Cycle tab: same one-tile-plus-settings layout as Random. Cycle
+             rotates through the default (built-in) themes on its own, with an
+             optional Holiday Override that force-switches to the matching
+             Holiday theme on its real-world date. -->
+        <div id="themePickerCyclePane" class="theme-picker-random-pane" style="display:none;">
+          <div id="themePickerCycleTileWrap" class="theme-picker-random-tile-wrap"></div>
+          <div id="cycleSubsettings" class="theme-picker-random-settings">
+            <div class="theme-picker-section-divider">Cycle Settings</div>
+            <div class="settings-row">
+              <span>Order:</span>
+              <div class="toggle-with-label">
+                <span id="cycleOrderLabel">Sequential</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="cycleOrderToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="settings-row">
+              <span>Change:</span>
+              <select id="cycleTriggerSelect">
+                <option value="onStartup">On Startup</option>
+                <option value="time">After Time Passes</option>
+                <option value="everything">On Interaction</option>
+                <option value="click">On Click</option>
+              </select>
+            </div>
+            <div id="cycleIntervalRow" class="settings-row" style="display:none;">
+              <span>Every:</span>
+              <div class="cycle-interval-inputs">
+                <input type="number" id="cycleIntervalAmount" min="1" max="999" />
+                <select id="cycleIntervalUnit">
+                  <option value="seconds">Seconds</option>
+                  <option value="minutes">Minutes</option>
+                  <option value="hours">Hours</option>
+                  <option value="days">Days</option>
+                </select>
+              </div>
+            </div>
+            <div class="settings-row">
+              <span>Include Custom Themes:</span>
+              <div class="toggle-with-label">
+                <span id="cycleIncludeCustomLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="cycleIncludeCustomToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="settings-row">
+              <span class="theme-picker-label-with-info">
+                Holiday Overrides:
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="When today's date matches a Holiday theme (Christmas, Halloween, etc.), Cycle force-switches to it, overriding whatever it would otherwise be showing, until the date passes. The two settings below only apply while this is on, which is why they're hidden until you enable it.">ℹ</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="cycleHolidayOverrideLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="cycleHolidayOverrideToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div id="cycleHolidayExclusiveRow" class="settings-row" style="display:none;">
+              <span class="theme-picker-label-with-info">
+                Only on Actual Holidays:
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Removes Holiday themes from the normal cycle rotation — they'll only ever show up via Holiday Overrides, on their actual date.">ℹ</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="cycleHolidayExclusiveLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="cycleHolidayExclusiveToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div id="cycleHolidayFullSeasonRow" class="settings-row" style="display:none;">
+              <span class="theme-picker-label-with-info">
+                Full Holiday Season:
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Widens each Holiday theme's active date range to its traditional season (e.g. all of October for Halloween) instead of just its exact date.">ℹ</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="cycleHolidayFullSeasonLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="cycleHolidayFullSeasonToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="random-roll-actions">
+              <button id="cycleNowBtn" title="Advance to the next theme in the cycle now">Cycle Now</button>
+            </div>
+            <p class="theme-picker-random-hint">Select the Cycle tile to enable these settings.</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2253,7 +2352,7 @@
        CHOOSE SOUND PACK
   ====================================================================== -->
   <div id="soundPackPickerBackdrop" class="modal-backdrop" style="display: none;">
-    <div class="modal">
+    <div class="modal sound-pack-picker-modal">
       <div class="modal-header">
         <button id="soundPackPickerBack" class="nav-back-btn modal-header-left" title="Back to Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>

@@ -55,6 +55,7 @@ import {
   maybeRegenerateRandom,
 } from "./random-theme";
 import { applyTheme, getActiveCustomId, setActiveCustomId } from "./theme-core";
+import { advanceCycleNow } from "./cycle-theme";
 import {
   genThemeId,
   saveCustomThemes,
@@ -152,6 +153,38 @@ type ShellSettings = {
   theme: string;
   randomPersistent: boolean;
   randomHarmonized: boolean;
+  /** Order themes advance through: "sequential" walks the pool in order,
+   *  "random" jumps to a random other pool member each time. */
+  cycleOrder: "sequential" | "random";
+  /** What advances the cycle: "click" reacts to any button click, "everything"
+   *  additionally reacts to the same field-commit/change events Random's
+   *  Regenerative mode does, "time" advances on a fixed interval instead of
+   *  user interaction (see cycleIntervalAmount/cycleIntervalUnit); "onStartup"
+   *  advances exactly once per session, the moment the app finishes loading
+   *  settings, and never again on its own after that. */
+  cycleTrigger: "onStartup" | "time" | "everything" | "click";
+  cycleIntervalAmount: number;
+  cycleIntervalUnit: "seconds" | "minutes" | "hours" | "days";
+  /** Off by default: whether saved Custom Themes are included in the cycle
+   *  pool alongside the built-in Main/Holiday/Special themes. */
+  cycleIncludeCustom: boolean;
+  /** Off by default: force-switches to the matching Holiday theme on its
+   *  real-world date, overriding whatever the cycle would otherwise show. */
+  cycleHolidayOverride: boolean;
+  /** Only meaningful with cycleHolidayOverride on: removes Holiday themes
+   *  from the normal cycle pool entirely, so they only ever appear via the
+   *  override on their actual date. */
+  cycleHolidayExclusive: boolean;
+  /** Only meaningful with cycleHolidayOverride on: widens each Holiday
+   *  theme's active window to its traditional season (e.g. all of October
+   *  for Halloween) instead of just its exact date. */
+  cycleHolidayFullSeason: boolean;
+  /** Which pool member (built-in theme id or custom theme id) Cycle mode is
+   *  currently showing — persisted so reopening the app doesn't jump. */
+  cycleCurrentThemeId: string;
+  /** Epoch ms of the last cycle advance — the anchor the "time" trigger
+   *  counts from, persisted so the countdown survives an app restart. */
+  cycleLastAdvance: number;
   appLock: boolean;
   lockCredentialType: "pin" | "password";
   soundPack: string;
@@ -216,6 +249,12 @@ const SOUND_PACKS: SoundPack[] = [
     error: "/sounds/subtle/subtle-error.wav",
   },
   {
+    id: "saxy-time",
+    name: "Saxy Time",
+    success: "/sounds/saxy-time/saxy-time-success.wav",
+    error: "/sounds/saxy-time/saxy-time-error.wav",
+  },
+  {
     id: "futuristic-1",
     name: "Futuristic 1",
     success: "/sounds/futuristic-1/futuristic-1-success.wav",
@@ -226,12 +265,6 @@ const SOUND_PACKS: SoundPack[] = [
     name: "Futuristic 2",
     success: "/sounds/futuristic-2/futuristic-2-success.wav",
     error: "/sounds/futuristic-2/futuristic-2-error.wav",
-  },
-  {
-    id: "saxy-time",
-    name: "Saxy Time",
-    success: "/sounds/saxy-time/saxy-time-success.wav",
-    error: "/sounds/saxy-time/saxy-time-error.wav",
   },
   {
     id: "cake",
@@ -269,6 +302,18 @@ function freshSidebarItems(): SidebarItemState[] {
   return ALL_TOOLS.map((t) => ({ key: t.key, pinned: true }));
 }
 
+/** Enforces the "After Time Passes" trigger's floor: an interval under 10
+ *  seconds is too fast to be a deliberate "ambient" cycle and mostly just
+ *  thrashes the theme, so seconds-denominated intervals are clamped up to at
+ *  least 10 — every other unit (minutes/hours/days) already clears that floor
+ *  at an amount of 1, so it's a no-op there. */
+function clampCycleIntervalAmount(
+  amount: number,
+  unit: ShellSettings["cycleIntervalUnit"],
+): number {
+  return Math.max(unit === "seconds" ? 10 : 1, amount);
+}
+
 const DEFAULT_SETTINGS: ShellSettings = {
   fontScale: 0,
   hour12: false,
@@ -278,6 +323,16 @@ const DEFAULT_SETTINGS: ShellSettings = {
   theme: "default",
   randomPersistent: true,
   randomHarmonized: true,
+  cycleOrder: "sequential",
+  cycleTrigger: "click",
+  cycleIntervalAmount: 1,
+  cycleIntervalUnit: "hours",
+  cycleIncludeCustom: false,
+  cycleHolidayOverride: false,
+  cycleHolidayExclusive: false,
+  cycleHolidayFullSeason: false,
+  cycleCurrentThemeId: "",
+  cycleLastAdvance: 0,
   appLock: false,
   lockCredentialType: "pin",
   soundPack: "default",
@@ -391,6 +446,26 @@ const themePickerClose = document.getElementById("themePickerClose")!;
 const themePickerGrid = document.getElementById("themePickerGrid")!;
 const themePickerRandomPane = document.getElementById("themePickerRandomPane")!;
 const themePickerRandomTileWrap = document.getElementById("themePickerRandomTileWrap")!;
+const themePickerCyclePane = document.getElementById("themePickerCyclePane")!;
+const themePickerCycleTileWrap = document.getElementById("themePickerCycleTileWrap")!;
+const cycleSubsettings = document.getElementById("cycleSubsettings")!;
+const cycleOrderToggle = document.getElementById("cycleOrderToggle") as HTMLInputElement;
+const cycleOrderLabel = document.getElementById("cycleOrderLabel")!;
+const cycleTriggerSelect = document.getElementById("cycleTriggerSelect") as HTMLSelectElement;
+const cycleIntervalRow = document.getElementById("cycleIntervalRow")!;
+const cycleIntervalAmountInput = document.getElementById("cycleIntervalAmount") as HTMLInputElement;
+const cycleIntervalUnitSelect = document.getElementById("cycleIntervalUnit") as HTMLSelectElement;
+const cycleIncludeCustomToggle = document.getElementById("cycleIncludeCustomToggle") as HTMLInputElement;
+const cycleIncludeCustomLabel = document.getElementById("cycleIncludeCustomLabel")!;
+const cycleHolidayOverrideToggle = document.getElementById("cycleHolidayOverrideToggle") as HTMLInputElement;
+const cycleHolidayOverrideLabel = document.getElementById("cycleHolidayOverrideLabel")!;
+const cycleHolidayExclusiveRow = document.getElementById("cycleHolidayExclusiveRow")!;
+const cycleHolidayExclusiveToggle = document.getElementById("cycleHolidayExclusiveToggle") as HTMLInputElement;
+const cycleHolidayExclusiveLabel = document.getElementById("cycleHolidayExclusiveLabel")!;
+const cycleHolidayFullSeasonRow = document.getElementById("cycleHolidayFullSeasonRow")!;
+const cycleHolidayFullSeasonToggle = document.getElementById("cycleHolidayFullSeasonToggle") as HTMLInputElement;
+const cycleHolidayFullSeasonLabel = document.getElementById("cycleHolidayFullSeasonLabel")!;
+const cycleNowBtn = document.getElementById("cycleNowBtn") as HTMLButtonElement;
 
 const appVersionEl = document.getElementById("appVersion");
 
@@ -836,6 +911,23 @@ document.addEventListener("mousedown", (e: MouseEvent) => {
   }
 });
 
+// Suppress WebView2/Chromium's built-in "Turn on caret browsing?" prompt.
+// F7 toggles it by default in every Chromium-based webview; nothing in this
+// app uses caret browsing, so the prompt is just an accidental-keypress
+// trap. Capturing phase + stopImmediatePropagation() so this runs before
+// (and blocks) the webview's own default handling of the key, which is what
+// actually shows the dialog.
+window.addEventListener(
+  "keydown",
+  (e: KeyboardEvent) => {
+    if (e.key === "F7") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  },
+  { capture: true },
+);
+
 /* =============================================================================
    SETTINGS — LOAD / SAVE / APPLY
 ============================================================================= */
@@ -875,6 +967,23 @@ export function applySettings(): void {
   randomPaletteLabel.textContent = settings.randomHarmonized
     ? "Harmonized"
     : "Chaotic";
+
+  // Same story for the Cycle tab's settings panel.
+  cycleOrderToggle.checked = settings.cycleOrder === "random";
+  cycleOrderLabel.textContent = settings.cycleOrder === "random" ? "Random" : "Sequential";
+  cycleTriggerSelect.value = settings.cycleTrigger;
+  cycleIntervalAmountInput.min = settings.cycleIntervalUnit === "seconds" ? "10" : "1";
+  cycleIntervalAmountInput.value = String(settings.cycleIntervalAmount);
+  cycleIntervalUnitSelect.value = settings.cycleIntervalUnit;
+  cycleIncludeCustomToggle.checked = settings.cycleIncludeCustom;
+  cycleIncludeCustomLabel.textContent = settings.cycleIncludeCustom ? "On" : "Off";
+  cycleHolidayOverrideToggle.checked = settings.cycleHolidayOverride;
+  cycleHolidayOverrideLabel.textContent = settings.cycleHolidayOverride ? "On" : "Off";
+  cycleHolidayExclusiveToggle.checked = settings.cycleHolidayExclusive;
+  cycleHolidayExclusiveLabel.textContent = settings.cycleHolidayExclusive ? "On" : "Off";
+  cycleHolidayFullSeasonToggle.checked = settings.cycleHolidayFullSeason;
+  cycleHolidayFullSeasonLabel.textContent = settings.cycleHolidayFullSeason ? "On" : "Off";
+  syncCycleSettingsVisibility();
 
   applyLockSettings();
   applyUpdateSettings();
@@ -972,6 +1081,59 @@ async function loadSettings(): Promise<void> {
         typeof merged.randomHarmonized === "boolean"
           ? merged.randomHarmonized
           : DEFAULT_SETTINGS.randomHarmonized,
+      cycleOrder:
+        merged.cycleOrder === "sequential" || merged.cycleOrder === "random"
+          ? merged.cycleOrder
+          : DEFAULT_SETTINGS.cycleOrder,
+      cycleTrigger:
+        merged.cycleTrigger === "onStartup" ||
+        merged.cycleTrigger === "time" ||
+        merged.cycleTrigger === "everything" ||
+        merged.cycleTrigger === "click"
+          ? merged.cycleTrigger
+          : DEFAULT_SETTINGS.cycleTrigger,
+      cycleIntervalAmount: clampCycleIntervalAmount(
+        typeof merged.cycleIntervalAmount === "number" && merged.cycleIntervalAmount > 0
+          ? merged.cycleIntervalAmount
+          : DEFAULT_SETTINGS.cycleIntervalAmount,
+        merged.cycleIntervalUnit === "seconds" ||
+          merged.cycleIntervalUnit === "minutes" ||
+          merged.cycleIntervalUnit === "hours" ||
+          merged.cycleIntervalUnit === "days"
+          ? merged.cycleIntervalUnit
+          : DEFAULT_SETTINGS.cycleIntervalUnit,
+      ),
+      cycleIntervalUnit:
+        merged.cycleIntervalUnit === "seconds" ||
+        merged.cycleIntervalUnit === "minutes" ||
+        merged.cycleIntervalUnit === "hours" ||
+        merged.cycleIntervalUnit === "days"
+          ? merged.cycleIntervalUnit
+          : DEFAULT_SETTINGS.cycleIntervalUnit,
+      cycleIncludeCustom:
+        typeof merged.cycleIncludeCustom === "boolean"
+          ? merged.cycleIncludeCustom
+          : DEFAULT_SETTINGS.cycleIncludeCustom,
+      cycleHolidayOverride:
+        typeof merged.cycleHolidayOverride === "boolean"
+          ? merged.cycleHolidayOverride
+          : DEFAULT_SETTINGS.cycleHolidayOverride,
+      cycleHolidayExclusive:
+        typeof merged.cycleHolidayExclusive === "boolean"
+          ? merged.cycleHolidayExclusive
+          : DEFAULT_SETTINGS.cycleHolidayExclusive,
+      cycleHolidayFullSeason:
+        typeof merged.cycleHolidayFullSeason === "boolean"
+          ? merged.cycleHolidayFullSeason
+          : DEFAULT_SETTINGS.cycleHolidayFullSeason,
+      cycleCurrentThemeId:
+        typeof merged.cycleCurrentThemeId === "string"
+          ? merged.cycleCurrentThemeId
+          : DEFAULT_SETTINGS.cycleCurrentThemeId,
+      cycleLastAdvance:
+        typeof merged.cycleLastAdvance === "number"
+          ? merged.cycleLastAdvance
+          : DEFAULT_SETTINGS.cycleLastAdvance,
       appLock:
         typeof merged.appLock === "boolean"
           ? merged.appLock
@@ -1313,9 +1475,11 @@ sidebarEditResetBtn.addEventListener("click", () => {
    icon for the same reason.
 ============================================================================= */
 
-type ThemePickerTab = "main" | "holiday" | "special" | "random" | "custom";
+export type ThemePickerTab = "main" | "holiday" | "special" | "cycle" | "random" | "custom";
 
-const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: string }[] }[] = [
+/** Exported so cycle-theme.ts can build its cycle pool and holiday-override
+ *  lookups off the same built-in theme list, rather than duplicating it. */
+export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: string }[] }[] = [
   {
     tab: "main",
     themes: [
@@ -1330,10 +1494,12 @@ const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: string }
   {
     tab: "holiday",
     themes: [
+      { id: "valentine", label: "Valentine" },
       { id: "mardi-gras", label: "Mardi Gras" },
       { id: "rainbow", label: "Rainbow" },
       { id: "patriot", label: "Patriot" },
       { id: "halloween", label: "Halloween" },
+      { id: "thanksgiving", label: "Thanksgiving" },
       { id: "christmas", label: "Christmas" },
     ],
   },
@@ -1344,11 +1510,13 @@ const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: string }
       { id: "knowledge", label: "Knowledge" },
       { id: "neon", label: "Neon" },
       { id: "retro-electric", label: "Retro-Electric" },
+      { id: "halo", label: "Halo" },
     ],
   },
 ];
 
 const DIE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="16" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg>`;
+const CYCLE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>`;
 const PALETTE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a9.5 9.5 0 1 1 0-19c4.7 0 9 3.5 9 8 0 2.5-2 4-4.5 4H15a2 2 0 0 0-1.5 3.3c.4.5.5 1.2.1 1.7-.4.6-1 1-1.6 1z"/><circle cx="7.5" cy="10.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="17" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>`;
 const EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>`;
 const TRASH_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>`;
@@ -1360,6 +1528,7 @@ const TRASH_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
  *  tile highlight. */
 function getThemeDisplayName(themeId: string): string {
   if (themeId === "random") return "Random";
+  if (themeId === "cycle") return "Cycle";
   if (themeId === "custom") {
     const activeId = getActiveCustomId();
     const active = activeId ? customThemes.find((t) => t.id === activeId) : undefined;
@@ -1514,6 +1683,28 @@ function buildRandomTile(): HTMLElement {
   return tile;
 }
 
+function buildCycleTile(): HTMLElement {
+  const tile = document.createElement("div");
+  tile.className = settings.theme === "cycle" ? "theme-tile active" : "theme-tile";
+  tile.dataset.themeId = "cycle";
+
+  const preview = document.createElement("div");
+  preview.className = "theme-tile-preview";
+  const iconWrap = document.createElement("div");
+  iconWrap.className = "theme-tile-preview-icon";
+  iconWrap.innerHTML = CYCLE_SVG;
+  preview.appendChild(iconWrap);
+  tile.appendChild(preview);
+
+  const name = document.createElement("span");
+  name.className = "theme-tile-name";
+  name.textContent = "Cycle";
+  tile.appendChild(name);
+
+  tile.addEventListener("click", () => selectTheme("cycle"));
+  return tile;
+}
+
 function buildCustomThemeTile(theme: CustomTheme): HTMLElement {
   const isActive = settings.theme === "custom" && getActiveCustomId() === theme.id;
   const tile = document.createElement("div");
@@ -1597,10 +1788,23 @@ let themePickerActiveTab: ThemePickerTab = "main";
 function tabForCurrentTheme(): ThemePickerTab {
   if (settings.theme === "custom") return "custom";
   if (settings.theme === "random") return "random";
+  if (settings.theme === "cycle") return "cycle";
   for (const group of THEME_GROUPS) {
     if (group.themes.some((t) => t.id === settings.theme)) return group.tab;
   }
   return "main";
+}
+
+/** Shows/hides the Cycle pane's conditional rows — the interval row only
+ *  matters for the "time" trigger, the holiday-exclusive row only matters
+ *  once Holiday Overrides is on. Called from applySettings() (so it stays
+ *  correct even while the pane isn't open) and whenever the picker renders
+ *  the Cycle tab. */
+function syncCycleSettingsVisibility(): void {
+  cycleIntervalRow.style.display = settings.cycleTrigger === "time" ? "" : "none";
+  const holidaySubRowDisplay = settings.cycleHolidayOverride ? "" : "none";
+  cycleHolidayExclusiveRow.style.display = holidaySubRowDisplay;
+  cycleHolidayFullSeasonRow.style.display = holidaySubRowDisplay;
 }
 
 function renderThemePickerTab(tab: ThemePickerTab): void {
@@ -1609,8 +1813,11 @@ function renderThemePickerTab(tab: ThemePickerTab): void {
     btn.classList.toggle("active", btn.dataset.themeTab === tab);
   });
 
+  themePickerGrid.style.display = "none";
+  themePickerRandomPane.style.display = "none";
+  themePickerCyclePane.style.display = "none";
+
   if (tab === "random") {
-    themePickerGrid.style.display = "none";
     themePickerRandomPane.style.display = "";
     themePickerRandomTileWrap.innerHTML = "";
     themePickerRandomTileWrap.appendChild(buildRandomTile());
@@ -1619,20 +1826,64 @@ function renderThemePickerTab(tab: ThemePickerTab): void {
     randomSubsettings.classList.toggle("inactive", settings.theme !== "random");
     return;
   }
-  themePickerGrid.style.display = "";
-  themePickerRandomPane.style.display = "none";
 
+  if (tab === "cycle") {
+    themePickerCyclePane.style.display = "";
+    themePickerCycleTileWrap.innerHTML = "";
+    themePickerCycleTileWrap.appendChild(buildCycleTile());
+    // Same "visible but inert until actually active" treatment as Random.
+    cycleSubsettings.classList.toggle("inactive", settings.theme !== "cycle");
+    syncCycleSettingsVisibility();
+    return;
+  }
+
+  themePickerGrid.style.display = "";
   themePickerGrid.innerHTML = "";
 
   if (tab === "custom") {
     customThemes.forEach((ct) => themePickerGrid.appendChild(buildCustomThemeTile(ct)));
     themePickerGrid.appendChild(buildNewCustomThemeTile());
+    syncThemeGridHeight();
     return;
   }
 
   const group = THEME_GROUPS.find((g) => g.tab === tab);
   group?.themes.forEach((t) => themePickerGrid.appendChild(buildThemeTile(t.id, t.label)));
+  syncThemeGridHeight();
 }
+
+/** Caps the grid at exactly two full tile rows and lets it scroll beyond
+ *  that, instead of the old fixed 58vh cap — which could either clip a
+ *  second row's titles or leave dead space, since tile height depends on
+ *  how many columns the auto-fill grid ends up with. One or two rows: no
+ *  cap, so the modal simply grows to fit. Three or more: capped to the
+ *  height of the first two rows, so row three+ scrolls into view instead
+ *  of being clipped. Reading offsetTop/offsetHeight forces a synchronous
+ *  layout, which is fine here since it runs once right after populating
+ *  the grid, not on every frame. */
+function syncThemeGridHeight(): void {
+  const tiles = Array.from(themePickerGrid.children) as HTMLElement[];
+  if (tiles.length === 0) {
+    themePickerGrid.style.maxHeight = "";
+    return;
+  }
+  const rowTops = [...new Set(tiles.map((t) => t.offsetTop))].sort((a, b) => a - b);
+  if (rowTops.length < 3) {
+    themePickerGrid.style.maxHeight = "none";
+    return;
+  }
+  const secondRowTile = tiles.find((t) => t.offsetTop === rowTops[1])!;
+  themePickerGrid.style.maxHeight = `${rowTops[1] + secondRowTile.offsetHeight}px`;
+}
+
+// Column count (and therefore row height/count) can change on window
+// resize, so re-run the cap while the picker is open and on a tab that
+// actually uses the grid (Random/Cycle use their own single-tile panes).
+window.addEventListener("resize", () => {
+  if (themePickerModal.isOpen && themePickerGrid.style.display !== "none") {
+    syncThemeGridHeight();
+  }
+});
 
 document.querySelectorAll<HTMLElement>(".theme-picker-tab").forEach((btn) => {
   btn.addEventListener("click", () => renderThemePickerTab(btn.dataset.themeTab as ThemePickerTab));
@@ -1833,6 +2084,117 @@ randomPaletteToggle.addEventListener("change", () => {
   saveSettings();
 });
 
+cycleOrderToggle.addEventListener("change", () => {
+  settings.cycleOrder = cycleOrderToggle.checked ? "random" : "sequential";
+  cycleOrderLabel.textContent = settings.cycleOrder === "random" ? "Random" : "Sequential";
+  saveSettings();
+});
+
+cycleTriggerSelect.addEventListener("change", () => {
+  settings.cycleTrigger = cycleTriggerSelect.value as typeof settings.cycleTrigger;
+  syncCycleSettingsVisibility();
+  applyTheme("cycle");
+  saveSettings();
+});
+
+cycleIntervalAmountInput.addEventListener("change", () => {
+  const parsed = parseInt(cycleIntervalAmountInput.value, 10);
+  const raw = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  settings.cycleIntervalAmount = clampCycleIntervalAmount(raw, settings.cycleIntervalUnit);
+  cycleIntervalAmountInput.value = String(settings.cycleIntervalAmount);
+  applyTheme("cycle");
+  saveSettings();
+});
+
+cycleIntervalUnitSelect.addEventListener("change", () => {
+  settings.cycleIntervalUnit = cycleIntervalUnitSelect.value as typeof settings.cycleIntervalUnit;
+  cycleIntervalAmountInput.min = settings.cycleIntervalUnit === "seconds" ? "10" : "1";
+  settings.cycleIntervalAmount = clampCycleIntervalAmount(
+    settings.cycleIntervalAmount,
+    settings.cycleIntervalUnit,
+  );
+  cycleIntervalAmountInput.value = String(settings.cycleIntervalAmount);
+  applyTheme("cycle");
+  saveSettings();
+});
+
+cycleIncludeCustomToggle.addEventListener("change", () => {
+  settings.cycleIncludeCustom = cycleIncludeCustomToggle.checked;
+  cycleIncludeCustomLabel.textContent = settings.cycleIncludeCustom ? "On" : "Off";
+  applyTheme("cycle");
+  saveSettings();
+});
+
+cycleHolidayOverrideToggle.addEventListener("change", () => {
+  settings.cycleHolidayOverride = cycleHolidayOverrideToggle.checked;
+  cycleHolidayOverrideLabel.textContent = settings.cycleHolidayOverride ? "On" : "Off";
+  syncCycleSettingsVisibility();
+  applyTheme("cycle");
+  saveSettings();
+});
+
+cycleHolidayExclusiveToggle.addEventListener("change", () => {
+  settings.cycleHolidayExclusive = cycleHolidayExclusiveToggle.checked;
+  cycleHolidayExclusiveLabel.textContent = settings.cycleHolidayExclusive ? "On" : "Off";
+  applyTheme("cycle");
+  saveSettings();
+});
+
+cycleHolidayFullSeasonToggle.addEventListener("change", () => {
+  settings.cycleHolidayFullSeason = cycleHolidayFullSeasonToggle.checked;
+  cycleHolidayFullSeasonLabel.textContent = settings.cycleHolidayFullSeason ? "On" : "Off";
+  applyTheme("cycle");
+  saveSettings();
+});
+
+cycleNowBtn.addEventListener("click", () => advanceCycleNow());
+
+/* -----------------------------------------------------------------------------
+   Cycle tab's holiday-subsettings (i) buttons — click-to-toggle popover,
+   styled and behaved identically to auto-backup.ts's own info-tooltip
+   feature (see that file's "Info tooltips" section) but reimplemented here
+   rather than imported, matching its own established convention of keeping
+   this pattern local to whichever file owns the buttons.
+----------------------------------------------------------------------------- */
+let themePickerInfoTooltipEl: HTMLDivElement | null = null;
+let themePickerInfoTooltipOpenBtn: HTMLButtonElement | null = null;
+
+function closeThemePickerInfoTooltip(): void {
+  themePickerInfoTooltipEl?.classList.remove("visible");
+  themePickerInfoTooltipOpenBtn = null;
+}
+
+function toggleThemePickerInfoTooltip(btn: HTMLButtonElement, text: string): void {
+  if (themePickerInfoTooltipOpenBtn === btn) {
+    closeThemePickerInfoTooltip();
+    return;
+  }
+  if (!themePickerInfoTooltipEl) {
+    themePickerInfoTooltipEl = document.createElement("div");
+    themePickerInfoTooltipEl.className = "theme-picker-info-tooltip";
+    document.body.appendChild(themePickerInfoTooltipEl);
+  }
+  themePickerInfoTooltipEl.textContent = text;
+  themePickerInfoTooltipEl.classList.add("visible");
+  const rect = btn.getBoundingClientRect();
+  const bubbleWidth = themePickerInfoTooltipEl.offsetWidth;
+  const left = Math.min(
+    Math.max(8, rect.left + rect.width / 2 - bubbleWidth / 2),
+    window.innerWidth - bubbleWidth - 8,
+  );
+  themePickerInfoTooltipEl.style.top = `${rect.bottom + 6}px`;
+  themePickerInfoTooltipEl.style.left = `${left}px`;
+  themePickerInfoTooltipOpenBtn = btn;
+}
+
+document.querySelectorAll<HTMLButtonElement>(".theme-picker-info-btn[data-tooltip]").forEach((btn) => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleThemePickerInfoTooltip(btn, btn.dataset.tooltip ?? "");
+  });
+});
+document.addEventListener("click", () => closeThemePickerInfoTooltip());
+
 dateFormatToggle.addEventListener("change", () => {
   settings.americanDates = dateFormatToggle.checked;
   dateFormatLabel.textContent = settings.americanDates
@@ -1867,12 +2229,29 @@ function refreshSoundPackCurrentBadge(): void {
   soundPackCurrentBadge.textContent = pack ? pack.name : settings.soundPack;
 }
 
+/** Tracks whatever preview cue is currently playing so a new preview click
+ *  can stop it — without this, rapid clicks across tiles/buttons stack up
+ *  and play over each other instead of replacing one another. */
+let _soundPackPreviewAudio: HTMLAudioElement | null = null;
+
 /** Plays one specific pack's cue directly — a standalone preview, not tied
- *  to the active successAudio/errorAudio elements used by flash(). */
+ *  to the active successAudio/errorAudio elements used by flash(). Only one
+ *  preview ever plays at a time; starting a new one kills the last. */
 function previewSoundPackCue(pack: SoundPack, kind: "success" | "error"): void {
   const src = kind === "success" ? pack.success : pack.error;
   if (!src) return;
-  new Audio(src).play().catch(() => {});
+
+  if (_soundPackPreviewAudio) {
+    _soundPackPreviewAudio.pause();
+    _soundPackPreviewAudio.currentTime = 0;
+  }
+
+  const audio = new Audio(src);
+  _soundPackPreviewAudio = audio;
+  audio.addEventListener("ended", () => {
+    if (_soundPackPreviewAudio === audio) _soundPackPreviewAudio = null;
+  });
+  audio.play().catch(() => {});
 }
 
 /** Selects a sound pack — same effect the old dropdown's "change" handler

@@ -1,0 +1,246 @@
+:root {
+  --color-bg:                  #201209;
+  --color-panel:               #341c11;
+  --color-input-bg:            #3d2313;
+  --color-border:              #6e3a1f;
+  --color-border-dashed:       #ff8a3f;
+  --color-text:                #f5e6c8;
+  --color-text-muted:          #dba876;
+  --color-hover:               #4c2814;
+
+  --color-btn:                 #e8631f;
+  --color-accent:              #ff8a3f;
+  --color-btn-hover:           #b8410f;
+  --color-btn-text:            #1a0f04;
+
+  --color-danger:              #c22a1e;
+  --color-danger-subtle:       rgba(194, 42, 30, 0.15);
+  --color-success:             #7a9a3d;
+
+  --color-accent-input:        #e8631f;
+  --color-accent-view:         #7a9a3d;
+  --color-accent-totals:       #c22a1e;
+  --color-accent-entries:      #ff8a3f;
+
+  --color-toggle-off:          #4c2814;
+  --color-toggle-on:           #e8631f;
+
+  /* ── Changelog accents ── Features (burnt orange) / Improvements (harvest olive) / Bugfixes (deep red) /
+     tool heading (gold, the one accent slot reserved for it so it stays a highlight, not the dominant hue) */
+  --color-changelog-features:     #e8631f;
+  --color-changelog-improvements: #7a9a3d;
+  --color-changelog-bugfixes:     #c22a1e;
+  --color-changelog-tool:         #e8b93d;
+
+  --color-toast-success-bg:    #10190a;
+  --color-toast-success-border:#7a9a3d;
+  --color-toast-success-text:  #d8e8bd;
+  --color-toast-error-bg:      #200907;
+  --color-toast-error-border:  #c22a1e;
+  --color-toast-error-text:    #f5c8bf;
+
+  /* ── Budget chart palette ── Burnt-orange / deep-red / bright-orange / cranberry / tomato / olive / gold / saddle-brown */
+  --color-chart-1:             #e8631f;
+  --color-chart-2:             #c22a1e;
+  --color-chart-3:             #ff8a3f;
+  --color-chart-4:             #8a2846;
+  --color-chart-5:             #d9432a;
+  --color-chart-6:             #7a9a3d;
+  --color-chart-7:             #e8b93d;
+  --color-chart-8:             #8b5a2e;
+}
+
+/* ── Time Tracker panels — orange / deep-red / bright-orange / cranberry ── */
+.input-panel {
+  background: linear-gradient(135deg, rgba(224, 85, 26, 0.1) 0%, #201007 100%);
+  border-left: 4px solid #e8631f;
+}
+.controls-panel {
+  background: linear-gradient(135deg, rgba(194, 42, 30, 0.09) 0%, #200a07 100%);
+  border-left: 4px solid #c22a1e;
+}
+.totals-panel {
+  background: linear-gradient(135deg, rgba(255, 122, 46, 0.09) 0%, #221208 100%);
+  border-left: 4px solid #ff8a3f;
+}
+.entries-panel {
+  background: linear-gradient(135deg, rgba(138, 40, 70, 0.08) 0%, #1e0d10 100%);
+  border-left: 4px solid #8a2846;
+}
+
+/* ── Tool / section header — burnt-orange to deep-red glow ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, rgba(224, 85, 26, 0.15), rgba(194, 42, 30, 0.1));
+  border-bottom-color: rgba(224, 85, 26, 0.4);
+  box-shadow: 0 0 20px rgba(224, 85, 26, 0.12);
+}
+
+.tool-view-title,
+.section-title {
+  color: #ff8a3f;
+  text-shadow: 0 0 16px rgba(255, 122, 46, 0.45);
+}
+
+/* ── Modal — translucent: warm red-orange-tinted frosted glass ── */
+body:not(.solid-modals) .modal {
+  background: linear-gradient(135deg, rgba(224, 85, 26, 0.1) 0%, rgba(23, 12, 7, 0.55) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(224, 85, 26, 0.4);
+  box-shadow: 0 0 30px rgba(194, 42, 30, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Modal — solid: deep brown-red panel ── */
+body.solid-modals .modal {
+  background: linear-gradient(135deg, #3d2313 0%, #201209 100%);
+  border-color: rgba(224, 85, 26, 0.4);
+  box-shadow: 0 0 30px rgba(194, 42, 30, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Primary button ── */
+.primary-btn {
+  background: rgba(224, 85, 26, 0.2);
+  border-color: rgba(224, 85, 26, 0.55);
+  color: #ff8a3f;
+}
+.primary-btn:hover {
+  background: rgba(224, 85, 26, 0.32);
+  border-color: #e8631f;
+  box-shadow: 0 0 16px rgba(224, 85, 26, 0.35);
+  color: #ff8a3f;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  background: linear-gradient(135deg, rgba(224, 85, 26, 0.08) 0%, #201007 100%);
+  border-color: rgba(224, 85, 26, 0.4);
+  box-shadow: 0 0 16px rgba(224, 85, 26, 0.1);
+}
+#media-tool-image-ccr .result-panel {
+  background: linear-gradient(135deg, rgba(194, 42, 30, 0.08) 0%, #200a07 100%);
+  border-color: rgba(194, 42, 30, 0.4);
+  border-left-color: rgba(194, 42, 30, 0.4);
+  box-shadow: 0 0 16px rgba(194, 42, 30, 0.1);
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: rgba(224, 85, 26, 0.5); }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: var(--color-text-muted);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.tab-btn:hover {
+  color: #ff8a3f;
+  border-color: rgba(224, 85, 26, 0.45);
+  background: rgba(224, 85, 26, 0.1);
+  box-shadow: none;
+}
+.tab-btn.active {
+  color: #ff8a3f;
+  border-color: rgba(194, 42, 30, 0.55);
+  background: rgba(194, 42, 30, 0.15);
+  box-shadow: none;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #341c11;
+  color: #dba876;
+  border-color: rgba(224, 85, 26, 0.25);
+  box-shadow: none;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: #ff8a3f;
+  border-color: rgba(224, 85, 26, 0.5);
+  background: #341c11;
+  box-shadow: none;
+}
+.dir-btn.active, .prv-btn.active {
+  color: #ff8a3f;
+  border-color: #e8631f;
+  background: rgba(194, 42, 30, 0.15);
+  box-shadow: none;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge { background: rgba(224, 85, 26, 0.9); color: #1a0f04; }
+
+/* ── Preview card accents ── */
+.preview-card:hover      { border-color: rgba(224, 85, 26, 0.65); box-shadow: 0 0 10px rgba(224, 85, 26, 0.18); }
+.preview-card.anchor-card { border-color: #e8631f; box-shadow: 0 0 12px rgba(224, 85, 26, 0.3); }
+.preview-card.drag-target  { border-color: #c22a1e; box-shadow: 0 0 12px rgba(194, 42, 30, 0.3); }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: #e8631f;
+  border-color: #201209;
+  box-shadow: 0 0 8px rgba(224, 85, 26, 0.55);
+}
+.img-slider::-webkit-slider-thumb:hover { background: #c22a1e; }
+.slider-val   { color: #ff8a3f; }
+.estimate-val { color: #ff8a3f; }
+.result-preview-wrap { border-color: rgba(194, 42, 30, 0.35); }
+
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #ff8a3f; }
+
+/* ── Budget Tracker ── */
+
+#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(224, 85, 26, 0.12) 0%, #341c11 100%); }
+#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(122, 154, 61, 0.09) 0%, #341c11 100%); }
+#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(194, 42, 30, 0.11) 0%, #341c11 100%); }
+#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(255, 122, 46, 0.1) 0%, #341c11 100%); }
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #e8631f;
+  box-shadow: 0 0 16px rgba(224, 85, 26, 0.15);
+}
+.budget-annual-stats-title {
+  color: #ff8a3f;
+  text-shadow: 0 0 12px rgba(255, 122, 46, 0.4);
+}
+
+.budget-summary-tab.active {
+  color: #ff8a3f;
+  background: rgba(194, 42, 30, 0.15);
+  border-bottom-color: #e8631f;
+  text-shadow: 0 0 8px rgba(224, 85, 26, 0.4);
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #7a9a3d; border-color: #7a9a3d; }
+.budget-stats-count-late    { color: #e8b93d; border-color: #e8b93d; }
+.budget-stats-count-overdue { color: #c22a1e; border-color: #c22a1e; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(224, 85, 26, 0.35);
+  color: #dba876;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(224, 85, 26, 0.12);
+  border-color: #e8631f;
+  color: #ff8a3f;
+}
+
+.budget-view-mode-btn.active {
+  background: #e8631f;
+  color: #1a0f04;
+  border-color: #e8631f;
+}
+
+.budget-stats-section-heading { color: #dba876; }

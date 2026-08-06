@@ -1,257 +1,254 @@
 :root {
-  --color-bg:                  #ffffff;
-  --color-panel:               #f0f0f0;
-  --color-input-bg:            #e8e8f0;
-  --color-border:              #aaaacc;
-  --color-border-dashed:       #ff0000;
-  --color-text:                #111111;
-  --color-text-muted:          rgba(17, 17, 17, 0.5);
+  --color-bg:                  #0a1128;
+  --color-panel:                #12193a;
+  --color-input-bg:             #182050;
+  --color-border:                #33407a;
+  --color-border-dashed:        #d62839;
+  --color-text:                  #f1f3f8;
+  --color-text-muted:           rgba(241, 243, 248, 0.55);
+  --color-hover:                #1c2554;
 
-  --color-hover:               #dde0f0;
-
-  --color-btn:                 #0000cc;
-  --color-accent:              #cc0000;
-  --color-btn-hover:           #0000aa;
+  --color-btn:                 #d62839;
+  --color-accent:              #8ecae6;
+  --color-btn-hover:           #b01f2e;
   --color-btn-text:            #ffffff;
 
-  --color-danger:              #cc0000;
-  --color-danger-subtle:       rgba(204, 0, 0, 0.12);
-  --color-success:             #0000cc;
+  --color-danger:              #e63946;
+  --color-danger-subtle:       rgba(230, 57, 70, 0.15);
+  --color-success:             #4cc9f0;
 
-  --color-accent-input:        #cc0000;
-  --color-accent-view:         #0000cc;
-  --color-accent-totals:       #cc0000;
-  --color-accent-entries:      #0000cc;
+  --color-accent-input:        #d62839;
+  --color-accent-view:         #4cc9f0;
+  --color-accent-totals:       #d62839;
+  --color-accent-entries:      #8ecae6;
 
-  --color-toggle-off:          #bbbbdd;
-  --color-toggle-on:           #0000cc;
+  --color-toggle-off:          #2a3566;
+  --color-toggle-on:           #d62839;
 
-  /* ── Changelog accents ── Features (red) / Improvements (blue) / Bugfixes (steel grey) / tool heading (bronze/gold) */
-  --color-changelog-features:     #cc0000;
-  --color-changelog-improvements: #0000cc;
-  --color-changelog-bugfixes:     #55557a;
-  --color-changelog-tool:         #a67c00;
+  /* ── Changelog accents ── Features (Old Glory red) / Improvements (icy blue) / Bugfixes (steel silver) / tool heading (gold star accent) */
+  --color-changelog-features:     #d62839;
+  --color-changelog-improvements: #4cc9f0;
+  --color-changelog-bugfixes:     #9aa5c9;
+  --color-changelog-tool:         #e0b13c;
 
-  --color-toast-success-bg:    #e8e8ff;
-  --color-toast-success-border:#0000cc;
-  --color-toast-success-text:  #00008a;
-  --color-toast-error-bg:      #ffe8e8;
-  --color-toast-error-border:  #cc0000;
-  --color-toast-error-text:    #8a0000;
-  /* ── Budget chart palette ── Red / blue / silver / red-dark / navy / white / blue-mid / grey — red, white, blue on light bg */
-  --color-chart-1:             #cc0000;
-  --color-chart-2:             #0000cc;
-  --color-chart-3:             #aaaadd;
-  --color-chart-4:             #dd2222;
-  --color-chart-5:             #3333bb;
-  --color-chart-6:             #ffffff;
-  --color-chart-7:             #2255cc;
-  --color-chart-8:             #888899;
+  --color-toast-success-bg:    #0c2438;
+  --color-toast-success-border:#4cc9f0;
+  --color-toast-success-text:  #cdeffd;
+  --color-toast-error-bg:      #35111a;
+  --color-toast-error-border:  #e63946;
+  --color-toast-error-text:    #ffd7db;
+
+  /* ── Budget chart palette ── Red / blue / silver / bright-red / navy-blue / white / light-blue / steel-grey — red, white, blue on a dark navy field */
+  --color-chart-1:             #d62839;
+  --color-chart-2:             #4cc9f0;
+  --color-chart-3:             #c7d2e8;
+  --color-chart-4:             #e63946;
+  --color-chart-5:             #3a6ea5;
+  --color-chart-6:             #f1f3f8;
+  --color-chart-7:             #8ecae6;
+  --color-chart-8:             #7a869e;
 }
 
-/* ── Patriotic gradient background ── */
+/* ── Patriotic gradient background — deep navy field, easy on the eyes
+   instead of the old blinding white, with red/white/blue reserved for
+   accents and content instead of the page itself. ── */
 body {
-  background: linear-gradient(160deg, #ffcccc 0%, #ffd9d9 20%, #ffffff 40%, #ffffff 60%, #d9d9ff 80%, #ccccff 100%) fixed;
+  background: linear-gradient(160deg, #0a1128 0%, #0d1734 30%, #101c44 60%, #0c1330 100%) fixed;
 }
 
-/* ── Panels — bold red / blue cards ── */
+/* ── Time Tracker panels — red / icy-blue / silver / gold on dark navy ── */
 .input-panel {
-  background: #fff0f0;
-  border-left: 4px solid #cc0000;
-  border-color: rgba(204, 0, 0, 0.35);
+  background: linear-gradient(135deg, rgba(214, 40, 57, 0.10) 0%, #0d1128 100%);
+  border-left: 4px solid #d62839;
 }
 .controls-panel {
-  background: #f0f0ff;
-  border-left: 4px solid #0000cc;
-  border-color: rgba(0, 0, 204, 0.3);
+  background: linear-gradient(135deg, rgba(76, 201, 240, 0.08) 0%, #0d1128 100%);
+  border-left: 4px solid #4cc9f0;
 }
 .totals-panel {
-  background: #fff0f0;
-  border-left: 4px solid #cc0000;
-  border-color: rgba(204, 0, 0, 0.35);
+  background: linear-gradient(135deg, rgba(199, 210, 232, 0.08) 0%, #0d1128 100%);
+  border-left: 4px solid #c7d2e8;
 }
 .entries-panel {
-  background: #f0f0ff;
-  border-left: 4px solid #0000cc;
-  border-color: rgba(0, 0, 204, 0.3);
+  background: linear-gradient(135deg, rgba(224, 177, 60, 0.08) 0%, #0d1128 100%);
+  border-left: 4px solid #e0b13c;
 }
 
-/* ── Tool / section header ── */
+/* ── Tool / section header — red-to-blue gradient ── */
 .tool-view-header,
 .section-header {
-  background: linear-gradient(90deg, rgba(204, 0, 0, 0.08), rgba(0, 0, 204, 0.08));
-  border-bottom-color: rgba(100, 100, 180, 0.3);
-  box-shadow: none;
+  background: linear-gradient(90deg, rgba(214, 40, 57, 0.15), rgba(76, 201, 240, 0.1));
+  border-bottom-color: rgba(76, 201, 240, 0.4);
+  box-shadow: 0 0 20px rgba(76, 201, 240, 0.08);
 }
+
 .tool-view-title,
 .section-title {
-  color: #111111;
-  opacity: 1;
+  color: #f1f3f8;
+  text-shadow: 0 0 14px rgba(76, 201, 240, 0.35);
 }
 
-/* ── Modal — solid: white card (original look) ── */
+/* ── Modal — solid: deep navy panel ── */
 body.solid-modals .modal {
-  background: #ffffff;
-  border-color: rgba(100, 100, 200, 0.3);
-  box-shadow: 0 8px 32px rgba(0, 0, 180, 0.15), 0 24px 48px rgba(0, 0, 0, 0.2);
-  color: #111111;
+  background: linear-gradient(135deg, #101c44 0%, #0a1128 100%);
+  border-color: rgba(76, 201, 240, 0.3);
+  box-shadow: 0 0 30px rgba(76, 201, 240, 0.1), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Modal — translucent: frosted stars-and-stripes glass ── */
+/* ── Modal — translucent: navy-red frosted glass ── */
 body:not(.solid-modals) .modal {
-  background: rgba(255, 255, 255, 0.45);
+  background: linear-gradient(135deg, rgba(214, 40, 57, 0.08) 0%, rgba(10, 17, 40, 0.6) 100%);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-color: rgba(100, 100, 200, 0.4);
-  box-shadow: 0 8px 32px rgba(0, 0, 180, 0.12), 0 24px 48px rgba(0, 0, 0, 0.15);
-  color: #111111;
+  border-color: rgba(76, 201, 240, 0.3);
+  box-shadow: 0 0 30px rgba(76, 201, 240, 0.1), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Primary button — solid blue ── */
+/* ── Primary button — solid red ── */
 .primary-btn {
-  background: #0000ff;
-  border-color: #0000ff;
+  background: #d62839;
+  border-color: #d62839;
   color: #ffffff;
 }
 .primary-btn:hover {
-  background: #0000cc;
-  border-color: #0000cc;
-  box-shadow: 0 0 14px rgba(0, 0, 255, 0.3);
+  background: #b01f2e;
+  border-color: #b01f2e;
+  box-shadow: 0 0 14px rgba(214, 40, 57, 0.4);
   color: #ffffff;
 }
 
-/* ── Danger button — solid red ── */
+/* ── Danger button — brighter alert red ── */
 .danger-btn {
-  background: #cc0000;
-  border-color: #cc0000;
+  background: #e63946;
+  border-color: #e63946;
   color: #ffffff;
 }
 .danger-btn:hover {
-  background: #aa0000;
-  border-color: #aa0000;
-  box-shadow: 0 0 14px rgba(204, 0, 0, 0.35);
+  background: #c22836;
+  border-color: #c22836;
+  box-shadow: 0 0 14px rgba(230, 57, 70, 0.4);
   color: #ffffff;
 }
 
 /* ── Image CCR panels ── */
 #media-tool-image-ccr .panel {
-  background: #f8f8ff;
-  border-color: rgba(0, 0, 204, 0.2);
+  background: linear-gradient(135deg, rgba(76, 201, 240, 0.06) 0%, #0d1128 100%);
+  border-color: rgba(76, 201, 240, 0.3);
 }
 #media-tool-image-ccr .result-panel {
-  background: #fff8f8;
-  border-color: rgba(204, 0, 0, 0.3);
-  border-left-color: #cc0000;
+  background: linear-gradient(135deg, rgba(214, 40, 57, 0.06) 0%, #0d1128 100%);
+  border-color: rgba(214, 40, 57, 0.3);
+  border-left-color: #d62839;
 }
 
 /* ── Drop zone ── */
-.drop-zone { border-color: rgba(0, 0, 204, 0.4); }
+.drop-zone { border-color: rgba(76, 201, 240, 0.4); }
 
 /* ── Tab buttons ── */
 .tab-btn {
-  color: rgba(17, 17, 17, 0.4);
+  color: var(--color-text-muted);
   border-color: transparent;
   background: transparent;
   box-shadow: none;
 }
 .tab-btn:hover {
-  color: #111111;
-  border-color: rgba(0, 0, 204, 0.3);
-  background: rgba(0, 0, 204, 0.06);
+  color: #f1f3f8;
+  border-color: rgba(76, 201, 240, 0.3);
+  background: rgba(76, 201, 240, 0.08);
   box-shadow: none;
 }
 .tab-btn.active {
-  color: #cc0000;
-  border-color: rgba(204, 0, 0, 0.45);
-  background: rgba(204, 0, 0, 0.08);
+  color: #d62839;
+  border-color: rgba(214, 40, 57, 0.45);
+  background: rgba(214, 40, 57, 0.1);
   box-shadow: none;
 }
 
 /* ── Dir buttons ── */
 .dir-btn, .prv-btn {
-  background: #f0f0f8;
-  color: rgba(17, 17, 17, 0.55);
-  border-color: rgba(0, 0, 204, 0.2);
+  background: #131c48;
+  color: rgba(241, 243, 248, 0.6);
+  border-color: rgba(76, 201, 240, 0.2);
   box-shadow: none;
 }
 .dir-btn:hover, .prv-btn:hover {
-  color: #111111;
-  border-color: rgba(0, 0, 204, 0.45);
-  background: #f0f0f8;
+  color: #f1f3f8;
+  border-color: rgba(76, 201, 240, 0.45);
+  background: #131c48;
   box-shadow: none;
 }
 .dir-btn.active, .prv-btn.active {
-  color: #cc0000;
-  border-color: #cc0000;
-  background: rgba(204, 0, 0, 0.08);
+  color: #d62839;
+  border-color: #d62839;
+  background: rgba(214, 40, 57, 0.1);
   box-shadow: none;
 }
 
 /* ── Anchor badge ── */
-.anchor-badge { background: #0000cc; color: #ffffff; }
+.anchor-badge { background: #d62839; color: #ffffff; }
 
 /* ── Preview cards ── */
-.preview-card:hover      { border-color: rgba(0, 0, 204, 0.45); }
-.preview-card.anchor-card { border-color: #cc0000; box-shadow: 0 0 10px rgba(204, 0, 0, 0.2); }
-.preview-card.drag-target  { border-color: #0000cc; }
+.preview-card:hover      { border-color: rgba(76, 201, 240, 0.5); }
+.preview-card.anchor-card { border-color: #d62839; box-shadow: 0 0 10px rgba(214, 40, 57, 0.25); }
+.preview-card.drag-target  { border-color: #4cc9f0; }
 
 /* ── Slider ── */
 .img-slider::-webkit-slider-thumb {
-  background: #cc0000;
-  border-color: #ffffff;
-  box-shadow: 0 0 8px rgba(204, 0, 0, 0.4);
+  background: #d62839;
+  border-color: #f1f3f8;
+  box-shadow: 0 0 8px rgba(214, 40, 57, 0.5);
 }
-.img-slider::-webkit-slider-thumb:hover { background: #0000cc; }
-.slider-val   { color: #cc0000; }
-.estimate-val { color: #0000cc; }
-.result-preview-wrap { border-color: rgba(0, 0, 204, 0.25); }
+.img-slider::-webkit-slider-thumb:hover { background: #4cc9f0; }
+.slider-val   { color: #d62839; }
+.estimate-val { color: #4cc9f0; }
+.result-preview-wrap { border-color: rgba(76, 201, 240, 0.25); }
 
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
    (--color-btn); this gives its version link a hover colour so the
    clickable part reacts. */
-.home-update-notice a:hover { color: #cc0000; }
+.home-update-notice a:hover { color: #4cc9f0; }
 
 /* ── Budget Tracker ── */
 
-#finance-tool-budget .panel-accent-input  { background: #fff4f4; }
-#finance-tool-budget .panel-accent-view   { background: #f4f4ff; }
-#finance-tool-budget .panel-accent-totals { background: #fff4f4; }
-#finance-tool-budget .panel-accent-entries{ background: #f4f4ff; }
+#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(214, 40, 57, 0.08) 0%, #101a40 100%); }
+#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(76, 201, 240, 0.07) 0%, #101a40 100%); }
+#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(199, 210, 232, 0.06) 0%, #101a40 100%); }
+#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(224, 177, 60, 0.06) 0%, #101a40 100%); }
 
 .budget-annual-stats-title-panel {
-  border-left: 4px solid #cc0000;
-  background: linear-gradient(90deg, #fff8f8, #f0f0f0);
+  border-left: 4px solid #d62839;
+  background: linear-gradient(90deg, #131c48, #101a40);
 }
-.budget-annual-stats-title { color: #cc0000; }
+.budget-annual-stats-title { color: #d62839; }
 
-.budget-summary-tab.active { color: #cc0000; background: rgba(204, 0, 0, 0.1); border-bottom-color: #cc0000; }
+.budget-summary-tab.active { color: #d62839; background: rgba(214, 40, 57, 0.12); border-bottom-color: #d62839; }
 
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }
 
-.budget-stats-count-good    { color: #0000cc; border-color: #0000cc; }
-.budget-stats-count-late    { color: #888800; border-color: #888800; }
-.budget-stats-count-overdue { color: #cc0000; border-color: #cc0000; }
+.budget-stats-count-good    { color: #4cc9f0; border-color: #4cc9f0; }
+.budget-stats-count-late    { color: #e0b13c; border-color: #e0b13c; }
+.budget-stats-count-overdue { color: #e63946; border-color: #e63946; }
 
 .budget-chart-cycle-btn,
 .budget-chart-expand-btn,
 .budget-chart-modal-cycle-btn {
-  border-color: rgba(0, 0, 204, 0.3);
-  color: rgba(17, 17, 17, 0.5);
+  border-color: rgba(76, 201, 240, 0.3);
+  color: rgba(241, 243, 248, 0.55);
 }
 .budget-chart-cycle-btn:hover,
 .budget-chart-expand-btn:hover,
 .budget-chart-modal-cycle-btn:hover {
-  background: rgba(0, 0, 204, 0.06);
-  border-color: #0000cc;
-  color: #0000cc;
+  background: rgba(76, 201, 240, 0.08);
+  border-color: #4cc9f0;
+  color: #4cc9f0;
 }
 
 .budget-view-mode-btn.active {
-  background: #0000cc;
+  background: #d62839;
   color: #ffffff;
-  border-color: #0000cc;
+  border-color: #d62839;
 }
-.budget-stats-section-heading { opacity: 0.5; color: #111111; }
+.budget-stats-section-heading { opacity: 0.55; color: #f1f3f8; }

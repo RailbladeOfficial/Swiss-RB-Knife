@@ -1,0 +1,256 @@
+/* =============================================================================
+   HALO  —  Special theme
+   -----------------------------------------------------------------------------
+   The mouse-reactive swirl (see startHaloSwirl() in theme-core.ts) is
+   inspired by obfuscator.io's WebGL hero background. The COLOR PALETTE below
+   is separately sourced from a Halo 3 main-menu screenshot (demo.png in the
+   repo root) — a happy coincidence once the swirl theme ended up named
+   "Halo": deep navy-blue sampled from the menu's background/panel fog drives
+   almost everything here, and the burnt orange of its highlighted "START
+   SOLO GAME" row (sampled directly off that pixel, ~#6b441e) is reserved for
+   exactly the same job it does there — marking the active/selected/primary
+   thing, not painted across the whole UI. See --color-accent-totals below
+   and the handful of .active/.primary-btn rules that key off it instead of
+   the ambient --color-btn blue.
+============================================================================= */
+
+:root {
+  --color-bg:                  #0f1830;
+  --color-panel:               #1c2b4d;
+  --color-input-bg:            #16223f;
+  --color-border:              #2c3c60;
+  --color-border-dashed:       rgba(143, 168, 217, 0.35);
+  --color-text:                #dde6f5;
+  --color-text-muted:          #8c99b6;
+  --color-hover:               #22335c;
+
+  --color-btn:                 #6fa0e0;
+  --color-accent:              #a8c8f0;
+  --color-btn-hover:           #86b3ea;
+  --color-btn-text:            #0a1830;
+
+  --color-danger:              #ff5f5f;
+  --color-danger-subtle:       rgba(255, 95, 95, 0.12);
+  --color-success:             #55d97e;
+
+  /* accent-totals is this theme's one deliberate orange — see file header */
+  --color-accent-input:        #6fa0e0;
+  --color-accent-view:         #9dc0ec;
+  --color-accent-totals:       #cf8a3a;
+  --color-accent-entries:      #3f6bb0;
+
+  --color-toggle-off:          #2c3c60;
+  --color-toggle-on:           #6fa0e0;
+
+  /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (red) / tool heading (orange) */
+  --color-changelog-features:     #6fa0e0;
+  --color-changelog-improvements: #55d97e;
+  --color-changelog-bugfixes:     #ff5f5f;
+  --color-changelog-tool:         #cf8a3a;
+
+  --color-toast-success-bg:    #0e2818;
+  --color-toast-success-border:#55d97e;
+  --color-toast-success-text:  #d3f7df;
+  --color-toast-error-bg:      #2a1010;
+  --color-toast-error-border:  #ff5f5f;
+  --color-toast-error-text:    #ffd9d9;
+
+  /* ── Budget chart palette ── Blue / orange / pale-blue / burnt-orange / deep-blue / gold / sky / bronze */
+  --color-chart-1:             #6fa0e0;
+  --color-chart-2:             #cf8a3a;
+  --color-chart-3:             #9dc0ec;
+  --color-chart-4:             #8a5624;
+  --color-chart-5:             #3f6bb0;
+  --color-chart-6:             #e0a95c;
+  --color-chart-7:             #b8d4f5;
+  --color-chart-8:             #6b441e;
+}
+
+/* ── Time Tracker panels — accent borders drive off the panel-accent vars, glow added ── */
+.input-panel    { border-left: 4px solid var(--color-accent-input); box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-input) 12%, transparent); }
+.controls-panel { border-left: 4px solid var(--color-accent-view);  box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-view) 12%, transparent); }
+.totals-panel   { border-left: 4px solid var(--color-accent-totals);box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-totals) 12%, transparent); }
+.entries-panel  { border-left: 4px solid var(--color-accent-entries);box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-entries) 12%, transparent); }
+
+/* ── Tool / section header ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-btn) 12%, transparent), transparent);
+  border-bottom-color: color-mix(in srgb, var(--color-btn) 35%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-btn) 10%, transparent);
+}
+
+.tool-view-title,
+.section-title {
+  color: var(--color-accent);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--color-btn) 55%, transparent);
+}
+
+/* ── Modal — solid: deep panel with blue glow ── */
+body.solid-modals .modal {
+  background: var(--color-panel);
+  border-color: color-mix(in srgb, var(--color-btn) 30%, transparent);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--color-btn) 12%, transparent), 0 24px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Modal — translucent: frosted glass over the swirl ── */
+body:not(.solid-modals) .modal {
+  background: color-mix(in srgb, var(--color-panel) 30%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-color: color-mix(in srgb, var(--color-btn) 25%, transparent);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--color-btn) 12%, transparent), 0 24px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Primary button — the theme's one deliberate orange fill, straight off
+   the "START SOLO GAME" highlight bar, glow on hover ── */
+.primary-btn {
+  background: var(--color-accent-totals);
+  border-color: var(--color-accent-totals);
+  color: var(--color-btn-text);
+}
+
+.primary-btn:hover {
+  background: color-mix(in srgb, var(--color-accent-totals) 85%, white);
+  border-color: color-mix(in srgb, var(--color-accent-totals) 85%, white);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-totals) 45%, transparent);
+}
+
+/* ── Buttons — quiet resting glow so they lift off the dark panels ── */
+button {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-btn) 10%, transparent);
+}
+button:hover {
+  box-shadow: 0 0 14px color-mix(in srgb, var(--color-btn) 22%, transparent);
+}
+
+/* ── Inputs — blue focus glow ── */
+input:focus {
+  outline: none;
+  border-color: var(--color-btn);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-btn) 40%, transparent);
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  border-left: 3px solid color-mix(in srgb, var(--color-btn) 40%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--color-btn) 8%, transparent);
+}
+
+#media-tool-image-ccr .result-panel {
+  border-left: 3px solid color-mix(in srgb, var(--color-accent-view) 50%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--color-accent-view) 8%, transparent);
+}
+
+/* ── Drop zone ── */
+.drop-zone { border-color: color-mix(in srgb, var(--color-btn) 35%, transparent); }
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: var(--color-text-muted);
+  border-color: transparent;
+  background: transparent;
+}
+
+.tab-btn:hover {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-btn) 40%, transparent);
+  background: color-mix(in srgb, var(--color-btn) 8%, transparent);
+  box-shadow: none;
+}
+
+.tab-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-accent-totals);
+  background: var(--color-accent-totals);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent-totals) 40%, transparent);
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: var(--color-input-bg);
+  color: var(--color-text-muted);
+  border-color: color-mix(in srgb, var(--color-btn) 20%, transparent);
+  box-shadow: none;
+}
+.dir-btn:hover, .prv-btn:hover {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-btn) 45%, transparent);
+  background: var(--color-input-bg);
+}
+.dir-btn.active, .prv-btn.active {
+  color: var(--color-btn-text);
+  border-color: var(--color-accent-totals);
+  background: var(--color-accent-totals);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent-totals) 40%, transparent);
+}
+
+/* ── Anchor badge / preview cards ── */
+.anchor-badge { background: var(--color-btn); color: var(--color-btn-text); }
+.preview-card:hover        { border-color: var(--color-btn); box-shadow: 0 0 12px color-mix(in srgb, var(--color-btn) 30%, transparent); }
+.preview-card.anchor-card  { border-color: var(--color-btn); box-shadow: 0 0 16px color-mix(in srgb, var(--color-btn) 40%, transparent); }
+.preview-card.drag-target  { border-color: var(--color-accent-entries); box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-entries) 40%, transparent); }
+
+/* ── Slider ── */
+.img-slider::-webkit-slider-thumb {
+  background: var(--color-btn);
+  border-color: var(--color-bg);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-btn) 55%, transparent);
+}
+.img-slider::-webkit-slider-thumb:hover { box-shadow: 0 0 14px color-mix(in srgb, var(--color-btn) 70%, transparent); }
+.slider-val    { color: var(--color-accent); text-shadow: 0 0 10px color-mix(in srgb, var(--color-btn) 45%, transparent); }
+.estimate-val  { color: var(--color-accent); }
+.result-preview-wrap { border-color: color-mix(in srgb, var(--color-accent-view) 30%, transparent); }
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: var(--color-btn-hover); }
+
+/* ── Budget Tracker ── */
+
+#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-btn) 9%, transparent) 0%, var(--color-panel) 100%); box-shadow: 0 0 14px color-mix(in srgb, var(--color-btn) 10%, transparent), inset 0 0 6px color-mix(in srgb, var(--color-btn) 4%, transparent); }
+#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 8%, transparent) 0%, var(--color-panel) 100%); box-shadow: 0 0 14px color-mix(in srgb, var(--color-accent-view) 8%, transparent), inset 0 0 6px color-mix(in srgb, var(--color-accent-view) 3%, transparent); }
+#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 8%, transparent) 0%, var(--color-panel) 100%); box-shadow: 0 0 14px color-mix(in srgb, var(--color-accent-totals) 10%, transparent), inset 0 0 6px color-mix(in srgb, var(--color-accent-totals) 3%, transparent); }
+#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-entries) 7%, transparent) 0%, var(--color-panel) 100%); box-shadow: 0 0 14px color-mix(in srgb, var(--color-accent-entries) 8%, transparent), inset 0 0 6px color-mix(in srgb, var(--color-accent-entries) 3%, transparent); }
+
+.budget-annual-stats-title-panel { border-left: 4px solid var(--color-btn); box-shadow: 0 0 16px color-mix(in srgb, var(--color-btn) 20%, transparent); }
+.budget-annual-stats-title { color: var(--color-accent); text-shadow: 0 0 12px color-mix(in srgb, var(--color-btn) 50%, transparent); }
+
+.budget-summary-tab.active {
+  color: var(--color-btn-text);
+  background: var(--color-accent-totals);
+  border-bottom-color: var(--color-accent-totals);
+  text-shadow: none;
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: var(--color-accent-view); border-color: var(--color-accent-view); }
+.budget-stats-count-late    { color: var(--color-accent-totals); border-color: var(--color-accent-totals); }
+.budget-stats-count-overdue { color: var(--color-danger); border-color: var(--color-danger); }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: color-mix(in srgb, var(--color-btn) 35%, transparent);
+  color: var(--color-text-muted);
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: color-mix(in srgb, var(--color-btn) 10%, transparent);
+  border-color: var(--color-btn);
+  color: var(--color-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-btn) 30%, transparent);
+}
+
+.budget-view-mode-btn.active {
+  background: var(--color-accent-totals);
+  color: var(--color-btn-text);
+  border-color: var(--color-accent-totals);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent-totals) 45%, transparent);
+}
+.budget-stats-section-heading { color: var(--color-text-muted); }

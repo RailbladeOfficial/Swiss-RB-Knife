@@ -1423,6 +1423,11 @@ button:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 16px;
+  /* Real cap is set inline by syncThemeGridHeight() in shell.ts, sized to
+     the actual rendered row height (which depends on how many columns the
+     auto-fill grid lands on) rather than a guessed viewport fraction — one
+     or two rows grow freely with no scrolling, three+ caps at two full
+     rows. This 58vh is just the pre-JS/no-JS fallback. */
   max-height: 58vh;
   overflow-y: auto;
   padding: 2px;
@@ -1644,6 +1649,14 @@ button:hover {
   width: 200px;
 }
 
+/* Capped and independently scrollable — same reasoning as .theme-picker-grid:
+   without this, a tall settings column (Cycle's, especially with Holiday
+   Override's sub-rows expanded) has nowhere to shrink, so the ancestor
+   .theme-picker-body scrolls instead — dragging the tabs row and the tile
+   on this pane's left (.theme-picker-random-tile-wrap) out of view with it.
+   Capping the settings column here keeps the tabs and the tile fixed while
+   only the settings scroll, matching how the grid tabs never need the body
+   to scroll. */
 .theme-picker-random-settings {
   flex: 1;
   min-width: 0;
@@ -1651,6 +1664,8 @@ button:hover {
   flex-direction: column;
   gap: 10px;
   padding: 4px 0;
+  max-height: 58vh;
+  overflow-y: auto;
   transition: opacity var(--hover-transition);
 }
 
@@ -1673,6 +1688,56 @@ button:hover {
   display: block;
 }
 
+/* Cycle tab's holiday-subsettings (i) buttons — same click-to-toggle
+   popover styling as the Auto-Backup Setup modal's "Show Tool Warning Page"
+   info button (see .ab-info-btn/.ab-info-tooltip in auto-backup.css); the
+   JS-side toggle logic is reimplemented here rather than shared, matching
+   that file's own convention of keeping this pattern per-owning-file. */
+.theme-picker-label-with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theme-picker-info-btn {
+  padding: 1px 8px;
+  font-size: 0.72rem;
+}
+
+.theme-picker-info-tooltip {
+  position: fixed;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  max-width: 260px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.theme-picker-info-tooltip.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Cycle tab: the "Every: [amount] [unit]" row's two controls side by side. */
+.cycle-interval-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#cycleIntervalAmount {
+  width: 52px;
+  text-align: center;
+}
+
 .theme-picker-section-divider {
   font-size: 0.7rem;
   font-weight: 600;
@@ -1691,9 +1756,18 @@ button:hover {
    active) theme's own colors rather than fetching/rendering another one's.
 ============================================================================= */
 
+/* Combined-class selector — same reasoning as .modal.theme-picker-modal
+   above: modal.css loads after shell.css, so a same-specificity single-class
+   rule here would otherwise lose the cascade and silently render at the
+   base .modal width of 500px. */
+.modal.sound-pack-picker-modal {
+  width: 680px;
+  max-width: 94vw;
+}
+
 .sound-pack-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   max-height: 60vh;
   overflow-y: auto;
