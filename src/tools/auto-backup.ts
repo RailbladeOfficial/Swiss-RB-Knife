@@ -12,8 +12,10 @@
        backup-folder-done, backup-complete). The overall bar is byte-weighted
        against a preflight plan and animated via requestAnimationFrame — see
        the SMOOTH PROGRESS BAR ENGINE section.
-     • Listeners are attached once at init and remain alive for the session
-       (unlisteners[] tracks them for cleanup if ever needed).
+     • Listeners are attached once at init and remain alive for the session.
+       unlisteners[] holds their handles and attachBackupListeners() drains it
+       before re-attaching, so a second call replaces the set rather than
+       stacking a duplicate of every handler on top of the live ones.
      • Source folder sizes are scanned lazily and cached in sizeCache/statsCache
        so the summary panel updates without re-rendering the whole list.
 
@@ -102,7 +104,11 @@ interface BackupCompleteEvent {
   total_extras: number;
   total_secs: number;
   aborted_file: string | null;
+  /** Capped by the backend's retention limit — use skipped_total for the
+   *  real count and the log files for the complete record. */
   skipped_files: SkippedFileEntry[];
+  /** Exact number of skipped files, even when skipped_files was truncated. */
+  skipped_total: number;
   skipped_log_paths: string[];
 }
 
@@ -215,6 +221,11 @@ let hasRunOnce = false; // tracks whether a backup has run this session
 /** Files the last run couldn't copy (locked/access error) — populated by
  *  backup-complete, read by the "View Skipped Files" modal. */
 let lastSkippedFiles: SkippedFileEntry[] = [];
+/** Exact skip count for the last run. Can exceed lastSkippedFiles.length: the
+ *  backend caps how many entries it retains and ships, but always reports the
+ *  true total. Every count shown to the user comes from this, never from the
+ *  truncated array's length. */
+let lastSkippedTotal = 0;
 
 /* ── Smooth progress-bar state ─────────────────────────────────────────────
    The bar is driven by a requestAnimationFrame loop, not directly by events.
@@ -1152,6 +1163,7 @@ function resetProgress(): void {
   runTotalBytes = 0;
   runStartTime  = null;
   lastSkippedFiles = [];
+  lastSkippedTotal = 0;
   syncSkippedFilesButton();
 }
 
@@ -1447,6 +1459,13 @@ function updateThroughput(bytesDoneNow: number): void {
 }
 
 async function attachBackupListeners(): Promise<void> {
+  // Idempotent: drop any previously-attached set first. initAutoBackup() is
+  // the only caller today and runs once, so this is normally a no-op — but a
+  // second call must not leave two of every handler live, each reacting to
+  // the same event and double-counting progress.
+  for (const off of unlisteners) off();
+  unlisteners = [];
+
   const unlistenPlanProgress = await listen<BackupPlanProgressEvent>(
     "backup-plan-progress",
     ({ payload }) => {
@@ -1600,6 +1619,7 @@ async function attachBackupListeners(): Promise<void> {
       }
 
       lastSkippedFiles = payload.skipped_files ?? [];
+      lastSkippedTotal = payload.skipped_total ?? lastSkippedFiles.length;
       syncSkippedFilesButton();
 
       if (payload.success) {
@@ -1609,7 +1629,7 @@ async function attachBackupListeners(): Promise<void> {
         config.lastBackupCompletedAt = new Date().toISOString();
         saveConfig();
 
-        const skipCount = lastSkippedFiles.length;
+        const skipCount = lastSkippedTotal;
         if (skipCount > 0) {
           // Succeeded, but some files couldn't be copied — flag it with the
           // same ⚠ used in the Estimate Summary rather than a clean ✓.
@@ -2213,7 +2233,7 @@ function initSkippedFilesModal(): void {
  *  run's results. Called each time the modal is opened, not just once at
  *  backup-complete, so it always reflects lastSkippedFiles exactly. */
 function renderSkippedFilesList(): void {
-  const n = lastSkippedFiles.length;
+  const n = lastSkippedTotal;
   skippedFilesCountEl.textContent = `${n.toLocaleString()} file${n === 1 ? "" : "s"} couldn't be copied`;
 
   skippedFilesListEl.innerHTML = "";
@@ -2240,11 +2260,24 @@ function renderSkippedFilesList(): void {
     row.appendChild(destEl);
     skippedFilesListEl.appendChild(row);
   }
+
+  // The backend caps how many entries it ships so a catastrophic run can't
+  // build a hundred thousand DOM rows. Say so explicitly rather than letting
+  // the list silently disagree with the count above it — the per-destination
+  // SKIPPED_FILES log holds every one.
+  const hidden = n - lastSkippedFiles.length;
+  if (hidden > 0) {
+    const note = document.createElement("div");
+    note.className = "ab-skipped-file-row ab-skipped-file-more";
+    note.textContent =
+      `…and ${hidden.toLocaleString()} more. The full list is in the SKIPPED_FILES log for each destination.`;
+    skippedFilesListEl.appendChild(note);
+  }
 }
 
 /** Shows/hides the "View Skipped Files" button based on the last run. */
 function syncSkippedFilesButton(): void {
-  skippedFilesBtn.style.display = lastSkippedFiles.length > 0 ? "" : "none";
+  skippedFilesBtn.style.display = lastSkippedTotal > 0 ? "" : "none";
 }
 
 /* =============================================================================

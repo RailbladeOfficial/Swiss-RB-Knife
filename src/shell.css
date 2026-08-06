@@ -1191,6 +1191,12 @@ button:hover {
   padding: 1px 7px;
 }
 
+.setup-item-count {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
 .setup-item-chevron {
   flex-shrink: 0;
   font-size: 1.1rem;
@@ -1676,6 +1682,41 @@ button:hover {
   pointer-events: none;
 }
 
+/* Preferences pane — a single settings column with no tile beside it, so it
+   spans the full body rather than using .theme-picker-random-pane's two-column
+   split. Capped and scrollable for the same reason the settings column above
+   is: with eight per-theme rows expanded, the pane has to absorb its own
+   overflow or the whole modal body scrolls and drags the tabs out of view. */
+.theme-picker-preferences-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+  min-height: 0;
+  max-height: 58vh;
+  overflow-y: auto;
+}
+
+.theme-animations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Theme name over its effect description, so the row reads as one label and
+   the toggle still lines up with the other settings rows. */
+.theme-animation-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.theme-animation-effect {
+  font-size: 0.75rem;
+  opacity: 0.55;
+}
+
 .theme-picker-random-hint {
   display: none;
   font-size: 0.78rem;
@@ -1686,6 +1727,21 @@ button:hover {
 
 .theme-picker-random-settings.inactive .theme-picker-random-hint {
   display: block;
+}
+
+/* Cycle pane's "a Holiday Override is forcing the theme right now" note —
+   shown/hidden directly via JS (refreshCycleHolidayNote() in shell.ts),
+   independent of the .inactive-driven hint above. Accent-colored so it reads
+   as a live status rather than the muted italic hint text. */
+.theme-picker-holiday-note {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin: 2px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 /* Cycle tab's holiday-subsettings (i) buttons — same click-to-toggle

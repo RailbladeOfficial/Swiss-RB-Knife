@@ -54,8 +54,18 @@ import {
   applyRandomModalStyles,
   maybeRegenerateRandom,
 } from "./random-theme";
-import { applyTheme, themeCssUrl, getActiveCustomId, setActiveCustomId } from "./theme-core";
-import { advanceCycleNow } from "./cycle-theme";
+import {
+  ANIMATED_THEMES,
+  applyTheme,
+  themeCssUrl,
+  getActiveCustomId,
+  setActiveCustomId,
+} from "./theme-core";
+import {
+  advanceCycleNow,
+  getActiveHolidayOverrideThemeId,
+  getHolidayOverrideEndDate,
+} from "./cycle-theme";
 import {
   genThemeId,
   saveCustomThemes,
@@ -169,15 +179,18 @@ type ShellSettings = {
    *  pool alongside the built-in Main/Holiday/Special themes. */
   cycleIncludeCustom: boolean;
   /** Off by default: force-switches to the matching Holiday theme on its
-   *  real-world date, overriding whatever the cycle would otherwise show. */
+   *  real-world date, overriding whatever the cycle would otherwise show.
+   *  Independent of cycleHolidaySeasonOnly — combine both if you want a
+   *  Holiday theme to appear ONLY by being force-switched to. */
   cycleHolidayOverride: boolean;
-  /** Only meaningful with cycleHolidayOverride on: removes Holiday themes
-   *  from the normal cycle pool entirely, so they only ever appear via the
-   *  override on their actual date. */
-  cycleHolidayExclusive: boolean;
-  /** Only meaningful with cycleHolidayOverride on: widens each Holiday
-   *  theme's active window to its traditional season (e.g. all of October
-   *  for Halloween) instead of just its exact date. */
+  /** Off by default, independent of cycleHolidayOverride: keeps each Holiday
+   *  theme out of the normal cycle pool except during its own window (so it
+   *  can still turn up via ordinary click/interaction/time advances, just
+   *  not year-round). */
+  cycleHolidaySeasonOnly: boolean;
+  /** Off by default: widens each Holiday theme's active window to its
+   *  traditional season (e.g. all of October for Halloween) instead of just
+   *  its exact date — shared by both settings above, wherever either is on. */
   cycleHolidayFullSeason: boolean;
   /** Which pool member (built-in theme id or custom theme id) Cycle mode is
    *  currently showing — persisted so reopening the app doesn't jump. */
@@ -185,6 +198,15 @@ type ShellSettings = {
   /** Epoch ms of the last cycle advance — the anchor the "time" trigger
    *  counts from, persisted so the countdown survives an app restart. */
   cycleLastAdvance: number;
+  /** On by default: master switch for every theme's canvas animation (snow,
+   *  lightning, fireworks, …). Off suppresses all of them and hides the
+   *  per-theme opt-outs below, which only make sense while this is on. */
+  themeAnimations: boolean;
+  /** Theme ids whose animation is individually switched off while
+   *  themeAnimations is still on — e.g. keeping Christmas snow but dropping
+   *  Halloween's lightning. Stored as an opt-OUT list so a newly added effect
+   *  is enabled by default without needing a migration. */
+  themeAnimationsOff: string[];
   appLock: boolean;
   lockCredentialType: "pin" | "password";
   soundPack: string;
@@ -329,10 +351,12 @@ const DEFAULT_SETTINGS: ShellSettings = {
   cycleIntervalUnit: "hours",
   cycleIncludeCustom: false,
   cycleHolidayOverride: false,
-  cycleHolidayExclusive: false,
+  cycleHolidaySeasonOnly: false,
   cycleHolidayFullSeason: false,
   cycleCurrentThemeId: "",
   cycleLastAdvance: 0,
+  themeAnimations: true,
+  themeAnimationsOff: [],
   appLock: false,
   lockCredentialType: "pin",
   soundPack: "default",
@@ -448,6 +472,11 @@ const themePickerRandomPane = document.getElementById("themePickerRandomPane")!;
 const themePickerRandomTileWrap = document.getElementById("themePickerRandomTileWrap")!;
 const themePickerCyclePane = document.getElementById("themePickerCyclePane")!;
 const themePickerCycleTileWrap = document.getElementById("themePickerCycleTileWrap")!;
+const themePickerPreferencesPane = document.getElementById("themePickerPreferencesPane")!;
+const themeAnimationsToggle = document.getElementById("themeAnimationsToggle") as HTMLInputElement;
+const themeAnimationsLabel = document.getElementById("themeAnimationsLabel")!;
+const themeAnimationsPerTheme = document.getElementById("themeAnimationsPerTheme")!;
+const themeAnimationsList = document.getElementById("themeAnimationsList")!;
 const cycleSubsettings = document.getElementById("cycleSubsettings")!;
 const cycleOrderToggle = document.getElementById("cycleOrderToggle") as HTMLInputElement;
 const cycleOrderLabel = document.getElementById("cycleOrderLabel")!;
@@ -459,12 +488,12 @@ const cycleIncludeCustomToggle = document.getElementById("cycleIncludeCustomTogg
 const cycleIncludeCustomLabel = document.getElementById("cycleIncludeCustomLabel")!;
 const cycleHolidayOverrideToggle = document.getElementById("cycleHolidayOverrideToggle") as HTMLInputElement;
 const cycleHolidayOverrideLabel = document.getElementById("cycleHolidayOverrideLabel")!;
-const cycleHolidayExclusiveRow = document.getElementById("cycleHolidayExclusiveRow")!;
-const cycleHolidayExclusiveToggle = document.getElementById("cycleHolidayExclusiveToggle") as HTMLInputElement;
-const cycleHolidayExclusiveLabel = document.getElementById("cycleHolidayExclusiveLabel")!;
+const cycleHolidaySeasonOnlyToggle = document.getElementById("cycleHolidaySeasonOnlyToggle") as HTMLInputElement;
+const cycleHolidaySeasonOnlyLabel = document.getElementById("cycleHolidaySeasonOnlyLabel")!;
 const cycleHolidayFullSeasonRow = document.getElementById("cycleHolidayFullSeasonRow")!;
 const cycleHolidayFullSeasonToggle = document.getElementById("cycleHolidayFullSeasonToggle") as HTMLInputElement;
 const cycleHolidayFullSeasonLabel = document.getElementById("cycleHolidayFullSeasonLabel")!;
+const cycleHolidayActiveNote = document.getElementById("cycleHolidayActiveNote")!;
 const cycleNowBtn = document.getElementById("cycleNowBtn") as HTMLButtonElement;
 
 const appVersionEl = document.getElementById("appVersion");
@@ -979,8 +1008,8 @@ export function applySettings(): void {
   cycleIncludeCustomLabel.textContent = settings.cycleIncludeCustom ? "On" : "Off";
   cycleHolidayOverrideToggle.checked = settings.cycleHolidayOverride;
   cycleHolidayOverrideLabel.textContent = settings.cycleHolidayOverride ? "On" : "Off";
-  cycleHolidayExclusiveToggle.checked = settings.cycleHolidayExclusive;
-  cycleHolidayExclusiveLabel.textContent = settings.cycleHolidayExclusive ? "On" : "Off";
+  cycleHolidaySeasonOnlyToggle.checked = settings.cycleHolidaySeasonOnly;
+  cycleHolidaySeasonOnlyLabel.textContent = settings.cycleHolidaySeasonOnly ? "On" : "Off";
   cycleHolidayFullSeasonToggle.checked = settings.cycleHolidayFullSeason;
   cycleHolidayFullSeasonLabel.textContent = settings.cycleHolidayFullSeason ? "On" : "Off";
   syncCycleSettingsVisibility();
@@ -1118,10 +1147,15 @@ async function loadSettings(): Promise<void> {
         typeof merged.cycleHolidayOverride === "boolean"
           ? merged.cycleHolidayOverride
           : DEFAULT_SETTINGS.cycleHolidayOverride,
-      cycleHolidayExclusive:
-        typeof merged.cycleHolidayExclusive === "boolean"
-          ? merged.cycleHolidayExclusive
-          : DEFAULT_SETTINGS.cycleHolidayExclusive,
+      // Falls back to the old "cycleHolidayExclusive" field name (pre-rename,
+      // back when this setting only applied while cycleHolidayOverride was
+      // on) so an existing on/off choice survives the rename.
+      cycleHolidaySeasonOnly:
+        typeof merged.cycleHolidaySeasonOnly === "boolean"
+          ? merged.cycleHolidaySeasonOnly
+          : typeof merged.cycleHolidayExclusive === "boolean"
+            ? merged.cycleHolidayExclusive
+            : DEFAULT_SETTINGS.cycleHolidaySeasonOnly,
       cycleHolidayFullSeason:
         typeof merged.cycleHolidayFullSeason === "boolean"
           ? merged.cycleHolidayFullSeason
@@ -1134,6 +1168,16 @@ async function loadSettings(): Promise<void> {
         typeof merged.cycleLastAdvance === "number"
           ? merged.cycleLastAdvance
           : DEFAULT_SETTINGS.cycleLastAdvance,
+      themeAnimations:
+        typeof merged.themeAnimations === "boolean"
+          ? merged.themeAnimations
+          : DEFAULT_SETTINGS.themeAnimations,
+      // Filtered to strings rather than trusted wholesale — this one is an
+      // array, so a corrupted/hand-edited entry would otherwise reach
+      // .includes() as a non-string and quietly never match.
+      themeAnimationsOff: Array.isArray(merged.themeAnimationsOff)
+        ? merged.themeAnimationsOff.filter((id: unknown): id is string => typeof id === "string")
+        : [...DEFAULT_SETTINGS.themeAnimationsOff],
       appLock:
         typeof merged.appLock === "boolean"
           ? merged.appLock
@@ -1475,7 +1519,14 @@ sidebarEditResetBtn.addEventListener("click", () => {
    icon for the same reason.
 ============================================================================= */
 
-export type ThemePickerTab = "main" | "holiday" | "special" | "cycle" | "random" | "custom";
+export type ThemePickerTab =
+  | "main"
+  | "holiday"
+  | "special"
+  | "cycle"
+  | "random"
+  | "custom"
+  | "preferences";
 
 /** Exported so cycle-theme.ts can build its cycle pool and holiday-override
  *  lookups off the same built-in theme list, rather than duplicating it. */
@@ -1796,16 +1847,123 @@ function tabForCurrentTheme(): ThemePickerTab {
 }
 
 /** Shows/hides the Cycle pane's conditional rows — the interval row only
- *  matters for the "time" trigger, the holiday-exclusive row only matters
- *  once Holiday Overrides is on. Called from applySettings() (so it stays
- *  correct even while the pane isn't open) and whenever the picker renders
- *  the Cycle tab. */
+ *  matters for the "time" trigger, the Full Holiday Season row only matters
+ *  once one of Holiday Overrides / Restrict to Holiday Season is on (it's a
+ *  shared window-widener for both, so either one turning it on is enough to
+ *  make it relevant). Called from applySettings() (so it stays correct even
+ *  while the pane isn't open) and whenever the picker renders the Cycle tab. */
 function syncCycleSettingsVisibility(): void {
   cycleIntervalRow.style.display = settings.cycleTrigger === "time" ? "" : "none";
-  const holidaySubRowDisplay = settings.cycleHolidayOverride ? "" : "none";
-  cycleHolidayExclusiveRow.style.display = holidaySubRowDisplay;
-  cycleHolidayFullSeasonRow.style.display = holidaySubRowDisplay;
+  cycleHolidayFullSeasonRow.style.display =
+    settings.cycleHolidayOverride || settings.cycleHolidaySeasonOnly ? "" : "none";
 }
+
+/** Explains, right where the Holiday Override toggles live, why the theme is
+ *  currently pinned to a Holiday theme regardless of the cycle rule — shown
+ *  only while an override is actually live today. Refreshed on tab render and
+ *  on every "themechange" so it tracks Cycle Now, interaction/time advances,
+ *  and the holiday-boundary recheck without needing its own polling. */
+const HOLIDAY_NOTE_DATE_FMT = new Intl.DateTimeFormat(undefined, { month: "long", day: "numeric" });
+
+function refreshCycleHolidayNote(): void {
+  const holidayId = getActiveHolidayOverrideThemeId();
+  if (!holidayId) {
+    cycleHolidayActiveNote.style.display = "none";
+    return;
+  }
+  let untilText = "";
+  if (settings.cycleHolidayFullSeason) {
+    const endDate = getHolidayOverrideEndDate(holidayId);
+    if (endDate) {
+      const dayAfterEnd = new Date(endDate);
+      dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+      untilText = ` until ${HOLIDAY_NOTE_DATE_FMT.format(dayAfterEnd)}`;
+    }
+  }
+  cycleHolidayActiveNote.textContent =
+    `Holiday Override active: showing ${getThemeDisplayName(holidayId)} today, overriding the normal cycle rotation${untilText}.`;
+  cycleHolidayActiveNote.style.display = "";
+}
+
+/* -----------------------------------------------------------------------------
+   Theme Animations (Preferences tab)
+----------------------------------------------------------------------------- */
+
+/** Re-applies the seasonal-effect decision for whatever theme is showing.
+ *  applySeasonalEffect() already listens for "themechange" and re-reads the
+ *  animation settings on each one, so re-dispatching is all it takes to start
+ *  or tear down an effect the moment a toggle flips — no direct call needed,
+ *  and Cycle's underlying-theme resolution stays in the one place that owns
+ *  it (theme-core.ts). */
+function refreshSeasonalEffect(): void {
+  window.dispatchEvent(new CustomEvent("themechange"));
+}
+
+/** Builds one toggle row per animated theme. Rebuilt on each render rather
+ *  than diffed — it's eight rows behind a tab that has to be opened, so the
+ *  simplicity is worth more than the churn. */
+function renderThemeAnimationRows(): void {
+  themeAnimationsList.innerHTML = "";
+
+  for (const anim of ANIMATED_THEMES) {
+    const row = document.createElement("div");
+    row.className = "settings-row";
+
+    const label = document.createElement("span");
+    label.className = "theme-animation-label";
+    const name = document.createElement("span");
+    name.textContent = `${anim.label}:`;
+    const effect = document.createElement("span");
+    effect.className = "theme-animation-effect";
+    effect.textContent = anim.effect;
+    label.append(name, effect);
+
+    const wrap = document.createElement("div");
+    wrap.className = "toggle-with-label";
+    const stateLabel = document.createElement("span");
+    const enabled = !settings.themeAnimationsOff.includes(anim.id);
+    stateLabel.textContent = enabled ? "Enabled" : "Disabled";
+
+    const switchLabel = document.createElement("label");
+    switchLabel.className = "toggle-switch";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = enabled;
+    const slider = document.createElement("span");
+    slider.className = "toggle-slider";
+    switchLabel.append(input, slider);
+
+    input.addEventListener("change", () => {
+      const off = settings.themeAnimationsOff.filter((id) => id !== anim.id);
+      if (!input.checked) off.push(anim.id);
+      settings.themeAnimationsOff = off;
+      saveSettings();
+      stateLabel.textContent = input.checked ? "Enabled" : "Disabled";
+      refreshSeasonalEffect();
+    });
+
+    wrap.append(stateLabel, switchLabel);
+    row.append(label, wrap);
+    themeAnimationsList.appendChild(row);
+  }
+}
+
+/** Paints the Preferences tab from current settings: master toggle state, and
+ *  the per-theme list (hidden entirely while the master switch is off, since
+ *  those toggles would otherwise be controls that visibly do nothing). */
+function renderThemePreferences(): void {
+  themeAnimationsToggle.checked = settings.themeAnimations;
+  themeAnimationsLabel.textContent = settings.themeAnimations ? "Enabled" : "Disabled";
+  themeAnimationsPerTheme.style.display = settings.themeAnimations ? "" : "none";
+  if (settings.themeAnimations) renderThemeAnimationRows();
+}
+
+themeAnimationsToggle.addEventListener("change", () => {
+  settings.themeAnimations = themeAnimationsToggle.checked;
+  saveSettings();
+  renderThemePreferences();
+  refreshSeasonalEffect();
+});
 
 function renderThemePickerTab(tab: ThemePickerTab): void {
   themePickerActiveTab = tab;
@@ -1816,6 +1974,13 @@ function renderThemePickerTab(tab: ThemePickerTab): void {
   themePickerGrid.style.display = "none";
   themePickerRandomPane.style.display = "none";
   themePickerCyclePane.style.display = "none";
+  themePickerPreferencesPane.style.display = "none";
+
+  if (tab === "preferences") {
+    themePickerPreferencesPane.style.display = "";
+    renderThemePreferences();
+    return;
+  }
 
   if (tab === "random") {
     themePickerRandomPane.style.display = "";
@@ -1834,6 +1999,7 @@ function renderThemePickerTab(tab: ThemePickerTab): void {
     // Same "visible but inert until actually active" treatment as Random.
     cycleSubsettings.classList.toggle("inactive", settings.theme !== "cycle");
     syncCycleSettingsVisibility();
+    refreshCycleHolidayNote();
     return;
   }
 
@@ -2133,9 +2299,10 @@ cycleHolidayOverrideToggle.addEventListener("change", () => {
   saveSettings();
 });
 
-cycleHolidayExclusiveToggle.addEventListener("change", () => {
-  settings.cycleHolidayExclusive = cycleHolidayExclusiveToggle.checked;
-  cycleHolidayExclusiveLabel.textContent = settings.cycleHolidayExclusive ? "On" : "Off";
+cycleHolidaySeasonOnlyToggle.addEventListener("change", () => {
+  settings.cycleHolidaySeasonOnly = cycleHolidaySeasonOnlyToggle.checked;
+  cycleHolidaySeasonOnlyLabel.textContent = settings.cycleHolidaySeasonOnly ? "On" : "Off";
+  syncCycleSettingsVisibility();
   applyTheme("cycle");
   saveSettings();
 });
@@ -2146,6 +2313,12 @@ cycleHolidayFullSeasonToggle.addEventListener("change", () => {
   applyTheme("cycle");
   saveSettings();
 });
+
+// Cycle can repaint for plenty of reasons that never touch the toggles above
+// — Cycle Now, an interaction/time-trigger advance, the holiday-boundary
+// recheck — so the note listens on "themechange" itself rather than being
+// called from each individual handler.
+window.addEventListener("themechange", refreshCycleHolidayNote);
 
 cycleNowBtn.addEventListener("click", () => advanceCycleNow());
 
@@ -2685,4 +2858,66 @@ async function init(): Promise<void> {
   await runStartupGates(_appVersion !== "unknown" ? _appVersion : "accepted");
 }
 
-init();
+/* -----------------------------------------------------------------------------
+   Startup, with a guaranteed-visible failure mode.
+
+   The window is created with "visible": false (tauri.conf.json) and only shown
+   by the getCurrentWindow().show() at the end of init(). That means ANY throw
+   before that line — a renamed element id tripping one of the getElementById
+   non-null assertions, a tool's init rejecting, a corrupt data file getting
+   past its parser — leaves a running process with no window at all. No error,
+   no UI, nothing to report: the user double-clicks the icon and believes the
+   app is broken.
+
+   budget.ts already guards its own init against this (see its "blast-door"
+   persistence notes), but that protects one call site out of many. This is the
+   backstop for every other one: whatever happens, show the window and say what
+   went wrong, so a startup failure is diagnosable instead of invisible.
+----------------------------------------------------------------------------- */
+init().catch(async (err: unknown) => {
+  devError("Startup failed:", err);
+
+  // Built with createElement/textContent rather than innerHTML: `err` can
+  // carry arbitrary text (file contents, paths) and must never be parsed as
+  // markup — least of all on the one path where the rest of the app's
+  // safeguards clearly aren't running.
+  try {
+    const banner = document.createElement("div");
+    banner.setAttribute(
+      "style",
+      "position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;" +
+        "gap:12px;align-items:flex-start;justify-content:center;padding:32px;" +
+        "background:#1a1a1a;color:#f5f5f5;font:14px/1.5 system-ui,sans-serif;overflow:auto",
+    );
+
+    const title = document.createElement("div");
+    title.setAttribute("style", "font-size:18px;font-weight:600;color:#ff6b6b");
+    title.textContent = "Swiss RB Knife failed to start";
+    banner.appendChild(title);
+
+    const detail = document.createElement("pre");
+    detail.setAttribute(
+      "style",
+      "margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.5 ui-monospace,monospace;opacity:0.85",
+    );
+    detail.textContent = err instanceof Error ? `${err.message}\n\n${err.stack ?? ""}` : String(err);
+    banner.appendChild(detail);
+
+    const hint = document.createElement("div");
+    hint.setAttribute("style", "opacity:0.7");
+    hint.textContent =
+      "Your data files were not modified. Please report this message to the developer.";
+    banner.appendChild(hint);
+
+    document.body.appendChild(banner);
+  } catch {
+    // DOM itself is unusable — nothing further to try; still show the window
+    // below so the failure is at least visible rather than silent.
+  }
+
+  try {
+    await getCurrentWindow().show();
+  } catch {
+    /* If even show() fails there is nothing left this code can do. */
+  }
+});

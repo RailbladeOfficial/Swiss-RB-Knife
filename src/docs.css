@@ -240,6 +240,21 @@
   flex-direction: column;
 }
 
+/* The tab buttons also carry .budget-summary-tab (see index.html for why) —
+   that shared class is what themes actually style, and it supplies flex:1 and
+   centred text so the tabs fill this strip evenly. No width here needed for
+   that: .licensing-modal is a column flexbox with the default align-items:
+   stretch, which already sizes this row to the modal's full content width,
+   correctly accounting for this rule's own padding. An explicit width: 100%
+   was tried here before and is deliberately NOT present — nothing in this
+   codebase sets box-sizing: border-box, so with the default content-box, a
+   literal 100% width gets this row's 16px+16px padding added on TOP of that
+   100%, overflowing 32px past the modal's right edge (the tabs render
+   right-shifted / cut off, since the box stays pinned at the left and only
+   the right side spills over). Stretch alone doesn't have this bug — it sizes
+   to the content width directly, padding included.
+   Everything below .licensing-tabs is the unthemed fallback; budget.css is
+   later in the bundle, so it wins wherever the two rule sets overlap. */
 .licensing-tabs {
   display: flex;
   border-bottom: 1px solid var(--color-border);

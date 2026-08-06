@@ -104,6 +104,35 @@ pub(crate) fn powershell_exe() -> String {
 }
 
 /* =============================================================================
+   FILENAME SAFETY
+============================================================================= */
+
+/// MS-DOS device names that Windows still reserves. Opening any of these as a
+/// file path talks to the DEVICE, not the filesystem — and the reservation
+/// applies with any extension and any casing, so "con", "CON.jpg" and
+/// "Con.tar.gz" are all the console.
+const RESERVED_DEVICE_NAMES: [&str; 22] = [
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+/// True if `name` is a reserved Windows device name, ignoring any extension
+/// and casing.
+///
+/// Worth guarding even though it looks exotic: a write to one of these does
+/// not fail loudly, it succeeds against the device and no file ever appears.
+/// The user sees a tool report success with nothing on disk, which is far
+/// harder to diagnose than a rejected filename. "con" in particular is a
+/// realistic thing to type — short for "concatenated" — when naming the output
+/// of the Combine tool.
+pub(crate) fn is_reserved_device_name(name: &str) -> bool {
+    let stem = name.split('.').next().unwrap_or("").trim();
+    RESERVED_DEVICE_NAMES
+        .iter()
+        .any(|r| stem.eq_ignore_ascii_case(r))
+}
+
+/* =============================================================================
    SAFE FILE WRITES
 ============================================================================= */
 
@@ -296,15 +325,13 @@ fn load_window_size(app: tauri::AppHandle) -> Result<String, String> {
    SETTINGS COMMANDS  (shell-level)
 ============================================================================= */
 
-/// Persists the serialised settings JSON to disk, replacing the whole file.
-/// DEPRECATED for multi-owner use: settings.json has several writers (shell,
-/// Time Tracker, Budget), and whole-file writes from any one of them clobber
-/// the others' keys — use merge_settings instead. Kept registered for
-/// backward compatibility.
-#[tauri::command]
-fn save_settings(app: tauri::AppHandle, data: String) -> Result<(), String> {
-    atomic_write(&get_data_path(&app, "settings.json"), data.as_bytes())
-}
+/* Removed: save_settings (whole-file write of settings.json).
+   settings.json has several writers (shell, Time Tracker, Budget), and a
+   whole-file write from any one of them clobbers the others' keys — the exact
+   bug merge_settings exists to fix. It was kept registered for backward
+   compatibility long after the last caller was gone; leaving a footgun IPC
+   command exposed to the webview earns nothing when nothing invokes it.
+   Use merge_settings (below), or save_tool_settings for per-tool state. */
 
 /// Merges a JSON patch into settings.json: only the TOP-LEVEL keys present in
 /// the patch are written; every other key on disk is preserved untouched.
@@ -517,9 +544,6 @@ fn clear_lock_hash(app: tauri::AppHandle) -> Result<(), String> {
 
 /// Repo slug ("owner/name") the update check queries. This single constant is
 /// the app's entire network footprint — the one place to edit if the repo moves.
-///
-/// TODO(Railblade): set to the real slug before release, e.g.
-/// "Railblade/swiss-rb-knife".
 const GITHUB_REPO: &str = "RailbladeOfficial/Swiss-RB-Knife";
 
 /// GitHub rejects API requests that omit a User-Agent (HTTP 403), so one is
@@ -603,7 +627,6 @@ pub fn run() {
         .setup(|_app| Ok(()))
         .invoke_handler(tauri::generate_handler![
             // Shell-level commands
-            save_settings,
             merge_settings,
             load_settings,
             save_tool_settings,
@@ -667,4 +690,34 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod filename_tests {
+    use super::is_reserved_device_name;
+
+    #[test]
+    fn flags_reserved_names_regardless_of_case_or_extension() {
+        for n in ["CON", "con", "Con", "NUL", "aux", "COM1", "lpt9"] {
+            assert!(is_reserved_device_name(n), "{n} should be reserved");
+        }
+        // The reservation survives any extension, including a compound one.
+        for n in ["CON.jpg", "con.txt", "Con.tar.gz", "PRN.csv"] {
+            assert!(is_reserved_device_name(n), "{n} should be reserved");
+        }
+    }
+
+    #[test]
+    fn allows_names_that_merely_start_with_a_reserved_word() {
+        // These are the false positives a naive "starts_with" check would
+        // produce. They are ordinary filenames and must be accepted — the
+        // Dummy File Generator composes names exactly like con001.txt from a
+        // legitimate "con" prefix.
+        for n in [
+            "con001.txt", "console.log", "conference.png", "connie.jpg",
+            "com10.txt", "lpt0.txt", "nullable.rs", "auxiliary.md", "",
+        ] {
+            assert!(!is_reserved_device_name(n), "{n} should be allowed");
+        }
+    }
 }

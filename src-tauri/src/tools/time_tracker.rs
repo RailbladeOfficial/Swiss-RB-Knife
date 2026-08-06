@@ -63,12 +63,36 @@ pub fn load_draft(app: tauri::AppHandle) -> Result<String, String> {
    CSV IMPORT
 ============================================================================= */
 
+/// Largest CSV this will read. Time Tracker exports are measured in kilobytes,
+/// so this is enormously generous for any legitimate import — it exists to
+/// bound the accidental case (picking a multi-gigabyte file by mistake), not
+/// to constrain real use.
+const MAX_IMPORT_CSV_BYTES: u64 = 50 * 1024 * 1024;
+
 /// Reads the contents of a user-selected CSV file. The path comes from the
-/// OS-native file picker (plugin-dialog on the frontend), so no additional
-/// validation is needed here beyond what fs::read_to_string already gives —
-/// same trust boundary as the path-taking commands in the other tools.
+/// OS-native file picker (plugin-dialog on the frontend), so no path
+/// validation is needed here — same trust boundary as the path-taking commands
+/// in the other tools.
+///
+/// The SIZE is checked, though, because reading is only the first of several
+/// copies: the whole file lands in this String, gets serialised into the IPC
+/// response as JSON (escaped, so potentially larger again), and is then parsed
+/// into a JS string on the other side. An accidental pick of a huge file would
+/// multiply its size several times over before anything could reject it, and
+/// the failure mode is the app dying rather than an error the user can act on.
+/// Checking the metadata first turns that into a clear message.
 #[tauri::command]
 pub fn import_csv(path: String) -> Result<String, String> {
+    let size = fs::metadata(&path)
+        .map_err(|e| format!("Could not read file: {e}"))?
+        .len();
+    if size > MAX_IMPORT_CSV_BYTES {
+        return Err(format!(
+            "That file is {:.1} MB. The import limit is {} MB — check you picked the right file.",
+            size as f64 / (1024.0 * 1024.0),
+            MAX_IMPORT_CSV_BYTES / (1024 * 1024)
+        ));
+    }
     fs::read_to_string(&path).map_err(|e| format!("Could not read file: {e}"))
 }
 
@@ -111,6 +135,9 @@ fn sanitize_filename(filename: &str) -> Result<String, String> {
     let illegal = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
     if name.chars().any(|c| illegal.contains(&c) || (c as u32) < 0x20) {
         return Err(format!("Filename contains characters Windows doesn't allow: {}", name));
+    }
+    if crate::is_reserved_device_name(name) {
+        return Err(format!("'{}' is a reserved Windows device name.", name));
     }
     Ok(name.to_string())
 }

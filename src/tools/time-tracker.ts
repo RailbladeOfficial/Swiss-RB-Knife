@@ -17,7 +17,8 @@
        form survives accidental closes.
 
    Rust commands used:
-     save_data, load_data, save_draft, load_draft, export_csv, save_settings, load_settings
+     save_data, load_data, save_draft, load_draft, export_csv, import_csv,
+     save_tool_settings, load_tool_settings, load_settings (legacy-key migration)
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -1132,7 +1133,7 @@ async function exportCSV(): Promise<void> {
    required field, the whole import is rejected and nothing changes.
 ============================================================================= */
 
-const CSV_IMPORT_REQUIRED_COLUMNS = ["date", "start time", "end time", "activity"] as const;
+const CSV_IMPORT_REQUIRED_COLUMNS = ["start date", "start time", "end time", "activity"] as const;
 
 /** Splits raw CSV text into rows of cells, honoring RFC4180 quoting (quoted
  *  fields may contain commas, newlines, and doubled "" as an escaped quote). */
@@ -1173,6 +1174,100 @@ function capitalizeHeader(h: string): string {
   return h.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const MONTH_NAMES = [
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+];
+const MONTH_ABBR: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
+};
+
+/** Resolves a month name/abbreviation ("March", "mar") to 1-12, or 0 if
+ *  unrecognized. */
+function monthNameToNumber(raw: string): number {
+  const name = raw.toLowerCase();
+  const fullIdx = MONTH_NAMES.indexOf(name);
+  if (fullIdx >= 0) return fullIdx + 1;
+  return MONTH_ABBR[name] ?? 0;
+}
+
+/** Builds a canonical "YYYY-MM-DD" string, rejecting anything that isn't a
+ *  real calendar date (e.g. month 13, or day 30 in February) — JS's Date
+ *  constructor silently rolls those over rather than erroring, so the
+ *  round-trip through getFullYear/getMonth/getDate is what actually catches
+ *  them. */
+function buildDateString(year: number, month: number, day: number): string {
+  if (month < 1 || month > 12) return "";
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return "";
+  return `${String(year).padStart(4, "0")}-${pad2(month)}-${pad2(day)}`;
+}
+
+/** Given two numeric date parts that could each plausibly be a month (1-12)
+ *  or a day, picks which is which. Prefers the reading implied by the
+ *  Date Format setting (M/D vs D/M) but falls back to whichever reading is
+ *  actually valid when the preferred one isn't (e.g. "25/03" under American
+ *  ordering still reads as day 25 / month 3, since 25 can't be a month). */
+function resolveMonthDay(a: number, b: number): [month: number, day: number] | null {
+  const aIsMonth = a >= 1 && a <= 12;
+  const bIsMonth = b >= 1 && b <= 12;
+  if (settings.americanDates) {
+    if (aIsMonth) return [a, b];
+    if (bIsMonth) return [b, a];
+  } else {
+    if (bIsMonth) return [b, a];
+    if (aIsMonth) return [a, b];
+  }
+  return null;
+}
+
+/** Parses a CSV date cell in any commonly-seen format — ISO ("2024-03-05"),
+ *  numeric with slashes/dashes/dots in either month-first or day-first order
+ *  ("3/5/2024", "05.03.2024"), or a month name ("March 5, 2024", "5 Mar
+ *  2024") — into a canonical "YYYY-MM-DD" string. Returns "" if the text
+ *  isn't a discernible date. Ambiguous numeric dates (both parts ≤12) follow
+ *  the Date Format setting's month/day order. */
+function normalizeCsvDate(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return "";
+
+  const isoMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (isoMatch) {
+    return buildDateString(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
+  }
+
+  const numericMatch = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/);
+  if (numericMatch) {
+    let year = Number(numericMatch[3]);
+    if (year < 100) year += year < 70 ? 2000 : 1900;
+    const resolved = resolveMonthDay(Number(numericMatch[1]), Number(numericMatch[2]));
+    if (!resolved) return "";
+    return buildDateString(year, resolved[0], resolved[1]);
+  }
+
+  const monthFirstMatch = trimmed.match(/^([A-Za-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/);
+  if (monthFirstMatch) {
+    const month = monthNameToNumber(monthFirstMatch[1]!);
+    if (month) return buildDateString(Number(monthFirstMatch[3]), month, Number(monthFirstMatch[2]));
+  }
+
+  const dayFirstMatch = trimmed.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\.?,?\s+(\d{4})$/);
+  if (dayFirstMatch) {
+    const month = monthNameToNumber(dayFirstMatch[2]!);
+    if (month) return buildDateString(Number(dayFirstMatch[3]), month, Number(dayFirstMatch[1]));
+  }
+
+  // Last resort — hand anything else recognizable (e.g. "2024-03-05T10:00:00")
+  // to the native parser rather than rejecting it outright.
+  const fallback = new Date(trimmed);
+  if (!isNaN(fallback.getTime())) {
+    return buildDateString(fallback.getFullYear(), fallback.getMonth() + 1, fallback.getDate());
+  }
+
+  return "";
+}
+
 type CsvImportResult =
   | { ok: true; entries: Entry[] }
   | { ok: false; message: string };
@@ -1203,7 +1298,7 @@ function parseCsvImport(raw: string): CsvImportResult {
 
   rows.slice(1).forEach((row, i) => {
     const lineNum = i + 2; // +1 for the header row, +1 for 1-indexing
-    const dateRaw     = (row[colIndex["date"]!] ?? "").trim();
+    const dateRaw     = (row[colIndex["start date"]!] ?? "").trim();
     const startRaw    = (row[colIndex["start time"]!] ?? "").trim();
     const endRaw      = (row[colIndex["end time"]!] ?? "").trim();
     const activityRaw = (row[colIndex["activity"]!] ?? "").trim();
@@ -1212,7 +1307,7 @@ function parseCsvImport(raw: string): CsvImportResult {
     const projectRaw    = projectIdx !== undefined ? (row[projectIdx] ?? "").trim() : "";
 
     const missing: string[] = [];
-    if (!dateRaw) missing.push("Date");
+    if (!dateRaw) missing.push("Start Date");
     if (!startRaw) missing.push("Start Time");
     if (!endRaw) missing.push("End Time");
     if (!activityRaw) missing.push("Activity");
@@ -1221,8 +1316,9 @@ function parseCsvImport(raw: string): CsvImportResult {
       return;
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
-      errors.push(`Line ${lineNum}: Date "${dateRaw}" isn't in YYYY-MM-DD format.`);
+    const date = normalizeCsvDate(dateRaw);
+    if (!date) {
+      errors.push(`Line ${lineNum}: Start Date "${dateRaw}" isn't a recognizable date.`);
       return;
     }
     const start = normalizeTime(startRaw);
@@ -1235,26 +1331,27 @@ function parseCsvImport(raw: string): CsvImportResult {
     // it rolls forward one day.
     let endDate: string;
     if (endDateRaw) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(endDateRaw)) {
-        errors.push(`Line ${lineNum}: End Date "${endDateRaw}" isn't in YYYY-MM-DD format.`);
+      const parsedEndDate = normalizeCsvDate(endDateRaw);
+      if (!parsedEndDate) {
+        errors.push(`Line ${lineNum}: End Date "${endDateRaw}" isn't a recognizable date.`);
         return;
       }
-      endDate = endDateRaw;
+      endDate = parsedEndDate;
     } else {
-      endDate = parseTime(end) < parseTime(start) ? addDaysToDate(dateRaw, 1) : dateRaw;
+      endDate = parseTime(end) < parseTime(start) ? addDaysToDate(date, 1) : date;
     }
 
-    if (endDate < dateRaw) {
-      errors.push(`Line ${lineNum}: End Date "${endDate}" is before Date "${dateRaw}".`);
+    if (endDate < date) {
+      errors.push(`Line ${lineNum}: End Date "${endDate}" is before Start Date "${dateRaw}".`);
       return;
     }
-    if (entryDurationSeconds({ date: dateRaw, start, endDate, end }) < 0) {
+    if (entryDurationSeconds({ date, start, endDate, end }) < 0) {
       errors.push(`Line ${lineNum}: End Time "${endRaw}" is before Start Time "${startRaw}" on the given dates.`);
       return;
     }
 
     parsed.push({
-      date: dateRaw,
+      date,
       start,
       endDate,
       end,
@@ -1281,7 +1378,7 @@ async function downloadCsvTemplate(): Promise<void> {
   try {
     await invoke("export_csv", {
       filename: "time-tracker-import-template.csv",
-      data: "Date,Start Time,End Date,End Time,Project,Activity,Notes",
+      data: "Start Date,Start Time,End Date,End Time,Project,Activity,Notes",
     });
     flash("Template downloaded to Downloads!", "success");
   } catch (err) {
@@ -1684,16 +1781,22 @@ function findOrCreateActivity(name: string): void {
 
 /**
  * Explicit add from the Setup modal's "+ New Activity" button. Reactivates a
- * matching retired activity instead of creating a duplicate. Mirrors Budget's
- * addOrReactivateSimple.
+ * matching retired activity instead of creating a duplicate; blocks (and
+ * flashes) if the name matches an already-ACTIVE activity, since two active
+ * activities can't share a name. Returns false on that failure so the modal
+ * can stay open. Mirrors Budget's addOrReactivateSimple.
  */
-function addOrReactivateActivity(name: string): void {
+function addOrReactivateActivity(name: string): boolean {
   const trimmed = name.trim();
-  if (!trimmed) return;
+  if (!trimmed) return false;
 
   const existing = activities.find(
     (a) => a.name.toLowerCase() === trimmed.toLowerCase(),
   );
+  if (existing && existing.status === "active") {
+    flash("Activity already exists", "error");
+    return false;
+  }
   const wasReactivated = !!existing && existing.status === "retired";
   if (existing) {
     existing.status = "active";
@@ -1705,6 +1808,7 @@ function addOrReactivateActivity(name: string): void {
   saveSettings();
   refreshActivityDatalist();
   renderActivitiesList();
+  return true;
 }
 
 /**
@@ -1726,6 +1830,19 @@ function refreshActivityDatalist(): void {
     });
 }
 
+/** Number of entries currently using a given activity/project name
+ *  (case-insensitive) — the "N entries" count shown in Setup list rows, the
+ *  Edit modal's context line, and the delete/merge confirmations. */
+function entryCountFor(kind: "activity" | "project", name: string): number {
+  return kind === "activity"
+    ? entries.filter((e) => e.activity.toLowerCase() === name.toLowerCase()).length
+    : entries.filter((e) => e.project.toLowerCase() === name.toLowerCase()).length;
+}
+
+function entryCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "entry" : "entries"}`;
+}
+
 function buildActivityRow(item: Activity): HTMLElement {
   const row = document.createElement("div");
   row.className = "setup-item";
@@ -1742,6 +1859,11 @@ function buildActivityRow(item: Activity): HTMLElement {
     nameSpan.appendChild(retiredBadge);
   }
   row.appendChild(nameSpan);
+
+  const countSpan = document.createElement("span");
+  countSpan.className = "setup-item-count";
+  countSpan.textContent = entryCountLabel(entryCountFor("activity", item.name));
+  row.appendChild(countSpan);
 
   const chevron = document.createElement("span");
   chevron.className = "setup-item-chevron";
@@ -1813,8 +1935,10 @@ function findOrCreateProject(name: string): void {
  * Explicit add from the Setup modal's "+ New Project" button, with a
  * user-chosen ID number. Reactivating a matching retired project (by name)
  * keeps its existing number rather than adopting the typed one, mirroring
- * addOrReactivateActivity's name-match convenience. Returns false (and
- * flashes the reason) on validation failure, so the modal can stay open.
+ * addOrReactivateActivity's name-match convenience. Blocks (and flashes) if
+ * the name matches an already-ACTIVE project, since two active projects
+ * can't share a name. Returns false (and flashes the reason) on validation
+ * failure, so the modal can stay open.
  */
 function addOrReactivateProject(name: string, projectNumber: number): boolean {
   const trimmed = name.trim();
@@ -1822,9 +1946,12 @@ function addOrReactivateProject(name: string, projectNumber: number): boolean {
 
   const existingByName = projects.find((p) => p.name.toLowerCase() === trimmed.toLowerCase());
   if (existingByName) {
-    const wasReactivated = existingByName.status === "retired";
+    if (existingByName.status === "active") {
+      flash("Project already exists", "error");
+      return false;
+    }
     existingByName.status = "active";
-    flash(wasReactivated ? "Project reactivated" : "Project added", "success");
+    flash("Project reactivated", "success");
     saveSettings();
     refreshProjectDatalist();
     renderProjectsList();
@@ -1911,6 +2038,11 @@ function buildProjectRow(item: Project): HTMLElement {
     nameSpan.appendChild(retiredBadge);
   }
   row.appendChild(nameSpan);
+
+  const countSpan = document.createElement("span");
+  countSpan.className = "setup-item-count";
+  countSpan.textContent = entryCountLabel(entryCountFor("project", item.name));
+  row.appendChild(countSpan);
 
   const chevron = document.createElement("span");
   chevron.className = "setup-item-chevron";
@@ -2041,7 +2173,7 @@ function getActivityAddModal(): Modal {
     function doSave() {
       const name = nameInput.value.trim();
       if (!name) { flash("Name cannot be empty", "error"); return; }
-      addOrReactivateActivity(name);
+      if (!addOrReactivateActivity(name)) return;
       ttActivityAddModal!.close();
       openTTSetupOnTab("activities");
     }
@@ -2076,10 +2208,25 @@ function getActivityEditModal(): Modal {
     function goBack() { ttActivityEditModal!.close(); openTTSetupOnTab("activities"); }
     function doSave() {
       if (!ttActivityEditItem) return;
+      const item = ttActivityEditItem;
       const name = nameInput.value.trim();
       if (!name) { flash("Name cannot be empty", "error"); return; }
-      const oldName = ttActivityEditItem.name;
-      ttActivityEditItem.name = name;
+      const oldName = item.name;
+
+      // Renaming onto another activity's name would leave two activities
+      // sharing one name — offer a merge instead of allowing the collision.
+      if (name.toLowerCase() !== oldName.toLowerCase()) {
+        const collision = activities.find(
+          (a) => a.id !== item.id && a.name.toLowerCase() === name.toLowerCase(),
+        );
+        if (collision) {
+          ttActivityEditModal!.close();
+          openTTMergeConfirm("activity", item, collision);
+          return;
+        }
+      }
+
+      item.name = name;
       // Entries store the activity as a free-text name (not an id), so a rename
       // must rewrite every matching entry to keep history in sync. Match
       // case-insensitively but write the new canonical casing.
@@ -2130,6 +2277,9 @@ function openActivityEdit(item: Activity): void {
   getTTSetupModal().close();
   getActivityEditModal(); // ensure wired
   (document.getElementById("ttActivityEditName") as HTMLInputElement).value = item.name;
+  setContextLines(document.getElementById("ttActivityEditContext")!, [
+    entryCountLabel(entryCountFor("activity", item.name)),
+  ]);
   const retireBtn = document.getElementById("ttActivityEditRetire") as HTMLButtonElement;
   const deleteBtn = document.getElementById("ttActivityEditDelete") as HTMLButtonElement;
   retireBtn.textContent = item.status === "active" ? "Retire" : "Reactivate";
@@ -2199,9 +2349,25 @@ function getProjectEditModal(): Modal {
     function goBack() { ttProjectEditModal!.close(); openTTSetupOnTab("projects"); }
     function doSave() {
       if (!ttProjectEditItem) return;
+      const item = ttProjectEditItem;
       const name = nameInput.value.trim();
+      if (!name) { flash("Name cannot be empty", "error"); return; }
+
+      // Renaming onto another project's name would leave two projects sharing
+      // one name — offer a merge instead of allowing the collision.
+      if (name.toLowerCase() !== item.name.toLowerCase()) {
+        const collision = projects.find(
+          (p) => p.id !== item.id && p.name.toLowerCase() === name.toLowerCase(),
+        );
+        if (collision) {
+          ttProjectEditModal!.close();
+          openTTMergeConfirm("project", item, collision);
+          return;
+        }
+      }
+
       const projectNumber = parseInt(numberInput.value, 10);
-      if (!saveProjectEdit(ttProjectEditItem, name, projectNumber)) return;
+      if (!saveProjectEdit(item, name, projectNumber)) return;
       goBack();
     }
 
@@ -2238,6 +2404,9 @@ function openProjectEdit(item: Project): void {
   getProjectEditModal(); // ensure wired
   (document.getElementById("ttProjectEditName") as HTMLInputElement).value = item.name;
   (document.getElementById("ttProjectEditNumber") as HTMLInputElement).value = String(item.projectNumber);
+  setContextLines(document.getElementById("ttProjectEditContext")!, [
+    entryCountLabel(entryCountFor("project", item.name)),
+  ]);
   const retireBtn = document.getElementById("ttProjectEditRetire") as HTMLButtonElement;
   const deleteBtn = document.getElementById("ttProjectEditDelete") as HTMLButtonElement;
   retireBtn.textContent = item.status === "active" ? "Retire" : "Reactivate";
@@ -2303,15 +2472,94 @@ function getTTSetupDeleteModal(): Modal {
 
 function openTTSetupDelete(kind: TTDeleteKind, id: string, name: string): void {
   pendingSetupDelete = { kind, id, name };
-  const impactCount = kind === "activity"
-    ? entries.filter((e) => e.activity.toLowerCase() === name.toLowerCase()).length
-    : entries.filter((e) => e.project.toLowerCase() === name.toLowerCase()).length;
+  const impactCount = entryCountFor(kind, name);
   const impactNote = impactCount > 0
     ? ` ${impactCount} logged ${impactCount === 1 ? "entry" : "entries"} will be reassigned to "Unknown".`
     : "";
   document.getElementById("ttSetupDeleteMessage")!.textContent =
     `Permanently delete "${name}"?${impactNote} This can't be undone.`;
   getTTSetupDeleteModal().open();
+}
+
+/* =============================================================================
+   MODAL — TT SETUP MERGE CONFIRM (shared by Activities and Projects)
+   Reached when an Edit rename collides with another activity/project's name
+   (case-insensitively) — since two active entities can't share a name, the
+   only way forward is to merge the one being edited (`source`) into the
+   existing one (`target`): source's entries are reassigned to target's name
+   and source itself is deleted. target keeps its own name/casing and (for
+   Project) its ID number; the typed name on `source` is discarded.
+============================================================================= */
+
+type TTMergeKind = "activity" | "project";
+let ttMergeConfirmModal: Modal | null = null;
+let pendingMerge: { kind: TTMergeKind; sourceId: string; targetId: string } | null = null;
+
+function getTTMergeConfirmModal(): Modal {
+  if (!ttMergeConfirmModal) {
+    ttMergeConfirmModal = new Modal(document.getElementById("ttMergeConfirmBackdrop")!, {
+      closeOnEsc: true,
+      onClosed: () => { pendingMerge = null; },
+    });
+
+    document.getElementById("ttMergeConfirmBtn")!.addEventListener("click", () => {
+      if (!pendingMerge) return;
+      const { kind, sourceId, targetId } = pendingMerge;
+      let changed = 0;
+      if (kind === "activity") {
+        const source = activities.find((a) => a.id === sourceId);
+        const target = activities.find((a) => a.id === targetId);
+        if (source && target) {
+          entries.forEach((e) => {
+            if (e.activity.toLowerCase() === source.name.toLowerCase()) { e.activity = target.name; changed++; }
+          });
+          activities = activities.filter((a) => a.id !== sourceId);
+          target.status = "active";
+        }
+      } else {
+        const source = projects.find((p) => p.id === sourceId);
+        const target = projects.find((p) => p.id === targetId);
+        if (source && target) {
+          entries.forEach((e) => {
+            if (e.project.toLowerCase() === source.name.toLowerCase()) { e.project = target.name; changed++; }
+          });
+          projects = projects.filter((p) => p.id !== sourceId);
+          target.status = "active";
+        }
+      }
+      pendingMerge = null;
+      if (changed > 0) { saveToDisk(); renderCurrentView(); }
+      saveSettings();
+      if (kind === "activity") { refreshActivityDatalist(); renderActivitiesList(); }
+      else { refreshProjectDatalist(); renderProjectsList(); }
+      ttMergeConfirmModal!.close();
+      openTTSetupOnTab(kind === "activity" ? "activities" : "projects");
+      flash(kind === "activity" ? "Activities merged" : "Projects merged", "success");
+    });
+
+    document.getElementById("ttMergeConfirmCancelBtn")!.addEventListener("click", () => {
+      const kind = pendingMerge?.kind;
+      pendingMerge = null;
+      ttMergeConfirmModal!.close();
+      openTTSetupOnTab(kind === "project" ? "projects" : "activities");
+    });
+  }
+  return ttMergeConfirmModal;
+}
+
+function openTTMergeConfirm(kind: TTMergeKind, source: Activity | Project, target: Activity | Project): void {
+  pendingMerge = { kind, sourceId: source.id, targetId: target.id };
+  const noun = kind === "activity" ? "activity" : "project";
+  const sourceCount = entryCountFor(kind, source.name);
+  const targetCount = entryCountFor(kind, target.name);
+
+  document.getElementById("ttMergeConfirmTitle")!.textContent =
+    `Merge ${kind === "activity" ? "Activities" : "Projects"}?`;
+  document.getElementById("ttMergeConfirmMessage")!.textContent =
+    `An ${noun} named "${target.name}" already exists, with ${entryCountLabel(targetCount)}. ` +
+    `Merge "${source.name}" (${entryCountLabel(sourceCount)}) into it? ` +
+    `This deletes "${source.name}" and moves its entries to "${target.name}". This can't be undone.`;
+  getTTMergeConfirmModal().open();
 }
 
 /* =============================================================================
@@ -2544,23 +2792,33 @@ function openNotesEditModal(entry: Entry, rerender: () => void): void {
 let dateEditModal: Modal | null = null;
 let dateEditEntry: Entry | null = null;
 let dateEditRerender: () => void = () => {};
+// Staged Start/End Time, initialized from the entry when the modal opens and
+// only written back to the entry on Update — see makeDateEditTimeEditable's
+// doc comment for why these can't just write straight to dateEditEntry.
+let dateEditStagedStart = "";
+let dateEditStagedEnd = "";
 
 /** Double-click-to-edit for the Start/End Time values shown (read-only,
  *  until now) in the Edit Dates modal. It's a bit silly to show them next to
  *  editable dates and not let you fix them too — especially since a date
  *  change can put them in conflict. Mirrors the Entries panel's inline time
- *  edit (same normalizeTime() + entryDurationSeconds() validation, no
- *  auto-roll — an edit that would make the span negative is just rejected),
- *  but commits against dateEditEntry directly and refreshes this modal's own
- *  span rather than the Entries panel's row markup. */
+ *  edit's normalizeTime() parsing, but does NOT validate or save immediately
+ *  the way that inline edit does: this modal's date fields are themselves
+ *  only staged until Update, so checking the edited time against the
+ *  entry's still-unstaged dates would reject perfectly valid combinations
+ *  (e.g. changing 8am-12pm on 8/6 to 8am-7am spanning 8/6-8/7 — typing the
+ *  new 7am end time fails immediately against the old same-day End Date,
+ *  even though the pending End Date edit would make it valid). So a typed
+ *  time is only parsed here and held in dateEditStaged{Start,End}; the real
+ *  entryDurationSeconds() check runs once, against everything staged
+ *  together, in doSave(). */
 function makeDateEditTimeEditable(span: HTMLElement, field: "start" | "end"): void {
-  const entry = dateEditEntry;
-  if (!entry) return;
+  if (!dateEditEntry) return;
   const spanId = span.id;
 
   const input = document.createElement("input");
   input.className = "entry-edit-input";
-  input.value = formatTime(entry[field]);
+  input.value = formatTime(field === "start" ? dateEditStagedStart : dateEditStagedEnd);
   input.style.width = span.offsetWidth + "px";
   restrictToTimeChars(input);
   span.replaceWith(input);
@@ -2574,7 +2832,7 @@ function makeDateEditTimeEditable(span: HTMLElement, field: "start" | "end"): vo
     fresh.id = spanId;
     fresh.className = "tt-date-edit-time-value";
     fresh.title = "Double-click to edit";
-    fresh.textContent = formatTime(entry![field]);
+    fresh.textContent = formatTime(field === "start" ? dateEditStagedStart : dateEditStagedEnd);
     fresh.addEventListener("dblclick", () => makeDateEditTimeEditable(fresh, field));
     input.replaceWith(fresh);
   }
@@ -2585,21 +2843,9 @@ function makeDateEditTimeEditable(span: HTMLElement, field: "start" | "end"): vo
     const normalized = normalizeTime(raw);
     if (!normalized) { rebuildSpan(); return; }
 
-    const prevValue = entry![field];
-    entry![field] = normalized;
-
-    if (entryDurationSeconds(entry!) < 0) {
-      entry![field] = prevValue;
-      flash("End time can't be before start time — check the dates above if this should span multiple days.", "error");
-      rebuildSpan();
-      return;
-    }
-
-    sortEntries();
-    saveToDisk();
-    dateEditRerender();
+    if (field === "start") dateEditStagedStart = normalized;
+    else dateEditStagedEnd = normalized;
     rebuildSpan();
-    flash("Entry edited", "success");
   }
 
   input.addEventListener("keydown", (e) => {
@@ -2650,12 +2896,14 @@ function getDateEditModal(): Modal {
       const newEnd = endInput.value;
       if (!newStart || !newEnd) { flash("Both dates are required.", "error"); return; }
       if (newEnd < newStart) { flash("End date cannot be before Start date.", "error"); return; }
-      if (entryDurationSeconds({ date: newStart, start: dateEditEntry.start, endDate: newEnd, end: dateEditEntry.end }) < 0) {
+      if (entryDurationSeconds({ date: newStart, start: dateEditStagedStart, endDate: newEnd, end: dateEditStagedEnd }) < 0) {
         flash("End time must be after Start time — check the dates.", "error");
         return;
       }
       dateEditEntry.date = newStart;
       dateEditEntry.endDate = newEnd;
+      dateEditEntry.start = dateEditStagedStart;
+      dateEditEntry.end = dateEditStagedEnd;
       sortEntries();
       saveToDisk();
       dateEditRerender();
@@ -2673,6 +2921,8 @@ function getDateEditModal(): Modal {
 function openDateEditModal(entry: Entry, rerender: () => void): void {
   dateEditEntry = entry;
   dateEditRerender = rerender;
+  dateEditStagedStart = entry.start;
+  dateEditStagedEnd = entry.end;
   const startInput = document.getElementById("ttDateEditStart") as HTMLInputElement;
   const endInput = document.getElementById("ttDateEditEnd") as HTMLInputElement;
   startInput.value = entry.date;

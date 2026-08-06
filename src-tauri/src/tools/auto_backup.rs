@@ -136,6 +136,63 @@ pub struct SkippedFileEntry {
     pub destination: String,
 }
 
+/// How many skipped-file entries are kept in memory (and sent to the frontend)
+/// per destination. Every skip is still written to that destination's
+/// _SKIPPED_FILES.txt log as it happens, so the cap only limits the in-app
+/// list, never the record.
+///
+/// This exists because the skip list is proportional to how badly a backup
+/// went, not to anything bounded: a source tree with a locked or
+/// access-denied branch can fail on tens of thousands of files. Every entry
+/// was previously retained, cloned into an IPC event, and rendered as its own
+/// DOM row — enough to lock up the UI on exactly the runs where the user most
+/// needs to read the result.
+const MAX_RETAINED_SKIPS: usize = 1_000;
+
+/// Accumulates skipped files for one destination: an O(1) dedup set, a
+/// retention-capped detail list, and an exact total.
+///
+/// The dedup used to be a linear scan of the detail Vec on every failure,
+/// which is O(n^2) over the run — at 100k skips that is billions of string
+/// comparisons on the backup thread, turning a slow backup into an apparent
+/// hang. The HashSet makes it O(1) per failure.
+struct SkippedFiles {
+    seen: std::collections::HashSet<String>,
+    entries: Vec<SkippedFileEntry>,
+    total: u64,
+}
+
+impl SkippedFiles {
+    fn new() -> Self {
+        SkippedFiles {
+            seen: std::collections::HashSet::new(),
+            entries: Vec::new(),
+            total: 0,
+        }
+    }
+
+    /// Records a skip if this source path hasn't already been recorded.
+    /// Returns true if it was newly recorded, so the caller knows whether to
+    /// append the log line (the log must not gain duplicates either).
+    fn record(&mut self, source: &str, destination: &str) -> bool {
+        if !self.seen.insert(source.to_string()) {
+            return false;
+        }
+        self.total += 1;
+        if self.entries.len() < MAX_RETAINED_SKIPS {
+            self.entries.push(SkippedFileEntry {
+                source: source.to_string(),
+                destination: destination.to_string(),
+            });
+        }
+        true
+    }
+
+    fn is_empty(&self) -> bool {
+        self.total == 0
+    }
+}
+
 #[derive(Clone, serde::Serialize)]
 pub struct BackupCompleteEvent {
     pub success: bool,
@@ -155,9 +212,14 @@ pub struct BackupCompleteEvent {
     /// partial destination copy was removed — see cancel_backup). None on a
     /// clean completion or a cancel that landed exactly between files.
     pub aborted_file: Option<String>,
-    /// Every file that failed to copy (locked/access error) across every
+    /// Files that failed to copy (locked/access error) across every
     /// destination in this run — feeds the "View Skipped Files" modal.
+    /// Capped at MAX_RETAINED_SKIPS per destination; use skipped_total for
+    /// the real count and the log files for the complete record.
     pub skipped_files: Vec<SkippedFileEntry>,
+    /// Exact number of skipped files across the run, even when skipped_files
+    /// was truncated by the retention cap.
+    pub skipped_total: u64,
     /// One robocopy_log_<timestamp>_SKIPPED_FILES.txt per destination that
     /// actually had at least one skip — only created when needed.
     pub skipped_log_paths: Vec<String>,
@@ -253,7 +315,11 @@ pub struct BackupDestinationDoneEvent {
     pub aborted_file: Option<String>,
     /// Files this destination couldn't copy (locked/access error) — the
     /// destination still completed; these files were skipped, not aborted.
+    /// Capped at MAX_RETAINED_SKIPS; see skipped_total for the real count.
     pub skipped_files: Vec<SkippedFileEntry>,
+    /// Exact number of skips for this destination, even when skipped_files
+    /// was truncated by the retention cap.
+    pub skipped_total: u64,
     /// Path of this destination's own SKIPPED_FILES log, if any skips happened.
     pub skipped_log_path: Option<String>,
 }
@@ -627,8 +693,11 @@ fn get_free_space_blocking(path: String) -> Result<u64, String> {
 #[tauri::command]
 pub fn cancel_backup() {
     CANCEL_REQUESTED.store(true, Ordering::SeqCst);
-    // Snapshot and clear under one short lock, then kill outside it — no
-    // reason to hold the lock while spawning taskkill processes.
+    // Snapshot under one short lock, then kill outside it — no reason to hold
+    // the lock while spawning taskkill processes. The list is NOT cleared
+    // here: each copy loop removes its own pid once it has reaped its child
+    // (see the retain() calls below), which is the only place that knows the
+    // process has actually been waited on.
     let pids: Vec<u32> = ACTIVE_ROBOCOPY_PIDS.lock().unwrap().clone();
     for pid in pids {
         // Kill by PID, but ONLY if that PID is still a robocopy.exe. A bare
@@ -650,6 +719,105 @@ pub fn cancel_backup() {
             ])
             .creation_flags(CREATE_NO_WINDOW)
             .spawn();
+    }
+}
+
+/* =============================================================================
+   FOLDER LOG SINK
+   -----------------------------------------------------------------------------
+   Robocopy prints one line per file it copies. A backup of a million-file tree
+   therefore produces hundreds of megabytes of stdout, and the previous design
+   accumulated ALL of it into one String per folder pair before writing the log
+   at the end — memory that scaled with the size of the user's data, not with
+   anything about the app. Fast mode was worse: read_to_end() buffered the raw
+   bytes and from_utf8_lossy().into_owned() then allocated a second full copy,
+   briefly doubling the peak.
+
+   This streams instead. Each line goes straight into a BufWriter on the log
+   file as it arrives, and only a bounded tail is retained in memory for
+   parse_robocopy_summary(), which reads nothing but the Files:/Dirs:/Bytes:
+   block robocopy prints at the very end. Peak memory is now the writer's
+   buffer plus SUMMARY_TAIL_LINES lines, regardless of how big the backup is.
+============================================================================= */
+
+/// How many trailing lines to keep for parse_robocopy_summary(). Robocopy's
+/// summary block is ~10 lines; 64 leaves generous headroom for banner or
+/// locale variations without the retained tail ever being a memory concern.
+const SUMMARY_TAIL_LINES: usize = 64;
+
+/// Buffer size for the log writer. Large enough that a burst of small-file
+/// lines costs one write syscall rather than hundreds — the log usually lives
+/// on the destination drive, which robocopy is already saturating.
+const LOG_WRITER_CAPACITY: usize = 64 * 1024;
+
+struct FolderLog {
+    /// None if the log file couldn't be opened. Logging is best-effort and
+    /// must never fail a backup, so every write is silently dropped in that
+    /// case — exactly the behaviour of the `let _ = ...` writes it replaces.
+    writer: Option<std::io::BufWriter<fs::File>>,
+    tail: std::collections::VecDeque<String>,
+}
+
+impl FolderLog {
+    /// Opens (appending) this destination's log and writes the folder-pair
+    /// header immediately, so a run killed mid-folder still leaves a log that
+    /// says which pair it died in.
+    fn open(path: &str, source: &str, dest_path: &str) -> Self {
+        let writer = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .ok()
+            .map(|f| std::io::BufWriter::with_capacity(LOG_WRITER_CAPACITY, f));
+
+        let mut log = FolderLog {
+            writer,
+            tail: std::collections::VecDeque::with_capacity(SUMMARY_TAIL_LINES),
+        };
+        log.raw(&format!("\n========== {} → {} ==========\n", source, dest_path));
+        log
+    }
+
+    /// Writes one output line and retains it in the bounded tail.
+    fn line(&mut self, line: &str) {
+        use std::io::Write;
+        if let Some(w) = self.writer.as_mut() {
+            let _ = w.write_all(line.as_bytes());
+            let _ = w.write_all(b"\n");
+        }
+        if self.tail.len() == SUMMARY_TAIL_LINES {
+            self.tail.pop_front();
+        }
+        self.tail.push_back(line.to_string());
+    }
+
+    /// Writes text through verbatim without touching the tail — headers and
+    /// closing notes, which are ours rather than robocopy's.
+    fn raw(&mut self, text: &str) {
+        use std::io::Write;
+        if let Some(w) = self.writer.as_mut() {
+            let _ = w.write_all(text.as_bytes());
+        }
+    }
+
+    /// The retained tail as one string, for parse_robocopy_summary().
+    fn tail_text(&self) -> String {
+        let mut s = String::new();
+        for line in &self.tail {
+            s.push_str(line);
+            s.push('\n');
+        }
+        s
+    }
+
+    /// Flushes buffered output to disk. Called on every exit path out of a
+    /// folder pair — without it, the last partial buffer is lost when the
+    /// BufWriter is dropped during a process kill.
+    fn flush(&mut self) {
+        use std::io::Write;
+        if let Some(w) = self.writer.as_mut() {
+            let _ = w.flush();
+        }
     }
 }
 
@@ -801,6 +969,7 @@ fn run_backup_thread(
                     total_secs: run_start.elapsed().as_secs_f64(),
                     aborted_file: None,
                     skipped_files: Vec::new(),
+                    skipped_total: 0,
                     skipped_log_paths: Vec::new(),
                 });
                 return;
@@ -841,6 +1010,7 @@ fn run_backup_thread(
                         total_secs: run_start.elapsed().as_secs_f64(),
                         aborted_file: None,
                         skipped_files: Vec::new(),
+                        skipped_total: 0,
                         skipped_log_paths: Vec::new(),
                     });
                     return;
@@ -908,8 +1078,12 @@ fn run_backup_thread(
     let total_bytes  = results.iter().map(|r| r.bytes).sum::<u64>();
     let total_extras = results.iter().map(|r| r.extras).sum::<u64>();
     let log_paths: Vec<String> = results.iter().filter_map(|r| r.log_path.clone()).collect();
+    // Each destination already truncated its own list to MAX_RETAINED_SKIPS,
+    // so this concatenation is bounded by that cap times the destination
+    // count. skipped_total stays exact regardless of the truncation.
     let skipped_files: Vec<SkippedFileEntry> =
         results.iter().flat_map(|r| r.skipped.clone()).collect();
+    let skipped_total: u64 = results.iter().map(|r| r.skipped_total).sum();
     let skipped_log_paths: Vec<String> =
         results.iter().filter_map(|r| r.skipped_log_path.clone()).collect();
 
@@ -943,13 +1117,13 @@ fn run_backup_thread(
                 detail
             },
         )
-    } else if !skipped_files.is_empty() {
+    } else if skipped_total > 0 {
         (
             true,
             format!(
                 "Backup complete, but {} file{} couldn't be copied (locked or access error). {} log file{} saved.",
-                skipped_files.len(),
-                if skipped_files.len() == 1 { "" } else { "s" },
+                skipped_total,
+                if skipped_total == 1 { "" } else { "s" },
                 log_paths.len(),
                 if log_paths.len() == 1 { "" } else { "s" }
             ),
@@ -973,6 +1147,7 @@ fn run_backup_thread(
         total_secs: run_start.elapsed().as_secs_f64(),
         aborted_file,
         skipped_files,
+        skipped_total,
         skipped_log_paths,
     });
 }
@@ -994,6 +1169,7 @@ struct DestinationResult {
     extras: u64,
     aborted_file: Option<String>,
     skipped: Vec<SkippedFileEntry>,
+    skipped_total: u64,
     skipped_log_path: Option<String>,
 }
 
@@ -1027,7 +1203,9 @@ fn run_destination(
     live_dirs_g: &AtomicU64,
     folders_done_g: &AtomicUsize,
 ) -> DestinationResult {
-    use std::io::{BufRead, BufReader, Read, Write};
+    // Read is no longer needed here: the fast path used to call read_to_end()
+    // and now streams with read_until() from BufRead like the details path.
+    use std::io::{BufRead, BufReader, Write};
     use std::process::{Command, Stdio};
 
     let dest_run_start = std::time::Instant::now();
@@ -1045,6 +1223,7 @@ fn run_destination(
             elapsed_secs: dest_run_start.elapsed().as_secs_f64(),
             aborted_file: None,
             skipped_files: Vec::new(),
+            skipped_total: 0,
             skipped_log_path: None,
         });
         return DestinationResult {
@@ -1053,6 +1232,7 @@ fn run_destination(
             log_path: None, files: 0, dirs: 0, bytes: 0, extras: 0,
             aborted_file: None,
             skipped: Vec::new(),
+            skipped_total: 0,
             skipped_log_path: None,
         };
     }
@@ -1067,7 +1247,7 @@ fn run_destination(
     let skipped_log_file = format!("{}/robocopy_log_{}_SKIPPED_FILES.txt", destination, timestamp);
     // This destination's running list of files that failed to copy. Every
     // return point below carries whatever's accumulated here so far.
-    let mut skipped: Vec<SkippedFileEntry> = Vec::new();
+    let mut skipped = SkippedFiles::new();
 
     let mut total_files: u64 = 0;
     let mut total_dirs:  u64 = 0;
@@ -1095,7 +1275,8 @@ fn run_destination(
                 bytes_copied: total_bytes, extras_deleted: total_extras,
                 elapsed_secs: dest_run_start.elapsed().as_secs_f64(),
                 aborted_file: None,
-                skipped_files: skipped.clone(),
+                skipped_files: skipped.entries.clone(),
+                skipped_total: skipped.total,
                 skipped_log_path: skipped_log_path.clone(),
             });
             return DestinationResult {
@@ -1104,7 +1285,8 @@ fn run_destination(
                 log_path: Some(dest_log_file),
                 files: total_files, dirs: total_dirs, bytes: total_bytes, extras: total_extras,
                 aborted_file: None,
-                skipped,
+                skipped: skipped.entries,
+                skipped_total: skipped.total,
                 skipped_log_path,
             };
         }
@@ -1170,7 +1352,8 @@ fn run_destination(
                     bytes_copied: total_bytes, extras_deleted: total_extras,
                     elapsed_secs: dest_run_start.elapsed().as_secs_f64(),
                     aborted_file: None,
-                    skipped_files: skipped.clone(),
+                    skipped_files: skipped.entries.clone(),
+                skipped_total: skipped.total,
                     skipped_log_path: skipped_log_path.clone(),
                 });
                 return DestinationResult {
@@ -1179,7 +1362,8 @@ fn run_destination(
                     log_path: Some(dest_log_file),
                     files: total_files, dirs: total_dirs, bytes: total_bytes, extras: total_extras,
                     aborted_file: None,
-                    skipped,
+                    skipped: skipped.entries,
+                skipped_total: skipped.total,
                     skipped_log_path,
                 };
             }
@@ -1191,7 +1375,9 @@ fn run_destination(
         let stdout = child.stdout.take().expect("stdout was piped");
         let mut reader = BufReader::new(stdout);
 
-        let mut folder_output = String::new();
+        // Streams robocopy's output to the log as it arrives and keeps only a
+        // bounded tail in memory for the summary parse — see FolderLog.
+        let mut folder_log = FolderLog::open(&dest_log_file, source, &dest_path);
         let mut files_this_folder: u64 = 0;
         let mut dirs_this_folder:  u64 = 0;
         // Size of the file robocopy is CURRENTLY copying. Its line appears
@@ -1287,8 +1473,7 @@ fn run_destination(
             // Normal line — take first non-empty CR segment as canonical content.
             let line = cr_segments.first().copied().unwrap_or(raw_line.trim()).to_string();
 
-            folder_output.push_str(&line);
-            folder_output.push('\n');
+            folder_log.line(&line);
 
             let trimmed = line.trim();
 
@@ -1318,14 +1503,12 @@ fn run_destination(
                 // fast path uses) to record each skipped file exactly once.
                 if !current_file_failed && !last_current_file.is_empty() {
                     current_file_failed = true;
-                    if !skipped.iter().any(|s| s.source == last_current_file) {
-                        let skip_dest = partial_dest_of(&last_current_file, source, &dest_path)
-                            .map(|p| p.to_string_lossy().to_string())
-                            .unwrap_or_else(|| dest_path.clone());
-                        skipped.push(SkippedFileEntry {
-                            source: last_current_file.clone(),
-                            destination: skip_dest.clone(),
-                        });
+                    let skip_dest = partial_dest_of(&last_current_file, source, &dest_path)
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|| dest_path.clone());
+                    // record() dedups; only a genuinely new skip writes a log
+                    // line, so the log gains no duplicates either.
+                    if skipped.record(&last_current_file, &skip_dest) {
                         let _ = fs::OpenOptions::new()
                             .create(true)
                             .append(true)
@@ -1384,36 +1567,55 @@ fn run_destination(
             }
         }
         } else {
-            // ── FAST MODE: drain robocopy's entire output in one bulk read,
-            // with NO per-line work while it runs. read_to_end just memcpys
-            // bytes out of the pipe as fast as the CPU can, which robocopy can
-            // never out-produce, so it never blocks — it runs at full speed,
-            // exactly like piping to NUL. We still keep the bytes (cheap) so
-            // the folder summary can be parsed afterward for accurate totals.
+            // ── FAST MODE: drain robocopy's output with NO progress parsing
+            // and no IPC emits while it runs, so robocopy never blocks waiting
+            // on us and runs at full speed — the whole point of this mode.
+            //
+            // Reads line-at-a-time rather than the previous single
+            // read_to_end(): that call buffered every byte of output in memory
+            // at once, and the from_utf8_lossy().into_owned() after it
+            // allocated a second full copy. read_until() on an already-buffered
+            // BufReader is a scan for '\n' inside memory the reader has
+            // fetched anyway, so this is still far faster than robocopy can
+            // produce output — while peak memory becomes one line instead of
+            // the entire run's stdout.
+            //
+            // The work per line is deliberately minimal: append to the log
+            // writer, and advance the skipped-file state machine. Neither
+            // touches the IPC channel, which is what actually made details
+            // mode slow.
+            //
             // On cancel, cancel_backup kills the child; the pipe then closes
             // and this read returns EOF, landing us in the cancel check below.
-            let mut raw_all: Vec<u8> = Vec::new();
-            let _ = reader.read_to_end(&mut raw_all);
-            folder_output = String::from_utf8_lossy(&raw_all).into_owned();
-
-            // Skipped-file detection, done AFTER robocopy finished (post-hoc
-            // parsing can't throttle a process that's already exited). Same
-            // signal as the live path: an ERROR line refers to the file named
-            // on the most recent file line. Deduplicated by source path so a
-            // /R:1 retry that errors twice is only recorded once.
+            //
+            // Skipped-file detection uses the same signal as the live path: an
+            // ERROR line refers to the file named on the most recent file
+            // line. Deduplicated by source path so a /R:1 retry that errors
+            // twice is only recorded once.
             let mut prev_file: Option<String> = None;
-            for out_line in folder_output.lines() {
+            let mut raw_buf: Vec<u8> = Vec::with_capacity(512);
+            loop {
+                raw_buf.clear();
+                match reader.read_until(b'\n', &mut raw_buf) {
+                    Ok(0) => break,  // EOF — robocopy closed stdout
+                    Ok(_) => {}
+                    Err(_) => break, // stream error — stop, don't spin
+                }
+                // Lossy decode for the same reason as the live path: robocopy
+                // writes console-codepage bytes, and strict UTF-8 would drop
+                // every line naming a non-ASCII file.
+                let out_line = String::from_utf8_lossy(&raw_buf)
+                    .trim_end_matches(['\r', '\n'])
+                    .to_string();
+                folder_log.line(&out_line);
+
                 let t = out_line.trim();
                 if is_robocopy_error_line(t) {
                     if let Some(f) = prev_file.take() {
-                        if !skipped.iter().any(|s| s.source == f) {
-                            let skip_dest = partial_dest_of(&f, source, &dest_path)
-                                .map(|p| p.to_string_lossy().to_string())
-                                .unwrap_or_else(|| dest_path.clone());
-                            skipped.push(SkippedFileEntry {
-                                source: f.clone(),
-                                destination: skip_dest.clone(),
-                            });
+                        let skip_dest = partial_dest_of(&f, source, &dest_path)
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_else(|| dest_path.clone());
+                        if skipped.record(&f, &skip_dest) {
                             let _ = fs::OpenOptions::new()
                                 .create(true)
                                 .append(true)
@@ -1451,17 +1653,11 @@ fn run_destination(
             let _ = child.wait();
             ACTIVE_ROBOCOPY_PIDS.lock().unwrap().retain(|&p| p != child_pid);
 
-            // Log what this folder managed before the stop.
-            let _ = fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&dest_log_file)
-                .and_then(|mut f| {
-                    let header = format!("\n========== {} → {} ==========\n", source, dest_path);
-                    f.write_all(header.as_bytes())?;
-                    f.write_all(folder_output.as_bytes())?;
-                    f.write_all(b"\n[Backup cancelled by user during this folder.]\n")
-                });
+            // Everything this folder produced has already been streamed to the
+            // log; just close it out with the reason it stopped and flush, so
+            // the partial buffer isn't lost.
+            folder_log.raw("\n[Backup cancelled by user during this folder.]\n");
+            folder_log.flush();
 
             let mut cleanup_note = String::new();
             if !last_current_file.is_empty() {
@@ -1499,7 +1695,8 @@ fn run_destination(
                 bytes_copied: total_bytes, extras_deleted: total_extras,
                 elapsed_secs: dest_run_start.elapsed().as_secs_f64(),
                 aborted_file: aborted_file.clone(),
-                skipped_files: skipped.clone(),
+                skipped_files: skipped.entries.clone(),
+                skipped_total: skipped.total,
                 skipped_log_path: skipped_log_path.clone(),
             });
             return DestinationResult {
@@ -1508,7 +1705,8 @@ fn run_destination(
                 log_path: Some(dest_log_file),
                 files: total_files, dirs: total_dirs, bytes: total_bytes, extras: total_extras,
                 aborted_file,
-                skipped,
+                skipped: skipped.entries,
+                skipped_total: skipped.total,
                 skipped_log_path,
             };
         }
@@ -1530,20 +1728,15 @@ fn run_destination(
 
         let elapsed = folder_start.elapsed().as_secs_f64();
 
-        // Append captured output to this destination's own log file.
-        let _ = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&dest_log_file)
-            .and_then(|mut f| {
-                let header = format!("\n========== {} → {} ==========\n", source, dest_path);
-                f.write_all(header.as_bytes())?;
-                f.write_all(folder_output.as_bytes())
-            });
+        // Output was streamed to the log as it arrived; just flush the tail of
+        // the buffer now that this folder pair is done.
+        folder_log.flush();
 
-        // Parse the summary from the captured output for accurate totals.
+        // Parse the summary from the retained tail. Robocopy prints its
+        // Files:/Dirs:/Bytes: block last, so the bounded tail always contains
+        // it — no need to have kept the whole run's output around for this.
         let (files_parsed, dirs_parsed, bytes_parsed, extras_parsed) =
-            parse_robocopy_summary(&folder_output);
+            parse_robocopy_summary(&folder_log.tail_text());
         // Use parsed values for the totals (more accurate than our live count).
         // Fall back to our live count if parsing returned zeros. Extras have
         // no live counterpart to fall back to (the real-time loop doesn't
@@ -1604,7 +1797,8 @@ fn run_destination(
                 bytes_copied: total_bytes, extras_deleted: total_extras,
                 elapsed_secs: dest_run_start.elapsed().as_secs_f64(),
                 aborted_file: None,
-                skipped_files: skipped.clone(),
+                skipped_files: skipped.entries.clone(),
+                skipped_total: skipped.total,
                 skipped_log_path: skipped_log_path.clone(),
             });
             return DestinationResult {
@@ -1613,7 +1807,8 @@ fn run_destination(
                 log_path: Some(dest_log_file),
                 files: total_files, dirs: total_dirs, bytes: total_bytes, extras: total_extras,
                 aborted_file: None,
-                skipped,
+                skipped: skipped.entries,
+                skipped_total: skipped.total,
                 skipped_log_path,
             };
         }
@@ -1638,7 +1833,7 @@ fn run_destination(
     } else {
         format!(
             "{} → {} complete, but {} file{} couldn't be copied (locked or access error) — see Skipped Files.",
-            sources.len(), destination, skipped.len(), if skipped.len() == 1 { "" } else { "s" }
+            sources.len(), destination, skipped.total, if skipped.total == 1 { "" } else { "s" }
         )
     };
     let _ = app.emit("backup-destination-done", BackupDestinationDoneEvent {
@@ -1652,7 +1847,8 @@ fn run_destination(
         bytes_copied: total_bytes, extras_deleted: total_extras,
         elapsed_secs: dest_run_start.elapsed().as_secs_f64(),
         aborted_file: None,
-        skipped_files: skipped.clone(),
+        skipped_files: skipped.entries.clone(),
+        skipped_total: skipped.total,
         skipped_log_path: skipped_log_path.clone(),
     });
     DestinationResult {
@@ -1661,7 +1857,8 @@ fn run_destination(
         log_path: Some(dest_log_file),
         files: total_files, dirs: total_dirs, bytes: total_bytes, extras: total_extras,
         aborted_file: None,
-        skipped,
+        skipped_total: skipped.total,
+        skipped: skipped.entries,
         skipped_log_path,
     }
 }
