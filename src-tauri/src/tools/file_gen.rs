@@ -106,6 +106,12 @@ fn validate_name_part(part: &str, field: &str) -> Result<(), String> {
             if (bad as u32) < 0x20 { '\u{FFFD}' } else { bad }
         ));
     }
+    // Deliberately NOT checked here: whether this part is a reserved Windows
+    // device name. A prefix/suffix is never the whole filename stem — the
+    // sequence identifier is always appended — so rejecting "con" here would
+    // refuse a perfectly valid prefix that generates con001.txt. The composed
+    // filename is what has to be legal, and that is checked at the point it is
+    // built (see the generation loop).
     Ok(())
 }
 
@@ -178,6 +184,15 @@ fn build_content(mode: &NamingMode, ext: &str, number: u32, total: u32) -> Strin
    TAURI COMMAND
 ============================================================================= */
 
+/// Ceiling on rows per run. The per-row count cap alone doesn't bound the
+/// batch — nothing stops a caller sending a thousand rows of 10,000 — and the
+/// frontend imposes no row limit of its own, so this is the only gate.
+const MAX_ENTRIES: usize = 100;
+/// Ceiling on total files per run, checked after summing every row. Bounds the
+/// batch even when both the row count and each row's count are individually
+/// legal (100 x 10,000 would otherwise be a million files).
+const MAX_TOTAL_FILES: u64 = 100_000;
+
 #[tauri::command]
 pub fn dfg_generate_files(
     entries: Vec<BatchEntry>,
@@ -186,6 +201,22 @@ pub fn dfg_generate_files(
 ) -> Result<GenerateResult, String> {
     if entries.is_empty() {
         return Err("No entries provided.".into());
+    }
+    if entries.len() > MAX_ENTRIES {
+        return Err(format!(
+            "Too many rows: {} (maximum is {MAX_ENTRIES} per run).",
+            entries.len()
+        ));
+    }
+
+    // u64 so the sum can't overflow before the cap is checked — 100 rows of
+    // u32::MAX would wrap a u32 accumulator and slip past the comparison.
+    let requested_total: u64 = entries.iter().map(|e| e.count as u64).sum();
+    if requested_total > MAX_TOTAL_FILES {
+        return Err(format!(
+            "This batch would create {requested_total} files; the maximum is \
+             {MAX_TOTAL_FILES} per run. Split it across several runs."
+        ));
     }
 
     for (i, entry) in entries.iter().enumerate() {
@@ -261,6 +292,19 @@ pub fn dfg_generate_files(
         for i in 1..=entry.count {
             let id        = build_identifier(&entry.naming_mode, i, entry.count);
             let file_name = format!("{}{}{}{}", prefix, id, suffix, ext);
+
+            // The composed stem is what Windows actually resolves, so this is
+            // the only place the device-name check is meaningful. Contrived
+            // but reachable: prefix "co" + alpha identifier "n" composes to
+            // "con.txt", which would write to the console device and silently
+            // produce no file.
+            if crate::is_reserved_device_name(&file_name) {
+                return Err(format!(
+                    "This combination generates '{file_name}', which is a reserved Windows \
+                     device name. Adjust the prefix, suffix, or naming mode."
+                ));
+            }
+
             let file_path = target_dir.join(&file_name);
 
             if write_text {

@@ -119,6 +119,12 @@ fn validate_output_name(name: &str) -> Result<(), String> {
             if (bad as u32) < 0x20 { '\u{FFFD}' } else { bad }
         ));
     }
+    if crate::is_reserved_device_name(trimmed) {
+        return Err(format!(
+            "'{trimmed}' is a reserved Windows device name — saving to it would write to the \
+             device instead of creating a file. Pick another name."
+        ));
+    }
     Ok(())
 }
 
@@ -191,98 +197,239 @@ fn parse_hex_color(hex: &str) -> [u8; 4] {
     [r, g, b, 255]
 }
 
-/// Core compositing: takes loaded images and all options, returns a DynamicImage.
-/// Images are NOT rotated to match orientation; mismatched sizes are padded with
-/// canvas_rgba so they align correctly (centred on the cross-axis).
-fn composite_images(
-    images: &[DynamicImage],
+/* =============================================================================
+   BOUNDED DECODING
+============================================================================= */
+
+/// Widest/tallest source this app will decode. Well beyond any real camera or
+/// scanner output, but low enough that a malformed or hostile header claiming
+/// absurd dimensions is rejected before any buffer is reserved for it.
+const MAX_SOURCE_DIMENSION: u32 = 65_535;
+
+/// Ceiling on what a single decode may allocate. The crate's own default is
+/// 512 MiB; this raises it enough for genuinely large photography (a 24-bit
+/// 20000x12000 TIFF decodes to ~960 MB as RGBA) while still refusing the
+/// unbounded case. Resize runs up to 8 workers, so the real worst case is this
+/// figure times the pool size — deliberately kept below what would page a
+/// typical 16 GB machine into swap.
+const MAX_DECODE_ALLOC: u64 = 1_536 * 1024 * 1024;
+
+/// Decodes an image file with explicit resource limits.
+///
+/// Every decode in this module goes through here rather than calling
+/// image::open() directly. image::open() applies Limits::default(), which sets
+/// no dimension bounds at all and caps allocation at 512 MiB — a cap the crate
+/// documents as non-strict and which some decoders ignore. Declaring the
+/// limits explicitly makes the ceiling a property of this app rather than of
+/// whatever the crate's defaults happen to be after the next upgrade, and
+/// turns an oversized or corrupt file into a clear error rather than an
+/// allocation the process may not survive.
+///
+/// Format detection is deliberately left as image::open() had it — derived
+/// from the file extension, NOT sniffed from the content. Adding
+/// with_guessed_format() here would quietly widen what the resize and compress
+/// tools accept, and would disagree with image_dimensions() (which is
+/// extension-based too) that the combine planner relies on. Limits are the
+/// only behaviour this wrapper changes.
+fn open_image_limited(path: &(impl AsRef<Path> + ?Sized)) -> Result<DynamicImage, String> {
+    let p = path.as_ref();
+    let mut reader = image::ImageReader::open(p)
+        .map_err(|e| format!("Cannot open {}: {e}", p.display()))?;
+
+    // Built by mutating the default rather than with a struct literal:
+    // image::Limits is #[non_exhaustive], so a literal won't compile, and this
+    // form also inherits sensible values for any field added in a future
+    // release instead of failing to set it.
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_SOURCE_DIMENSION);
+    limits.max_image_height = Some(MAX_SOURCE_DIMENSION);
+    limits.max_alloc = Some(MAX_DECODE_ALLOC);
+    reader.limits(limits);
+
+    reader
+        .decode()
+        .map_err(|e| format!("Cannot decode {}: {e}", p.display()))
+}
+
+/// Upper bound on the composited canvas, in pixels. At 4 bytes per RGBA pixel
+/// this caps the single largest allocation the combine path can make at ~1.6 GB
+/// — big enough for any realistic photo montage, small enough that an absurd
+/// selection fails with a clear message instead of an allocation abort.
+const MAX_CANVAS_PIXELS: u64 = 400_000_000;
+
+/// Ordered source paths plus the header-read dimensions of each, so the canvas
+/// can be sized without holding a single decoded pixel.
+#[derive(Debug)]
+struct CombinePlan {
+    paths: Vec<String>,
+    dims: Vec<(u32, u32)>,
+    canvas_w: u32,
+    canvas_h: u32,
+}
+
+/// Reads every source's dimensions from its header, applies the ordering for
+/// "above"/"left", and computes the final canvas size (border included).
+///
+/// Header-only: image_dimensions() parses just enough of each file to learn its
+/// size, so planning a 40-image combine costs no more memory than planning a
+/// 2-image one. This is what lets composite_streaming() below hold exactly one
+/// decoded source at a time.
+fn plan_combine(
+    paths: &[String],
+    direction: &str,
+    gap_px: u32,
+    border_px: u32,
+) -> Result<CombinePlan, String> {
+    let mut paths: Vec<String> = paths.to_vec();
+    if direction == "above" || direction == "left" {
+        paths.reverse();
+    }
+
+    let mut dims: Vec<(u32, u32)> = Vec::with_capacity(paths.len());
+    for p in &paths {
+        let d = image::image_dimensions(p).map_err(|e| format!("Cannot read {p}: {e}"))?;
+        dims.push(d);
+    }
+
+    let gap_count = (dims.len() as u32).saturating_sub(1);
+    // u64 throughout: a few very large sources can overflow u32 on the summed
+    // axis, and a wrapped total would size the canvas far too small and
+    // silently crop the result rather than erroring.
+    let (inner_w, inner_h): (u64, u64) = match direction {
+        "below" | "above" => (
+            dims.iter().map(|d| d.0 as u64).max().unwrap_or(0),
+            dims.iter().map(|d| d.1 as u64).sum::<u64>() + gap_count as u64 * gap_px as u64,
+        ),
+        _ /* "left" | "right" */ => (
+            dims.iter().map(|d| d.0 as u64).sum::<u64>() + gap_count as u64 * gap_px as u64,
+            dims.iter().map(|d| d.1 as u64).max().unwrap_or(0),
+        ),
+    };
+
+    let full_w = inner_w + border_px as u64 * 2;
+    let full_h = inner_h + border_px as u64 * 2;
+
+    if full_w == 0 || full_h == 0 {
+        return Err("Combined image would be empty.".to_string());
+    }
+    if full_w > u32::MAX as u64 || full_h > u32::MAX as u64 || full_w * full_h > MAX_CANVAS_PIXELS {
+        return Err(format!(
+            "Combined image would be {full_w}x{full_h}, which is too large to build. \
+             Combine fewer images at a time, or resize them first."
+        ));
+    }
+
+    Ok(CombinePlan {
+        paths,
+        dims,
+        canvas_w: full_w as u32,
+        canvas_h: full_h as u32,
+    })
+}
+
+/// Composites the planned sources onto one canvas, decoding each image only
+/// when it is about to be drawn and dropping it immediately afterwards.
+///
+/// Peak memory is the canvas plus a single source, rather than the canvas plus
+/// every source at once — the previous version decoded all of them up front
+/// into a Vec<DynamicImage> and then made a second full copy of each via
+/// to_rgba8() during the overlay, so a 20-image montage of 24 MP photos held
+/// well over a gigabyte before compositing even began.
+///
+/// The border is handled by insetting the draw offsets into a canvas that was
+/// allocated at full size from the start, pre-filled with the border colour.
+/// The old code composited at inner size and then copied the whole thing into
+/// a second, larger canvas — briefly holding two full-size images to add what
+/// is just a coloured margin.
+///
+/// Images are NOT rotated to match orientation; mismatched sizes are padded
+/// with canvas_rgba so they align correctly (centred on the cross-axis).
+fn composite_streaming(
+    plan: &CombinePlan,
     direction: &str,
     gap_px: u32,
     canvas_rgba: [u8; 4],
     border_px: u32,
     border_rgba: [u8; 4],
-) -> DynamicImage {
-    let n = images.len() as u32;
-    let gap_count = n.saturating_sub(1);
+) -> Result<DynamicImage, String> {
+    // One allocation for the whole output. Without a border the composited
+    // region IS the whole canvas, so it can be filled with the canvas colour
+    // outright; with one, fill with the border colour and repaint the inner
+    // rect below.
+    let mut canvas = image::RgbaImage::from_pixel(
+        plan.canvas_w,
+        plan.canvas_h,
+        image::Rgba(if border_px > 0 { border_rgba } else { canvas_rgba }),
+    );
 
-    // ── Compose images onto canvas ──────────────────────────────────────────
-    let composited = match direction {
-        "below" | "above" => {
-            let canvas_w: u32 = images.iter().map(|i| i.width()).max().unwrap_or(0);
-            let imgs_h: u32   = images.iter().map(|i| i.height()).sum();
-            let canvas_h: u32 = imgs_h + gap_count * gap_px;
-
-            // Pre-fill canvas with canvas color (used for padding + gap bands)
-            let mut canvas = image::RgbaImage::from_pixel(
-                canvas_w, canvas_h, image::Rgba(canvas_rgba),
-            );
-
-            let mut y_offset = 0u32;
-            for (idx, img) in images.iter().enumerate() {
-                let rgba = img.to_rgba8();
-                // Horizontally centre narrower images
-                let x_off = (canvas_w.saturating_sub(img.width())) / 2;
-                image::imageops::overlay(&mut canvas, &rgba, x_off as i64, y_offset as i64);
-                y_offset += img.height();
-                // Gap band (canvas color already there; skip explicit fill)
-                if idx + 1 < images.len() {
-                    y_offset += gap_px;
-                }
+    // Repaint the composited region, row by row into the existing buffer —
+    // no second full-size image is allocated to do it.
+    //
+    // Skipped when the canvas colour is transparent, which preserves the old
+    // two-pass build's result exactly: that version composited onto a
+    // transparent inner canvas and then overlaid the whole thing onto the
+    // border canvas, and overlaying fully transparent pixels is a no-op, so
+    // the border colour showed through there as well.
+    if border_px > 0 && canvas_rgba[3] != 0 {
+        let stride = plan.canvas_w as usize;
+        let buf = canvas.as_mut();
+        for y in border_px..(plan.canvas_h - border_px) {
+            let row = y as usize * stride;
+            let from = (row + border_px as usize) * 4;
+            let to = (row + (plan.canvas_w - border_px) as usize) * 4;
+            for px in buf[from..to].chunks_exact_mut(4) {
+                px.copy_from_slice(&canvas_rgba);
             }
-
-            DynamicImage::ImageRgba8(canvas)
         }
-        _ /* "left" | "right" */ => {
-            let imgs_w: u32   = images.iter().map(|i| i.width()).sum();
-            let canvas_h: u32 = images.iter().map(|i| i.height()).max().unwrap_or(0);
-            let canvas_w: u32 = imgs_w + gap_count * gap_px;
-
-            let mut canvas = image::RgbaImage::from_pixel(
-                canvas_w, canvas_h, image::Rgba(canvas_rgba),
-            );
-
-            let mut x_offset = 0u32;
-            for (idx, img) in images.iter().enumerate() {
-                let rgba = img.to_rgba8();
-                // Vertically centre shorter images
-                let y_off = (canvas_h.saturating_sub(img.height())) / 2;
-                image::imageops::overlay(&mut canvas, &rgba, x_offset as i64, y_off as i64);
-                x_offset += img.width();
-                if idx + 1 < images.len() {
-                    x_offset += gap_px;
-                }
-            }
-
-            DynamicImage::ImageRgba8(canvas)
-        }
-    };
-
-    // ── Apply border (uniform padding around the composited image) ──────────
-    if border_px > 0 {
-        let (cw, ch) = composited.dimensions();
-        let full_w = cw + border_px * 2;
-        let full_h = ch + border_px * 2;
-        let mut canvas = image::RgbaImage::from_pixel(full_w, full_h, image::Rgba(border_rgba));
-        let inner = composited.to_rgba8();
-        image::imageops::overlay(&mut canvas, &inner, border_px as i64, border_px as i64);
-        DynamicImage::ImageRgba8(canvas)
-    } else {
-        composited
-    }
-}
-
-/// Load images from paths and reverse order for "above"/"left" directions.
-fn load_and_order(paths: &[String], direction: &str) -> Result<Vec<DynamicImage>, String> {
-    let mut images: Vec<DynamicImage> = paths
-        .iter()
-        .map(|p| image::open(p).map_err(|e| format!("Cannot open {p}: {e}")))
-        .collect::<Result<_, _>>()?;
-
-    if direction == "above" || direction == "left" {
-        images.reverse();
     }
 
-    Ok(images)
+    let vertical = direction == "below" || direction == "above";
+    let inner_w = plan.canvas_w - border_px * 2;
+    let inner_h = plan.canvas_h - border_px * 2;
+    let mut offset: u32 = 0;
+
+    // zip rather than index: paths and dims are built together in
+    // plan_combine, and pairing them here means they cannot drift apart.
+    let total = plan.paths.len();
+    for (idx, (path, &(w, h))) in plan.paths.iter().zip(plan.dims.iter()).enumerate() {
+        // Decoded here, dropped at the end of this iteration.
+        let img = open_image_limited(path.as_str())?;
+
+        // The canvas was sized from image_dimensions(); this is the decode of
+        // the same file. Both go through the same decoder's dimensions(), and
+        // decode() sizes its buffer from that, so these agree by construction
+        // for every supported format (including GIF/WebP, whose decoders
+        // expand a smaller frame to the logical screen size). A mismatch means
+        // the file changed on disk between the two reads, or is truncated.
+        // Bail rather than draw a misaligned composite that reads as a
+        // rendering bug.
+        if img.width() != w || img.height() != h {
+            return Err(format!(
+                "{path} changed size while being read ({}x{} vs {w}x{h} in its header). \
+                 The file may be corrupt or still being written.",
+                img.width(),
+                img.height()
+            ));
+        }
+
+        let rgba = img.to_rgba8();
+        drop(img);
+
+        let (x_off, y_off) = if vertical {
+            (border_px + (inner_w.saturating_sub(w)) / 2, border_px + offset)
+        } else {
+            (border_px + offset, border_px + (inner_h.saturating_sub(h)) / 2)
+        };
+        image::imageops::overlay(&mut canvas, &rgba, x_off as i64, y_off as i64);
+        drop(rgba);
+
+        offset += if vertical { h } else { w };
+        if idx + 1 < total {
+            offset += gap_px;
+        }
+    }
+
+    Ok(DynamicImage::ImageRgba8(canvas))
 }
 
 // =============================================================================
@@ -319,8 +466,9 @@ pub async fn preview_combine(
         let canvas_rgba  = parse_hex_color(canvas_color.as_deref().unwrap_or("#ffffff"));
         let border_rgba  = parse_hex_color(border_color.as_deref().unwrap_or("#000000"));
 
-        let images = load_and_order(&paths, &direction)?;
-        let combined = composite_images(&images, &direction, gap_px, canvas_rgba, border_px, border_rgba);
+        let plan = plan_combine(&paths, &direction, gap_px, border_px)?;
+        let combined =
+            composite_streaming(&plan, &direction, gap_px, canvas_rgba, border_px, border_rgba)?;
 
         // Scale down for preview (max 1200px on the long edge)
         let (w, h) = combined.dimensions();
@@ -395,8 +543,9 @@ pub async fn combine_images(
         let canvas_rgba  = parse_hex_color(canvas_color.as_deref().unwrap_or("#ffffff"));
         let border_rgba  = parse_hex_color(border_color.as_deref().unwrap_or("#000000"));
 
-        let images  = load_and_order(&paths, &direction)?;
-        let combined = composite_images(&images, &direction, gap_px, canvas_rgba, border_px, border_rgba);
+        let plan = plan_combine(&paths, &direction, gap_px, border_px)?;
+        let combined =
+            composite_streaming(&plan, &direction, gap_px, canvas_rgba, border_px, border_rgba)?;
 
         // ── Determine output format ──────────────────────────────────────────
         let use_png  = output_format.as_deref() == Some("png");
@@ -451,7 +600,7 @@ pub async fn compress_image(
 
         let clean_path = path.replace('/', "\\");
         let p = Path::new(&clean_path);
-        let img = image::open(p).map_err(|e| format!("Cannot open image: {e}"))?;
+        let img = open_image_limited(p)?;
 
         let (orig_w, orig_h) = img.dimensions();
         let scale = percentage as f32 / 100.0;
@@ -901,7 +1050,7 @@ fn resize_images_thread(
                         .unwrap_or("?")
                         .to_string();
 
-                    let img = match image::open(src_path) {
+                    let img = match open_image_limited(src_path) {
                         Ok(i)  => i,
                         Err(_) => {
                             let done = processed.fetch_add(1, Ordering::SeqCst) + 1;
@@ -1029,4 +1178,132 @@ fn resize_images_thread(
         output_folder: out_dir.to_string_lossy().to_string(),
         count: final_count,
     });
+}
+
+/* =============================================================================
+   TESTS — combine geometry
+   -----------------------------------------------------------------------------
+   Covers the streaming compositor's layout maths: canvas sizing, cross-axis
+   centring of mismatched sources, gap placement, direction reversal, and
+   border insetting. These are the parts that were previously implicit in
+   "decode everything, then measure it" and are now computed up front from
+   headers, so they are worth pinning down.
+============================================================================= */
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RED: [u8; 4] = [255, 0, 0, 255];
+    const BLUE: [u8; 4] = [0, 0, 255, 255];
+    const WHITE: [u8; 4] = [255, 255, 255, 255];
+    const BLACK: [u8; 4] = [0, 0, 0, 255];
+
+    /// Writes a solid-colour PNG into a fresh temp dir and returns its path.
+    fn solid(dir: &Path, name: &str, w: u32, h: u32, rgba: [u8; 4]) -> String {
+        let img = image::RgbaImage::from_pixel(w, h, image::Rgba(rgba));
+        let p = dir.join(name);
+        img.save_with_format(&p, ImageFormat::Png).unwrap();
+        p.to_string_lossy().to_string()
+    }
+
+    fn scratch(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("srbk_combine_test_{tag}"));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    fn px(img: &DynamicImage, x: u32, y: u32) -> [u8; 4] {
+        img.to_rgba8().get_pixel(x, y).0
+    }
+
+    #[test]
+    fn stacks_vertically_centring_narrower_sources_and_honouring_the_gap() {
+        let d = scratch("vertical");
+        let a = solid(&d, "a.png", 10, 20, RED);
+        let b = solid(&d, "b.png", 30, 5, BLUE);
+
+        let plan = plan_combine(&[a, b], "below", 4, 0).unwrap();
+        assert_eq!((plan.canvas_w, plan.canvas_h), (30, 29)); // max(10,30) x (20+5+4)
+
+        let out = composite_streaming(&plan, "below", 4, WHITE, 0, BLACK).unwrap();
+        assert_eq!(out.dimensions(), (30, 29));
+
+        assert_eq!(px(&out, 10, 0), RED, "first image starts at centred x offset");
+        assert_eq!(px(&out, 0, 0), WHITE, "cross-axis padding uses the canvas colour");
+        assert_eq!(px(&out, 0, 21), WHITE, "gap band uses the canvas colour");
+        assert_eq!(px(&out, 0, 24), BLUE, "second image starts after the gap");
+    }
+
+    #[test]
+    fn stacks_horizontally_centring_shorter_sources() {
+        let d = scratch("horizontal");
+        let a = solid(&d, "a.png", 10, 20, RED);
+        let b = solid(&d, "b.png", 6, 10, BLUE);
+
+        let plan = plan_combine(&[a, b], "right", 2, 0).unwrap();
+        assert_eq!((plan.canvas_w, plan.canvas_h), (18, 20)); // (10+6+2) x max(20,10)
+
+        let out = composite_streaming(&plan, "right", 2, WHITE, 0, BLACK).unwrap();
+        assert_eq!(px(&out, 0, 0), RED);
+        assert_eq!(px(&out, 10, 0), WHITE, "gap band");
+        assert_eq!(px(&out, 12, 5), BLUE, "second image centred vertically: (20-10)/2 = 5");
+        assert_eq!(px(&out, 12, 4), WHITE, "just above the centred second image");
+    }
+
+    #[test]
+    fn above_and_left_reverse_the_source_order() {
+        let d = scratch("reverse");
+        let a = solid(&d, "a.png", 8, 8, RED);
+        let b = solid(&d, "b.png", 8, 8, BLUE);
+
+        let plan = plan_combine(&[a, b], "above", 0, 0).unwrap();
+        let out = composite_streaming(&plan, "above", 0, WHITE, 0, BLACK).unwrap();
+
+        assert_eq!(px(&out, 0, 0), BLUE, "'above' puts the second image on top");
+        assert_eq!(px(&out, 0, 8), RED);
+    }
+
+    #[test]
+    fn border_expands_the_canvas_and_insets_the_composite() {
+        let d = scratch("border");
+        let a = solid(&d, "a.png", 8, 8, RED);
+        let b = solid(&d, "b.png", 8, 8, BLUE);
+
+        let plan = plan_combine(&[a, b], "below", 0, 3).unwrap();
+        assert_eq!((plan.canvas_w, plan.canvas_h), (14, 22)); // 8+6 x 16+6
+
+        let out = composite_streaming(&plan, "below", 0, WHITE, 3, BLACK).unwrap();
+        assert_eq!(px(&out, 0, 0), BLACK, "corner is border colour");
+        assert_eq!(px(&out, 13, 21), BLACK, "opposite corner too");
+        assert_eq!(px(&out, 3, 3), RED, "composite starts inside the border");
+        assert_eq!(px(&out, 3, 11), BLUE);
+    }
+
+    #[test]
+    fn border_region_uses_the_canvas_colour_where_sources_do_not_reach() {
+        let d = scratch("borderpad");
+        // Narrower than the widest source, so there is cross-axis padding
+        // INSIDE the border — the region repainted by the row-fill path.
+        let a = solid(&d, "a.png", 4, 6, RED);
+        let b = solid(&d, "b.png", 10, 6, BLUE);
+
+        let plan = plan_combine(&[a, b], "below", 0, 2).unwrap();
+        let out = composite_streaming(&plan, "below", 0, WHITE, 2, BLACK).unwrap();
+
+        assert_eq!(px(&out, 0, 0), BLACK, "border");
+        assert_eq!(px(&out, 2, 2), WHITE, "padding beside the narrow first image");
+        assert_eq!(px(&out, 5, 2), RED, "narrow image centred: 2 + (10-4)/2 = 5");
+        assert_eq!(px(&out, 2, 8), BLUE, "full-width second image fills to the border");
+    }
+
+    #[test]
+    fn rejects_a_canvas_beyond_the_pixel_cap() {
+        let d = scratch("toobig");
+        let a = solid(&d, "a.png", 4, 4, RED);
+        // A gap alone is enough to push the canvas past MAX_CANVAS_PIXELS
+        // without needing an actually-enormous file on disk.
+        let err = plan_combine(&[a.clone(), a], "below", u32::MAX / 2, 0).unwrap_err();
+        assert!(err.contains("too large to build"), "unexpected error: {err}");
+    }
 }

@@ -1025,6 +1025,16 @@
   border-bottom: none;
 }
 
+/* Truncation notice appended when the run had more skips than the backend
+   retains. Single child in a 3-column grid row, so it has to span all of
+   them or it would be squeezed into the first column's width. */
+.ab-skipped-file-more {
+  display: block;
+  font-style: italic;
+  opacity: 0.75;
+  white-space: normal;
+}
+
 .ab-skipped-file-source,
 .ab-skipped-file-dest {
   overflow: hidden;

@@ -2211,6 +2211,7 @@
           <button class="theme-picker-tab" data-theme-tab="cycle">Cycle</button>
           <button class="theme-picker-tab" data-theme-tab="random">Random</button>
           <button class="theme-picker-tab" data-theme-tab="custom">Custom</button>
+          <button class="theme-picker-tab" data-theme-tab="preferences">Preferences</button>
         </div>
         <div id="themePickerGrid" class="theme-picker-grid"></div>
 
@@ -2302,7 +2303,7 @@
             <div class="settings-row">
               <span class="theme-picker-label-with-info">
                 Holiday Overrides:
-                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="When today's date matches a Holiday theme (Christmas, Halloween, etc.), Cycle force-switches to it, overriding whatever it would otherwise be showing, until the date passes. The two settings below only apply while this is on, which is why they're hidden until you enable it.">ℹ</button>
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="When today's date matches a Holiday theme (Christmas, Halloween, etc.), Cycle force-switches to it, overriding whatever it would otherwise be showing, until the date passes. Independent of the setting below — combine both if you want a Holiday theme to appear ONLY by being force-switched to.">ℹ</button>
               </span>
               <div class="toggle-with-label">
                 <span id="cycleHolidayOverrideLabel">Off</span>
@@ -2312,15 +2313,15 @@
                 </label>
               </div>
             </div>
-            <div id="cycleHolidayExclusiveRow" class="settings-row" style="display:none;">
+            <div class="settings-row">
               <span class="theme-picker-label-with-info">
-                Only on Actual Holidays:
-                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Removes Holiday themes from the normal cycle rotation — they'll only ever show up via Holiday Overrides, on their actual date.">ℹ</button>
+                Restrict to Holiday Season:
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Keeps Holiday themes out of the normal cycle rotation except during their own window (their exact date, or their full season if that's on below) — independent of Holiday Overrides above, so this works whether or not that's on.">ℹ</button>
               </span>
               <div class="toggle-with-label">
-                <span id="cycleHolidayExclusiveLabel">Off</span>
+                <span id="cycleHolidaySeasonOnlyLabel">Off</span>
                 <label class="toggle-switch">
-                  <input type="checkbox" id="cycleHolidayExclusiveToggle" />
+                  <input type="checkbox" id="cycleHolidaySeasonOnlyToggle" />
                   <span class="toggle-slider"></span>
                 </label>
               </div>
@@ -2328,7 +2329,7 @@
             <div id="cycleHolidayFullSeasonRow" class="settings-row" style="display:none;">
               <span class="theme-picker-label-with-info">
                 Full Holiday Season:
-                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Widens each Holiday theme's active date range to its traditional season (e.g. all of October for Halloween) instead of just its exact date.">ℹ</button>
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Widens each Holiday theme's active date range to its traditional season (e.g. all of October for Halloween) instead of just its exact date — affects both settings above, wherever either is on.">ℹ</button>
               </span>
               <div class="toggle-with-label">
                 <span id="cycleHolidayFullSeasonLabel">Off</span>
@@ -2338,10 +2339,38 @@
                 </label>
               </div>
             </div>
+            <p id="cycleHolidayActiveNote" class="theme-picker-holiday-note" style="display:none;"></p>
             <div class="random-roll-actions">
               <button id="cycleNowBtn" title="Advance to the next theme in the cycle now">Cycle Now</button>
             </div>
             <p class="theme-picker-random-hint">Select the Cycle tile to enable these settings.</p>
+          </div>
+        </div>
+
+        <!-- Preferences tab: cross-theme settings that aren't a theme choice.
+             Unlike Random/Cycle these apply no matter which theme is active,
+             so there's no tile and no "inactive until selected" treatment.
+             The per-theme list is built by renderThemeAnimationRows() from
+             ANIMATED_THEMES (theme-core.ts) rather than written out here, so
+             the two can't drift apart. -->
+        <div id="themePickerPreferencesPane" class="theme-picker-preferences-pane" style="display:none;">
+          <div class="theme-picker-section-divider">Theme Preferences</div>
+          <div class="settings-row">
+            <span>Theme Animations:</span>
+            <div class="toggle-with-label">
+              <span id="themeAnimationsLabel">Enabled</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="themeAnimationsToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Hidden wholesale while the master switch is off — with nothing
+               running, per-theme opt-outs would be controls with no effect. -->
+          <div id="themeAnimationsPerTheme">
+            <div class="theme-picker-section-divider">Per-Theme Animations</div>
+            <div id="themeAnimationsList" class="theme-animations-list"></div>
           </div>
         </div>
       </div>
@@ -2524,10 +2553,21 @@
           </svg>
         </button>
       </div>
+      <!-- These carry .budget-summary-tab alongside .licensing-tab on purpose.
+           All 18 built-in themes (and any user-made Custom theme) style
+           .budget-summary-tab unscoped with their own hover/active colours;
+           .licensing-tab has no such theme coverage. Sharing the class is the
+           only way to get identical highlight behaviour under every theme —
+           including custom ones we can't edit — without restating the rule in
+           each theme file. It also brings flex:1 + centred text, so the tabs
+           fill and centre the strip the same way the Budget summary panel's
+           do. .licensing-tab still supplies the JS hooks and is kept as a
+           fallback; where the two collide, budget.css wins (it's later in the
+           bundle than docs.css). -->
       <div class="licensing-tabs">
-        <button class="licensing-tab active" data-tab="license">Licensing</button>
-        <button class="licensing-tab" data-tab="attribution">Attributions</button>
-        <button class="licensing-tab" data-tab="thirdparty">Third-Party</button>
+        <button class="licensing-tab budget-summary-tab active" data-tab="license">Licensing</button>
+        <button class="licensing-tab budget-summary-tab" data-tab="attribution">Attributions</button>
+        <button class="licensing-tab budget-summary-tab" data-tab="thirdparty">Third-Party</button>
       </div>
       <div id="licensingBody" class="modal-body changelog-body">
         <p class="changelog-loading">Loading...</p>
@@ -2815,8 +2855,9 @@
         </button>
       </div>
       <div class="modal-body" style="text-align:left;">
-        <p>Import entries from a CSV file. The first row must be a header row with these columns: <strong>Date</strong>, <strong>Start Time</strong>, <strong>End Time</strong>, <strong>Activity</strong>, and optionally <strong>End Date</strong>, <strong>Project</strong>, and <strong>Notes</strong>.</p>
-        <p>Every row needs a Date, Start Time, End Time, and Activity — if any row is missing one, the whole import is cancelled and nothing is added. This can only add new entries; it can't edit existing ones.</p>
+        <p>Import entries from a CSV file. The first row must be a header row with these columns: <strong>Start Date</strong>, <strong>Start Time</strong>, <strong>End Time</strong>, <strong>Activity</strong>, and optionally <strong>End Date</strong>, <strong>Project</strong>, and <strong>Notes</strong>.</p>
+        <p>Every row needs a Start Date, Start Time, End Time, and Activity — if any row is missing one, the whole import is cancelled and nothing is added. This can only add new entries; it can't edit existing ones.</p>
+        <p>Dates can be in any common format (e.g. <strong>2024-03-05</strong>, <strong>3/5/2024</strong>, or <strong>March 5, 2024</strong>) as long as they're unambiguous — numeric dates follow the Date Format setting's month/day order.</p>
         <p id="ttCsvImportLastRow" class="tt-csv-import-last">Never imported</p>
 
         <button id="ttCsvImportTemplateBtn" class="settings-action-btn">Download Template</button>
@@ -2981,6 +3022,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
+      <div id="ttActivityEditContext" class="tt-notes-edit-context"></div>
       <div class="modal-body setup-body" style="text-align:left;">
         <div class="setup-form">
           <div class="setup-field">
@@ -3045,6 +3087,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
       </div>
+      <div id="ttProjectEditContext" class="tt-notes-edit-context"></div>
       <div class="modal-body setup-body" style="text-align:left;">
         <div class="setup-form">
           <div class="setup-field">
@@ -3079,6 +3122,24 @@
         <div class="exit-modal-actions">
           <button id="ttSetupDeleteConfirmBtn" class="danger-btn">Delete</button>
           <button id="ttSetupDeleteCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       TIME TRACKER — SETUP MERGE CONFIRM (shared by Activities and Projects)
+  ====================================================================== -->
+  <div id="ttMergeConfirmBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span id="ttMergeConfirmTitle">Merge?</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="ttMergeConfirmMessage">This name is already in use.</p>
+        <div class="exit-modal-actions">
+          <button id="ttMergeConfirmBtn" class="danger-btn">Merge</button>
+          <button id="ttMergeConfirmCancelBtn" class="modal-cancel-btn">Cancel</button>
         </div>
       </div>
     </div>

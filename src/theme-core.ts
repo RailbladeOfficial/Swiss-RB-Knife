@@ -184,6 +184,7 @@ let seasonalAnimationId: number | null = null;
 let seasonalResizeHandler: (() => void) | null = null;
 let seasonalMouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 let seasonalMouseDownHandler: ((e: MouseEvent) => void) | null = null;
+let seasonalClickHandler: ((e: MouseEvent) => void) | null = null;
 let seasonalActiveTheme: string | null = null;
 
 let snowflakes: Snowflake[] = [];
@@ -197,6 +198,13 @@ const SNOW_WANDER_DAMPING = 0.86; // per-frame decay applied to wanderVel so gus
 
 let lightningStrikes: LightningStrike[] = [];
 let lightningTimeoutId: number | null = null;
+/** Pending double-strike timers. Unlike lightningTimeoutId (the scheduler,
+ *  of which exactly one is ever in flight), several of these can overlap —
+ *  each strike independently rolls for a quick restrike. They're collected
+ *  so stopSeasonalEffect() can cancel every one; an untracked timer that
+ *  fires after teardown would push onto the cleared lightningStrikes array
+ *  with no animation loop left to drain it. */
+let lightningRestrikeTimeouts: number[] = [];
 const LIGHTNING_DARKEN_STRENGTH = 0.4; // how far the screen dims at peak flash brightness, so bolts pop by contrast
 
 let leaves: Leaf[] = [];
@@ -355,6 +363,8 @@ function stopSeasonalEffect(): void {
     window.clearTimeout(lightningTimeoutId);
     lightningTimeoutId = null;
   }
+  for (const id of lightningRestrikeTimeouts) window.clearTimeout(id);
+  lightningRestrikeTimeouts = [];
   if (leafTimeoutId !== null) {
     window.clearTimeout(leafTimeoutId);
     leafTimeoutId = null;
@@ -375,6 +385,10 @@ function stopSeasonalEffect(): void {
     window.removeEventListener("mousedown", seasonalMouseDownHandler);
     seasonalMouseDownHandler = null;
   }
+  if (seasonalClickHandler) {
+    document.removeEventListener("click", seasonalClickHandler);
+    seasonalClickHandler = null;
+  }
   if (seasonalCanvas) {
     seasonalCanvas.remove();
     seasonalCanvas = null;
@@ -394,10 +408,43 @@ function stopSeasonalEffect(): void {
   seasonalActiveTheme = null;
 }
 
+/** Every theme that has a canvas effect, with a short description of what it
+ *  actually does. Single source of truth: applySeasonalEffect() dispatches on
+ *  these ids, and the Theme Picker's Preferences tab builds its per-theme
+ *  toggle list straight from this array — so adding an effect below is all it
+ *  takes for it to appear (and be switchable) in the UI. Ordered to match the
+ *  Holiday tab's own order, with the one Special-tab effect (Halo) last. */
+export const ANIMATED_THEMES: { id: string; label: string; effect: string }[] = [
+  { id: "valentine", label: "Valentine", effect: "Floating hearts" },
+  { id: "mardi-gras", label: "Mardi Gras", effect: "Falling bead strands" },
+  { id: "rainbow", label: "Rainbow", effect: "Cursor sparkle trail" },
+  { id: "patriot", label: "Patriot", effect: "Fireworks" },
+  { id: "halloween", label: "Halloween", effect: "Lightning strikes" },
+  { id: "thanksgiving", label: "Thanksgiving", effect: "Blowing leaves" },
+  { id: "christmas", label: "Christmas", effect: "Falling snow" },
+  { id: "halo", label: "Halo", effect: "Cursor glow swirl" },
+];
+
+/** Whether the given theme's canvas effect is allowed to run: the master
+ *  "Theme Animations" switch, then that theme's own opt-out. Themes with no
+ *  effect at all return true here and simply match nothing in the dispatch
+ *  below — this answers "is it permitted", not "does it have one". */
+export function isThemeAnimationEnabled(themeId: string): boolean {
+  if (!settings.themeAnimations) return false;
+  return !settings.themeAnimationsOff.includes(themeId);
+}
+
 /** Starts (or leaves running) the canvas effect matching the given theme
  *  name, tearing down whatever was running before. No-ops if the requested
- *  effect is already active. Called on startup and on every "themechange". */
+ *  effect is already active. Called on startup, on every "themechange", and
+ *  whenever an animation toggle changes (which re-dispatches "themechange"). */
 function applySeasonalEffect(themeName: string): void {
+  // Checked before the already-active early-return below, so turning an
+  // animation off tears down a running effect instead of leaving it up.
+  if (!isThemeAnimationEnabled(themeName)) {
+    stopSeasonalEffect();
+    return;
+  }
   if (seasonalActiveTheme === themeName) return;
   stopSeasonalEffect();
   if (themeName === "christmas") {
@@ -667,7 +714,11 @@ function startHalloweenLightning(): void {
 
     // Occasional quick double-strike, like real lightning restriking the same area.
     if (Math.random() < 0.22) {
-      window.setTimeout(spawnStrike, 60 + Math.random() * 90);
+      const id = window.setTimeout(() => {
+        lightningRestrikeTimeouts = lightningRestrikeTimeouts.filter((t) => t !== id);
+        spawnStrike();
+      }, 60 + Math.random() * 90);
+      lightningRestrikeTimeouts.push(id);
     }
   }
 
@@ -761,7 +812,13 @@ function startHalloweenLightning(): void {
 
   seasonalResizeHandler = () => resizeSeasonalCanvas();
   window.addEventListener("resize", seasonalResizeHandler);
-  document.addEventListener("click", () => spawnStrike());
+  // Tracked in a module-level handle like every other seasonal listener, so
+  // stopSeasonalEffect() can drop it. Left untracked, each switch back to
+  // Halloween stacked another permanent listener, and clicks made AFTER
+  // leaving the theme still pushed onto lightningStrikes — an array the
+  // cancelled animation loop no longer drains.
+  seasonalClickHandler = () => spawnStrike();
+  document.addEventListener("click", seasonalClickHandler);
 }
 
 /** Thanksgiving leaves. Unlike the continuous Christmas snow, this is a

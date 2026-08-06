@@ -1,21 +1,26 @@
 [
   {
     "version": "0.5.0",
-    "date": "2026-08-01",
+    "date": "2026-08-06",
     "changes": {
       "features": {
         "App Overall": [
           "Added ability in General Settings to Customize the Sidebar.",
           "Clicking 'Customize' launches the Edit Sidebar modal, which allows you to reorder and hide tools from the sidebar and home dashboard you don't want to see.",
-
+          "Added new Cycle Theme ability, so that you can experience all the standard (and optionally custom) themes naturally over time or as you interact with the app, if you don't have one that's not-so-secretly your favorite.",
+          "Added ability to disable animations for specific / all themes with animations.",
+          "New Theme Added - Halo.",
+          "New Theme Added - Valentine.",
+          "New Theme Added - Thanksgiving."
         ],
         "Time Tracker": [
           "Added full CSV entry import. Dates must be entered in YYYY-MM-DD format.",
           "Added a Notes box to capture more information about a particular activity.",
           "Added tabs to the Setup modal for Projects, Activities, and Preferences.",
-          "Added Projects, which can be used to help better organize / categorize Activities",
-          "Projects and Activities are now saved in the Setup modal, and can be edited, which changes the name for all entries using that Project / Activity",
-          "If you manually type a new Project / Activity name into its field, it'll automatically be saved as a known Project / Activity in the Setup modal",
+          "Added Projects, which can be used to help better organize / categorize Activities.",
+          "Projects and Activities are now saved in the Setup modal, and can be edited, which changes the name for all entries using that Project / Activity.",
+          "Editing a Project / Activity Name to one already in use allows you to merge projects / activities.",
+          "If you manually type a new Project / Activity name into its field, it'll automatically be saved as a known Project / Activity in the Setup modal.",
           "Previously used / 'known' Projects / Activities show under their fields as you type, allowing quick selection for repeat events.",
           "Added an End Date field to the Input panel, allowing for multi-day events.",
           "Added Support for timestamps being captured to the exact second.",
@@ -36,7 +41,9 @@
           "Refactored all TS and CSS files to better organize and componentize them, where possible.",
           "Ensured that styles that were being shared across tools are now coming from the shell files.",
           "Changed Theme Select from a dropdown select to its own modal, with previews of the themes.",
-          "Changed Sound Pack Select from a dropdown select to its own modal, with previes of the sound packs."
+          "Changed Sound Pack Select from a dropdown select to its own modal, with previes of the sound packs.",
+          "Updated the Mardi Gras and Rainbow themes to have unique animations.",
+          "Redesigned the Patriot theme and gave it unique animations."
         ],
         "Budget Tracker": [
           "Added totals to the Ledger subheaders for all three Ledger views."

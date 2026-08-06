@@ -13,262 +13,27 @@ All credit and gratitude to their respective authors and maintainers.
 | Package | Version | License |
 |---------|---------|---------|
 | [@esbuild/win32-x64](https://github.com/evanw/esbuild) | 0.25.12 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [@rollup/rollup-win32-x64-gnu](https://github.com/rollup/rollup) | 4.62.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [@rollup/rollup-win32-x64-msvc](https://github.com/rollup/rollup) | 4.62.2 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@rollup/rollup-win32-x64-gnu](https://github.com/rollup/rollup) | 4.62.4 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@rollup/rollup-win32-x64-msvc](https://github.com/rollup/rollup) | 4.62.4 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [@tauri-apps/api](https://github.com/tauri-apps/tauri) | 2.11.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [@tauri-apps/cli](https://github.com/tauri-apps/tauri) | 2.11.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [@tauri-apps/cli-win32-x64-msvc](https://github.com/tauri-apps/tauri) | 2.11.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [@tauri-apps/plugin-dialog](https://github.com/tauri-apps/plugins-workspace) | 2.7.1 | [MIT OR Apache-2.0](https://spdx.org/licenses/MIT.html) |
+| [@tauri-apps/plugin-dialog](https://github.com/tauri-apps/plugins-workspace) | 2.7.2 | [MIT OR Apache-2.0](https://spdx.org/licenses/MIT.html) |
 | [@tauri-apps/plugin-opener](https://github.com/tauri-apps/plugins-workspace) | 2.5.4 | [MIT OR Apache-2.0](https://spdx.org/licenses/MIT.html) |
 | [@types/estree](https://github.com/DefinitelyTyped/DefinitelyTyped) | 1.0.9 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped) | 25.9.5 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [abab](https://github.com/jsdom/abab) | 1.0.4 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [acorn](https://github.com/ternjs/acorn) | 2.7.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [acorn-globals](https://github.com/ForbesLindesay/acorn-globals) | 1.0.9 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [ajv](https://github.com/ajv-validator/ajv) | 6.15.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [ansi-regex](https://github.com/chalk/ansi-regex) | 2.1.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [array-equal](https://github.com/sindresorhus/array-equal) | 1.0.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [asn1](https://github.com/joyent/node-asn1) | 0.2.6 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [assert-plus](https://github.com/mcavage/node-assert-plus) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [asynckit](https://github.com/alexindigo/asynckit) | 0.4.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [aws-sign2](https://github.com/mikeal/aws-sign) | 0.7.0 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [aws4](https://github.com/mhart/aws4) | 1.13.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [bcrypt-pbkdf](https://github.com/joyent/node-bcrypt-pbkdf) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [bossy](https://github.com/hapijs/bossy) | 3.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [buffer-crc32](https://github.com/brianloveswords/buffer-crc32) | 0.2.13 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [buffer-from](https://github.com/LinusU/buffer-from) | 1.1.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [camelcase](https://github.com/sindresorhus/camelcase) | 3.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [caseless](https://github.com/mikeal/caseless) | 0.12.0 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [cliui](https://github.com/yargs/cliui) | 3.2.0 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [code-point-at](https://github.com/sindresorhus/code-point-at) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [combined-stream](https://github.com/felixge/node-combined-stream) | 1.0.8 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [commander](https://github.com/tj/commander.js) | 2.20.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [concat-stream](https://github.com/maxogden/concat-stream) | 1.6.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [core-util-is](https://github.com/isaacs/core-util-is) | 1.0.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [core-util-is](https://github.com/isaacs/core-util-is) | 1.0.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [cssom](https://github.com/NV/CSSOM) | 0.3.8 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [cssstyle](https://github.com/chad3814/CSSStyleDeclaration) | 0.2.37 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [d3](https://github.com/d3/d3) | 4.4.0 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3](https://github.com/d3/d3) | 4.7.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-array](https://github.com/d3/d3-array) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-array](https://github.com/d3/d3-array) | 1.1.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-axis](https://github.com/d3/d3-axis) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-axis](https://github.com/d3/d3-axis) | 1.0.6 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-brush](https://github.com/d3/d3-brush) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-brush](https://github.com/d3/d3-brush) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-chord](https://github.com/d3/d3-chord) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-chord](https://github.com/d3/d3-chord) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-collection](https://github.com/d3/d3-collection) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-collection](https://github.com/d3/d3-collection) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-color](https://github.com/d3/d3-color) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-color](https://github.com/d3/d3-color) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-dispatch](https://github.com/d3/d3-dispatch) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-dispatch](https://github.com/d3/d3-dispatch) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-drag](https://github.com/d3/d3-drag) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-drag](https://github.com/d3/d3-drag) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-dsv](https://github.com/d3/d3-dsv) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-dsv](https://github.com/d3/d3-dsv) | 1.0.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-ease](https://github.com/d3/d3-ease) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-ease](https://github.com/d3/d3-ease) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-force](https://github.com/d3/d3-force) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-force](https://github.com/d3/d3-force) | 1.0.6 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-format](https://github.com/d3/d3-format) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-format](https://github.com/d3/d3-format) | 1.1.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-geo](https://github.com/d3/d3-geo) | 1.4.0 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-geo](https://github.com/d3/d3-geo) | 1.6.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-hierarchy](https://github.com/d3/d3-hierarchy) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-hierarchy](https://github.com/d3/d3-hierarchy) | 1.1.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-interpolate](https://github.com/d3/d3-interpolate) | 1.1.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-interpolate](https://github.com/d3/d3-interpolate) | 1.1.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-node](https://github.com/bradoyler/d3-node) | 1.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [d3-path](https://github.com/d3/d3-path) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-path](https://github.com/d3/d3-path) | 1.0.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-polygon](https://github.com/d3/d3-polygon) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-polygon](https://github.com/d3/d3-polygon) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-quadtree](https://github.com/d3/d3-quadtree) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-quadtree](https://github.com/d3/d3-quadtree) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-queue](https://github.com/d3/d3-queue) | 3.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-queue](https://github.com/d3/d3-queue) | 3.0.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-random](https://github.com/d3/d3-random) | 1.0.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-random](https://github.com/d3/d3-random) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-request](https://github.com/d3/d3-request) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-request](https://github.com/d3/d3-request) | 1.0.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-scale](https://github.com/d3/d3-scale) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-scale](https://github.com/d3/d3-scale) | 1.0.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-selection](https://github.com/d3/d3-selection) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-selection](https://github.com/d3/d3-selection) | 1.0.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-shape](https://github.com/d3/d3-shape) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-shape](https://github.com/d3/d3-shape) | 1.0.6 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-time](https://github.com/d3/d3-time) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-time](https://github.com/d3/d3-time) | 1.0.6 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-time-format](https://github.com/d3/d3-time-format) | 2.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-time-format](https://github.com/d3/d3-time-format) | 2.0.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-timer](https://github.com/d3/d3-timer) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-timer](https://github.com/d3/d3-timer) | 1.0.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-transition](https://github.com/d3/d3-transition) | 1.0.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-transition](https://github.com/d3/d3-transition) | 1.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-voronoi](https://github.com/d3/d3-voronoi) | 1.1.0 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-voronoi](https://github.com/d3/d3-voronoi) | 1.1.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-zoom](https://github.com/d3/d3-zoom) | 1.1.0 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [d3-zoom](https://github.com/d3/d3-zoom) | 1.1.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [dashdash](https://github.com/trentm/node-dashdash) | 1.14.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [debug](https://github.com/visionmedia/debug) | 2.6.9 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [decamelize](https://github.com/sindresorhus/decamelize) | 1.2.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [deep-is](https://github.com/thlorenz/deep-is) | 0.1.4 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [delayed-stream](https://github.com/felixge/node-delayed-stream) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [ecc-jsbn](https://github.com/quartzjer/ecc-jsbn) | 0.1.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [error-ex](https://github.com/qix-/node-error-ex) | 1.3.4 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [es-errors](https://github.com/ljharb/es-errors) | 1.3.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [es6-promise](https://github.com/stefanpenner/es6-promise) | 4.2.8 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [esbuild](https://github.com/evanw/esbuild) | 0.25.12 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [escodegen](https://github.com/estools/escodegen) | 1.14.3 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [esprima](https://github.com/jquery/esprima) | 4.0.1 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [estraverse](https://github.com/estools/estraverse) | 4.3.0 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [esutils](https://github.com/estools/esutils) | 2.0.3 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [extend](https://github.com/justmoon/node-extend) | 3.0.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [extract-zip](https://github.com/maxogden/extract-zip) | 1.7.0 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [extsprintf](https://github.com/davepacheco/node-extsprintf) | 1.3.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [fast-deep-equal](https://github.com/epoberezkin/fast-deep-equal) | 3.1.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [fast-json-stable-stringify](https://github.com/epoberezkin/fast-json-stable-stringify) | 2.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [fast-levenshtein](https://github.com/hiddentao/fast-levenshtein) | 2.0.6 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [fd-slicer](https://github.com/andrewrk/node-fd-slicer) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [fdir](https://github.com/thecodrr/fdir) | 6.5.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [file-url](https://github.com/sindresorhus/file-url) | 2.0.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [find-up](https://github.com/sindresorhus/find-up) | 1.1.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [forever-agent](https://github.com/mikeal/forever-agent) | 0.6.1 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [form-data](https://github.com/form-data/form-data) | 2.3.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [fs-extra](https://github.com/jprichardson/node-fs-extra) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [function-bind](https://github.com/Raynos/function-bind) | 1.1.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [get-caller-file](https://github.com/stefanpenner/get-caller-file) | 1.0.3 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [getpass](https://github.com/arekinath/node-getpass) | 0.1.7 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [graceful-fs](https://github.com/isaacs/node-graceful-fs) | 4.2.11 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [har-schema](https://github.com/ahmadnassri/har-schema) | 2.0.0 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [har-validator](https://github.com/ahmadnassri/node-har-validator) | 5.1.5 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [hasha](https://github.com/sindresorhus/hasha) | 2.2.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [hasown](https://github.com/inspect-js/hasOwn) | 2.0.4 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [hoek](https://github.com/hapijs/hoek) | 4.3.1 | [Custom: https://github.com/lodash/lodash](https://spdx.org/licenses/Custom:%20https://github.com/lodash/lodash.html) |
-| [hosted-git-info](https://github.com/npm/hosted-git-info) | 2.8.9 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [http-signature](https://github.com/joyent/node-http-signature) | 1.2.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | 0.4.24 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [inherits](https://github.com/isaacs/inherits) | 2.0.4 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [invert-kv](https://github.com/sindresorhus/invert-kv) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [is-arrayish](https://github.com/qix-/node-is-arrayish) | 0.2.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [is-core-module](https://github.com/inspect-js/is-core-module) | 2.16.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [is-fullwidth-code-point](https://github.com/sindresorhus/is-fullwidth-code-point) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [is-stream](https://github.com/sindresorhus/is-stream) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [is-typedarray](https://github.com/hughsk/is-typedarray) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [is-utf8](https://github.com/wayfind/is-utf8) | 0.2.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [isarray](https://github.com/juliangruber/isarray) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [isemail](https://github.com/hapijs/isemail) | 2.2.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [isexe](https://github.com/isaacs/isexe) | 2.0.0 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [isstream](https://github.com/rvagg/isstream) | 0.1.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [items](https://github.com/hapijs/items) | 2.2.1 | [Custom: https://hapi.dev](https://spdx.org/licenses/Custom:%20https://hapi.dev.html) |
-| [joi](https://github.com/hapijs/joi) | 10.6.0 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [jsbn](https://github.com/andyperlitch/jsbn) | 0.1.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [jsdom](https://github.com/tmpvar/jsdom) | 9.4.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [json-schema](https://github.com/kriszyp/json-schema) | 0.4.0 | [(AFL-2.1 OR BSD-3-Clause)](https://spdx.org/licenses/AFL-2.1.html) |
-| [json-schema-traverse](https://github.com/epoberezkin/json-schema-traverse) | 0.4.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [json-stringify-safe](https://github.com/isaacs/json-stringify-safe) | 5.0.1 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [jsonfile](https://github.com/jprichardson/node-jsonfile) | 2.4.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [jsprim](https://github.com/joyent/node-jsprim) | 1.4.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [kew](https://github.com/Medium/kew) | 0.7.0 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [klaw](https://github.com/jprichardson/node-klaw) | 1.3.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [lcid](https://github.com/sindresorhus/lcid) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [levn](https://github.com/gkz/levn) | 0.3.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [load-json-file](https://github.com/sindresorhus/load-json-file) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [lts](https://github.com/nodejs/lts-schedule) | 2.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [mime-db](https://github.com/jshttp/mime-db) | 1.52.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [mime-types](https://github.com/jshttp/mime-types) | 2.1.35 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [minimist](https://github.com/minimistjs/minimist) | 1.2.8 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [mkdirp](https://github.com/substack/node-mkdirp) | 0.5.6 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [ms](https://github.com/zeit/ms) | 2.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [nanoid](https://github.com/ai/nanoid) | 3.3.16 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [normalize-package-data](https://github.com/npm/normalize-package-data) | 2.5.0 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [number-is-nan](https://github.com/sindresorhus/number-is-nan) | 1.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [nwmatcher](https://github.com/dperini/nwmatcher) | 1.4.4 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [oauth-sign](https://github.com/mikeal/oauth-sign) | 0.9.0 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [optionator](https://github.com/gkz/optionator) | 0.8.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [os-locale](https://github.com/sindresorhus/os-locale) | 1.4.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [parse-json](https://github.com/sindresorhus/parse-json) | 2.2.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [parse5](https://github.com/inikulin/parse5) | 1.5.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [path-exists](https://github.com/sindresorhus/path-exists) | 2.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [path-parse](https://github.com/jbgutierrez/path-parse) | 1.0.7 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [path-type](https://github.com/sindresorhus/path-type) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [pend](https://github.com/andrewrk/node-pend) | 1.2.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [performance-now](https://github.com/braveg1rl/performance-now) | 2.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [phantomjs-prebuilt](https://github.com/Medium/phantomjs) | 2.1.16 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
+| [nanoid](https://github.com/ai/nanoid) | 3.3.17 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [picocolors](https://github.com/alexeyraspopov/picocolors) | 1.1.1 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [picomatch](https://github.com/micromatch/picomatch) | 4.0.5 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [pify](https://github.com/sindresorhus/pify) | 2.3.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [pinkie](https://github.com/floatdrop/pinkie) | 2.0.4 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [pinkie-promise](https://github.com/floatdrop/pinkie-promise) | 2.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [pn](https://github.com/cscott/node-pn) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [postcss](https://github.com/postcss/postcss) | 8.5.19 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [prelude-ls](https://github.com/gkz/prelude-ls) | 1.1.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [process-nextick-args](https://github.com/calvinmetcalf/process-nextick-args) | 2.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [progress](https://github.com/visionmedia/node-progress) | 1.1.8 | [MIT*](https://spdx.org/licenses/MIT*.html) |
-| [psl](https://github.com/lupomontero/psl) | 1.15.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [punycode](https://github.com/mathiasbynens/punycode.js) | 2.3.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [qs](https://github.com/ljharb/qs) | 6.5.5 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [read-pkg](https://github.com/sindresorhus/read-pkg) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [read-pkg-up](https://github.com/sindresorhus/read-pkg-up) | 1.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [readable-stream](https://github.com/nodejs/readable-stream) | 2.3.8 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [request](https://github.com/request/request) | 2.88.2 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [request-progress](https://github.com/IndigoUnited/node-request-progress) | 2.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [require-directory](https://github.com/troygoode/node-require-directory) | 2.1.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [require-main-filename](https://github.com/yargs/require-main-filename) | 1.0.1 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [resolve](https://github.com/browserify/resolve) | 1.22.12 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [rollup](https://github.com/rollup/rollup) | 4.62.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [rw](https://github.com/mbostock/rw) | 1.3.3 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [safe-buffer](https://github.com/feross/safe-buffer) | 5.1.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [safe-buffer](https://github.com/feross/safe-buffer) | 5.2.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [safer-buffer](https://github.com/ChALkeR/safer-buffer) | 2.1.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [sax](https://github.com/isaacs/sax-js) | 1.6.0 | [BlueOak-1.0.0](https://spdx.org/licenses/BlueOak-1.0.0.html) |
-| [semver](https://github.com/npm/node-semver) | 5.7.2 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [set-blocking](https://github.com/yargs/set-blocking) | 2.0.0 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [source-map](https://github.com/mozilla/source-map) | 0.6.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
+| [postcss](https://github.com/postcss/postcss) | 8.5.26 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [rollup](https://github.com/rollup/rollup) | 4.62.4 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [source-map-js](https://github.com/7rulnik/source-map-js) | 1.2.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [spdx-correct](https://github.com/jslicense/spdx-correct.js) | 3.2.0 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [spdx-exceptions](https://github.com/kemitchell/spdx-exceptions.json) | 2.5.0 | [CC-BY-3.0](https://spdx.org/licenses/CC-BY-3.0.html) |
-| [spdx-expression-parse](https://github.com/jslicense/spdx-expression-parse.js) | 3.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [spdx-license-ids](https://github.com/jslicense/spdx-license-ids) | 3.0.23 | [CC0-1.0](https://spdx.org/licenses/CC0-1.0.html) |
-| [sshpk](https://github.com/joyent/node-sshpk) | 1.18.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [string_decoder](https://github.com/nodejs/string_decoder) | 1.1.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [string-width](https://github.com/sindresorhus/string-width) | 1.0.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [strip-ansi](https://github.com/chalk/strip-ansi) | 3.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [strip-bom](https://github.com/sindresorhus/strip-bom) | 2.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [supports-preserve-symlinks-flag](https://github.com/inspect-js/node-supports-preserve-symlinks-flag) | 1.0.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [svg2png](https://github.com/domenic/svg2png) | 4.1.1 | [WTFPL](https://spdx.org/licenses/WTFPL.html) |
-| [symbol-tree](https://github.com/jsdom/js-symbol-tree) | 3.2.4 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [throttleit](https://github.com/sindresorhus/throttleit) | 1.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [tinyglobby](https://github.com/SuperchupuDev/tinyglobby) | 0.2.17 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [topo](https://github.com/hapijs/topo) | 2.1.1 | [Custom: https://travis-ci.org/hapijs/topo.svg](https://spdx.org/licenses/Custom:%20https://travis-ci.org/hapijs/topo.svg.html) |
-| [tough-cookie](https://github.com/salesforce/tough-cookie) | 2.5.0 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [tr46](https://github.com/Sebmaster/tr46.js) | 0.0.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [tunnel-agent](https://github.com/mikeal/tunnel-agent) | 0.6.0 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [tweetnacl](https://github.com/dchest/tweetnacl-js) | 0.14.5 | [Unlicense](https://spdx.org/licenses/Unlicense.html) |
-| [type-check](https://github.com/gkz/type-check) | 0.3.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [typedarray](https://github.com/substack/typedarray) | 0.0.6 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [typescript](https://github.com/microsoft/TypeScript) | 5.6.3 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [undici-types](https://github.com/nodejs/undici) | 7.24.6 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [uri-js](https://github.com/garycourt/uri-js) | 4.4.1 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [util-deprecate](https://github.com/TooTallNate/util-deprecate) | 1.0.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [uuid](https://github.com/uuidjs/uuid) | 3.4.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [validate-npm-package-license](https://github.com/kemitchell/validate-npm-package-license.js) | 3.0.4 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [verror](https://github.com/davepacheco/node-verror) | 1.10.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [vite](https://github.com/vitejs/vite) | 6.4.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [webidl-conversions](https://github.com/jsdom/webidl-conversions) | 3.0.1 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
-| [whatwg-url](https://github.com/jsdom/whatwg-url) | 3.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [which](https://github.com/isaacs/node-which) | 1.3.1 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [which-module](https://github.com/nexdrew/which-module) | 1.0.0 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [word-wrap](https://github.com/jonschlinkert/word-wrap) | 1.2.5 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [wrap-ansi](https://github.com/chalk/wrap-ansi) | 2.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [xml-name-validator](https://github.com/jsdom/xml-name-validator) | 2.0.1 | [WTFPL](https://spdx.org/licenses/WTFPL.html) |
-| [xmlhttprequest](https://github.com/driverdan/node-XMLHttpRequest) | 1.8.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [y18n](https://github.com/yargs/y18n) | 3.2.2 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [yargs](https://github.com/yargs/yargs) | 6.6.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [yargs-parser](https://github.com/yargs/yargs-parser) | 4.2.1 | [ISC](https://spdx.org/licenses/ISC.html) |
-| [yauzl](https://github.com/thejoshwolfe/yauzl) | 2.10.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 
 ---
 
@@ -280,12 +45,12 @@ All credit and gratitude to their respective authors and maintainers.
 | [aead](https://github.com/RustCrypto/traits) | 0.5.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [aes](https://github.com/RustCrypto/block-ciphers) | 0.8.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [aes-gcm](https://github.com/RustCrypto/AEADs) | 0.10.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [aho-corasick](https://github.com/BurntSushi/aho-corasick) | 1.1.4 | [MIT OR Unlicense](https://spdx.org/licenses/MIT.html) |
+| [aho-corasick](https://github.com/BurntSushi/aho-corasick) | 1.1.5 | [MIT OR Unlicense](https://spdx.org/licenses/MIT.html) |
 | [aligned](https://github.com/rust-embedded-community/aligned) | 0.4.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [aligned-vec](https://github.com/sarah-ek/aligned-vec/) | 0.6.4 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [alloc-no-stdlib](https://github.com/dropbox/rust-alloc-no-stdlib) | 2.0.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
 | [alloc-stdlib](https://github.com/dropbox/rust-alloc-no-stdlib) | 0.2.4 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
-| [android_system_properties](https://github.com/nical/android_system_properties) | 0.1.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [android_system_properties](https://github.com/nical/android_system_properties) | 0.1.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [anyhow](https://github.com/dtolnay/anyhow) | 1.0.104 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [arbitrary](https://github.com/rust-fuzz/arbitrary/) | 1.4.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [arg_enum_proc_macro](https://github.com/lu-zero/arg_enum_proc_macro) | 0.3.4 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -333,11 +98,11 @@ All credit and gratitude to their respective authors and maintainers.
 | [bytes](https://github.com/tokio-rs/bytes) | 1.12.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cairo-rs](https://github.com/gtk-rs/gtk-rs-core) | 0.18.5 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cairo-sys-rs](https://github.com/gtk-rs/gtk-rs-core) | 0.18.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [camino](https://github.com/camino-rs/camino) | 1.2.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [camino](https://github.com/camino-rs/camino) | 1.2.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cargo_metadata](https://github.com/oli-obk/cargo_metadata) | 0.19.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cargo_toml](https://gitlab.com/lib.rs/cargo_toml) | 0.22.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cargo-platform](https://github.com/rust-lang/cargo) | 0.1.9 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [cc](https://github.com/rust-lang/cc-rs) | 1.3.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [cc](https://github.com/rust-lang/cc-rs) | 1.4.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cesu8](https://github.com/emk/cesu8-rs) | 1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cfb](https://github.com/mdsteele/rust-cfb) | 0.7.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cfg-expr](https://github.com/EmbarkStudios/cfg-expr) | 0.15.8 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -378,7 +143,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [dirs-sys](https://github.com/dirs-dev/dirs-sys-rs) | 0.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [dirs-sys](https://github.com/dirs-dev/dirs-sys-rs) | 0.5.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [dispatch2](https://github.com/madsmtm/objc2) | 0.3.1 | [Apache-2.0 OR MIT OR Zlib](https://spdx.org/licenses/Apache-2.0.html) |
-| [displaydoc](https://github.com/yaahc/displaydoc) | 0.2.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [displaydoc](https://github.com/yaahc/displaydoc) | 0.2.7 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [dlopen2](https://github.com/OpenByteDev/dlopen2) | 0.8.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [dlopen2_derive](https://github.com/OpenByteDev/dlopen2) | 0.4.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [dom_query](https://github.com/niklak/dom_query) | 0.27.0 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -389,7 +154,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [dtor-proc-macro](https://github.com/mmastrac/rust-ctor) | 0.0.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [dunce](https://gitlab.com/kornelski/dunce) | 1.0.5 | [Apache-2.0 OR CC0-1.0 OR MIT-0](https://spdx.org/licenses/Apache-2.0.html) |
 | [dyn-clone](https://github.com/dtolnay/dyn-clone) | 1.0.20 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [either](https://github.com/rayon-rs/either) | 1.16.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [either](https://github.com/rayon-rs/either) | 1.17.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [embed_plist](https://github.com/nvzqz/embed-plist-rs) | 1.2.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [embed-resource](https://github.com/nabijaczleweli/rust-embed-resource) | 3.0.11 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [endi](https://github.com/zeenix/endi) | 1.1.1 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -400,7 +165,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [equivalent](https://github.com/indexmap-rs/equivalent) | 1.0.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [erased-serde](https://github.com/dtolnay/erased-serde) | 0.4.10 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [errno](https://github.com/lambda-fairy/rust-errno) | 0.3.14 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [event-listener](https://github.com/smol-rs/event-listener) | 5.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [event-listener](https://github.com/smol-rs/event-listener) | 5.4.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [event-listener-strategy](https://github.com/smol-rs/event-listener-strategy) | 0.5.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [exr](https://github.com/johannesvollmer/exrs) | 1.74.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
 | [fastrand](https://github.com/smol-rs/fastrand) | 2.5.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -455,7 +220,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [hermit-abi](https://github.com/hermit-os/hermit-rs) | 0.5.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [hex](https://github.com/KokaKiwi/rust-hex) | 0.4.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [html5ever](https://github.com/servo/html5ever) | 0.38.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [http](https://github.com/hyperium/http) | 1.4.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [http](https://github.com/hyperium/http) | 1.5.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [http-body](https://github.com/hyperium/http-body) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [http-body-util](https://github.com/hyperium/http-body) | 0.1.4 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [http-range](https://github.com/bancek/rust-http-range.git) | 0.1.5 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -483,7 +248,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [infer](https://github.com/bojand/infer) | 0.19.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [inout](https://github.com/RustCrypto/utils) | 0.1.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [interpolate_name](https://github.com/lu-zero/interpolate_name) | 0.2.4 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [ipnet](https://github.com/krisprice/ipnet) | 2.12.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [ipnet](https://github.com/krisprice/ipnet) | 2.12.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [is-docker](https://github.com/TheLarkInn/is-docker) | 0.2.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [is-wsl](https://github.com/TheLarkInn/is-wsl) | 0.4.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [itertools](https://github.com/rust-itertools/itertools) | 0.14.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -507,7 +272,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [libfuzzer-sys](https://github.com/rust-fuzz/libfuzzer) | 0.4.13 | [(Apache-2.0 OR MIT) AND NCSA](https://spdx.org/licenses/Apache-2.0.html) |
 | [libloading](https://github.com/nagisa/rust_libloading/) | 0.7.4 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [libm](https://github.com/rust-lang/compiler-builtins) | 0.2.16 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [libredox](https://gitlab.redox-os.org/redox-os/libredox.git) | 0.1.18 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [libredox](https://gitlab.redox-os.org/redox-os/libredox.git) | 0.1.19 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [linux-raw-sys](https://github.com/sunfishcode/linux-raw-sys) | 0.12.1 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [litemap](https://github.com/unicode-org/icu4x) | 0.8.2 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
 | [lock_api](https://github.com/Amanieu/parking_lot) | 0.4.14 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -556,7 +321,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [objc2-web-kit](https://github.com/madsmtm/objc2) | 0.3.2 | [Apache-2.0 OR MIT OR Zlib](https://spdx.org/licenses/Apache-2.0.html) |
 | [once_cell](https://github.com/matklad/once_cell) | 1.21.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [opaque-debug](https://github.com/RustCrypto/utils) | 0.3.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [open](https://github.com/Byron/open-rs) | 5.4.0 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [open](https://github.com/Byron/open-rs) | 5.4.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [option-ext](https://github.com/soc/option-ext.git) | 0.2.0 | [MPL-2.0](https://spdx.org/licenses/MPL-2.0.html) |
 | [ordered-stream](https://github.com/danieldg/ordered-stream) | 0.2.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [pango](https://github.com/gtk-rs/gtk-rs-core) | 0.18.3 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -619,7 +384,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [ref-cast](https://github.com/dtolnay/ref-cast) | 1.0.26 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [ref-cast-impl](https://github.com/dtolnay/ref-cast) | 1.0.26 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [regex](https://github.com/rust-lang/regex) | 1.13.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [regex-automata](https://github.com/rust-lang/regex) | 0.4.16 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [regex-automata](https://github.com/rust-lang/regex) | 0.4.18 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [regex-syntax](https://github.com/rust-lang/regex) | 0.8.11 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [reqwest](https://github.com/seanmonstar/reqwest) | 0.13.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rfd](https://github.com/PolyMeilex/rfd) | 0.16.0 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -628,14 +393,14 @@ All credit and gratitude to their respective authors and maintainers.
 | [rustc_version](https://github.com/djc/rustc-version-rs) | 0.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustc-hash](https://github.com/rust-lang/rustc-hash) | 2.1.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustix](https://github.com/bytecodealliance/rustix) | 1.1.4 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [rustls](https://github.com/rustls/rustls) | 0.23.42 | [Apache-2.0 OR ISC OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [rustls](https://github.com/rustls/rustls) | 0.23.43 | [Apache-2.0 OR ISC OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustls-pki-types](https://github.com/rustls/pki-types) | 1.15.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustls-webpki](https://github.com/rustls/webpki) | 0.103.13 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [rustversion](https://github.com/dtolnay/rustversion) | 1.0.23 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [same-file](https://github.com/BurntSushi/same-file) | 1.0.6 | [MIT OR Unlicense](https://spdx.org/licenses/MIT.html) |
 | [schemars](https://github.com/GREsau/schemars) | 0.8.22 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [schemars](https://github.com/GREsau/schemars) | 0.9.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [schemars](https://github.com/GREsau/schemars) | 1.2.1 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [schemars](https://github.com/GREsau/schemars) | 1.2.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [schemars_derive](https://github.com/GREsau/schemars) | 0.8.22 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [scopeguard](https://github.com/bluss/scopeguard) | 1.2.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [selectors](https://github.com/servo/stylo) | 0.36.1 | [MPL-2.0](https://spdx.org/licenses/MPL-2.0.html) |
@@ -680,7 +445,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [synstructure](https://github.com/mystor/synstructure) | 0.13.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [system-deps](https://github.com/gdesmott/system-deps) | 6.2.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tao](https://github.com/tauri-apps/tao) | 0.35.3 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [tao-macros](https://github.com/tauri-apps/tao) | 0.1.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [tao-macros](https://github.com/tauri-apps/tao) | 0.1.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [target-lexicon](https://github.com/bytecodealliance/target-lexicon) | 0.12.16 | [Apache-2.0 WITH LLVM-exception](https://spdx.org/licenses/Apache-2.0.html) |
 | [tauri](https://github.com/tauri-apps/tauri) | 2.11.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tauri-build](https://github.com/tauri-apps/tauri) | 2.6.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -701,7 +466,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [thiserror-impl](https://github.com/dtolnay/thiserror) | 1.0.69 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [thiserror-impl](https://github.com/dtolnay/thiserror) | 2.0.19 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tiff](https://github.com/image-rs/image-tiff) | 0.11.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [time](https://github.com/time-rs/time) | 0.3.54 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [time](https://github.com/time-rs/time) | 0.3.55 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [time-core](https://github.com/time-rs/time) | 0.1.9 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [time-macros](https://github.com/time-rs/time) | 0.2.32 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tinystr](https://github.com/unicode-org/icu4x) | 0.8.3 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
@@ -711,14 +476,14 @@ All credit and gratitude to their respective authors and maintainers.
 | [tokio-util](https://github.com/tokio-rs/tokio) | 0.7.19 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [toml](https://github.com/toml-rs/toml) | 0.8.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [toml](https://github.com/toml-rs/toml) | 0.9.12+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [toml](https://github.com/toml-rs/toml) | 1.1.3+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [toml](https://github.com/toml-rs/toml) | 1.1.4+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [toml_datetime](https://github.com/toml-rs/toml) | 0.6.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [toml_datetime](https://github.com/toml-rs/toml) | 0.7.5+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [toml_datetime](https://github.com/toml-rs/toml) | 1.1.1+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [toml_edit](https://github.com/toml-rs/toml) | 0.19.15 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [toml_edit](https://github.com/toml-rs/toml) | 0.20.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [toml_edit](https://github.com/toml-rs/toml) | 0.25.13+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [toml_parser](https://github.com/toml-rs/toml) | 1.1.2+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [toml_parser](https://github.com/toml-rs/toml) | 1.1.3+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [toml_writer](https://github.com/toml-rs/toml) | 1.1.2+spec-1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tower](https://github.com/tower-rs/tower) | 0.5.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [tower-http](https://github.com/tower-rs/tower-http) | 0.6.11 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -727,7 +492,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [tracing](https://github.com/tokio-rs/tracing) | 0.1.44 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [tracing-attributes](https://github.com/tokio-rs/tracing) | 0.1.31 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [tracing-core](https://github.com/tokio-rs/tracing) | 0.1.36 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [tray-icon](https://github.com/tauri-apps/tray-icon) | 0.24.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [tray-icon](https://github.com/tauri-apps/tray-icon) | 0.24.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [try-lock](https://github.com/seanmonstar/try-lock) | 0.2.5 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [typeid](https://github.com/dtolnay/typeid) | 1.0.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [typenum](https://github.com/paholg/typenum) | 1.20.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |

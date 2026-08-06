@@ -138,20 +138,49 @@ function getActiveHolidayThemeId(now: Date = new Date()): string | null {
   return null;
 }
 
+/** Same "is a Holiday Override live right now" check resolveActiveCycleThemeId()
+ *  uses to decide whether to force a holiday theme — exposed so shell.ts can
+ *  explain, in the Cycle pane, *why* the theme is pinned. Returns null
+ *  whenever the override wouldn't actually fire (setting off, or no Holiday
+ *  window active today), same as resolveActiveCycleThemeId's own check. */
+export function getActiveHolidayOverrideThemeId(): string | null {
+  return settings.cycleHolidayOverride ? getActiveHolidayThemeId() : null;
+}
+
+/** The last calendar day `themeId`'s currently-active window keeps it forced
+ *  on (inclusive) — Mardi Gras/Thanksgiving via their own movable-date math,
+ *  everything else via whichever of the two HOLIDAY_WINDOWS_* tables actually
+ *  produced the active match, so this always agrees with isHolidayActive().
+ *  Only meaningful to call while getActiveHolidayOverrideThemeId() returns
+ *  this same themeId. */
+export function getHolidayOverrideEndDate(themeId: string, now: Date = new Date()): Date | null {
+  if (themeId === "mardi-gras") return computeMardiGras(now.getFullYear());
+  if (themeId === "thanksgiving") return computeThanksgiving(now.getFullYear());
+  const windows = settings.cycleHolidayFullSeason ? HOLIDAY_WINDOWS_WIDE : HOLIDAY_WINDOWS_TIGHT;
+  const win = windows[themeId];
+  return win ? new Date(now.getFullYear(), win.endMonth - 1, win.endDay) : null;
+}
+
 /* -----------------------------------------------------------------------------
    Cycle pool + pointer advancement
 ----------------------------------------------------------------------------- */
 
 /** The ordered set of theme ids Cycle rotates through: every built-in
- *  Main/Holiday/Special theme (Holiday themes excluded when Holiday Override
- *  + "Holiday-Only Themes" are both on), plus saved Custom themes if opted in. */
+ *  Main/Holiday/Special theme, plus saved Custom themes if opted in. With
+ *  "Restrict to Holiday Season" on, a Holiday theme is only pool-eligible
+ *  during its own window (tight day or full season, per cycleHolidayFullSeason)
+ *  — independent of Holiday Override, which is a separate force-switch check
+ *  resolveActiveCycleThemeId() makes outside of pool membership entirely. */
 function buildCyclePool(): string[] {
   const holidayIds = new Set(
     (THEME_GROUPS.find((g) => g.tab === "holiday")?.themes ?? []).map((t) => t.id),
   );
-  const excludeHolidays = settings.cycleHolidayOverride && settings.cycleHolidayExclusive;
+  const now = new Date();
   const builtins = THEME_GROUPS.flatMap((g) => g.themes)
-    .filter((t) => !(excludeHolidays && holidayIds.has(t.id)))
+    .filter(
+      (t) =>
+        !settings.cycleHolidaySeasonOnly || !holidayIds.has(t.id) || isHolidayActive(t.id, now),
+    )
     .map((t) => t.id);
   const customs = settings.cycleIncludeCustom ? customThemes.map((t) => t.id) : [];
   const pool = [...builtins, ...customs];
