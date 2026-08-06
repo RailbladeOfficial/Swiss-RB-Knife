@@ -17,7 +17,7 @@
 ============================================================================= */
 
 import { settings, saveSettings, THEME_GROUPS } from "./shell";
-import { themeLink } from "./theme-core";
+import { themeLink, themeCssUrl } from "./theme-core";
 import { clearRandomPalette, PERSISTENT_RANDOM_KEY } from "./random-theme";
 import { applyCustomThemeById, clearCustomTheme, customThemes } from "./theme-editor";
 
@@ -195,7 +195,7 @@ function pickNextInPool(pool: string[], current: string): string {
 function applyUnderlyingTheme(themeId: string): void {
   const isCustom = customThemes.some((t) => t.id === themeId);
   if (isCustom) {
-    themeLink.href = "/themes/default.css";
+    themeLink.href = themeCssUrl("default");
     themeLink.onload = () => {
       applyCustomThemeById(themeId);
       window.dispatchEvent(new CustomEvent("themechange"));
@@ -205,7 +205,7 @@ function applyUnderlyingTheme(themeId: string): void {
     return;
   }
   localStorage.removeItem(PERSISTENT_RANDOM_KEY);
-  themeLink.href = `/themes/${themeId}.css`;
+  themeLink.href = themeCssUrl(themeId);
   themeLink.onload = () => {
     clearRandomPalette();
     clearCustomTheme();

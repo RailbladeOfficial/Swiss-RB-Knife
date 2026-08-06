@@ -30,6 +30,17 @@ import { activateCycleTheme, getCurrentCycleUnderlyingThemeId } from "./cycle-th
 
 export const themeLink = document.getElementById("themeLink") as HTMLLinkElement;
 
+/** Builds the URL for a theme's CSS file, stamped with the current build id.
+ *  Theme CSS is swapped at runtime via themeLink.href rather than flowing
+ *  through Vite's module graph, so it never gets a content hash like
+ *  shell.css etc. do — without a cache-busting query string, WebView2's HTTP
+ *  cache keeps serving old theme CSS after an in-place app update, since the
+ *  URL never changes even though the file on disk did. Every place that sets
+ *  themeLink.href (or fetches a theme's CSS directly) should go through this. */
+export function themeCssUrl(themeId: string): string {
+  return `/themes/${themeId}.css?v=${__BUILD_ID__}`;
+}
+
 /** Which custom theme (if any) is currently active. Theme-selection state —
  *  owned here rather than in theme-editor.ts's storage/editing logic. Mutate
  *  only through setActiveCustomId(); the binding itself is exported read-only
@@ -51,7 +62,7 @@ export function setActiveCustomId(id: string | null): void {
  *  For "custom": applies the selected custom theme by id. */
 export function applyTheme(themeName: string): void {
   if (themeName === "custom") {
-    themeLink.href = "/themes/default.css";
+    themeLink.href = themeCssUrl("default");
     themeLink.onload = () => {
       if (_activeCustomId) applyCustomThemeById(_activeCustomId);
     };
@@ -82,13 +93,13 @@ export function applyTheme(themeName: string): void {
         palette = generator();
       }
       localStorage.setItem(PERSISTENT_RANDOM_KEY, JSON.stringify(palette));
-      themeLink.href = "/themes/default.css";
+      themeLink.href = themeCssUrl("default");
       themeLink.onload = () => applyPalette(palette);
       applyPalette(palette);
     } else {
       // Regenerative: generate fresh every time applyTheme is called
       const palette = generator();
-      themeLink.href = "/themes/default.css";
+      themeLink.href = themeCssUrl("default");
       themeLink.onload = () => applyPalette(palette);
       applyPalette(palette);
     }
@@ -100,7 +111,7 @@ export function applyTheme(themeName: string): void {
   // href is the same as the current one (e.g. switching from Random to Default,
   // both of which use default.css as a base), the browser won't fire onload.
   localStorage.removeItem(PERSISTENT_RANDOM_KEY);
-  themeLink.href = `/themes/${themeName}.css`;
+  themeLink.href = themeCssUrl(themeName);
   themeLink.onload = () => {
     clearRandomPalette();
     clearCustomTheme();

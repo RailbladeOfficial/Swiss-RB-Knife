@@ -54,7 +54,7 @@ import {
   applyRandomModalStyles,
   maybeRegenerateRandom,
 } from "./random-theme";
-import { applyTheme, getActiveCustomId, setActiveCustomId } from "./theme-core";
+import { applyTheme, themeCssUrl, getActiveCustomId, setActiveCustomId } from "./theme-core";
 import { advanceCycleNow } from "./cycle-theme";
 import {
   genThemeId,
@@ -1588,7 +1588,7 @@ async function fetchThemePreviewVars(themeId: string): Promise<Record<string, st
   if (cached) return cached;
   const vars: Record<string, string> = {};
   try {
-    const res = await fetch(`/themes/${themeId}.css`);
+    const res = await fetch(themeCssUrl(themeId));
     const text = await res.text();
     for (const name of THEME_PREVIEW_VAR_NAMES) {
       const match = text.match(new RegExp(`${name}:\\s*([^;]+);`));

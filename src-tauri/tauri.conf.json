@@ -48,7 +48,7 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "both",
+        "installMode": "perMachine",
         "installerIcon": "icons/icon.ico",
         "startMenuFolder": "Swiss RB Knife"
       }

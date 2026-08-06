@@ -28,7 +28,7 @@ import {
   type CustomTheme,
 } from "./shell";
 import { RANDOM_VARS, clearRandomPalette } from "./random-theme";
-import { applyTheme, themeLink, getActiveCustomId, setActiveCustomId } from "./theme-core";
+import { applyTheme, themeLink, themeCssUrl, getActiveCustomId, setActiveCustomId } from "./theme-core";
 
 /* ── Element refs ────────────────────────────────────────────────────────── */
 
@@ -687,7 +687,7 @@ teBaseSelect.addEventListener("change", async () => {
     const saved = themeLink.href;
     await new Promise<void>((resolve) => {
       themeLink.onload = () => resolve();
-      themeLink.href = `/themes/${val}.css`;
+      themeLink.href = themeCssUrl(val);
       // Fallback in case onload doesn't fire (same href)
       setTimeout(resolve, 100);
     });
