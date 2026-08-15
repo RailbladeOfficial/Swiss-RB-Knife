@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="src/tools/file-gen.css" />
   <link rel="stylesheet" href="src/tools/auto-backup.css" />
   <link rel="stylesheet" href="src/tools/budget.css" />
+  <link rel="stylesheet" href="src/tools/game-stats.css" />
   <link id="themeLink" rel="stylesheet" href="/themes/default.css" />
   <script type="module" src="src/shell.ts"></script>
 </head>
@@ -196,6 +197,17 @@
             </svg>
           </span>
           <span class="nav-label">Dummy File Generator</span>
+        </li>
+
+        <li class="nav-item" data-section="games" data-tool="game-stats" title="Game Stats">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <rect x="2" y="7" width="13" height="16" rx="2" ry="2" transform="rotate(-8 8.5 15)" />
+              <rect x="9" y="4" width="13" height="16" rx="2" ry="2" />
+            </svg>
+          </span>
+          <span class="nav-label">Game Stats</span>
         </li>
 
         <!-- =================================================================
@@ -384,6 +396,19 @@
             </div>
             <div class="tool-card-name">Dummy File Generator</div>
             <div class="tool-card-desc">Create placeholder files of any size and type for testing.</div>
+          </div>
+
+          <div class="tool-card" data-section="games" data-tool="game-stats">
+            <div class="tool-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="2" y="7" width="13" height="16" rx="2" ry="2" transform="rotate(-8 8.5 15)" />
+                <rect x="9" y="4" width="13" height="16" rx="2" ry="2" />
+              </svg>
+            </div>
+            <div class="tool-card-name">Game Stats</div>
+            <div class="tool-card-desc">Log card and board game results and get fully automatic stats — starting
+              with Five Crowns.</div>
           </div>
 
         </div>
@@ -1974,6 +1999,317 @@
         </div><!-- /finance-tool-budget -->
       </section>
 
+      <!-- =================================================================
+           GAMES — TOOL VIEWS
+      ================================================================== -->
+      <section id="section-games" class="content-section">
+
+        <div id="games-tool-game-stats" class="tool-view" style="display:none;">
+          <div class="tool-view-header">
+            <button class="tool-back-btn" data-section="home" title="Back to Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span class="tool-view-title">Game Stats</span>
+            <button id="gsSetupBtn" class="tool-view-header-action" title="Game Stats setup: profiles, preferences">Setup</button>
+          </div>
+
+          <!-- HOME -->
+          <div id="gsViewHome" class="gs-view">
+
+            <!-- A thin strip of at-a-glance numbers. No game list and no game
+                 switcher: browsing belongs to Historical (which can filter),
+                 and each destination picks its own game type on arrival. -->
+            <div id="gsHomeTiles" class="gs-tiles"></div>
+
+            <!-- Four destinations. The last is one square split along its
+                 diagonal into two halves that open the matching Setup tab. -->
+            <div class="gs-home-actions">
+              <button id="gsNavNewGameBtn" class="gs-action-card" type="button">
+                <span class="gs-action-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="3" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                </span>
+                <span class="gs-action-text">
+                  <span class="gs-action-title">New Game</span>
+                  <span class="gs-action-desc">Set the table and score it round by round.</span>
+                </span>
+              </button>
+              <button id="gsNavHistoricalBtn" class="gs-action-card" type="button">
+                <span class="gs-action-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                    <circle cx="3.5" cy="6" r="1.2" /><circle cx="3.5" cy="12" r="1.2" /><circle cx="3.5" cy="18" r="1.2" />
+                  </svg>
+                </span>
+                <span class="gs-action-text">
+                  <span class="gs-action-title">Historical Games</span>
+                  <span class="gs-action-desc">Browse, reopen and edit everything logged.</span>
+                </span>
+              </button>
+              <button id="gsNavStatsBtn" class="gs-action-card" type="button">
+                <span class="gs-action-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="20" x2="20" y2="20" />
+                    <rect x="6" y="11" width="3.5" height="7" rx="1" /><rect x="10.5" y="6" width="3.5" height="12" rx="1" /><rect x="15" y="13" width="3.5" height="5" rx="1" />
+                  </svg>
+                </span>
+                <span class="gs-action-text">
+                  <span class="gs-action-title">Stats &amp; Compare</span>
+                  <span class="gs-action-desc">Head-to-head records, streaks and charts.</span>
+                </span>
+              </button>
+
+              <div class="gs-action-card gs-split-card">
+                <button id="gsNavPlayersBtn" class="gs-split-half gs-split-half-a" type="button" title="Players">
+                  <span class="gs-split-content">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="9" cy="8" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+                      <circle cx="17" cy="9" r="2.4" /><path d="M16 15.6a4.6 4.6 0 0 1 5 3.4" />
+                    </svg>
+                    <span class="gs-split-title">Players</span>
+                  </span>
+                </button>
+                <button id="gsNavTablesBtn" class="gs-split-half gs-split-half-b" type="button" title="Tables">
+                  <span class="gs-split-content">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <ellipse cx="12" cy="12" rx="8.5" ry="5.5" />
+                      <circle cx="12" cy="5.4" r="1.5" /><circle cx="20" cy="12" r="1.5" />
+                      <circle cx="12" cy="18.6" r="1.5" /><circle cx="4" cy="12" r="1.5" />
+                    </svg>
+                    <span class="gs-split-title">Tables</span>
+                  </span>
+                </button>
+                <svg class="gs-split-divider" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                  <line x1="0" y1="100" x2="100" y2="0" vector-effect="non-scaling-stroke" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- NEW GAME -->
+          <div id="gsViewNewGame" class="gs-view" style="display:none;">
+            <div class="gs-view-bar">
+              <button class="gs-subview-back-btn" data-gs-back="home" type="button">&lsaquo; Back</button>
+              <span id="gsNewGameCrumb" class="gs-view-crumb">New Game</span>
+            </div>
+
+            <!-- Step 1: date/players -->
+            <div id="gsNewGameSetup" class="panel gs-new-game-setup-panel">
+              <div class="gs-panel-header">
+                <div class="gs-panel-heading">
+                  <div class="gs-panel-title">Set the Table</div>
+                  <div class="gs-panel-sub">Type a name to reuse a profile — anyone new is created automatically.</div>
+                </div>
+              </div>
+
+              <div class="gs-setup-grid">
+                <div class="gs-field">
+                  <label for="gsNewGameTypeSelect">Game</label>
+                  <select id="gsNewGameTypeSelect"></select>
+                </div>
+                <div class="gs-field">
+                  <label for="gsGameDate">Date</label>
+                  <input id="gsGameDate" type="date" />
+                </div>
+                <div class="gs-field">
+                  <label for="gsFillFromTableSelect">Fill from an existing table</label>
+                  <select id="gsFillFromTableSelect">
+                    <option value="">— None —</option>
+                  </select>
+                </div>
+                <!-- Shown before the game starts so it can be checked against
+                     a paper scoresheet while the roster is still on screen.
+                     Locked by default — the auto value is right whenever games
+                     are entered in order. -->
+                <div class="gs-field">
+                  <label for="gsGameNumberInput">Game Number</label>
+                  <div class="gs-game-number-row">
+                    <input id="gsGameNumberInput" type="number" min="1" step="1" class="gs-locked-input" readonly />
+                    <button id="gsGameNumberLockBtn" class="gs-lock-btn" type="button" title="Unlock to set the game number by hand" aria-label="Unlock to set the game number by hand">
+                      <svg class="gs-lock-icon-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                      </svg>
+                      <svg class="gs-lock-icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 7.5-2" />
+                      </svg>
+                    </button>
+                  </div>
+                  <span id="gsGameNumberHint" class="gs-hint gs-game-number-hint"></span>
+                </div>
+              </div>
+
+              <div class="gs-field">
+                <label>Players</label>
+                <div id="gsPlayerPickers" class="gs-player-pickers"></div>
+                <div class="gs-player-picker-actions">
+                  <button id="gsAddPlayerBtn" class="gs-ghost-add-btn" type="button">+ Add Player</button>
+                  <button id="gsClearPlayersBtn" class="gs-ghost-add-btn gs-ghost-clear-btn" type="button" title="Empty every seat and start the roster over">Clear Players</button>
+                </div>
+              </div>
+              <datalist id="gsProfileDatalist"></datalist>
+
+              <div class="gs-panel-footer">
+                <span id="gsPlayerCountHint" class="gs-hint"></span>
+                <button id="gsStartGameBtn" class="gs-primary-action-btn" type="button">Start Game</button>
+              </div>
+            </div>
+
+            <!-- Step 2: round entry (built once Start Game is clicked, or when
+                 viewing/editing an existing game from Historical) -->
+            <div id="gsNewGameEntry" class="gs-new-game-entry" style="display:none;">
+              <div class="panel gs-game-header-panel">
+                <!-- Read-only view only (toggled in applyGsGameMode). Arrows step
+                     to the game with the next/previous stable gameNumber; the
+                     label doubles as a jump-to-a-specific-game field on dblclick. -->
+                <div id="gsGameCarousel" class="gs-game-carousel" style="display:none;">
+                  <div class="gs-game-carousel-row">
+                    <button id="gsGameCarouselPrevBtn" class="gs-carousel-btn" type="button" title="Previous game at this table" aria-label="Previous game at this table">&lsaquo;</button>
+                    <span id="gsGameCarouselLabel" class="gs-game-carousel-label" title="Double-click to jump to a specific game"></span>
+                    <input id="gsGameCarouselInput" class="gs-game-carousel-input" type="number" min="1" step="1" style="display:none;" aria-label="Jump to game number" />
+                    <button id="gsGameCarouselNextBtn" class="gs-carousel-btn" type="button" title="Next game at this table" aria-label="Next game at this table">&rsaquo;</button>
+                  </div>
+                  <!-- Numbers only mean something relative to their table, so
+                       the table is named right under it. -->
+                  <span id="gsGameCarouselTable" class="gs-game-carousel-table"></span>
+                </div>
+                <div class="gs-game-header-top">
+                  <div class="gs-game-header-titles">
+                    <div class="gs-game-title-row">
+                      <span id="gsPlayersSummary" class="gs-game-title"></span>
+                      <span id="gsGameBadges" class="gs-game-badges"></span>
+                    </div>
+                    <div class="gs-entry-date-field">
+                      <label for="gsGameDateEdit">Date</label>
+                      <input id="gsGameDateEdit" type="date" />
+                      <button id="gsGameDateNowBtn" class="gs-mini-btn" type="button">Today</button>
+                    </div>
+                  </div>
+                  <div class="gs-game-header-actions">
+                    <button id="gsEditPlayersBtn" class="gs-ghost-btn" type="button">Start Over</button>
+                    <button id="gsViewEditBtn" type="button" style="display:none;">Edit</button>
+                    <button id="gsViewSaveBtn" type="button" style="display:none;">Save Changes</button>
+                    <button id="gsViewDiscardBtn" class="gs-ghost-btn" type="button" style="display:none;">Discard Changes</button>
+                  </div>
+                </div>
+                <div id="gsScoreboard" class="gs-scoreboard"></div>
+              </div>
+
+              <div class="panel gs-round-grid-panel">
+                <div class="gs-panel-header">
+                  <div class="gs-panel-heading">
+                    <div class="gs-panel-title">Rounds</div>
+                    <div class="gs-panel-sub">Enter moves down a column · Tab moves across.</div>
+                  </div>
+                </div>
+                <div id="gsRoundGridWrap" class="gs-round-grid-wrap"></div>
+              </div>
+
+              <div class="panel gs-progress-chart-panel">
+                <div class="gs-panel-header">
+                  <div class="gs-panel-heading">
+                    <div class="gs-panel-title">Progress</div>
+                    <div class="gs-panel-sub">Running total after each round — lowest line is leading.</div>
+                  </div>
+                  <button id="gsProgressChartExpandBtn" class="gs-chart-expand-btn" type="button" title="Expand chart">⤢</button>
+                </div>
+                <canvas id="gsProgressChartCanvas" class="gs-chart-canvas"></canvas>
+              </div>
+
+              <div class="gs-footer-actions">
+                <button id="gsDeleteGameBtn" class="danger-btn" type="button" style="display:none;">Delete Game</button>
+                <span class="gs-footer-spacer"></span>
+                <button id="gsCancelGameBtn" class="gs-ghost-btn" type="button">Cancel</button>
+                <button id="gsSaveGameBtn" class="gs-primary-action-btn" type="button">Save Game</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- HISTORICAL GAMES -->
+          <div id="gsViewHistorical" class="gs-view" style="display:none;">
+            <div class="gs-view-bar">
+              <button class="gs-subview-back-btn" data-gs-back="home" type="button">&lsaquo; Back</button>
+              <span class="gs-view-crumb">Historical Games</span>
+            </div>
+            <div class="panel gs-toolbar-panel">
+              <div class="gs-toolbar-group">
+                <span class="gs-toolbar-label">Game</span>
+                <select id="gsHistGameTypeSelect"></select>
+              </div>
+              <div class="gs-toolbar-group">
+                <span class="gs-toolbar-label">Filter by</span>
+                <div class="gs-segment" role="group" aria-label="Filter mode">
+                  <button class="gs-segment-btn active" data-gs-hist-filter-mode="player" type="button">Player</button>
+                  <button class="gs-segment-btn" data-gs-hist-filter-mode="table" type="button">Table</button>
+                </div>
+                <select id="gsHistoricalFilter">
+                  <option value="">All players</option>
+                </select>
+                <select id="gsHistoricalTableFilter" style="display:none;">
+                  <option value="">All tables</option>
+                </select>
+                <button id="gsHistoricalShowAllBtn" class="gs-ghost-btn" type="button">Show All</button>
+              </div>
+              <div class="gs-toolbar-group gs-toolbar-right">
+                <span id="gsHistoricalCount" class="gs-toolbar-count"></span>
+                <!-- Single toggle: the glyph shown is the layout you'd switch
+                     TO, so the button reads as an action. Both icons ship in
+                     the markup and CSS picks one off the .is-cards class. -->
+                <button id="gsHistLayoutBtn" class="gs-icon-btn gs-layout-toggle-btn" type="button">
+                  <svg class="gs-layout-icon-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" />
+                    <rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" />
+                  </svg>
+                  <svg class="gs-layout-icon-rows" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+                    <circle cx="3.5" cy="6" r="1.2" /><circle cx="3.5" cy="12" r="1.2" /><circle cx="3.5" cy="18" r="1.2" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div id="gsHistoricalList" class="gs-historical-list"></div>
+          </div>
+
+          <!-- STATS & COMPARE -->
+          <div id="gsViewStats" class="gs-view" style="display:none;">
+            <div class="gs-view-bar">
+              <button class="gs-subview-back-btn" data-gs-back="home" type="button">&lsaquo; Back</button>
+              <span class="gs-view-crumb">Stats &amp; Compare</span>
+            </div>
+            <div class="panel gs-toolbar-panel gs-stats-controls-panel">
+              <div class="gs-toolbar-group">
+                <span class="gs-toolbar-label">Game</span>
+                <select id="gsStatsGameTypeSelect"></select>
+              </div>
+              <div class="gs-toolbar-group">
+                <span class="gs-toolbar-label">Compare</span>
+                <div class="gs-segment" role="group" aria-label="Comparison mode">
+                  <button class="gs-segment-btn active" data-gs-mode="profile" type="button">Profiles</button>
+                  <button class="gs-segment-btn" data-gs-mode="table" type="button">Tables</button>
+                </div>
+              </div>
+              <div id="gsStatsProfileControls" class="gs-toolbar-group gs-stats-profile-controls">
+                <div id="gsStatsProfileSelects" class="gs-stats-profile-selects"></div>
+                <button id="gsStatsAddCompareBtn" class="gs-ghost-btn" type="button">+ Compare</button>
+                <span id="gsStatsCompareHint" class="gs-hint gs-stats-compare-hint"></span>
+              </div>
+              <div id="gsStatsTableControls" class="gs-toolbar-group gs-stats-table-controls" style="display:none;">
+                <span class="gs-toolbar-label">Table</span>
+                <select id="gsStatsTableSelect"></select>
+                <!-- Lives in the toolbar rather than either face, since it has
+                     to stay reachable from both sides of the flip. -->
+                <button id="gsWinChartToggleBtn" class="gs-ghost-btn" type="button">View Win Chart</button>
+              </div>
+            </div>
+            <div id="gsStatsResults" class="gs-stats-results"></div>
+          </div>
+        </div><!-- /games-tool-game-stats -->
+
+      </section>
+
     </main>
   </div>
 
@@ -2064,6 +2400,7 @@
               <option value="files:auto-backup">Auto-Backup</option>
               <option value="media:image-ccr">Image CCR</option>
               <option value="files:dummy-file-generator">Dummy File Generator</option>
+              <option value="games:game-stats">Game Stats</option>
             </optgroup>
           </select>
         </div>
@@ -4888,6 +5225,364 @@
       <div class="modal-body budget-chart-expand-body">
         <p id="budgetChartExpandSubtitle" class="budget-chart-expand-subtitle"></p>
         <canvas id="budgetChartExpandCanvas" class="budget-chart-expand-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — SETUP MODAL
+  ====================================================================== -->
+  <div id="gsSettingsBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="gsSettingsModal" class="modal setup-modal">
+      <div class="modal-header">
+        <span>Game Stats Setup</span>
+        <button id="gsSettingsClose" class="modal-close-btn modal-header-right">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+
+        <div class="setup-tabs">
+          <button class="setup-tab active" data-gs-tab="profiles">Profiles</button>
+          <button class="setup-tab" data-gs-tab="tables">Tables</button>
+          <button class="setup-tab" data-gs-tab="preferences">Preferences</button>
+        </div>
+
+        <!-- PROFILES -->
+        <div id="gsTabProfiles" class="setup-tab-pane">
+          <button id="gsProfileNewBtn" class="setup-new-btn">+ New Profile</button>
+          <div id="gsProfilesList" class="setup-list"></div>
+        </div>
+
+        <!-- TABLES — appear on their own the first time a roster is played,
+             so there's no "+ New Table" button; only naming is manual. -->
+        <div id="gsTabTables" class="setup-tab-pane" style="display:none;">
+          <p class="gs-preference-hint gs-tables-intro">
+            A table is one exact group playing one game. Game numbers count within a table,
+            so each group keeps its own sequence. Tables appear here once they've played a game.
+          </p>
+          <div id="gsTablesList" class="setup-list"></div>
+        </div>
+
+        <!-- PREFERENCES -->
+        <div id="gsTabPreferences" class="setup-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <span>Require Date</span>
+              <div class="toggle-with-label">
+                <span id="gsRequireDateLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="gsRequireDateToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <p class="gs-preference-hint">When off, a game's Date can be left blank.</p>
+
+            <div class="settings-row">
+              <span>Auto-Add Overtime Rounds</span>
+              <div class="toggle-with-label">
+                <span id="gsAutoOvertimeLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="gsAutoOvertimeToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <p class="gs-preference-hint">When off, you'll be asked to confirm before an overtime round is added to break a tie.</p>
+
+            <div class="settings-row">
+              <div class="gs-settings-label-col">
+                <span>XLSX Import</span>
+                <span id="gsImportStatus" class="gs-settings-status-badge">Never imported</span>
+              </div>
+              <button id="gsImportBtn" class="settings-action-btn">Import</button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — EDIT TABLE (name only; a table's roster is defined by
+       the games played at it and can't be edited here)
+  ====================================================================== -->
+  <div id="gsTableEditBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <button id="gsTableEditBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Edit Table</span>
+        <button id="gsTableEditClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div id="gsTableEditContext" class="gs-edit-context"></div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label>Name</label>
+            <input id="gsTableEditName" type="text" autocomplete="off" placeholder="Leave blank to use player names" />
+          </div>
+          <div class="setup-field">
+            <label>Seat Order</label>
+            <div id="gsTableEditSeats" class="gs-seat-list"></div>
+            <p class="gs-preference-hint">Drag to set the column order. Applies to every game at this table — past and future.</p>
+          </div>
+          <div class="setup-actions">
+            <button id="gsTableEditSave">Save</button>
+            <button id="gsTableEditCancel" class="modal-cancel-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — IMPORT WORKBOOK
+       Choose-then-run, mirroring Time Tracker's CSV Import modal. Nothing is
+       written until the whole workbook validates, so a failed run's error
+       list is a to-do for the spreadsheet, not a partial-failure log.
+  ====================================================================== -->
+  <div id="gsImportBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal modal-scrollable">
+      <div class="modal-header">
+        <button id="gsImportBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Import Workbook</span>
+        <button id="gsImportClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+        <div class="setup-field">
+          <label>Game</label>
+          <select id="gsImportGameTypeSelect"></select>
+        </div>
+
+        <p>Import an Excel workbook with one sheet per game, named &quot;Game 1&quot;, &quot;Game 2&quot;, and so on. The template explains the exact layout.</p>
+        <p>Every sheet is validated before anything is added — if even one game has a problem, the whole import is cancelled and nothing changes.</p>
+        <p id="gsImportLastRow" class="gs-import-last">Never imported</p>
+
+        <div class="gs-import-template-row">
+          <label for="gsImportTemplateCount">Game sheets</label>
+          <input type="number" id="gsImportTemplateCount" min="1" max="200" value="1" />
+          <button id="gsImportTemplateBtn" class="settings-action-btn">Download Template</button>
+        </div>
+
+        <div class="gs-import-file-row">
+          <button id="gsImportChooseBtn" class="settings-action-btn">Choose Workbook File</button>
+          <span id="gsImportFileName" class="gs-import-filename">No file selected</span>
+        </div>
+
+        <div class="exit-modal-actions" style="margin-top:18px;">
+          <button id="gsImportRunBtn" disabled>Import Workbook</button>
+          <button id="gsImportCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — IMPORT RESULT
+       Replaces the Import Workbook modal (replaceModal) once Import Workbook
+       is clicked. Errors send you back to that modal via "Try Again" (the
+       chosen file stays selected); success sends you back to Setup.
+  ====================================================================== -->
+  <div id="gsImportResultBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal modal-scrollable">
+      <div class="modal-header">
+        <span>Import Result</span>
+        <button id="gsImportResultClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+        <p id="gsImportSummary" class="gs-import-summary"></p>
+        <ul id="gsImportErrorList" class="gs-import-error-list"></ul>
+
+        <div class="exit-modal-actions" style="margin-top:18px;">
+          <button id="gsImportResultActionBtn">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — ADD PROFILE
+  ====================================================================== -->
+  <div id="gsProfileAddBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <button id="gsProfileAddBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Add Profile</span>
+        <button id="gsProfileAddClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label>Name</label>
+            <input id="gsProfileAddName" type="text" autocomplete="off" />
+          </div>
+          <div class="setup-actions">
+            <button id="gsProfileAddSave">Add</button>
+            <button id="gsProfileAddCancel" class="modal-cancel-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — EDIT PROFILE
+  ====================================================================== -->
+  <div id="gsProfileEditBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <button id="gsProfileEditBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Edit Profile</span>
+        <button id="gsProfileEditClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div id="gsProfileEditContext" class="gs-edit-context"></div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label>Name</label>
+            <input id="gsProfileEditName" type="text" autocomplete="off" />
+          </div>
+          <div class="setup-actions">
+            <button id="gsProfileEditSave">Save</button>
+            <button id="gsProfileEditRetire" class="modal-cancel-btn">Retire</button>
+            <button id="gsProfileEditDelete" class="danger-btn" style="display:none;">Delete Permanently</button>
+            <button id="gsProfileEditCancel" class="modal-cancel-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — SETUP DELETE CONFIRM
+  ====================================================================== -->
+  <div id="gsProfileDeleteBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Delete Permanently</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="gsProfileDeleteMessage">Permanently delete this profile? This can't be undone.</p>
+        <div class="exit-modal-actions">
+          <button id="gsProfileDeleteConfirmBtn" class="danger-btn">Delete</button>
+          <button id="gsProfileDeleteCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — DELETE GAME CONFIRM
+  ====================================================================== -->
+  <div id="gsGameDeleteBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Delete Game</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="gsGameDeleteMessage">Permanently delete this game record? This can't be undone.</p>
+        <div class="exit-modal-actions">
+          <button id="gsGameDeleteConfirmBtn" class="danger-btn">Delete</button>
+          <button id="gsGameDeleteCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — OVERTIME CONFIRM
+       Only reachable when the "Auto-Add Overtime Rounds" preference is off.
+  ====================================================================== -->
+  <div id="gsOvertimeConfirmBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Add Overtime Round?</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="gsOvertimeConfirmMessage">Round 13 ended in a tie. Add an overtime round to break it?</p>
+        <div class="exit-modal-actions">
+          <button id="gsOvertimeConfirmAddBtn">Add Overtime Round</button>
+          <button id="gsOvertimeConfirmDeclineBtn" class="modal-cancel-btn">Leave Tied</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — STAT DETAIL
+       Opened by double-clicking a comparison-table cell that has more than
+       one game behind it (career records, milestone games).
+  ====================================================================== -->
+  <div id="gsStatDetailBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal gs-stat-detail-modal">
+      <div class="modal-header">
+        <span id="gsStatDetailTitle">Detail</span>
+        <button class="modal-close-btn modal-header-right" data-modal-close title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body gs-stat-detail-modal-body">
+        <div id="gsStatDetailBody" class="gs-stat-detail-body"></div>
+        <div id="gsStatDetailPager" class="gs-stat-detail-pager" style="display:none;">
+          <button id="gsStatDetailPrevBtn" class="gs-pager-arrow-btn" type="button" title="Previous page">&lsaquo;</button>
+          <span id="gsStatDetailPageLabel" class="gs-pager-label" title="Click to jump to a page">Page 1</span>
+          <input id="gsStatDetailPageInput" class="gs-pager-input" type="number" min="1" step="1" style="display:none;" aria-label="Jump to page" />
+          <button id="gsStatDetailNextBtn" class="gs-pager-arrow-btn" type="button" title="Next page (past the last page shows everything)">&rsaquo;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       GAME STATS — CHART EXPAND
+       Larger redraw of an inline chart (Win Chart or a game's progress
+       chart), with axis labels and a hover tooltip — like Budget Tracker's
+       chart-expand modal.
+  ====================================================================== -->
+  <div id="gsChartExpandBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal gs-chart-expand-modal">
+      <div class="modal-header">
+        <span id="gsChartExpandTitle">Chart</span>
+        <button class="modal-close-btn modal-header-right" data-modal-close title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body gs-chart-expand-body">
+        <div class="gs-chart-expand-canvas-wrap">
+          <canvas id="gsChartExpandCanvas" class="gs-chart-expand-canvas"></canvas>
+          <div id="gsChartExpandTooltip" class="gs-chart-tooltip" style="display:none;"></div>
+        </div>
       </div>
     </div>
   </div>

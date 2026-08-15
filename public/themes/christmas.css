@@ -278,3 +278,19 @@ body.solid-modals .modal {
 
 /* Stats headings */
 .budget-stats-section-heading { color: #cc8888; }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      #228b22;
+  --gs-accent-soft: #4ade80;
+  --gs-win:         #4ade80;
+  --gs-loss:        #ff6666;
+  --gs-surface:     rgba(34, 139, 34, 0.12);
+  --gs-header-bg:   rgba(255, 215, 0, 0.10);
+  --gs-grid-line:   rgba(255, 215, 0, 0.20);
+  --gs-zebra:       rgba(255, 248, 232, 0.03);
+}

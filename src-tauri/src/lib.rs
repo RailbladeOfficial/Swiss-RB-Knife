@@ -27,6 +27,7 @@ use argon2::{
     Argon2,
 };
 
+mod session_watch;
 mod tools;
 
 /* =============================================================================
@@ -130,6 +131,32 @@ pub(crate) fn is_reserved_device_name(name: &str) -> bool {
     RESERVED_DEVICE_NAMES
         .iter()
         .any(|r| stem.eq_ignore_ascii_case(r))
+}
+
+/// Rejects any filename that could resolve outside its target folder or that
+/// Windows can't create: path separators, "..", illegal characters, control
+/// characters, reserved device names, and empty names.
+///
+/// Lives here rather than in a tool module because every "write a file to
+/// Downloads" command needs exactly this check, and a second copy is a second
+/// thing to keep correct. The frontends only ever send generated names today —
+/// this guard exists so that never has to stay true.
+pub(crate) fn sanitize_filename(filename: &str) -> Result<String, String> {
+    let name = filename.trim();
+    if name.is_empty() {
+        return Err("Filename is empty.".to_string());
+    }
+    if name == "." || name == ".." {
+        return Err("Invalid filename.".to_string());
+    }
+    let illegal = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+    if name.chars().any(|c| illegal.contains(&c) || (c as u32) < 0x20) {
+        return Err(format!("Filename contains characters Windows doesn't allow: {}", name));
+    }
+    if is_reserved_device_name(name) {
+        return Err(format!("'{}' is a reserved Windows device name.", name));
+    }
+    Ok(name.to_string())
 }
 
 /* =============================================================================
@@ -624,7 +651,10 @@ pub fn run() {
         // tauri-plugin-fs intentionally NOT registered — nothing in the
         // frontend uses it (all file I/O goes through custom commands), so
         // shipping it would only widen the attack surface for no benefit.
-        .setup(|_app| Ok(()))
+        .setup(|app| {
+            session_watch::init(app.handle());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Shell-level commands
             merge_settings,
@@ -687,6 +717,13 @@ pub fn run() {
             tools::budget::budget_enable_encryption,
             tools::budget::budget_disable_encryption,
             tools::budget::budget_set_session_unlock,
+            // Game Stats
+            tools::game_stats::save_game_stats_data,
+            tools::game_stats::load_game_stats_data,
+            tools::game_stats::save_game_stats_draft,
+            tools::game_stats::load_game_stats_draft,
+            tools::game_stats::read_game_stats_workbook,
+            tools::game_stats::write_game_stats_download,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1078,7 +1078,12 @@ button:hover {
   flex-direction: column;
 }
 
-.setup-body {
+/* .modal-body qualifier (rather than .setup-body alone) is deliberate: both
+   classes always appear together on this element, and modal.css's later-
+   loaded .modal-body { text-align: center } has equal specificity to a bare
+   .setup-body rule, so which one wins depends on file load order — it was
+   losing here. Pairing the selectors makes this one unconditionally win. */
+.modal-body.setup-body {
   display: flex;
   flex-direction: column;
   gap: 10px;

@@ -193,3 +193,19 @@ body:not(.solid-modals) .modal {
   border-color: var(--color-btn);
   color: var(--color-accent);
 }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      var(--color-btn);
+  --gs-accent-soft: var(--color-accent);
+  --gs-win:         var(--color-success);
+  --gs-loss:        var(--color-danger);
+  --gs-surface:     color-mix(in srgb, var(--color-btn) 7%, transparent);
+  --gs-header-bg:   color-mix(in srgb, var(--color-btn) 10%, transparent);
+  --gs-grid-line:   color-mix(in srgb, var(--color-border) 70%, transparent);
+  --gs-zebra:       color-mix(in srgb, var(--color-text) 3%, transparent);
+}

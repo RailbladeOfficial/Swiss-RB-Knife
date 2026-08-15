@@ -109,7 +109,7 @@ pub fn import_csv(path: String) -> Result<String, String> {
 /// generated names today — this guard exists so that never has to stay true.
 #[tauri::command]
 pub fn export_csv(app: tauri::AppHandle, filename: String, data: String) -> Result<String, String> {
-    let safe_name = sanitize_filename(&filename)?;
+    let safe_name = crate::sanitize_filename(&filename)?;
 
     let downloads = app
         .path()
@@ -121,23 +121,5 @@ pub fn export_csv(app: tauri::AppHandle, filename: String, data: String) -> Resu
     Ok(path.to_string_lossy().to_string())
 }
 
-/// Rejects any filename that could resolve outside the target folder or that
-/// Windows can't create: path separators, "..", illegal characters, control
-/// characters, and empty names.
-fn sanitize_filename(filename: &str) -> Result<String, String> {
-    let name = filename.trim();
-    if name.is_empty() {
-        return Err("Filename is empty.".to_string());
-    }
-    if name == "." || name == ".." {
-        return Err("Invalid filename.".to_string());
-    }
-    let illegal = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
-    if name.chars().any(|c| illegal.contains(&c) || (c as u32) < 0x20) {
-        return Err(format!("Filename contains characters Windows doesn't allow: {}", name));
-    }
-    if crate::is_reserved_device_name(name) {
-        return Err(format!("'{}' is a reserved Windows device name.", name));
-    }
-    Ok(name.to_string())
-}
+// Filename sanitising lives in lib.rs (crate::sanitize_filename) — shared with
+// Game Stats' template download, which needs the identical guard.

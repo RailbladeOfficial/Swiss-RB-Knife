@@ -254,3 +254,19 @@ input:focus {
   box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent-totals) 45%, transparent);
 }
 .budget-stats-section-heading { color: var(--color-text-muted); }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      #6fa0e0;
+  --gs-accent-soft: #a8c8f0;
+  --gs-win:         #55d97e;
+  --gs-loss:        #ff5f5f;
+  --gs-surface:     rgba(111, 160, 224, 0.11);
+  --gs-header-bg:   rgba(111, 160, 224, 0.15);
+  --gs-grid-line:   rgba(143, 168, 217, 0.24);
+  --gs-zebra:       rgba(221, 230, 245, 0.03);
+}

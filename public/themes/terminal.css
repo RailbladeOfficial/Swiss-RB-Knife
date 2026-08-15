@@ -282,3 +282,44 @@ body:not(.solid-modals) .modal {
   border-color: #00cc00;
 }
 .budget-stats-section-heading { color: #007700; }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      #00cc00;
+  --gs-accent-soft: #00ff00;
+  --gs-win:         #00ff00;
+  --gs-loss:        #ff0000;
+  --gs-surface:     rgba(0, 204, 0, 0.07);
+  --gs-header-bg:   rgba(0, 204, 0, 0.12);
+  --gs-grid-line:   #0a2a0a;
+  --gs-zebra:       rgba(0, 255, 0, 0.035);
+}
+
+/* Phosphor terminal: everything numeric is monospace, and the grids square
+   off their corners like the rest of this theme. */
+.gs-round-grid,
+.gs-stats-table,
+.gs-tile-value,
+.gs-score-chip-value {
+  font-family: "Courier New", Courier, monospace;
+}
+
+.gs-tile,
+.gs-score-chip,
+.gs-game-row,
+.gs-action-card,
+.gs-round-grid-wrap,
+.gs-stats-table-wrap {
+  border-radius: 0;
+}
+
+.gs-segment,
+.gs-segment-btn,
+.gs-badge,
+.gs-game-row-player {
+  border-radius: 2px;
+}

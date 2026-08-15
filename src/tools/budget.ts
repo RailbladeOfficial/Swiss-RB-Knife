@@ -26,6 +26,8 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { flash, escapeHtml } from "../shell";
 import { Modal } from "../modal";
 
@@ -3448,7 +3450,7 @@ function getBillActionModal(): Modal {
 
 function openBillAction(row: BillRow): void {
   const bill = row.bill;
-  billActionTitleEl.textContent = bill.name;
+  billActionTitleEl.textContent = `Pay ${bill.name}`;
 
   // Item 8: always show the bill's read-only details
   billActionDetailsEl.innerHTML = "";
@@ -5665,6 +5667,34 @@ export function onBudgetToolEntry(): void {
   sessionUnlocked = false;
   _showAuthGate();
 }
+
+/* =============================================================================
+   OS SESSION LOCK  →  BUDGET RE-LOCK
+   -----------------------------------------------------------------------------
+   Windows session lock/unlock (Win+L, the lock key, idle lock) isn't visible
+   to the DOM in any reliable way, so the Rust side watches for it directly
+   (WM_WTSSESSION_CHANGE — see src-tauri/src/session_watch.rs) and emits
+   "session-lock-changed". When re-auth-on-every-entry is the active
+   encryption mode and there's a live authenticated session, an OS lock
+   force-relocks the budget exactly like navigating away and back — and on
+   unlock, flashes the taskbar so the re-auth prompt isn't missed (without
+   stealing focus outright). Mirrors how a password manager like Bitwarden
+   re-locks its vault with the machine.
+============================================================================= */
+
+let _relockedByOsLock = false;
+
+listen<boolean>("session-lock-changed", async (event) => {
+  if (event.payload) {
+    if (encryptionEnabled && !sessionUnlockMode && sessionUnlocked) {
+      onBudgetToolEntry();
+      _relockedByOsLock = true;
+    }
+  } else if (_relockedByOsLock) {
+    _relockedByOsLock = false;
+    await getCurrentWindow().requestUserAttention(UserAttentionType.Critical).catch(() => {});
+  }
+}).catch(() => {});
 
 /* =============================================================================
    ENCRYPTION SETTINGS — Enable / Disable flows

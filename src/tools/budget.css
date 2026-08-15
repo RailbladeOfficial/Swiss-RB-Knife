@@ -1122,6 +1122,10 @@ span.entry-col-category:not(.entry-field) {
 .budget-setup-field label {
   font-size: 0.75rem;
   opacity: 0.7;
+  /* .modal-body sets text-align: center and, being an inherited property,
+     cascades down to these labels unless overridden here — same issue
+     documented above .budget-setup-bill-summary-name. */
+  text-align: left;
 }
 
 .budget-setup-field input:not(.budget-setup-recurrence-interval),

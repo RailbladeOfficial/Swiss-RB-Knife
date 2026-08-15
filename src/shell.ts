@@ -31,7 +31,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { Modal, setGlobalModalOpenHook } from "./modal";
 import { initTimeTracker } from "./tools/time-tracker";
@@ -48,6 +48,7 @@ import {
   onBudgetToolEntry,
   onBudgetToolExit,
 } from "./tools/budget";
+import { initGameStats, onGameStatsToolEntry, onGameStatsIconClicked } from "./tools/game-stats";
 import {
   RANDOM_VARS,
   PERSISTENT_RANDOM_KEY,
@@ -95,9 +96,19 @@ import { applyUpdateSettings, checkForUpdates, runStartupGates } from "./docs";
 
 type ToastMeta = {
   id: number;
-  timeout: ReturnType<typeof setTimeout>;
+  timeout: ReturnType<typeof setTimeout> | null;
+  /** The toast's own requested duration, untouched by pausing — the floor a
+   *  return-from-away resume never shortens it below (see TOAST_RETURN_MS). */
+  durationMs: number;
   remaining: number;
   startedAt: number;
+  hovered: boolean;
+  /** True only for a toast that fired while the app wasn't on screen and so
+   *  has never been shown to the user yet — its countdown hasn't started.
+   *  Cleared the first time the app becomes visible, after which the toast
+   *  is "seen" and leaving the app again no longer pauses it. */
+  awaitingFirstView: boolean;
+  dismiss: () => void;
 };
 
 type NavEntry = {
@@ -313,6 +324,7 @@ const ALL_TOOLS: ToolMeta[] = [
   { key: "files/auto-backup", section: "files", tool: "auto-backup", label: "Auto-Backup" },
   { key: "media/image-ccr", section: "media", tool: "image-ccr", label: "Image CCR" },
   { key: "files/dummy-file-generator", section: "files", tool: "dummy-file-generator", label: "Dummy File Generator" },
+  { key: "games/game-stats", section: "games", tool: "game-stats", label: "Game Stats" },
 ];
 
 /** A fresh default sidebarItems array — all tools pinned, in ALL_TOOLS order.
@@ -638,13 +650,23 @@ function activateSection(sectionKey: string): void {
   }
 }
 
+/** Wraps activateTool() for explicit user clicks only (sidebar icon, Home
+ *  tile, tool-card) — never for mouse back/forward history replay or
+ *  restored-state entry, which call activateTool() directly. Game Stats uses
+ *  this to jump back to its tile view even when the icon is clicked while
+ *  the tool is already open; see onGameStatsIconClicked(). */
+function activateToolFromClick(section: string, tool: string): void {
+  activateTool(section, tool);
+  if (section === "games" && tool === "game-stats") onGameStatsIconClicked();
+}
+
 navItems.forEach((item) => {
   item.addEventListener("click", () => {
     const section = item.dataset.section;
     const tool = item.dataset.tool;
     if (!section) return;
     if (tool) {
-      activateTool(section, tool);
+      activateToolFromClick(section, tool);
     } else {
       activateSection(section);
     }
@@ -697,6 +719,7 @@ function activateTool(section: string, tool: string): void {
   // Notify tools that need to gate entry (e.g. Budget encryption auth,
   // Auto-Backup's first-entry disclaimer)
   if (section === "finance" && tool === "budget") onBudgetToolEntry();
+  if (section === "games" && tool === "game-stats") onGameStatsToolEntry();
   if (section === "files" && tool === "auto-backup") onAutoBackupToolEntry();
 
   saveShellState(section, tool);
@@ -732,7 +755,7 @@ document.querySelectorAll<HTMLElement>(".dashboard-tool-btn").forEach((btn) => {
     const section = btn.dataset.section!;
     const tool = btn.dataset.tool;
     if (tool) {
-      activateTool(section, tool);
+      activateToolFromClick(section, tool);
     } else {
       activateSection(section);
     }
@@ -752,7 +775,7 @@ document
   .querySelectorAll<HTMLElement>(".tool-card[data-tool]")
   .forEach((card) => {
     card.addEventListener("click", () => {
-      activateTool(card.dataset.section!, card.dataset.tool!);
+      activateToolFromClick(card.dataset.section!, card.dataset.tool!);
     });
   });
 
@@ -928,17 +951,52 @@ function navigateForward(): void {
   isNavigatingHistory = false;
 }
 
-// Mouse button 3 = back, button 4 = forward (the extra side buttons on most mice)
-document.addEventListener("mousedown", (e: MouseEvent) => {
-  if (e.button === 3) {
+/** Lets a tool with its own internal sub-pages (e.g. Game Stats' Home/New
+ *  Game/Historical/Stats views) claim the mouse back/forward buttons while
+ *  it's the active tool. back()/forward() should return true once they've
+ *  handled the navigation themselves, or false to fall through to this
+ *  shell's own section/tool-level history (e.g. once the tool's own
+ *  sub-history is exhausted). Only one tool can hold this at a time; a tool
+ *  that isn't currently visible should just return false from both. */
+export type SubNavHandler = { back: () => boolean; forward: () => boolean };
+let activeSubNavHandler: SubNavHandler | null = null;
+export function setSubNavHandler(handler: SubNavHandler | null): void {
+  activeSubNavHandler = handler;
+}
+
+/* Mouse button 3 = back, button 4 = forward (the extra side buttons on most
+   mice).
+
+   Registered in the CAPTURE phase on `window` — the earliest point in the
+   dispatch — rather than bubbling up to `document`. A focused form control
+   (e.g. a score cell in Game Stats' round grid) sits deep in the tree, and
+   anything between it and `document` that consumes the event would silently
+   swallow the navigation; capturing at the root can't be pre-empted.
+
+   The active element is also blurred BEFORE navigating. An <input> that loses
+   focus as a side effect of its view being hidden fires its `change` event
+   afterwards, so the edit would be committed against a screen that has
+   already been swapped out. Blurring first lets that commit run against the
+   view it was actually made in. */
+window.addEventListener(
+  "mousedown",
+  (e: MouseEvent) => {
+    if (e.button !== 3 && e.button !== 4) return;
     e.preventDefault();
-    navigateBack();
-  }
-  if (e.button === 4) {
-    e.preventDefault();
-    navigateForward();
-  }
-});
+
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body) active.blur();
+
+    if (e.button === 3) {
+      if (activeSubNavHandler?.back()) return;
+      navigateBack();
+    } else {
+      if (activeSubNavHandler?.forward()) return;
+      navigateForward();
+    }
+  },
+  true,
+);
 
 // Suppress WebView2/Chromium's built-in "Turn on caret browsing?" prompt.
 // F7 toggles it by default in every Chromium-based webview; nothing in this
@@ -2620,9 +2678,66 @@ function loadSoundPack(id: string): void {
 }
 loadSoundPack(DEFAULT_SETTINGS.soundPack);
 
+/* A toast that fires while the app isn't on screen — window unfocused
+   (alt-tabbed away, covered by another window) or the document hidden
+   (minimized) — doesn't start its countdown at all. It waits, and the
+   taskbar flashes, until the user comes back and can actually read it; the
+   timer then starts with TOAST_RETURN_MS of fresh time, since a toast that
+   expires the instant attention returns defeats the point of holding it.
+
+   Only that FIRST view is waited for. Once a toast has been on screen its
+   countdown just runs, and alt-tabbing away again does not pause it — a
+   toast you've already seen shouldn't be able to outlive the moment it
+   belongs to, and a toast fired while you're looking at the app was never
+   waiting on anything to begin with. */
+let _appVisible = document.visibilityState === "visible" && document.hasFocus();
+
+// A toast resuming because the user came back gets AT LEAST this much visible
+// time — longer than the standard 5s, since attention was elsewhere and a
+// just-expired-or-nearly-expired toast would otherwise vanish before it's
+// even read. Only a floor: a toast whose own requested duration is already
+// longer (e.g. an 8s error) keeps that instead.
+const TOAST_RETURN_MS = 7000;
+
+function _isAppVisible(): boolean {
+  return document.visibilityState === "visible" && document.hasFocus();
+}
+
+function _setAppVisible(visible: boolean): void {
+  if (visible === _appVisible) return;
+  _appVisible = visible;
+  // Leaving no longer pauses anything: unseen toasts have no timer running to
+  // pause, and seen ones are meant to keep counting down in the background.
+  if (!visible) return;
+
+  for (const meta of toastMetas) {
+    if (meta.awaitingFirstView) {
+      // Being on screen at last is what this toast was waiting for. Full fresh
+      // time (never less than TOAST_RETURN_MS), and from here on it's an
+      // ordinary toast that ignores visibility entirely.
+      meta.awaitingFirstView = false;
+      meta.remaining = Math.max(meta.durationMs, TOAST_RETURN_MS);
+    }
+    // Already counting down — leave it be. Hovered — mouseleave owns the
+    // restart, and now reads the remaining set just above. The rest is a
+    // toast left paused by a mouseleave that happened while the app was
+    // away (which couldn't restart it then); this is where it recovers.
+    if (meta.timeout !== null || meta.hovered) continue;
+    meta.startedAt = Date.now();
+    meta.timeout = setTimeout(meta.dismiss, meta.remaining);
+  }
+}
+
+document.addEventListener("visibilitychange", () => _setAppVisible(_isAppVisible()));
+window.addEventListener("focus", () => _setAppVisible(_isAppVisible()));
+window.addEventListener("blur", () => _setAppVisible(_isAppVisible()));
+
 /** Displays a toast notification with optional type and duration.
  *  Plays the corresponding audio cue, enforces a MAX_TOASTS cap by evicting the
- *  oldest toast, and supports hover-to-pause and click-to-dismiss. */
+ *  oldest toast, and supports hover-to-pause and click-to-dismiss. A toast
+ *  fired while the app is unfocused/hidden holds its countdown until the user
+ *  is back to see it; once shown, it counts down regardless — see
+ *  _setAppVisible() above. */
 export function flash(
   message: string,
   type: "success" | "error" = "success",
@@ -2639,7 +2754,7 @@ export function flash(
 
   if (toastMetas.length >= MAX_TOASTS) {
     const oldest = toastMetas.shift()!;
-    clearTimeout(oldest.timeout);
+    if (oldest.timeout !== null) clearTimeout(oldest.timeout);
     const oldEl = document.getElementById(`toast-${oldest.id}`);
     if (oldEl) oldEl.remove();
   }
@@ -2651,21 +2766,25 @@ export function flash(
   toast.textContent = message;
   toastContainer.appendChild(toast);
 
-  const meta: ToastMeta = {
-    id,
-    timeout: 0 as unknown as ReturnType<typeof setTimeout>,
-    remaining: durationMs,
-    startedAt: Date.now(),
-  };
-
   function dismiss(): void {
-    clearTimeout(meta.timeout);
+    meta.timeout = null;
     toastMetas = toastMetas.filter((m) => m.id !== id);
     toast.classList.add("hide");
     toast.addEventListener("animationend", () => toast.remove(), {
       once: true,
     });
   }
+
+  const meta: ToastMeta = {
+    id,
+    timeout: null,
+    durationMs,
+    remaining: durationMs,
+    startedAt: Date.now(),
+    hovered: false,
+    awaitingFirstView: !_appVisible,
+    dismiss,
+  };
 
   function startTimer(ms: number): void {
     meta.remaining = ms;
@@ -2674,7 +2793,10 @@ export function flash(
   }
 
   toast.addEventListener("mouseenter", () => {
+    meta.hovered = true;
+    if (meta.timeout === null) return;
     clearTimeout(meta.timeout);
+    meta.timeout = null;
     meta.remaining = Math.max(
       0,
       meta.remaining - (Date.now() - meta.startedAt),
@@ -2682,13 +2804,52 @@ export function flash(
   });
 
   toast.addEventListener("mouseleave", () => {
-    startTimer(meta.remaining);
+    meta.hovered = false;
+    if (_appVisible) startTimer(meta.remaining);
   });
 
   toast.addEventListener("click", dismiss);
 
   toastMetas.push(meta);
-  startTimer(durationMs);
+  if (_appVisible) {
+    // On screen when it fired, so it starts counting down straight away and
+    // keeps doing so even if the user alt-tabs off mid-toast.
+    startTimer(durationMs);
+  } else {
+    // Unseen, so no timer yet — _setAppVisible(true) starts it on return with
+    // TOAST_RETURN_MS of fresh time. Flash the taskbar meanwhile, so a toast
+    // firing in the background (e.g. a backup finishing while alt-tabbed away)
+    // doesn't go unnoticed. Windows clears the flash on its own once the user
+    // brings the window to the front.
+    getCurrentWindow().requestUserAttention(UserAttentionType.Critical).catch(() => {});
+  }
+}
+
+/* Dev-only: type "debugtoast" anywhere outside a text field to fire a toast
+   5 seconds later — long enough to alt-tab away and confirm it's still
+   waiting, unstarted, when you come back (and that it then counts down and
+   goes, even if you alt-tab away again). Stripped from production builds
+   along with every other __DEV__ block. */
+if (__DEV__) {
+  let _debugToastBuffer = "";
+  const DEBUG_TOAST_PHRASE = "debugtoast";
+  document.addEventListener("keydown", (e) => {
+    const active = document.activeElement;
+    const isTyping =
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      (active instanceof HTMLElement && active.isContentEditable);
+    if (isTyping || e.key.length !== 1 || !/[a-z]/i.test(e.key)) return;
+
+    _debugToastBuffer = (_debugToastBuffer + e.key.toLowerCase()).slice(
+      -DEBUG_TOAST_PHRASE.length,
+    );
+    if (_debugToastBuffer !== DEBUG_TOAST_PHRASE) return;
+    _debugToastBuffer = "";
+
+    console.log("[debugtoast] firing in 5s — alt-tab away now");
+    setTimeout(() => flash("Debug toast — fired 5s ago, still here?", "success"), 5000);
+  });
 }
 
 /* =============================================================================
@@ -2817,6 +2978,7 @@ async function init(): Promise<void> {
   initFileGen();
   await initAutoBackup();
   await initBudget();
+  initGameStats();
 
   let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
   getCurrentWindow().onResized(() => {

@@ -36,3 +36,13 @@ zeroize = "1"
 # check_for_updates). Pinned to 2.x for a stable API; default features bundle a
 # rustls TLS stack, so there's no system OpenSSL dependency to satisfy on build.
 ureq = "2"
+# Windows session lock/unlock detection (see session_watch.rs) — needs the raw
+# WTS session-notification API and a window subclass, neither of which Tauri's
+# window API exposes. Windows-only; this whole app already targets Windows
+# exclusively (elevated manifest, System32 paths throughout lib.rs).
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_RemoteDesktop",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+] }

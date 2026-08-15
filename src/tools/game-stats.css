@@ -1,0 +1,2047 @@
+/* =============================================================================
+   GAME STATS
+   -----------------------------------------------------------------------------
+   Shell-level styles (body, buttons, inputs, modals, toasts, title bar,
+   scrollbars, toggles, settings rows, .panel, .tool-view*, .coming-soon-*)
+   all live in shell.css / modal.css / landing.css. Everything here is
+   specific to the Game Stats tool. Tool-unique classes are prefixed `gs-`.
+
+   THEMING
+   -----------------------------------------------------------------------------
+   Every colour in this file resolves through the `--gs-*` hooks declared on
+   :root below, which default to the shared theme tokens. A theme re-skins the
+   whole tool by overriding just those hooks (see the "Game Stats" block at the
+   bottom of each themes/*.css) instead of restating a selector per component.
+
+   WHY THERE IS NO game-stats-five-crowns.css
+   -----------------------------------------------------------------------------
+   game-stats-five-crowns.ts exists because the *rules* are game-specific —
+   round structure, the overtime tie-break, the stat catalog. None of that
+   reaches the presentation layer: the round grid, scoreboard, history cards
+   and comparison table are all "score per player per round" widgets that any
+   second game type would reuse verbatim. Round labels ("Rd 7", "OT 1") arrive
+   as text from TS, so even those cost no CSS. Splitting now would move ~0 rules
+   into a file that only adds an import. The seam is reserved instead: anything
+   genuinely Five-Crowns-only gets a `gs-fc-` prefix, and the split happens the
+   day a second game type needs its first divergent rule.
+============================================================================= */
+
+:root {
+  /* Primary accent — rails, active segments, focus rings, links. */
+  --gs-accent: var(--color-btn);
+  /* Lighter companion for text on dark surfaces. */
+  --gs-accent-soft: var(--color-accent);
+  /* Semantic result colours. */
+  --gs-win: var(--color-success);
+  --gs-loss: var(--color-danger);
+  /* Wash laid over --color-panel on the tool's feature panels. */
+  --gs-surface: color-mix(in srgb, var(--color-btn) 7%, transparent);
+  /* Table header / sticky-column backing. */
+  --gs-header-bg: color-mix(in srgb, var(--color-btn) 10%, transparent);
+  /* Row separators inside the grids — deliberately softer than --color-border. */
+  --gs-grid-line: color-mix(in srgb, var(--color-border) 70%, transparent);
+  /* Zebra striping. */
+  --gs-zebra: color-mix(in srgb, var(--color-text) 3%, transparent);
+
+  /* Geometry, shared so panels/cards/chips stay on one rhythm. */
+  --gs-radius: 10px;
+  --gs-radius-sm: 6px;
+  --gs-rail-width: 3px;
+}
+
+/* =============================================================================
+   VIEW SCAFFOLDING (Home / New Game / Historical / Stats)
+============================================================================= */
+
+.gs-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Slim breadcrumb strip above each sub-view — the "‹ Back" affordance plus a
+   label saying where you are, since the tool header only ever says "Game
+   Stats". */
+.gs-view-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px;
+}
+
+.gs-subview-back-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.gs-subview-back-btn:hover {
+  color: var(--gs-accent-soft);
+  background: color-mix(in srgb, var(--gs-accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--gs-accent) 35%, transparent);
+}
+
+.gs-view-crumb {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gs-eyebrow {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gs-accent-soft);
+  opacity: 0.85;
+}
+
+/* =============================================================================
+   PANEL FURNITURE
+   Shared header/footer treatment so every panel in the tool reads the same.
+============================================================================= */
+
+.gs-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.gs-panel-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gs-panel-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.gs-panel-sub {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.gs-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gs-grid-line);
+}
+
+.gs-hint {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+/* A hint that's reporting a problem rather than just describing state. */
+.gs-hint-warn {
+  color: var(--color-danger);
+}
+
+/* Footer action row that sits outside a panel (round entry). */
+.gs-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gs-footer-spacer {
+  flex: 1;
+}
+
+.gs-empty {
+  padding: 22px 12px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: var(--gs-radius);
+  /* Historical's card layout is a grid — an empty state must span it rather
+     than sit in the first cell. No-op in the flex list layout. */
+  grid-column: 1 / -1;
+}
+
+/* =============================================================================
+   BUTTONS
+   Shell gives every <button> the solid accent fill, which is far too loud for
+   a screen that has this many controls — these are the tool's quieter tiers.
+============================================================================= */
+
+.gs-primary-action-btn {
+  padding: 7px 18px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  border-radius: var(--gs-radius-sm);
+}
+
+.gs-primary-action-btn:hover {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--gs-accent) 32%, transparent);
+}
+
+.gs-ghost-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  border-radius: var(--gs-radius-sm);
+}
+
+.gs-ghost-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: color-mix(in srgb, var(--gs-accent) 45%, transparent);
+}
+
+.gs-mini-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  border-radius: 999px;
+}
+
+.gs-mini-btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--gs-accent-soft);
+  border-color: color-mix(in srgb, var(--gs-accent) 45%, transparent);
+}
+
+.gs-mini-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Square icon-only button (Historical's layout toggle). */
+.gs-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--gs-radius-sm);
+}
+
+.gs-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.gs-icon-btn:hover {
+  background: color-mix(in srgb, var(--gs-accent) 10%, transparent);
+  border-color: var(--gs-accent);
+  color: var(--gs-accent-soft);
+}
+
+/* One button, two glyphs — the hidden one is the layout currently in use. */
+.gs-layout-toggle-btn .gs-layout-icon-rows,
+.gs-layout-toggle-btn.is-cards .gs-layout-icon-grid {
+  display: none;
+}
+
+.gs-layout-toggle-btn.is-cards .gs-layout-icon-rows {
+  display: block;
+}
+
+/* Dashed "add another" row — reads as an empty slot rather than an action. */
+.gs-ghost-add-btn {
+  width: 100%;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border-dashed);
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  border-radius: var(--gs-radius-sm);
+  margin-top: 6px;
+}
+
+.gs-ghost-add-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gs-accent) 8%, transparent);
+  border-color: var(--gs-accent);
+  color: var(--gs-accent-soft);
+}
+
+/* Add carries the row; Clear sits beside it at its natural width so the
+   destructive one is never the bigger target. */
+.gs-player-picker-actions {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.gs-player-picker-actions .gs-ghost-add-btn {
+  flex: 1 1 auto;
+}
+
+.gs-ghost-clear-btn {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.gs-ghost-clear-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.gs-ghost-clear-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* =============================================================================
+   SEGMENTED CONTROL
+   Replaces the old .gs-game-type-btn row, which inherited shell's solid-accent
+   <button> fill and so rendered every option as if it were selected.
+============================================================================= */
+
+.gs-segment {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.gs-segment-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.gs-segment-btn:hover:not(:disabled):not(.active) {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.gs-segment-btn.active {
+  background: var(--gs-accent);
+  color: var(--color-btn-text);
+}
+
+.gs-segment-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: transparent;
+}
+
+/* =============================================================================
+   TOOLBAR PANEL  (Historical filters, Stats controls)
+============================================================================= */
+
+.gs-toolbar-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+}
+
+.gs-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gs-toolbar-right {
+  margin-left: auto;
+}
+
+.gs-toolbar-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gs-toolbar-count {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-toolbar-panel select {
+  font-size: 0.82rem;
+  padding: 5px 8px;
+  max-width: 260px;
+}
+
+/* =============================================================================
+   HOME — a launchpad: a thin strip of numbers over four destination tiles.
+   No game list (that's Historical, which can filter) and no game switcher
+   (each destination picks its own game type on arrival).
+============================================================================= */
+
+/* ── Stat tiles ── */
+
+.gs-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.gs-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+  border: 1px solid var(--gs-grid-line);
+  border-radius: var(--gs-radius-sm);
+  min-width: 0;
+}
+
+.gs-tile-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: var(--gs-accent-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-tile-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gs-tile-sub {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A tile that is currently "live" (games still in progress) pulls the accent. */
+.gs-tile.gs-tile-alert {
+  border-color: color-mix(in srgb, var(--color-accent-totals) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent-totals) 8%, transparent);
+}
+
+.gs-tile.gs-tile-alert .gs-tile-value {
+  color: var(--color-accent-totals);
+}
+
+/* ── Destination tiles ──
+   A fixed 2×2 grid, not auto-fit: the four destinations are a stable set and
+   the arrangement is meaningful (the two things you do most on top, the two
+   management screens below), so it shouldn't reflow into a row. The rows share
+   the height evenly via grid-auto-rows: 1fr. */
+
+.gs-home-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(140px, 1fr);
+  gap: 14px;
+  /* .tool-view doesn't stretch to the viewport, so the tiles can't inherit a
+     height to fill — they claim one instead. */
+  min-height: min(58vh, 620px);
+}
+
+.gs-action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 20px 24px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-left: var(--gs-rail-width) solid color-mix(in srgb, var(--gs-accent) 55%, transparent);
+  border-radius: var(--gs-radius);
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition),
+    box-shadow var(--hover-transition),
+    transform 0.16s ease;
+}
+
+/* One column on narrow windows — two big tiles side by side stop being
+   readable well before the sidebar-collapsed width. */
+@media (max-width: 700px) {
+  .gs-home-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Card-level feedback applies to all four tiles, including the split one. */
+.gs-action-card:hover {
+  border-color: var(--gs-accent);
+  border-left-color: var(--gs-accent);
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--gs-accent) 18%, transparent);
+  transform: translateY(-2px);
+}
+
+/* The accent wash is the same one each half of the split tile uses, so all
+   four destinations highlight identically. Excluded on the split card itself:
+   there the wash belongs to whichever half is hovered, not the whole tile. */
+.gs-action-card:not(.gs-split-card):hover {
+  background: color-mix(in srgb, var(--gs-accent) 16%, transparent);
+  color: var(--gs-accent-soft);
+}
+
+.gs-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: var(--gs-radius-sm);
+  background: color-mix(in srgb, var(--gs-accent) 14%, transparent);
+  color: var(--gs-accent-soft);
+}
+
+.gs-action-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.gs-action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.gs-action-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.gs-action-desc {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+  max-width: 32ch;
+  margin: 0 auto;
+}
+
+/* ── Split destination tile (Players / Tables) ──
+   One card cut corner-to-corner into two triangles that share the diagonal.
+   Each half is its own button so both are separately clickable, hoverable and
+   reachable by keyboard; the clip-path is what makes the halves triangular
+   while their hit areas stay exactly the visible shape. */
+
+.gs-split-card {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  display: block;
+}
+
+.gs-split-half {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--color-text);
+  border: none;
+  border-radius: 0;
+  display: flex;
+  /* Matches the whole-card tiles: wash and label recolour together rather
+     than the text snapping while the background eases. The title and icon
+     inherit `color`, so animating it here carries them along. */
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
+}
+
+/* Top-left triangle: the shared long side runs bottom-left to top-right. */
+.gs-split-half-a {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+/* Bottom-right triangle, mirroring across that same diagonal. */
+.gs-split-half-b {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.gs-split-half:hover {
+  background: color-mix(in srgb, var(--gs-accent) 16%, transparent);
+  color: var(--gs-accent-soft);
+}
+
+.gs-split-half:focus-visible {
+  outline: 2px solid var(--gs-accent);
+  outline-offset: -4px;
+}
+
+.gs-split-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Generous inset keeps each label clear of the diagonal it shares. */
+  padding: 20px 24px;
+  min-width: 0;
+}
+
+.gs-split-half-b .gs-split-content {
+  flex-direction: row-reverse;
+}
+
+.gs-split-content svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.gs-split-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+/* The visible seam, drawn as an SVG line rather than a gradient: a CSS
+   `to top right` gradient is only corner-to-corner on a square, and these
+   tiles are wider than they are tall, so the seam would drift off the
+   corners and stop matching the clip-path edges. preserveAspectRatio="none"
+   stretches the line exactly corner to corner; non-scaling-stroke keeps it
+   an even hairline despite that non-uniform scale. Decorative only —
+   pointer-events off so it never eats a click meant for either half. */
+.gs-split-divider {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+/* =============================================================================
+   NEW GAME — SETUP (date / fill-from-table / players)
+============================================================================= */
+
+.gs-new-game-setup-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-left: var(--gs-rail-width) solid var(--gs-accent);
+}
+
+.gs-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.gs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.gs-field label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gs-field input,
+.gs-field select {
+  font-size: 0.86rem;
+  padding: 6px 9px;
+}
+
+/* ── Game number field (New Game setup) ──
+   Read-only by default with a padlock beside it: the auto value is correct
+   whenever games are entered in order, so editing is deliberately a second
+   gesture rather than an inviting empty box. */
+
+.gs-game-number-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gs-game-number-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.gs-locked-input {
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  cursor: default;
+}
+
+.gs-game-number-hint {
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.gs-lock-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--gs-radius-sm);
+}
+
+.gs-lock-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.gs-lock-btn:hover {
+  background: color-mix(in srgb, var(--gs-accent) 10%, transparent);
+  border-color: var(--gs-accent);
+  color: var(--gs-accent-soft);
+}
+
+/* Unlocked is the "armed" state — accent it so an edited number is obvious. */
+.gs-lock-btn.is-unlocked {
+  color: var(--gs-accent-soft);
+  border-color: var(--gs-accent);
+  background: color-mix(in srgb, var(--gs-accent) 12%, transparent);
+}
+
+.gs-lock-btn .gs-lock-icon-open,
+.gs-lock-btn.is-unlocked .gs-lock-icon-closed {
+  display: none;
+}
+
+.gs-lock-btn.is-unlocked .gs-lock-icon-open {
+  display: block;
+}
+
+.gs-player-pickers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gs-player-picker-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: color-mix(in srgb, var(--color-bg) 45%, transparent);
+  border: 1px solid var(--gs-grid-line);
+  border-radius: var(--gs-radius-sm);
+  padding: 5px 8px 5px 6px;
+  transition: border-color var(--hover-transition);
+}
+
+.gs-player-picker-row:focus-within {
+  border-color: var(--gs-accent);
+}
+
+/* Seat number — makes the column order (which drives the grid) explicit. */
+.gs-player-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gs-accent) 16%, transparent);
+  color: var(--gs-accent-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-player-picker-row input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 3px 2px;
+  font-size: 0.88rem;
+}
+
+.gs-player-picker-row input:focus {
+  outline: none;
+}
+
+.gs-player-remove-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  padding: 2px 8px;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: var(--gs-radius-sm);
+  flex-shrink: 0;
+}
+
+.gs-player-remove-btn:hover:not(:disabled) {
+  color: var(--gs-loss);
+  background: var(--color-danger-subtle);
+}
+
+.gs-player-remove-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+  background: transparent;
+}
+
+/* =============================================================================
+   NEW GAME — GAME HEADER + SCOREBOARD
+============================================================================= */
+
+.gs-new-game-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gs-game-header-panel {
+  background: linear-gradient(135deg, var(--gs-surface) 0%, var(--color-panel) 60%);
+  border-left: var(--gs-rail-width) solid var(--gs-accent);
+}
+
+/* Read-only Game Detail carousel — arrows around a centered, double-click-
+   to-edit Game ID, with the table named underneath (the number only means
+   something relative to its own table). Hidden outside "view" mode. */
+.gs-game-carousel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.gs-game-carousel-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.gs-game-carousel-table {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.gs-carousel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.gs-carousel-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gs-accent) 10%, transparent);
+  border-color: var(--gs-accent);
+  color: var(--gs-accent-soft);
+}
+
+.gs-carousel-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.gs-game-carousel-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: var(--gs-radius-sm);
+}
+
+.gs-game-carousel-label:hover {
+  background: var(--color-hover);
+}
+
+.gs-game-carousel-input {
+  font-size: 1.05rem;
+  font-weight: 700;
+  width: 72px;
+  text-align: center;
+  padding: 2px 4px;
+}
+
+.gs-game-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.gs-game-header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gs-game-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gs-game-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.gs-game-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gs-entry-date-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+}
+
+.gs-entry-date-field label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gs-entry-date-field input {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+}
+
+.gs-game-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gs-game-header-actions button {
+  font-size: 0.82rem;
+  padding: 6px 12px;
+}
+
+/* ── Status badges ── */
+
+.gs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-dashed);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.gs-badge:empty {
+  display: none;
+}
+
+.gs-badge-live {
+  color: var(--color-accent-totals);
+  border-color: color-mix(in srgb, var(--color-accent-totals) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent-totals) 12%, transparent);
+}
+
+.gs-badge-done {
+  color: var(--gs-win);
+  border-color: color-mix(in srgb, var(--gs-win) 55%, transparent);
+  background: color-mix(in srgb, var(--gs-win) 12%, transparent);
+}
+
+.gs-badge-ot {
+  color: var(--gs-accent-soft);
+  border-color: color-mix(in srgb, var(--gs-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--gs-accent) 12%, transparent);
+}
+
+.gs-badge-readonly {
+  color: var(--color-text-muted);
+  border-style: dashed;
+}
+
+/* ── Scoreboard strip ── */
+
+.gs-scoreboard {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.gs-scoreboard:empty {
+  display: none;
+}
+
+.gs-score-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 92px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+  border: 1px solid var(--gs-grid-line);
+  border-radius: var(--gs-radius-sm);
+}
+
+.gs-score-chip-name {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-score-chip-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+/* Lowest running total — in Five Crowns low score leads. */
+.gs-score-chip.leader {
+  border-color: color-mix(in srgb, var(--gs-win) 60%, transparent);
+  background: color-mix(in srgb, var(--gs-win) 10%, transparent);
+}
+
+.gs-score-chip.leader .gs-score-chip-value {
+  color: var(--gs-win);
+}
+
+.gs-score-chip.leader .gs-score-chip-name::after {
+  content: " ★";
+  color: var(--gs-win);
+}
+
+/* =============================================================================
+   ROUND ENTRY GRID
+   Horizontally scrollable with a pinned round-label column, so a 6-player
+   table stays readable without the round numbers scrolling out of sight.
+============================================================================= */
+
+.gs-round-grid-panel {
+  border-left: var(--gs-rail-width) solid color-mix(in srgb, var(--gs-accent) 45%, transparent);
+}
+
+.gs-round-grid-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--gs-grid-line);
+  border-radius: var(--gs-radius-sm);
+}
+
+.gs-round-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 320px;
+  font-size: 0.82rem;
+}
+
+.gs-round-grid th,
+.gs-round-grid td {
+  padding: 5px 8px;
+  text-align: center;
+  border-bottom: 1px solid var(--gs-grid-line);
+}
+
+/* Sticky headers must be fully opaque or the rows scroll visibly through
+   them — --gs-header-bg is a translucent tint, so it's layered as a
+   background-image over the opaque panel colour rather than used alone. */
+.gs-round-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--color-panel);
+  background-image: linear-gradient(var(--gs-header-bg), var(--gs-header-bg));
+  color: var(--color-text);
+  font-weight: 700;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.gs-round-grid th.gs-subheader {
+  font-weight: 600;
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Vertical rule between player groups (both header sub-cells and body cells
+   that start a new player's Score column). */
+.gs-round-grid .gs-col-start {
+  border-left: 1px solid var(--gs-grid-line);
+}
+
+.gs-round-grid tbody tr:nth-child(even) td {
+  background: var(--gs-zebra);
+}
+
+.gs-round-grid tbody tr:hover td {
+  background: color-mix(in srgb, var(--gs-accent) 8%, transparent);
+}
+
+/* Pinned round-label column. */
+.gs-round-label-cell {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-panel);
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-align: left !important;
+  white-space: nowrap;
+}
+
+.gs-round-grid tbody tr:nth-child(even) .gs-round-label-cell,
+.gs-round-grid tbody tr:hover .gs-round-label-cell {
+  background: color-mix(in srgb, var(--color-panel) 92%, var(--color-text));
+}
+
+/* Only the rowspan'd corner cell pins left — scoping to the first header row
+   matters, since the sub-header row's first child is a player's "Score"
+   heading, which must scroll with its column. */
+.gs-round-grid thead tr:first-child th:first-child {
+  left: 0;
+  z-index: 3;
+}
+
+/* Overtime rounds — visually separated from the fixed 3-13 block. */
+.gs-round-ot-row .gs-round-label-cell {
+  color: var(--gs-accent-soft);
+}
+
+.gs-round-ot-row td {
+  border-top: 1px solid color-mix(in srgb, var(--gs-accent) 45%, transparent);
+}
+
+.gs-round-grid input[type="number"] {
+  width: 100%;
+  min-width: 46px;
+  text-align: center;
+  padding: 4px;
+  font-size: 0.82rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-round-grid input[type="number"]:hover:not(:disabled) {
+  border-color: var(--gs-grid-line);
+}
+
+.gs-round-grid input[type="number"]:focus {
+  outline: none;
+  background: var(--color-input-bg);
+  border-color: var(--gs-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gs-accent) 25%, transparent);
+}
+
+.gs-round-grid input[type="number"]:disabled {
+  color: var(--color-text);
+  opacity: 0.85;
+  /* Disabled controls swallow mouse events entirely (they never dispatch, so
+     they can't be caught in the capture phase either), which turned every
+     read-only score cell into a dead zone for the mouse back/forward buttons.
+     Falling through to the <td> restores them; nothing here is interactive. */
+  pointer-events: none;
+}
+
+.gs-round-total-cell {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  min-width: 44px;
+}
+
+.gs-round-cell-na {
+  color: var(--color-border-dashed);
+}
+
+.gs-round-grid tfoot td {
+  position: sticky;
+  bottom: 0;
+  background-color: var(--color-panel);
+  background-image: linear-gradient(var(--gs-header-bg), var(--gs-header-bg));
+  border-top: 1px solid color-mix(in srgb, var(--gs-accent) 40%, transparent);
+  border-bottom: none;
+  font-weight: 700;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.gs-round-grid tfoot td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  text-align: left;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gs-winner-cell {
+  background: color-mix(in srgb, var(--gs-win) 22%, transparent) !important;
+  color: var(--gs-win);
+}
+
+/* =============================================================================
+   HISTORICAL GAMES
+============================================================================= */
+
+.gs-historical-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gs-historical-list.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 10px;
+}
+
+/* ── Table sections ──
+   Filtering by player can return games from several tables at once, and each
+   numbers its games independently — so a flat list would interleave two
+   unrelated "Game 40"s and bury a short table's run below a long one's. A
+   sticky header keeps the table you're reading identified while you scroll. */
+
+.gs-hist-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.gs-hist-section-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 2px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--gs-grid-line);
+}
+
+.gs-hist-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--gs-accent-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-hist-section-count {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.gs-game-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: var(--gs-rail-width) solid color-mix(in srgb, var(--gs-win) 55%, transparent);
+  border-radius: var(--gs-radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition),
+    box-shadow var(--hover-transition);
+}
+
+/* Games still being played get the "live" rail instead of the finished one. */
+.gs-game-row.gs-game-row-live {
+  border-left-color: color-mix(in srgb, var(--color-accent-totals) 65%, transparent);
+}
+
+.gs-game-row:hover {
+  border-color: var(--gs-accent);
+  background: linear-gradient(135deg, var(--gs-surface) 0%, var(--color-panel) 70%);
+  box-shadow: 0 3px 14px color-mix(in srgb, var(--gs-accent) 14%, transparent);
+}
+
+/* The whole card is the click target, so it's focusable — give keyboard users
+   the same affordance the pointer gets. */
+.gs-game-row:focus-visible {
+  outline: none;
+  border-color: var(--gs-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gs-accent) 40%, transparent);
+}
+
+.gs-game-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gs-game-row-titles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.gs-game-row-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.gs-game-row-date {
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Player score chips inside a history row. */
+.gs-game-row-players {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gs-game-row-player {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.78rem;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+  border: 1px solid var(--gs-grid-line);
+  color: var(--color-text-muted);
+}
+
+.gs-game-row-player-score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.gs-game-row-winner {
+  color: var(--gs-win);
+  border-color: color-mix(in srgb, var(--gs-win) 55%, transparent);
+  background: color-mix(in srgb, var(--gs-win) 12%, transparent);
+}
+
+.gs-game-row-winner .gs-game-row-player-score {
+  color: var(--gs-win);
+}
+
+/* =============================================================================
+   STATS & COMPARE
+============================================================================= */
+
+.gs-stats-controls-panel {
+  border-left: var(--gs-rail-width) solid var(--gs-accent);
+}
+
+.gs-stats-profile-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gs-stats-profile-select-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.gs-stats-profile-select {
+  font-size: 0.82rem;
+  padding: 5px 8px;
+  max-width: 200px;
+}
+
+/* Names the players still addable to the comparison, so a missing name reads
+   as the shared-table rule rather than a bug. Breaks onto its own full-width
+   line under the pickers. */
+.gs-stats-compare-hint {
+  flex-basis: 100%;
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.gs-stats-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Comparison table ── */
+
+.gs-stats-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--gs-grid-line);
+  border-radius: var(--gs-radius-sm);
+  background: var(--color-panel);
+}
+
+.gs-stats-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.gs-stats-table th,
+.gs-stats-table td {
+  padding: 5px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--gs-grid-line);
+}
+
+.gs-stats-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--color-panel);
+  background-image: linear-gradient(var(--gs-header-bg), var(--gs-header-bg));
+  font-weight: 700;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.gs-stats-table th.gs-subheader {
+  font-weight: 600;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gs-stats-table .gs-col-start {
+  border-left: 1px solid var(--gs-grid-line);
+}
+
+/* Pinned stat-name column. */
+.gs-stats-row-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-panel);
+  text-align: left !important;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+/* Same scoping as the round grid — only the rowspan'd corner pins left. */
+.gs-stats-table thead tr:first-child th:first-child {
+  left: 0;
+  z-index: 3;
+}
+
+.gs-stats-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--gs-accent) 7%, transparent);
+}
+
+.gs-stats-table tbody tr:hover .gs-stats-row-label {
+  background: color-mix(in srgb, var(--color-panel) 92%, var(--color-text));
+}
+
+/* Group divider rows (Rates / Records / Streaks) — pure wayfinding, they hold
+   no data, which is why they span the whole table. */
+.gs-stats-group-row td {
+  text-align: left !important;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gs-accent-soft);
+  background: color-mix(in srgb, var(--gs-accent) 9%, transparent);
+  padding: 5px 10px;
+}
+
+.gs-stat-best {
+  background: color-mix(in srgb, var(--gs-win) 20%, transparent) !important;
+  color: var(--gs-win);
+  font-weight: 700;
+}
+
+.gs-stat-worst {
+  background: color-mix(in srgb, var(--gs-loss) 16%, transparent) !important;
+  color: var(--gs-loss);
+}
+
+.gs-stats-game-cell {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.gs-stat-detail-cell {
+  cursor: pointer;
+}
+
+.gs-stat-detail-cell:hover {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* ── Face switcher (Table Stats ⇄ Win Chart) ──
+   Mirrors Budget Tracker's Annual Stats cross-fade. Only one face is ever in
+   normal flow, so the container height is always exact and no leftover gap is
+   possible. JS drives the swap via the .gs-face-hiding / .gs-face-showing
+   classes at the midpoint of the fade. */
+
+.gs-flip-front,
+.gs-flip-back {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Second face hidden by default; JS flips display at the fade midpoint. */
+.gs-flip-back {
+  display: none;
+}
+
+@keyframes gs-face-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes gs-face-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.gs-face-hiding {
+  animation: gs-face-out 0.4s ease both;
+  pointer-events: none;
+}
+
+.gs-face-showing {
+  animation: gs-face-in 0.4s ease both;
+}
+
+/* ── Table (head-to-head) summary card ── */
+
+.gs-table-stats-card {
+  border-left: var(--gs-rail-width) solid var(--gs-accent);
+}
+
+/* Head-to-head win tiles, reusing the home tile grid. */
+.gs-h2h-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* Key/value list for the table's shared records. */
+.gs-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.gs-record-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.32fr) 1fr;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--gs-grid-line);
+  font-size: 0.78rem;
+}
+
+.gs-record-row:last-child {
+  border-bottom: none;
+}
+
+.gs-record-label {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Spreadsheet import (Preferences) ──
+   Same shape as Time Tracker's CSV import row (.tt-settings-label-col /
+   .tt-settings-status-badge in time-tracker.css) — duplicated here rather
+   than shared across tool stylesheets, matching this codebase's convention
+   for small per-file UI bits. */
+
+.gs-settings-label-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gs-settings-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.gs-import-last {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  margin: 4px 0 14px;
+}
+
+.gs-import-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.gs-import-template-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gs-import-template-row label {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.gs-import-template-row input[type="number"] {
+  width: 60px;
+  box-sizing: border-box;
+}
+
+.gs-import-filename {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.gs-import-summary {
+  margin: 14px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.gs-import-summary.success {
+  background: var(--color-toast-success-bg);
+  border: 1px solid var(--color-toast-success-border);
+  color: var(--color-toast-success-text);
+}
+
+.gs-import-summary.error {
+  background: var(--color-toast-error-bg);
+  border: 1px solid var(--color-toast-error-border);
+  color: var(--color-toast-error-text);
+}
+
+.gs-import-error-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  /* Long workbooks can fail in bulk; the list scrolls rather than growing the
+     modal past the viewport. */
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.gs-import-error-list:empty {
+  margin: 0;
+}
+
+.gs-import-error-list li {
+  overflow-wrap: anywhere;
+}
+
+/* ── Seat order (Edit Table) ──
+   Mirrors the Edit Sidebar modal's drag rows so reordering feels the same
+   wherever the app offers it. */
+
+.gs-seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gs-seat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--gs-radius-sm);
+  background: var(--color-input-bg);
+  font-size: 0.82rem;
+  cursor: grab;
+}
+
+.gs-seat-row.dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.gs-seat-handle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gs-seat-handle svg {
+  width: 100%;
+  height: 100%;
+}
+
+.gs-seat-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Whole-row target rather than per-cell (as the comparison table uses), since
+   the label and value together are what names the record. */
+.gs-record-row-detail {
+  cursor: pointer;
+}
+
+.gs-record-row-detail:hover {
+  background: color-mix(in srgb, var(--gs-accent) 10%, transparent);
+}
+
+.gs-record-value {
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.gs-record-value.gs-record-empty {
+  color: var(--color-text-muted);
+}
+
+/* =============================================================================
+   CHARTS
+============================================================================= */
+
+.gs-chart-canvas {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+
+.gs-win-chart-panel,
+.gs-progress-chart-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-left: var(--gs-rail-width) solid color-mix(in srgb, var(--gs-accent) 45%, transparent);
+}
+
+.gs-chart-expand-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 2px 9px;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  border-radius: var(--gs-radius-sm);
+  flex-shrink: 0;
+}
+
+.gs-chart-expand-btn:hover {
+  background: color-mix(in srgb, var(--gs-accent) 10%, transparent);
+  border-color: var(--gs-accent);
+  color: var(--gs-accent-soft);
+}
+
+.gs-chart-expand-modal {
+  width: min(90vw, 820px);
+}
+
+.gs-chart-expand-body {
+  padding-top: 4px;
+}
+
+.gs-chart-expand-canvas-wrap {
+  position: relative;
+}
+
+.gs-chart-expand-canvas {
+  width: 100%;
+  height: 380px;
+  display: block;
+}
+
+.gs-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--color-panel);
+  border: 1px solid color-mix(in srgb, var(--gs-accent) 40%, transparent);
+  border-radius: var(--gs-radius-sm);
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  white-space: nowrap;
+  z-index: 5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.gs-chart-tooltip-header {
+  font-weight: 700;
+  margin-bottom: 3px;
+  color: var(--gs-accent-soft);
+}
+
+/* Swatch matching the series' line colour, so the tooltip is readable without
+   glancing down at the legend. */
+.gs-chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gs-chart-tooltip-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* Marks the winner on the final round's tooltip. Pushed to the right so it
+   can't be mistaken for part of the score. */
+.gs-chart-tooltip-star {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--gs-accent-soft);
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   MODALS
+============================================================================= */
+
+.gs-edit-context {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: -10px 0 16px;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.gs-context-line {
+  color: inherit;
+}
+
+.gs-preference-hint {
+  margin: -6px 0 4px;
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}
+
+.gs-tables-intro {
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+/* Roster shown beneath a table's custom name — without it there'd be no way
+   to tell two named tables apart in the Setup list. */
+.gs-table-roster {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* Sized so a full page of 10 rows AND the pager fit without scrolling. The
+   body was previously capped at 52vh with the pager stacked underneath it
+   inside the same scroll region, which clipped the last row. Now the modal
+   owns the height, the pager is pinned outside the scroll area, and the table
+   takes whatever is left — so the only time it scrolls is "show all". */
+.gs-stat-detail-modal {
+  width: min(90vw, 620px);
+  max-height: 90vh;
+}
+
+.gs-stat-detail-modal-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.gs-stat-detail-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--gs-grid-line);
+  border-radius: var(--gs-radius-sm);
+}
+
+/* Rank column in the detail table. */
+.gs-stat-detail-rank {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  width: 3rem;
+}
+
+.gs-stat-detail-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.gs-pager-label {
+  min-width: 8rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  border-radius: var(--gs-radius-sm);
+  padding: 2px 6px;
+}
+
+.gs-pager-label:hover {
+  background: var(--color-hover);
+  color: var(--gs-accent-soft);
+}
+
+.gs-pager-input {
+  width: 8rem;
+  text-align: center;
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A detail row that names a real game is openable — same double-click
+   gesture that opened this modal in the first place. */
+.gs-stat-detail-row-link {
+  cursor: pointer;
+}
+
+.gs-stat-detail-row-link:hover {
+  background: color-mix(in srgb, var(--gs-accent) 10%, transparent);
+}
+
+.gs-pager-arrow-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 2px 12px;
+  font-size: 1rem;
+  line-height: 1.2;
+  border-radius: var(--gs-radius-sm);
+}
+
+.gs-pager-arrow-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gs-accent) 10%, transparent);
+  border-color: var(--gs-accent);
+  color: var(--gs-accent-soft);
+}
+
+.gs-pager-arrow-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}

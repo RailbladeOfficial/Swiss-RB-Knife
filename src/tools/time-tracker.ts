@@ -1376,8 +1376,17 @@ function parseCsvImport(raw: string): CsvImportResult {
 
 async function downloadCsvTemplate(): Promise<void> {
   try {
+    const now = new Date();
+    const timestamp = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+      String(now.getHours()).padStart(2, "0"),
+      String(now.getMinutes()).padStart(2, "0"),
+      String(now.getSeconds()).padStart(2, "0"),
+    ].join("-");
     await invoke("export_csv", {
-      filename: "time-tracker-import-template.csv",
+      filename: `time-tracker-import-template-${timestamp}.csv`,
       data: "Start Date,Start Time,End Date,End Time,Project,Activity,Notes",
     });
     flash("Template downloaded to Downloads!", "success");

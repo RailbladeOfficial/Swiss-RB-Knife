@@ -298,3 +298,39 @@ body.solid-modals .modal {
   box-shadow: 0 0 12px rgba(255, 0, 255, 0.5);
 }
 .budget-stats-section-heading { color: #00ffff; text-shadow: 0 0 8px rgba(0, 255, 255, 0.4); }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      #ff00ff;
+  --gs-accent-soft: #00ffff;
+  --gs-win:         #39ff14;
+  --gs-loss:        #ff4400;
+  --gs-surface:     rgba(255, 0, 255, 0.10);
+  --gs-header-bg:   rgba(0, 255, 255, 0.10);
+  --gs-grid-line:   rgba(0, 255, 255, 0.30);
+  --gs-zebra:       rgba(0, 255, 255, 0.04);
+}
+
+/* Neon earns its glow everywhere else in the shell — the tool's headline
+   numbers and active segment get the same treatment. */
+.gs-tile-value,
+.gs-panel-title,
+.gs-hero-title {
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.45);
+}
+
+.gs-segment-btn.active {
+  box-shadow: 0 0 12px rgba(255, 0, 255, 0.5);
+}
+
+.gs-action-card:hover {
+  box-shadow: 0 0 18px rgba(255, 0, 255, 0.35);
+}
+
+.gs-score-chip.leader {
+  box-shadow: 0 0 12px rgba(57, 255, 20, 0.35);
+}

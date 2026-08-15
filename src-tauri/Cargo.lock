@@ -4054,6 +4054,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "ureq",
+ "windows",
  "zeroize",
 ]
 
