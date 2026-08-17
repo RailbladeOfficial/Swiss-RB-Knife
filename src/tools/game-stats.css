@@ -15,7 +15,7 @@
 
    WHY THERE IS NO game-stats-five-crowns.css
    -----------------------------------------------------------------------------
-   game-stats-five-crowns.ts exists because the *rules* are game-specific —
+   game-stats-five-crowns.ts exists because the *rules* are game-specific,
    round structure, the overtime tie-break, the stat catalog. None of that
    reaches the presentation layer: the round grid, scoreboard, history cards
    and comparison table are all "score per player per round" widgets that any
@@ -27,7 +27,7 @@
 ============================================================================= */
 
 :root {
-  /* Primary accent — rails, active segments, focus rings, links. */
+  /* Primary accent, rails, active segments, focus rings, links. */
   --gs-accent: var(--color-btn);
   /* Lighter companion for text on dark surfaces. */
   --gs-accent-soft: var(--color-accent);
@@ -38,7 +38,7 @@
   --gs-surface: color-mix(in srgb, var(--color-btn) 7%, transparent);
   /* Table header / sticky-column backing. */
   --gs-header-bg: color-mix(in srgb, var(--color-btn) 10%, transparent);
-  /* Row separators inside the grids — deliberately softer than --color-border. */
+  /* Row separators inside the grids, deliberately softer than --color-border. */
   --gs-grid-line: color-mix(in srgb, var(--color-border) 70%, transparent);
   /* Zebra striping. */
   --gs-zebra: color-mix(in srgb, var(--color-text) 3%, transparent);
@@ -59,7 +59,7 @@
   gap: 12px;
 }
 
-/* Slim breadcrumb strip above each sub-view — the "‹ Back" affordance plus a
+/* Slim breadcrumb strip above each sub-view. The "‹ Back" affordance plus a
    label saying where you are, since the tool header only ever says "Game
    Stats". */
 .gs-view-bar {
@@ -171,7 +171,7 @@
   font-size: 0.8rem;
   border: 1px dashed var(--color-border-dashed);
   border-radius: var(--gs-radius);
-  /* Historical's card layout is a grid — an empty state must span it rather
+  /* Historical's card layout is a grid, an empty state must span it rather
      than sit in the first cell. No-op in the flex list layout. */
   grid-column: 1 / -1;
 }
@@ -179,7 +179,7 @@
 /* =============================================================================
    BUTTONS
    Shell gives every <button> the solid accent fill, which is far too loud for
-   a screen that has this many controls — these are the tool's quieter tiers.
+   a screen that has this many controls. These are the tool's quieter tiers.
 ============================================================================= */
 
 .gs-primary-action-btn {
@@ -254,7 +254,7 @@
   color: var(--gs-accent-soft);
 }
 
-/* One button, two glyphs — the hidden one is the layout currently in use. */
+/* One button, two glyphs. The hidden one is the layout currently in use. */
 .gs-layout-toggle-btn .gs-layout-icon-rows,
 .gs-layout-toggle-btn.is-cards .gs-layout-icon-grid {
   display: none;
@@ -264,7 +264,7 @@
   display: block;
 }
 
-/* Dashed "add another" row — reads as an empty slot rather than an action. */
+/* Dashed "add another" row, reads as an empty slot rather than an action. */
 .gs-ghost-add-btn {
   width: 100%;
   background: transparent;
@@ -396,7 +396,7 @@
 }
 
 /* =============================================================================
-   HOME — a launchpad: a thin strip of numbers over four destination tiles.
+   HOME: a launchpad: a thin strip of numbers over four destination tiles.
    No game list (that's Historical, which can filter) and no game switcher
    (each destination picks its own game type on arrival).
 ============================================================================= */
@@ -469,7 +469,7 @@
   grid-auto-rows: minmax(140px, 1fr);
   gap: 14px;
   /* .tool-view doesn't stretch to the viewport, so the tiles can't inherit a
-     height to fill — they claim one instead. */
+     height to fill. They claim one instead. */
   min-height: min(58vh, 620px);
 }
 
@@ -494,7 +494,7 @@
     transform 0.16s ease;
 }
 
-/* One column on narrow windows — two big tiles side by side stop being
+/* One column on narrow windows. Two big tiles side by side stop being
    readable well before the sidebar-collapsed width. */
 @media (max-width: 700px) {
   .gs-home-actions {
@@ -644,7 +644,7 @@
    tiles are wider than they are tall, so the seam would drift off the
    corners and stop matching the clip-path edges. preserveAspectRatio="none"
    stretches the line exactly corner to corner; non-scaling-stroke keeps it
-   an even hairline despite that non-uniform scale. Decorative only —
+   an even hairline despite that non-uniform scale. Decorative only,
    pointer-events off so it never eats a click meant for either half. */
 .gs-split-divider {
   position: absolute;
@@ -657,7 +657,7 @@
 }
 
 /* =============================================================================
-   NEW GAME — SETUP (date / fill-from-table / players)
+   NEW GAME: SETUP (date / fill-from-table / players)
 ============================================================================= */
 
 .gs-new-game-setup-panel {
@@ -746,7 +746,7 @@
   color: var(--gs-accent-soft);
 }
 
-/* Unlocked is the "armed" state — accent it so an edited number is obvious. */
+/* Unlocked is the "armed" state, accent it so an edited number is obvious. */
 .gs-lock-btn.is-unlocked {
   color: var(--gs-accent-soft);
   border-color: var(--gs-accent);
@@ -783,7 +783,7 @@
   border-color: var(--gs-accent);
 }
 
-/* Seat number — makes the column order (which drives the grid) explicit. */
+/* Seat number, makes the column order (which drives the grid) explicit. */
 .gs-player-index {
   display: flex;
   align-items: center;
@@ -835,7 +835,7 @@
 }
 
 /* =============================================================================
-   NEW GAME — GAME HEADER + SCOREBOARD
+   NEW GAME: GAME HEADER + SCOREBOARD
 ============================================================================= */
 
 .gs-new-game-entry {
@@ -849,7 +849,7 @@
   border-left: var(--gs-rail-width) solid var(--gs-accent);
 }
 
-/* Read-only Game Detail carousel — arrows around a centered, double-click-
+/* Read-only Game Detail carousel, arrows around a centered, double-click-
    to-edit Game ID, with the table named underneath (the number only means
    something relative to its own table). Hidden outside "view" mode. */
 .gs-game-carousel {
@@ -1068,7 +1068,7 @@
   line-height: 1.15;
 }
 
-/* Lowest running total — in Five Crowns low score leads. */
+/* Lowest running total, in Five Crowns low score leads. */
 .gs-score-chip.leader {
   border-color: color-mix(in srgb, var(--gs-win) 60%, transparent);
   background: color-mix(in srgb, var(--gs-win) 10%, transparent);
@@ -1115,7 +1115,7 @@
 }
 
 /* Sticky headers must be fully opaque or the rows scroll visibly through
-   them — --gs-header-bg is a translucent tint, so it's layered as a
+   them, --gs-header-bg is a translucent tint, so it's layered as a
    background-image over the opaque panel colour rather than used alone. */
 .gs-round-grid thead th {
   position: sticky;
@@ -1169,7 +1169,7 @@
   background: color-mix(in srgb, var(--color-panel) 92%, var(--color-text));
 }
 
-/* Only the rowspan'd corner cell pins left — scoping to the first header row
+/* Only the rowspan'd corner cell pins left, scoping to the first header row
    matters, since the sub-header row's first child is a player's "Score"
    heading, which must scroll with its column. */
 .gs-round-grid thead tr:first-child th:first-child {
@@ -1177,7 +1177,7 @@
   z-index: 3;
 }
 
-/* Overtime rounds — visually separated from the fixed 3-13 block. */
+/* Overtime rounds, visually separated from the fixed 3-13 block. */
 .gs-round-ot-row .gs-round-label-cell {
   color: var(--gs-accent-soft);
 }
@@ -1277,7 +1277,7 @@
 
 /* ── Table sections ──
    Filtering by player can return games from several tables at once, and each
-   numbers its games independently — so a flat list would interleave two
+   numbers its games independently, so a flat list would interleave two
    unrelated "Game 40"s and bury a short table's run below a long one's. A
    sticky header keeps the table you're reading identified while you scroll. */
 
@@ -1344,7 +1344,7 @@
   box-shadow: 0 3px 14px color-mix(in srgb, var(--gs-accent) 14%, transparent);
 }
 
-/* The whole card is the click target, so it's focusable — give keyboard users
+/* The whole card is the click target, so it's focusable, give keyboard users
    the same affordance the pointer gets. */
 .gs-game-row:focus-visible {
   outline: none;
@@ -1513,7 +1513,7 @@
   white-space: nowrap;
 }
 
-/* Same scoping as the round grid — only the rowspan'd corner pins left. */
+/* Same scoping as the round grid, only the rowspan'd corner pins left. */
 .gs-stats-table thead tr:first-child th:first-child {
   left: 0;
   z-index: 3;
@@ -1527,7 +1527,7 @@
   background: color-mix(in srgb, var(--color-panel) 92%, var(--color-text));
 }
 
-/* Group divider rows (Rates / Records / Streaks) — pure wayfinding, they hold
+/* Group divider rows (Rates / Records / Streaks), pure wayfinding, they hold
    no data, which is why they span the whole table. */
 .gs-stats-group-row td {
   text-align: left !important;
@@ -1646,7 +1646,7 @@
 
 /* ── Spreadsheet import (Preferences) ──
    Same shape as Time Tracker's CSV import row (.tt-settings-label-col /
-   .tt-settings-status-badge in time-tracker.css) — duplicated here rather
+   .tt-settings-status-badge in time-tracker.css), duplicated here rather
    than shared across tool stylesheets, matching this codebase's convention
    for small per-file UI bits. */
 
@@ -1941,7 +1941,7 @@
   line-height: 1.4;
 }
 
-/* Roster shown beneath a table's custom name — without it there'd be no way
+/* Roster shown beneath a table's custom name. Without it there'd be no way
    to tell two named tables apart in the Setup list. */
 .gs-table-roster {
   display: block;
@@ -1955,7 +1955,7 @@
    body was previously capped at 52vh with the pager stacked underneath it
    inside the same scroll region, which clipped the last row. Now the modal
    owns the height, the pager is pinned outside the scroll area, and the table
-   takes whatever is left — so the only time it scrolls is "show all". */
+   takes whatever is left, so the only time it scrolls is "show all". */
 .gs-stat-detail-modal {
   width: min(90vw, 620px);
   max-height: 90vh;
@@ -2015,7 +2015,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A detail row that names a real game is openable — same double-click
+/* A detail row that names a real game is openable. Same double-click
    gesture that opened this modal in the first place. */
 .gs-stat-detail-row-link {
   cursor: pointer;

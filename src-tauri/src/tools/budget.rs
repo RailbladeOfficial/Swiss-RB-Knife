@@ -1,5 +1,5 @@
 /* =============================================================================
-   BUDGET TRACKER — Rust backend
+   BUDGET TRACKER: Rust backend
    -----------------------------------------------------------------------------
    Persistence and optional AES-256-GCM encryption of budget data, split
    across two independent files:
@@ -10,23 +10,23 @@
      • budget-entities.json / budget-entities.enc
        Setup-modal structure: categories, incomeSources, expenseSources,
        recurringBills. Also carries `sessionUnlock` as a plain sibling field
-       (never encrypted, whether the rest of the file is or not) — it's a UI
+       (never encrypted, whether the rest of the file is or not), it's a UI
        preference, not sensitive, and budget_lock_status() needs to read it
        before any password is available.
 
    Both files toggle plaintext <-> encrypted together, under the same
    password, via budget_enable_encryption / budget_disable_encryption. There
-   is no "enabled" flag stored anywhere — it's just whether budget-entities.enc
+   is no "enabled" flag stored anywhere, it's just whether budget-entities.enc
    exists. One less piece of state that could disagree with reality.
 
-   Each encrypted file is a fully self-contained JSON envelope — its own
+   Each encrypted file is a fully self-contained JSON envelope. Its own
    passwordHash, kdfSaltHex, nonceHex, ciphertextHex, all together, written
    in one call. The two envelopes share the same password and salt VALUES
    (generated once, at enable time) but are duplicated independently into
    each file rather than one file referencing the other's copy. That's
    deliberate: no file's decryptability should ever depend on a different
-   file's bytes being intact. That exact dependency — a salt in one file,
-   ciphertext in another — is what silently destroyed six months of real
+   file's bytes being intact. That exact dependency (a salt in one file,
+   ciphertext in another) is what silently destroyed six months of real
    budget data once already on this codebase, discovered days later with no
    warning and no way back. See lib.rs's backed_up_write_group for the other
    half of the fix (nothing here can ever be left half-written either).
@@ -52,7 +52,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 /// All four possible on-disk files for budget state. Only two exist at once
-/// per data/entities pair (plaintext XOR encrypted) — backed_up_write_group
+/// per data/entities pair (plaintext XOR encrypted), backed_up_write_group
 /// just skips whichever don't currently exist, so listing all four here
 /// means a snapshot always captures whichever pair is live.
 const BUDGET_BACKUP_GROUP: [&str; 4] = [
@@ -82,7 +82,7 @@ struct EntitiesEncryptedEnvelope {
     kdf_salt_hex: String,
     nonce_hex: String,
     ciphertext_hex: String,
-    /// Plain, unencrypted — see file header for why.
+    /// Plain, unencrypted, see file header for why.
     session_unlock: bool,
 }
 
@@ -99,7 +99,7 @@ fn read_entities_envelope(app: &tauri::AppHandle) -> Option<EntitiesEncryptedEnv
 /* =============================================================================
    PLAINTEXT ENTITIES WRAPPER
    Only used when encryption is off. sessionUnlock sits alongside the opaque
-   entities payload — Rust doesn't need to understand categories/sources/etc.
+   entities payload. Rust doesn't need to understand categories/sources/etc.
    any more than it understands the entries file's contents; it just needs
    this one field's name.
 ============================================================================= */
@@ -117,7 +117,7 @@ fn read_plaintext_entities(app: &tauri::AppHandle) -> Option<PlaintextEntitiesFi
 }
 
 /// Reads sessionUnlock from whichever shape (plaintext or encrypted) the
-/// entities file is currently in. Never needs a password — this is exactly
+/// entities file is currently in. Never needs a password. This is exactly
 /// why it lives as a plain field either way.
 fn read_session_unlock(app: &tauri::AppHandle) -> bool {
     if let Some(env) = read_entities_envelope(app) {
@@ -135,7 +135,7 @@ fn read_session_unlock(app: &tauri::AppHandle) -> bool {
 
 /// Derives the AES-256 key from the password + stored salt. The key is
 /// returned inside a Zeroizing wrapper, so its bytes are wiped from memory
-/// automatically when the caller's copy goes out of scope — derived key
+/// automatically when the caller's copy goes out of scope, derived key
 /// material should never outlive the single encrypt/decrypt it was made for.
 fn derive_key(password: &str, kdf_salt_hex: &str) -> Result<Zeroizing<[u8; 32]>, String> {
     let salt_bytes = hex::decode(kdf_salt_hex).map_err(|e| e.to_string())?;
@@ -151,7 +151,7 @@ fn derive_key(password: &str, kdf_salt_hex: &str) -> Result<Zeroizing<[u8; 32]>,
     Ok(key)
 }
 
-/// Returns (nonce_bytes, ciphertext_with_tag) separately — the envelope
+/// Returns (nonce_bytes, ciphertext_with_tag) separately. The envelope
 /// stores them as separate hex fields rather than one concatenated blob, so
 /// the format is self-describing instead of relying on "the first 12 bytes
 /// are the nonce" being remembered correctly everywhere that touches it.
@@ -174,11 +174,11 @@ fn decrypt_bytes(key: &[u8; 32], nonce_bytes: &[u8], ciphertext: &[u8]) -> Resul
     let nonce = Nonce::from_slice(nonce_bytes);
     cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|_| "Decryption failed — wrong password or corrupted data".to_string())
+        .map_err(|_| "Decryption failed: wrong password or corrupted data".to_string())
 }
 
 /* =============================================================================
-   STANDARD SAVE / LOAD — ENTRIES  (budget-data.json, used when encryption is off)
+   STANDARD SAVE / LOAD: ENTRIES  (budget-data.json, used when encryption is off)
 ============================================================================= */
 
 /// Persists the entries JSON (billInstances/incomeEntries/fluctuatingExpenses)
@@ -198,11 +198,11 @@ pub fn load_budget_data(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 /* =============================================================================
-   STANDARD SAVE / LOAD — ENTITIES  (budget-entities.json, used when encryption is off)
+   STANDARD SAVE / LOAD: ENTITIES  (budget-entities.json, used when encryption is off)
 ============================================================================= */
 
 /// Persists the entities JSON (categories/incomeSources/expenseSources/
-/// recurringBills) to disk, plaintext — wrapped with the current
+/// recurringBills) to disk, plaintext, wrapped with the current
 /// sessionUnlock value, which the frontend never sends here and never sees
 /// on load either; it's managed separately via budget_set_session_unlock.
 #[tauri::command]
@@ -216,7 +216,7 @@ pub fn save_budget_entities(app: tauri::AppHandle, data: String) -> Result<(), S
     backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-entities.json", json.as_bytes())
 }
 
-/// Loads just the entities JSON from disk — sessionUnlock is stripped back
+/// Loads just the entities JSON from disk, sessionUnlock is stripped back
 /// out, since callers of this command only ever want the ledger structure.
 #[tauri::command]
 pub fn load_budget_entities(app: tauri::AppHandle) -> Result<String, String> {
@@ -237,11 +237,11 @@ pub struct BudgetLockStatus {
     session_unlock: bool,
 }
 
-/// "enabled" is just "does budget-entities.enc exist" — not a stored flag
+/// "enabled" is just "does budget-entities.enc exist", not a stored flag
 /// that could disagree with which files are actually on disk. Also treats
 /// leftover artifacts from before this file split (a bare budget-data.enc
 /// with no matching budget-entities.enc, or an old budget-lock.json) as
-/// "enabled" too — the alternative is reporting encryption as off and
+/// "enabled" too. The alternative is reporting encryption as off and
 /// silently handing back an empty budget while real encrypted data sits
 /// right there unread. A stuck auth screen is loud and diagnosable; a
 /// quietly empty tool is not.
@@ -270,16 +270,16 @@ pub fn budget_verify_password(app: tauri::AppHandle, password: String) -> Result
         Some(e) => e,
         None => {
             // No new-format envelope, but budget_lock_status() reported
-            // enabled=true — that only happens if legacy artifacts were
+            // enabled=true. That only happens if legacy artifacts were
             // detected. Say so plainly instead of returning Ok(false), which
-            // the frontend shows as "Incorrect password." — misleading when
+            // the frontend shows as "Incorrect password.", misleading when
             // the actual problem is an unrecognized on-disk format.
             let legacy = get_data_path(&app, "budget-data.enc").exists()
                 || get_data_path(&app, "budget-lock.json").exists();
             if legacy {
                 return Err(
                     "Found an older-format encrypted budget file this version can't read. \
-                     This needs a one-time migration — don't enter data yet, get help before continuing."
+                     This needs a one-time migration. Don't enter data yet, get help before continuing."
                         .to_string(),
                 );
             }
@@ -293,11 +293,11 @@ pub fn budget_verify_password(app: tauri::AppHandle, password: String) -> Result
 }
 
 /* =============================================================================
-   ENCRYPTED LOAD / SAVE — ENTRIES
+   ENCRYPTED LOAD / SAVE: ENTRIES
 ============================================================================= */
 
 /// Decrypts budget-data.enc and returns the entries JSON. Plaintext never
-/// touches disk — it lives only in memory.
+/// touches disk. It lives only in memory.
 #[tauri::command]
 pub fn budget_decrypt_to_memory(app: tauri::AppHandle, password: String) -> Result<String, String> {
     // Wipe the password from memory when this function returns (all paths).
@@ -315,7 +315,7 @@ pub fn budget_decrypt_to_memory(app: tauri::AppHandle, password: String) -> Resu
 }
 
 /// Re-encrypts updated entries to disk. Same salt and password hash carried
-/// forward unchanged — only the nonce and ciphertext are new — written back
+/// forward unchanged (only the nonce and ciphertext are new) written back
 /// as one object, one write, so they can never end up representing two
 /// different moments.
 #[tauri::command]
@@ -325,7 +325,7 @@ pub fn budget_save_encrypted(app: tauri::AppHandle, password: String, data: Stri
     let envelope = read_data_envelope(&app).ok_or_else(|| "Encryption is not enabled".to_string())?;
     let parsed = PasswordHash::new(envelope.password_hash.trim()).map_err(|e| e.to_string())?;
     if Argon2::default().verify_password(password.as_bytes(), &parsed).is_err() {
-        return Err("Wrong password — refusing to overwrite the encrypted file".to_string());
+        return Err("Wrong password: refusing to overwrite the encrypted file".to_string());
     }
     let key = derive_key(&password, &envelope.kdf_salt_hex)?;
     let (nonce_bytes, ciphertext) = encrypt_bytes(&key, data.as_bytes())?;
@@ -340,11 +340,11 @@ pub fn budget_save_encrypted(app: tauri::AppHandle, password: String, data: Stri
 }
 
 /* =============================================================================
-   ENCRYPTED LOAD / SAVE — ENTITIES
+   ENCRYPTED LOAD / SAVE: ENTITIES
 ============================================================================= */
 
 /// Decrypts budget-entities.enc and returns the entities JSON (sessionUnlock
-/// is not part of the ciphertext — see file header — so it's not part of
+/// is not part of the ciphertext (see file header) so it's not part of
 /// this return value either; callers get exactly the same shape whether
 /// encryption is on or off).
 #[tauri::command]
@@ -364,7 +364,7 @@ pub fn budget_decrypt_entities_to_memory(app: tauri::AppHandle, password: String
 }
 
 /// Re-encrypts updated entities to disk. sessionUnlock is carried forward
-/// unchanged from the existing envelope — this command only ever touches
+/// unchanged from the existing envelope. This command only ever touches
 /// the entities data itself.
 #[tauri::command]
 pub fn budget_save_entities_encrypted(app: tauri::AppHandle, password: String, data: String) -> Result<(), String> {
@@ -373,7 +373,7 @@ pub fn budget_save_entities_encrypted(app: tauri::AppHandle, password: String, d
     let envelope = read_entities_envelope(&app).ok_or_else(|| "Encryption is not enabled".to_string())?;
     let parsed = PasswordHash::new(envelope.password_hash.trim()).map_err(|e| e.to_string())?;
     if Argon2::default().verify_password(password.as_bytes(), &parsed).is_err() {
-        return Err("Wrong password — refusing to overwrite the encrypted file".to_string());
+        return Err("Wrong password: refusing to overwrite the encrypted file".to_string());
     }
     let key = derive_key(&password, &envelope.kdf_salt_hex)?;
     let (nonce_bytes, ciphertext) = encrypt_bytes(&key, data.as_bytes())?;
@@ -411,7 +411,7 @@ pub fn budget_enable_encryption(app: tauri::AppHandle, password: String) -> Resu
         None => ("{}".to_string(), false),
     };
 
-    // One password hash, one KDF salt — generated once, duplicated into both
+    // One password hash, one KDF salt, generated once, duplicated into both
     // envelopes below rather than referenced from a shared file.
     let salt = SaltString::generate(&mut OsRng);
     let password_hash = Argon2::default()
@@ -448,7 +448,7 @@ pub fn budget_enable_encryption(app: tauri::AppHandle, password: String) -> Resu
     // the on-disk state stays all-or-nothing. A lone budget-data.enc with no
     // matching entities envelope would otherwise trip the legacy-artifact
     // detector on next launch and show a misleading "older-format file"
-    // message — when the truth is simply "enabling failed, nothing changed."
+    // message, when the truth is simply "enabling failed, nothing changed."
     // The plaintext files are still untouched at this point, so backing out
     // loses nothing.
     if let Err(e) = backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-entities.enc", entities_json.as_bytes()) {
@@ -469,7 +469,7 @@ pub fn budget_enable_encryption(app: tauri::AppHandle, password: String) -> Resu
 
 /* =============================================================================
    DISABLE ENCRYPTION
-   Verifies the password against BOTH envelopes independently — they should
+   Verifies the password against BOTH envelopes independently. They should
    always agree since they were created together, but "assume two files
    agree" is exactly the bug this whole design exists to eliminate, so it's
    checked rather than assumed. Decrypts both, writes both plaintexts,
@@ -504,7 +504,7 @@ pub fn budget_disable_encryption(app: tauri::AppHandle, password: String) -> Res
     let entities_value: serde_json::Value =
         serde_json::from_slice(&plain_entities_bytes).map_err(|e| e.to_string())?;
 
-    // Write both plaintexts first — only remove the envelopes after both succeed.
+    // Write both plaintexts first, only remove the envelopes after both succeed.
     backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-data.json", &plain_data)?;
 
     let entities_wrapper = PlaintextEntitiesFile {
@@ -531,7 +531,7 @@ pub fn budget_disable_encryption(app: tauri::AppHandle, password: String) -> Res
 ============================================================================= */
 
 /// Updates sessionUnlock in place, in whichever shape the entities file is
-/// currently in — never touches the password hash, salt, or ciphertext, so
+/// currently in, never touches the password hash, salt, or ciphertext, so
 /// this never needs a password.
 #[tauri::command]
 pub fn budget_set_session_unlock(app: tauri::AppHandle, session_unlock: bool) -> Result<(), String> {

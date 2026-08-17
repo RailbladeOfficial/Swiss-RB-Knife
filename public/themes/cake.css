@@ -50,7 +50,7 @@
   --color-chart-8:             #2ecc71;
 }
 
-/* ── Panels — sky blue / orange alternating on gunmetal ── */
+/* ── Panels, sky blue / orange alternating on gunmetal ── */
 .input-panel {
   background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%);
   border-left: 4px solid #ffa500;
@@ -85,14 +85,14 @@
   opacity: 1;
 }
 
-/* ── Modal — solid: flat gunmetal panel (original look) ── */
+/* ── Modal, solid: flat gunmetal panel (original look) ── */
 body.solid-modals .modal {
   background: #484848;
   border-color: rgba(255, 165, 0, 0.3);
   box-shadow: 0 0 24px rgba(255, 165, 0, 0.1), 0 24px 48px rgba(0, 0, 0, 0.5);
 }
 
-/* ── Modal — translucent: frosted gunmetal glass ── */
+/* ── Modal, translucent: frosted gunmetal glass ── */
 body:not(.solid-modals) .modal {
   background: rgba(72, 72, 72, 0.25);
   backdrop-filter: blur(24px);
@@ -101,7 +101,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 24px rgba(255, 165, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.5);
 }
 
-/* ── Primary button — sky blue ghost ── */
+/* ── Primary button, sky blue ghost ── */
 .primary-btn {
   background: rgba(54, 192, 241, 0.12);
   border-color: rgba(54, 192, 241, 0.5);
@@ -114,7 +114,7 @@ body:not(.solid-modals) .modal {
   color: #ffa500;
 }
 
-/* ── Danger button — solid orange ── */
+/* ── Danger button, solid orange ── */
 .danger-btn {
   background: #ffa500;
   border-color: #ffa500;
@@ -189,7 +189,7 @@ body:not(.solid-modals) .modal {
 .preview-card.anchor-card { border-color: #ffa500; box-shadow: 0 0 10px rgba(255, 165, 0, 0.25); }
 .preview-card.drag-target  { border-color: #36c0f1; }
 
-/* ── Slider — silver/chrome feel ── */
+/* ── Slider, silver/chrome feel ── */
 .img-slider::-webkit-slider-thumb {
   background: linear-gradient(135deg, #d8d8d8, #909898);
   border-color: #2c2c2e;
@@ -211,7 +211,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds — gunmetal with alternating sky/orange tints */
+/* Panel backgrounds, gunmetal with alternating sky/orange tints */
 #finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%); }
 #finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(54, 192, 241, 0.1) 0%, #484848 100%); }
 #finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%); }
@@ -224,10 +224,10 @@ body:not(.solid-modals) .modal {
 }
 .budget-annual-stats-title { color: #36c0f1; }
 
-/* Summary tab active — alternating orange/blue matches cake theme personality */
+/* Summary tab active, alternating orange/blue matches cake theme personality */
 .budget-summary-tab.active { color: #ffa500; background: rgba(255, 165, 0, 0.12); border-bottom-color: #ffa500; }
 
-/* View-mode toggle active — sky-blue primary (was missing) */
+/* View-mode toggle active, sky-blue primary (was missing) */
 .budget-view-mode-btn.active {
   background: #36c0f1;
   color: #ffffff;

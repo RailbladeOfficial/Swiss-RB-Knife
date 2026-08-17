@@ -1,0 +1,643 @@
+/* =============================================================================
+   TTS REPEATER  (tts-repeater.css)
+   All color references use var(--color-*) from the active theme.
+
+   Segmented toggles reuse the shared .toggle-btn component from shell.css
+   (the documented Tier 3 pattern) with only a padding/font-size delta here,
+   rather than growing another private copy of it.
+
+   DISPLAY VIEW THEMING
+   -----------------------------------------------------------------------------
+   "Follow theme" does not define a look of its own. It borrows the two rules
+   every theme already writes for the app's top bar:
+
+     .tool-view-header / .section-header  → background (a gradient in most
+                                            themes), border, box-shadow
+     .tool-view-title  / .section-title   → text colour, and on the themes
+                                            that have one, the glow (neon's
+                                            cyan bloom, terminal's green,
+                                            Halloween's orange, Christmas's
+                                            gold)
+
+   #tts-display-chrome wears the first, #tts-display-text the second, and this
+   file strips the layout properties that come along with them. So the glow
+   toggle switches the theme's ACTUAL glow rather than an imitation, and a
+   theme with no glow simply has nothing to switch, which is also why the
+   Setup modal probes for one (see #tts-glow-probe) instead of assuming.
+
+   Nothing is set inline from TypeScript in theme mode, which is what lets a
+   theme change mid-run (Cycle mode included) repaint an open Display View
+   live. "Custom" look is the deliberate opposite: two exact inline colours,
+   flat, no chrome layer, no glow.
+============================================================================= */
+
+/* ── Container ─────────────────────────────────────────────────────────────── */
+
+.tts-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Shared field furniture ────────────────────────────────────────────────── */
+
+.tts-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tts-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tts-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* ── Message ───────────────────────────────────────────────────────────────── */
+
+#tts-message {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.tts-message-count {
+  font-size: 0.7rem;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* maxLength makes this unreachable through typing; it still covers a pasted
+   over-long message and a hand-edited data file. */
+.tts-message-count.tts-count-over {
+  color: var(--color-danger);
+  opacity: 1;
+}
+
+/* ── Timing row: interval + repeat ─────────────────────────────────────────── */
+
+.tts-timing-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.tts-inline-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.tts-number-input {
+  width: 84px;
+  flex-shrink: 0;
+}
+
+.tts-seg-group {
+  display: flex;
+  gap: 4px;
+}
+
+.tts-seg-group .toggle-btn {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
+/* ── Voice + sliders ───────────────────────────────────────────────────────── */
+
+#tts-voice {
+  width: 100%;
+  max-width: 420px;
+}
+
+.tts-slider-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px 12px;
+  align-items: center;
+  max-width: 420px;
+}
+
+.tts-slider-label {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+/* Read-out column: holds the display span and, while you're typing an exact
+   value, the number box that replaces it. Fixed width so swapping between the
+   two never shifts the slider beside it. */
+.tts-slider-readout {
+  display: flex;
+  justify-content: flex-end;
+  width: 68px;
+  flex-shrink: 0;
+}
+
+.tts-slider-value {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  text-align: right;
+  cursor: text;
+  /* Double-click to edit would otherwise just select the text. */
+  user-select: none;
+}
+
+.tts-slider-value:hover {
+  opacity: 1;
+}
+
+.tts-slider-entry {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.78rem;
+  padding: 2px 4px;
+  text-align: right;
+}
+
+/* The [hidden] attribute is what bindSliderEntry() toggles; spell out the
+   display:none so a future flex/grid rule on these can't quietly defeat it. */
+.tts-slider-value[hidden],
+.tts-slider-entry[hidden] {
+  display: none;
+}
+
+/* accent-color themes the native track/thumb in one line and follows the
+   active theme automatically. No need to rebuild the control per-vendor. */
+.tts-slider-grid input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-btn);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.tts-voice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.tts-voice-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 260px;
+  flex: 1;
+}
+
+#tts-test-btn {
+  align-self: flex-start;
+}
+
+/* ── Actions + status ──────────────────────────────────────────────────────── */
+
+.tts-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+#tts-start-btn {
+  min-width: 140px;
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.tts-status {
+  font-size: 0.82rem;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pushed to the far right, away from Start/Stop, it's the one destructive
+   control in the row and shouldn't sit under a cursor aiming for Start. */
+.tts-reset-btn {
+  margin-left: auto;
+}
+
+.tts-reset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tts-status.tts-status-live {
+  opacity: 1;
+  color: var(--color-accent);
+}
+
+/* Whole-panel dimming while a run is in progress. Replaces the original's
+   per-input inline backgroundColor, which hard-coded a grey that only looked
+   right on a light page. This leaves colour to the theme and just signals
+   "locked". :disabled already handles the individual controls' own styling. */
+.tts-running .tts-locked-panel {
+  opacity: 0.55;
+}
+
+/* ── Sidebar "speaking" indicator ──────────────────────────────────────────
+   Lives here rather than in shell.css because it's this tool's status
+   affordance, not shell chrome, shell.css only owns the .nav-item base.
+   Once you start a repeat and navigate away, this dot is the only thing
+   telling you the app is still going to talk at you, so it has to read at a
+   glance in the collapsed (icon-only) sidebar too, hence the dot on the icon
+   rather than a label suffix.
+========================================================================== */
+
+.nav-item.tts-speaking .nav-icon {
+  position: relative;
+}
+
+.nav-item.tts-speaking .nav-icon::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  /* Ring in the sidebar's own background so the dot stays legible against
+     whatever the icon underneath it is doing. */
+  box-shadow: 0 0 0 2px var(--color-panel);
+  animation: tts-speaking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes tts-speaking-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-item.tts-speaking .nav-icon::after {
+    animation: none;
+  }
+}
+
+/* ── Display View ──────────────────────────────────────────────────────────
+   Full-window overlay showing nothing but the message. z-index deliberately
+   clears #toastContainer (10000): this is built to go on a stream, and a
+   toast sliding in over a "we'll be back" card is the exact thing it exists
+   to prevent. Background and text colour are set inline from the saved
+   display settings, see applyDisplayAppearance().
+========================================================================== */
+
+#tts-display-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5vmin;
+  overflow: auto;
+  cursor: default;
+}
+
+/* Applied once the pointer has been still (same timer as the exit button),
+   a cursor parked on the card is as much of a giveaway as the button. Any
+   movement clears it, so it never traps anyone. */
+#tts-display-overlay.tts-display-idle {
+  cursor: none;
+}
+
+#tts-display-text {
+  width: 100%;
+  font-weight: 700;
+  line-height: 1.2;
+  /* Honours the newlines the user typed in the message box, a "we'll be
+     back" card is usually more than one line. */
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* ── "Follow theme" look ───────────────────────────────────────────────────
+   Applied by applyDisplayAppearance() to the overlay AND the Setup preview,
+   so what the preview shows is literally the rules the real thing runs.
+========================================================================== */
+
+/* Opaque base under the chrome layer, theme header gradients are mostly
+   semi-transparent, since they're designed to sit over the app background. */
+.tts-display-themed {
+  background: var(--color-bg);
+}
+
+/* The colour layer. Carries .tool-view-header for the theme's gradient, with
+   every layout property that class brings along stripped back off. This is
+   not a header, it just wants a header's paint. */
+#tts-display-chrome,
+#tts-display-preview-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  padding: 0;
+  gap: 0;
+  border: none;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Custom look is flat by definition: the inline background is the whole
+   design, so the theme's gradient must not sit on top of it. */
+#tts-display-overlay:not(.tts-display-themed) #tts-display-chrome,
+#tts-display-preview:not(.tts-display-themed) #tts-display-preview-chrome {
+  display: none;
+}
+
+/* Message rides above the colour layer. (The exit button gets the same
+   z-index in its own rule below, which owns its positioning.) */
+#tts-display-text,
+#tts-display-preview-text {
+  position: relative;
+  z-index: 1;
+}
+
+/* .tool-view-title is sized for a 1.1rem header row; here the size is the
+   user's own setting and the text is the entire screen, so both of that
+   class's own type rules get overridden. Colour and text-shadow (the parts
+   that carry the theme) are deliberately left alone. */
+#tts-display-text,
+#tts-display-preview-text {
+  opacity: 1;
+}
+
+/* A theme's glow is tuned for a 1.1rem header row, neon's 16px/32px blur is a
+   bloom at that size and a thin outline at 72px. This adds a second, font-
+   RELATIVE halo in the text's own colour so the effect still reads as a glow
+   at display sizes. Applied only when the theme already has a text-shadow (see
+   themeHasGlow); it amplifies a glow, it never invents one, so Light and
+   Default stay clean. */
+.tts-display-themeglow {
+  filter: drop-shadow(0 0 0.08em currentColor);
+}
+
+/* Glow off, and every custom-look case: strip whatever text-shadow the theme
+   contributed. Custom mode picks two exact colours and means them. */
+.tts-display-noglow,
+#tts-display-overlay:not(.tts-display-themed) #tts-display-text,
+#tts-display-preview:not(.tts-display-themed) #tts-display-preview-text {
+  text-shadow: none;
+  filter: none;
+}
+
+/* The probe exists only to be measured, getComputedStyle() on it answers
+   "does the active theme put a glow on its titles?". Kept in the layout tree
+   (visibility, not display:none) so the answer is a real rendered value. */
+#tts-glow-probe {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#tts-display-exit {
+  position: absolute;
+  z-index: 1; /* above #tts-display-chrome's colour layer */
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  /* Inherits the message colour so it stays visible against any custom
+     background without needing its own contrast rule. */
+  color: inherit;
+  border: none;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+#tts-display-exit svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Added by nudgeDisplayExit() on pointer movement, removed once the pointer
+   has been still, an idle cursor shouldn't leave a button on the stream. */
+#tts-display-exit.tts-display-exit-visible {
+  opacity: 0.45;
+  pointer-events: auto;
+}
+
+#tts-display-exit.tts-display-exit-visible:hover {
+  opacity: 1;
+  background: transparent;
+}
+
+/* ── Setup modal ───────────────────────────────────────────────────────────── */
+
+.tts-setup-modal {
+  width: min(560px, 94vw);
+}
+
+.tts-setup-intro {
+  margin: 0 0 16px;
+  font-size: 0.82rem;
+  opacity: 0.7;
+  line-height: 1.5;
+}
+
+.tts-setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.tts-color-row {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.tts-effect-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 340px;
+  font-size: 0.85rem;
+}
+
+.tts-effect-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* "This theme has no glow" / "This theme has no animation", a toggle that
+   can't do anything on the current theme says so rather than looking broken. */
+.tts-effect-note {
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+.tts-effect-row .toggle-switch input:disabled + .toggle-slider {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tts-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.tts-color-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.tts-color-field input[type="color"] {
+  width: 42px;
+  height: 26px;
+  padding: 2px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Live preview of the Display View settings. Fixed height with the text scaled
+   proportionally (see syncSetupUI) so it shows the look without needing the
+   window's real dimensions. */
+.tts-display-preview {
+  position: relative; /* containing block for the absolute chrome layer */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 130px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#tts-display-preview-text {
+  width: 100%;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  /* Clamped rather than scrolled: the preview is judging colour, alignment and
+     relative size, and a scrollbar in it would only be noise. */
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* ── Presets modal ─────────────────────────────────────────────────────────── */
+
+.tts-presets-modal {
+  width: min(620px, 94vw);
+}
+
+.tts-preset-save-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tts-preset-save-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tts-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tts-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.tts-preset-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tts-preset-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+/* Messages can be a paragraph; one clamped line keeps every row the same
+   height so a long list stays scannable. */
+.tts-preset-message {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tts-preset-summary {
+  font-size: 0.72rem;
+  opacity: 0.5;
+}
+
+.tts-preset-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ── Narrow window ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 620px) {
+  .tts-timing-row,
+  .tts-voice-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tts-voice-col {
+    min-width: 0;
+  }
+
+  .tts-preset-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tts-preset-actions {
+    justify-content: flex-end;
+  }
+}

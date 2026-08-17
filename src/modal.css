@@ -1,15 +1,15 @@
 /* =============================================================================
-   MODALS — SHARED CHROME
+   MODALS: SHARED CHROME
    -----------------------------------------------------------------------------
    The structural skeleton + behaviour styling common to every modal in the app.
    Driven by modal.ts. Content-specific modal styling (settings rows, changelog,
    licensing tabs, tool pickers, etc.) stays in shell.css / the owning tool CSS.
 
-   All colours reference var(--color-*) from the active theme — never hardcoded.
+   All colours reference var(--color-*) from the active theme, never hardcoded.
 ============================================================================= */
 
 /* Set by modal.ts (syncBodyClass) while any modal is open.
-   Used internally to block body scroll. Not hooked by any tool CSS —
+   Used internally to block body scroll. Not hooked by any tool CSS,
    if you need to style against modal presence, use this class here only. */
 body.modal-open {
   overflow: hidden;
@@ -21,7 +21,7 @@ body.modal-open {
 
 /* Single shared dim + blur layer. Sits below all backdrops (z-index 999).
    Fades in when the first modal opens, fades out when the last closes.
-   Never touched during modal-to-modal transitions — no flicker, no double-dim. */
+   Never touched during modal-to-modal transitions. No flicker, no double-dim. */
 #modalOverlay {
   position: fixed;
   inset: 0;
@@ -40,7 +40,7 @@ body.modal-open {
   pointer-events: none; /* clicks pass through to the backdrop above */
 }
 
-/* Backdrops are now transparent centering containers only — no background,
+/* Backdrops are now transparent centering containers only. No background,
    no blur. The shared overlay provides the dim/blur beneath them. */
 .modal-backdrop {
   position: fixed;
@@ -72,7 +72,7 @@ body.modal-open {
   /* Every modal must fit the viewport: cap the panel height and let the body
      scroll (see the .modal-body overflow rule below). Column-flex keeps the
      header (and any footer actions) fixed while only the body overflows.
-     Previously opt-in via .modal-scrollable — now the default, because a
+     Previously opt-in via .modal-scrollable, now the default, because a
      modal taller than the window with no scrollbar is never the right
      outcome, and per-modal opt-in kept missing cases. */
   max-height: 85vh;
@@ -80,7 +80,7 @@ body.modal-open {
   flex-direction: column;
 }
 
-/* Solid modals — full opaque panel background.
+/* Solid modals, full opaque panel background.
    These are fallback rules for themes that don't define their own .modal
    background. The random theme overrides both with !important via a <style>
    tag injected by applyRandomModalStyles() in shell.ts. */
@@ -88,7 +88,7 @@ body.solid-modals .modal {
   background: var(--color-panel);
 }
 
-/* Translucent modals — frosted glass effect.
+/* Translucent modals, frosted glass effect.
    Same caveat: fallback only; random theme overrides via injected <style>. */
 body:not(.solid-modals) .modal {
   background: color-mix(in srgb, var(--color-panel) 60%, transparent);
@@ -102,7 +102,7 @@ body:not(.solid-modals) .modal {
 }
 
 /* =============================================================================
-   HEADER  (drag handle — close top-right, optional button top-left)
+   HEADER  (drag handle, close top-right, optional button top-left)
 ============================================================================= */
 
 .modal-header {
@@ -156,7 +156,7 @@ body:not(.solid-modals) .modal {
   line-height: 1.6;
   text-align: center;
   /* Paired with the .modal max-height: the body is the scroll region.
-     min-height: 0 lets it actually shrink inside the column flex — without
+     min-height: 0 lets it actually shrink inside the column flex. Without
      it, flex items refuse to go below their content height and the cap
      silently does nothing. */
   overflow-y: auto;
@@ -191,7 +191,7 @@ body:not(.solid-modals) .modal {
   color: var(--color-text);
 }
 
-/* Confirm/cancel modals (exit, delete) — centred body + spread actions row */
+/* Confirm/cancel modals (exit, delete), centred body + spread actions row */
 .exit-modal-body {
   align-items: center;
   text-align: center;
@@ -205,12 +205,20 @@ body:not(.solid-modals) .modal {
   margin-top: 8px;
 }
 
+/* Three-way action rows (the Budget reminder's go / mark-reviewed /
+   procrastinate) stack instead of squeezing three full-sentence labels onto
+   one line, where space-between would leave them cramped and unreadable. */
+.exit-modal-actions.stacked {
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* =============================================================================
-   SCROLLABLE MODALS  (legacy opt-in — now the default)
+   SCROLLABLE MODALS  (legacy opt-in, now the default)
    -----------------------------------------------------------------------------
    Every .modal now caps its height and scrolls its body (see the base .modal
    and .modal-body rules above), so this class is redundant. It's kept only so
-   existing class="modal modal-scrollable" markup stays valid — safe to remove
+   existing class="modal modal-scrollable" markup stays valid, safe to remove
    from markup at leisure.
 ============================================================================= */
 

@@ -1,16 +1,16 @@
 /* =============================================================================
-   AUTO-BACKUP  — Robocopy-based folder mirroring
+   AUTO-BACKUP: Robocopy-based folder mirroring
    -----------------------------------------------------------------------------
    Tauri commands for the Auto-Backup tool. All heavy lifting (the Robocopy
    subprocess and live progress streaming) runs on a dedicated OS thread so the
    Tauri IPC thread pool is never blocked.
 
    Architecture:
-     • run_backup()            — command entry point; resets cancel flag, spawns thread
-     • run_backup_thread()     — orchestrates preflight, then the real run
-     • run_destination()       — one destination's full source loop; destinations
+     • run_backup(): command entry point; resets cancel flag, spawns thread
+     • run_backup_thread(): orchestrates preflight, then the real run
+     • run_destination(): one destination's full source loop; destinations
                                    are called one after another (SEQUENTIALLY)
-     • parse_robocopy_*        — helpers for parsing Robocopy stdout line-by-line
+     • parse_robocopy_*:        helpers for parsing Robocopy stdout line-by-line
 
    Logging: each destination gets its own robocopy_log_<timestamp>.txt, written
    inside that destination's own folder and containing only the output for
@@ -18,12 +18,12 @@
    run with multiple destinations from dumping every destination's log into
    whichever destination happened to be first.
 
-   EXECUTION MODEL (Phase 2 — the real run)
+   EXECUTION MODEL (Phase 2. The real run)
    -----------------------------------------
    Destinations are mirrored SEQUENTIALLY: destination 1 fully completes (all
    its source folders) before destination 2 begins, and so on. Within a
    destination, its source folders are likewise done one after another. This
-   is the simple, predictable model — one robocopy process at a time — chosen
+   is the simple, predictable model (one robocopy process at a time) chosen
    over running destinations at once because concurrency's speed benefit was
    inconsistent (it depends entirely on whether the destinations sit on truly
    independent hardware paths, which the app can't know) and it introduced a
@@ -42,37 +42,37 @@
    State: CANCEL_REQUESTED (checked between destinations and inside each copy
    loop) and ACTIVE_ROBOCOPY_PIDS (holds the single currently-running child's
    pid so cancel_backup can kill it). Per-run totals (files/dirs/bytes/extras)
-   are accumulated across destinations via the live_*_g counters, which — with
-   only one destination ever running at a time — simply tally run-wide totals
+   are accumulated across destinations via the live_*_g counters, which (with
+   only one destination ever running at a time) simply tally run-wide totals
    in call order.
 
    Event names emitted to the frontend:
-     backup-plan-progress     — during the preflight pass, once per folder pair
-     backup-plan-done         — preflight finished: exact bytes/files to copy
-     backup-folder-start      — before each source×dest folder pair begins
-     backup-file-progress     — per copied file (carries dest_index + that
+     backup-plan-progress:     during the preflight pass, once per folder pair
+     backup-plan-done:         preflight finished: exact bytes/files to copy
+     backup-folder-start:      before each source×dest folder pair begins
+     backup-file-progress:     per copied file (carries dest_index + that
                                  destination's own running byte total alongside
                                  the run-wide totals)
-     backup-folder-done       — after each folder pair completes
-     backup-destination-done  — fires once a destination finishes (success,
+     backup-folder-done:       after each folder pair completes
+     backup-destination-done:  fires once a destination finishes (success,
                                  failure, or cancel), so that destination's row
                                  can go green/red as soon as it completes
-     backup-complete          — once every destination has run (success only if
+     backup-complete:          once every destination has run (success only if
                                  every destination succeeded)
 
    Progress model (the "smooth bar" contract with the frontend):
      A backup run has two phases, mirroring what Windows Explorer does.
      Phase 1 is a PREFLIGHT: every folder pair is run through robocopy /L
-     (list-only — a directory walk, no data read or written) with the same
+     (list-only, a directory walk, no data read or written) with the same
      selection flags as the real run, so robocopy itself tells us exactly
      which files WOULD be copied and their exact byte sizes (/BYTES). The
-     summed result is the run's true workload — for an incremental /MIR run
+     summed result is the run's true workload, for an incremental /MIR run
      this is the DELTA, not the source size, which is what makes the bar
      honest on recurring backups. Phase 2 is the real run, whose per-file
      events report completed bytes against that plan. Both phases run
      sequentially.
 
-   File I/O uses crate::get_data_path() from lib.rs — the dev/release directory
+   File I/O uses crate::get_data_path() from lib.rs. The dev/release directory
    logic lives in exactly one place.
 
    Rust commands exposed:
@@ -115,7 +115,7 @@ pub struct BackupFolderDoneEvent {
     pub bytes_copied: u64,
     pub elapsed_secs: f64,
     /// Which destination (by index into the run's destination list) this
-    /// folder pair belongs to — lets the frontend update that destination's
+    /// folder pair belongs to, lets the frontend update that destination's
     /// own row/bar now that destinations complete folders concurrently.
     pub dest_index: usize,
     /// How many source*dest folder pairs have now completed (1-based).
@@ -124,8 +124,8 @@ pub struct BackupFolderDoneEvent {
     pub folders_total: usize,
 }
 
-/// One file that robocopy attempted to copy but could not — because it was
-/// locked/in use, or some other access error — even after its retries ran
+/// One file that robocopy attempted to copy but could not (because it was
+/// locked/in use, or some other access error) even after its retries ran
 /// out. This is NEVER a file robocopy simply decided not to touch because the
 /// source and destination already matched; unchanged files never produce an
 /// output line at all in the mode this app runs robocopy in, so there's
@@ -145,7 +145,7 @@ pub struct SkippedFileEntry {
 /// went, not to anything bounded: a source tree with a locked or
 /// access-denied branch can fail on tens of thousands of files. Every entry
 /// was previously retained, cloned into an IPC event, and rendered as its own
-/// DOM row — enough to lock up the UI on exactly the runs where the user most
+/// DOM row, enough to lock up the UI on exactly the runs where the user most
 /// needs to read the result.
 const MAX_RETAINED_SKIPS: usize = 1_000;
 
@@ -153,7 +153,7 @@ const MAX_RETAINED_SKIPS: usize = 1_000;
 /// retention-capped detail list, and an exact total.
 ///
 /// The dedup used to be a linear scan of the detail Vec on every failure,
-/// which is O(n^2) over the run — at 100k skips that is billions of string
+/// which is O(n^2) over the run, at 100k skips that is billions of string
 /// comparisons on the backup thread, turning a slow backup into an apparent
 /// hang. The HashSet makes it O(1) per failure.
 struct SkippedFiles {
@@ -204,16 +204,16 @@ pub struct BackupCompleteEvent {
     pub total_dirs: u64,
     pub total_bytes: u64,
     /// Destination-side files/dirs deleted by /MIR across the run (or up to
-    /// the point of cancellation) — mirrors the Summary panel's "Stale Items
+    /// the point of cancellation), mirrors the Summary panel's "Stale Items
     /// to Remove" so the Last Run panel can report what actually happened.
     pub total_extras: u64,
     pub total_secs: f64,
     /// On a mid-file cancellation, the file that was interrupted (and whose
-    /// partial destination copy was removed — see cancel_backup). None on a
+    /// partial destination copy was removed, see cancel_backup). None on a
     /// clean completion or a cancel that landed exactly between files.
     pub aborted_file: Option<String>,
     /// Files that failed to copy (locked/access error) across every
-    /// destination in this run — feeds the "View Skipped Files" modal.
+    /// destination in this run, feeds the "View Skipped Files" modal.
     /// Capped at MAX_RETAINED_SKIPS per destination; use skipped_total for
     /// the real count and the log files for the complete record.
     pub skipped_files: Vec<SkippedFileEntry>,
@@ -221,7 +221,7 @@ pub struct BackupCompleteEvent {
     /// was truncated by the retention cap.
     pub skipped_total: u64,
     /// One robocopy_log_<timestamp>_SKIPPED_FILES.txt per destination that
-    /// actually had at least one skip — only created when needed.
+    /// actually had at least one skip, only created when needed.
     pub skipped_log_paths: Vec<String>,
 }
 
@@ -235,7 +235,7 @@ pub struct BackupCompleteEvent {
 #[derive(Clone, serde::Serialize)]
 pub struct BackupFileProgressEvent {
     /// Bytes of COMPLETED files so far across all folders in this run
-    /// (excludes the file currently being copied). RUN-WIDE — sums every
+    /// (excludes the file currently being copied). RUN-WIDE, sums every
     /// destination's progress, since multiple destinations now copy at once.
     pub bytes_done: u64,
     /// Running total of files started so far, run-wide. Includes the current file.
@@ -249,12 +249,12 @@ pub struct BackupFileProgressEvent {
     /// Per-file copy percentage from /Z output (0-100), or None when not available.
     pub file_pct: Option<u8>,
     /// Which destination (by index into the run's destination list) this file
-    /// belongs to — lets the frontend route the event to that destination's
+    /// belongs to, lets the frontend route the event to that destination's
     /// own progress bar as well as the shared overall bar.
     pub dest_index: usize,
     /// Bytes of completed files so far WITHIN THIS DESTINATION ONLY (excludes
     /// the in-flight file, same semantics as bytes_done but scoped to one
-    /// destination) — the numerator for that destination's own bar.
+    /// destination). The numerator for that destination's own bar.
     pub dest_bytes_done: u64,
 }
 
@@ -287,13 +287,13 @@ pub struct BackupPlanDoneEvent {
     pub files_to_copy: u64,
     /// Number of extra files/dirs that will be DELETED from destinations (/MIR).
     pub extras_to_delete: u64,
-    /// Per-pair breakdown, in run order — lets the frontend weight the
+    /// Per-pair breakdown, in run order, lets the frontend weight the
     /// progress bar by each pair's total work (copying AND scanning).
     pub per_pair: Vec<PlanPair>,
 }
 
-/// Emitted once a single destination's own thread finishes — success,
-/// failure, or cancellation — independent of how the other destinations in
+/// Emitted once a single destination's own thread finishes (success,
+/// failure, or cancellation) independent of how the other destinations in
 /// this run are doing. Lets the frontend mark that destination's row/bar as
 /// done immediately rather than waiting for the whole (possibly
 /// multi-destination) run to finish.
@@ -313,7 +313,7 @@ pub struct BackupDestinationDoneEvent {
     pub extras_deleted: u64,
     pub elapsed_secs: f64,
     pub aborted_file: Option<String>,
-    /// Files this destination couldn't copy (locked/access error) — the
+    /// Files this destination couldn't copy (locked/access error). The
     /// destination still completed; these files were skipped, not aborted.
     /// Capped at MAX_RETAINED_SKIPS; see skipped_total for the real count.
     pub skipped_files: Vec<SkippedFileEntry>,
@@ -335,7 +335,7 @@ static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
 /// runs would share one cancel flag and interleave robocopy trees.
 static BACKUP_RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// PIDs of the robocopy children CURRENTLY copying — one entry per destination
+/// PIDs of the robocopy children CURRENTLY copying. One entry per destination
 /// that's mid-copy right now, since destinations run concurrently. Lets
 /// cancel_backup kill every active child DIRECTLY instead of waiting for
 /// output: robocopy prints nothing while it's deep inside one huge file, so a
@@ -344,7 +344,7 @@ static ACTIVE_ROBOCOPY_PIDS: Mutex<Vec<u32>> = Mutex::new(Vec::new());
 
 /// Monotonic generation counter for estimate scans. Every new estimate (and
 /// every explicit cancel) bumps it; a running estimate whose remembered
-/// generation no longer matches aborts at its next check — killing the old
+/// generation no longer matches aborts at its next check, killing the old
 /// robocopy /L child instead of letting it burn disk for a result nobody
 /// will read. Bump-to-cancel is race-free by construction: whichever call
 /// bumps LAST is the only one whose generation survives.
@@ -366,15 +366,15 @@ pub fn cancel_estimate() {
    isn't in the source. Three configurations turn that from "mirror" into
    "destroy data", and all are cheap to detect up front:
 
-     1. A destination inside a source — robocopy recurses into its own output.
+     1. A destination inside a source, robocopy recurses into its own output.
      2. A computed destination subfolder (destination\<leaf>) that overlaps a
-        source — mirroring a folder onto itself or onto its own ancestor.
-     3. Two sources sharing the same leaf folder name — both map to the SAME
+        source, mirroring a folder onto itself or onto its own ancestor.
+     3. Two sources sharing the same leaf folder name. Both map to the SAME
         destination subfolder, so the second /MIR pass deletes everything the
         first one just copied.
 ============================================================================= */
 
-/// Lowercased, backslash-normalized, no trailing separator — good enough for
+/// Lowercased, backslash-normalized, no trailing separator, good enough for
 /// prefix comparisons on Windows paths (which are case-insensitive).
 fn normalize_path(p: &str) -> String {
     p.replace('/', "\\").trim_end_matches('\\').to_lowercase()
@@ -394,7 +394,7 @@ fn validate_backup_paths(sources: &[String], destinations: &[String]) -> Result<
     let mut seen_leaves: std::collections::HashMap<String, &String> = std::collections::HashMap::new();
     for src in sources {
         // Must mirror the folder_name computation in run_backup_thread exactly
-        // (lowercased, since Windows paths are case-insensitive) — otherwise
+        // (lowercased, since Windows paths are case-insensitive), otherwise
         // the collision check and the actual on-disk naming could disagree.
         let leaf = std::path::Path::new(src)
             .file_name()
@@ -404,7 +404,7 @@ fn validate_backup_paths(sources: &[String], destinations: &[String]) -> Result<
             return Err(format!(
                 "Duplicate Folder Name error: two source folders share the name '{}' \
                  ('{}' and '{}'). They would mirror into the same destination subfolder \
-                 and erase each other — rename one of them or back them up in separate runs.",
+                 and erase each other. Rename one of them or back them up in separate runs.",
                 leaf, prev, src
             ));
         }
@@ -425,7 +425,7 @@ fn validate_backup_paths(sources: &[String], destinations: &[String]) -> Result<
             if dest_norm.starts_with(&format!("{}\\", src_norm)) {
                 return Err(format!(
                     "Destination Inside Source error: destination '{}' is inside source \
-                     '{}' — the backup would copy into itself endlessly.",
+                     '{}'. The backup would copy into itself endlessly.",
                     dest, src
                 ));
             }
@@ -449,13 +449,13 @@ fn validate_backup_paths(sources: &[String], destinations: &[String]) -> Result<
     // Destination-vs-destination overlap. Two /MIR passes into overlapping
     // folders are dangerous even when they run one after another:
     //   • Exact duplicate → the second pass re-mirrors what the first just
-    //     wrote, and both share one log file — pointless and confusing.
+    //     wrote, and both share one log file, pointless and confusing.
     //   • One destination nested inside another → the OUTER destination's
     //     /MIR treats the inner destination's folder as "extra" content that
-    //     isn't in the source, and DELETES it — wiping a backup you just made.
+    //     isn't in the source, and DELETES it, wiping a backup you just made.
     //     (Order doesn't save you: whichever runs second destroys or
     //     re-does the other's work.) The frontend only blocks exact-string
-    //     duplicates, so "D:\Backup" vs "D:\Backup\" — or a nested subfolder —
+    //     duplicates, so "D:\Backup" vs "D:\Backup\", or a nested subfolder,
     //     slips past it; this is the authoritative gate.
     for (i, a) in destinations.iter().enumerate() {
         let a_norm = normalize_path(a);
@@ -472,7 +472,7 @@ fn validate_backup_paths(sources: &[String], destinations: &[String]) -> Result<
                 return Err(format!(
                     "Nested Destination error: '{}' and '{}' overlap (one is inside the \
                      other). Mirroring into both would make the outer backup delete the \
-                     inner one — remove one of them or back them up in separate runs.",
+                     inner one. Remove one of them or back them up in separate runs.",
                     a, b
                 ));
             }
@@ -530,8 +530,8 @@ pub struct FolderStats {
 /// and byte size. Used by the frontend summary panel to show source folder stats.
 ///
 /// Declared async and pushed onto a blocking-work thread: in Tauri v2, a
-/// NON-async command runs on the MAIN thread — the same thread driving the
-/// webview — so a long tree walk here would freeze the entire UI for its
+/// NON-async command runs on the MAIN thread (the same thread driving the
+/// webview) so a long tree walk here would freeze the entire UI for its
 /// duration. (run_backup dodges this by spawning its own thread; every other
 /// potentially-slow command in this file must use this pattern instead.)
 #[tauri::command]
@@ -584,11 +584,11 @@ fn get_folder_stats_blocking(path: String) -> Result<FolderStats, String> {
 /// so it works even when the destination folder doesn't exist yet.
 ///
 /// Primary method is a CIM query via PowerShell, which prints a bare byte
-/// count with invariant-culture digits — it works identically on every
+/// count with invariant-culture digits. It works identically on every
 /// Windows display language. `fsutil volume diskfree` is kept only as a
 /// fallback; its output labels ("Total free bytes") are localized, so the
 /// text-matching parse below silently fails on non-English Windows.
-/// Async + blocking-thread for the same reason as get_folder_stats — the
+/// Async + blocking-thread for the same reason as get_folder_stats. The
 /// PowerShell/fsutil round-trip takes a few hundred milliseconds, which is a
 /// visible UI hitch when run on the main thread.
 #[tauri::command]
@@ -611,7 +611,7 @@ fn get_free_space_blocking(path: String) -> Result<u64, String> {
         .ok_or_else(|| "Empty path".to_string())?
         .to_ascii_uppercase();
     // Strict validation before the letter is interpolated into a PowerShell
-    // command string — anything that isn't a plain drive letter is rejected,
+    // command string. Anything that isn't a plain drive letter is rejected,
     // so no other character can ever reach the command line.
     if !drive_char.is_ascii_alphabetic() {
         return Err(format!(
@@ -685,15 +685,15 @@ fn get_free_space_blocking(path: String) -> Result<u64, String> {
 
 /// Cancels the running backup. Sets the flag (which every destination's
 /// source loop and the preflight honor) AND force-kills EVERY currently
-/// active robocopy child — one per destination still mid-copy, since
-/// destinations run concurrently — so the stop is immediate even mid-file on
+/// active robocopy child (one per destination still mid-copy, since
+/// destinations run concurrently) so the stop is immediate even mid-file on
 /// all of them at once. Each destination's own thread then removes its
 /// half-copied destination file, leaving the backup clean: the interrupted
 /// file is simply absent, and the next /MIR run copies it fresh.
 #[tauri::command]
 pub fn cancel_backup() {
     CANCEL_REQUESTED.store(true, Ordering::SeqCst);
-    // Snapshot under one short lock, then kill outside it — no reason to hold
+    // Snapshot under one short lock, then kill outside it. No reason to hold
     // the lock while spawning taskkill processes. The list is NOT cleared
     // here: each copy loop removes its own pid once it has reaped its child
     // (see the retain() calls below), which is the only place that knows the
@@ -728,7 +728,7 @@ pub fn cancel_backup() {
    Robocopy prints one line per file it copies. A backup of a million-file tree
    therefore produces hundreds of megabytes of stdout, and the previous design
    accumulated ALL of it into one String per folder pair before writing the log
-   at the end — memory that scaled with the size of the user's data, not with
+   at the end, memory that scaled with the size of the user's data, not with
    anything about the app. Fast mode was worse: read_to_end() buffered the raw
    bytes and from_utf8_lossy().into_owned() then allocated a second full copy,
    briefly doubling the peak.
@@ -746,14 +746,14 @@ pub fn cancel_backup() {
 const SUMMARY_TAIL_LINES: usize = 64;
 
 /// Buffer size for the log writer. Large enough that a burst of small-file
-/// lines costs one write syscall rather than hundreds — the log usually lives
+/// lines costs one write syscall rather than hundreds. The log usually lives
 /// on the destination drive, which robocopy is already saturating.
 const LOG_WRITER_CAPACITY: usize = 64 * 1024;
 
 struct FolderLog {
     /// None if the log file couldn't be opened. Logging is best-effort and
     /// must never fail a backup, so every write is silently dropped in that
-    /// case — exactly the behaviour of the `let _ = ...` writes it replaces.
+    /// case, exactly the behaviour of the `let _ = ...` writes it replaces.
     writer: Option<std::io::BufWriter<fs::File>>,
     tail: std::collections::VecDeque<String>,
 }
@@ -791,7 +791,7 @@ impl FolderLog {
         self.tail.push_back(line.to_string());
     }
 
-    /// Writes text through verbatim without touching the tail — headers and
+    /// Writes text through verbatim without touching the tail, headers and
     /// closing notes, which are ours rather than robocopy's.
     fn raw(&mut self, text: &str) {
         use std::io::Write;
@@ -811,7 +811,7 @@ impl FolderLog {
     }
 
     /// Flushes buffered output to disk. Called on every exit path out of a
-    /// folder pair — without it, the last partial buffer is lost when the
+    /// folder pair. Without it, the last partial buffer is lost when the
     /// BufWriter is dropped during a process kill.
     fn flush(&mut self) {
         use std::io::Write;
@@ -838,7 +838,7 @@ fn partial_dest_of(source_file: &str, source_root: &str, dest_root: &str) -> Opt
     }
 }
 
-/// Validates a source/destination configuration without running anything —
+/// Validates a source/destination configuration without running anything,
 /// exposed so the frontend can refuse the Run button BEFORE showing the
 /// confirmation modal, instead of letting the user click Proceed into an
 /// immediate error. Pure string checks; effectively instant.
@@ -857,14 +857,14 @@ pub fn run_backup(
     sources: Vec<String>,
     destinations: Vec<String>,
     // When false ("fast" mode), robocopy's output is drained without live
-    // per-line parsing, so robocopy never blocks waiting on us — the price is
+    // per-line parsing, so robocopy never blocks waiting on us. The price is
     // no live "current file" text and a bar/stats that update per-folder
     // rather than per-file. When true ("details" mode), the live progress is
     // shown at the cost of throttling robocopy on small-file-heavy trees.
     show_details: bool,
 ) -> Result<(), String> {
     // Refuse unsafe source/destination combinations BEFORE any thread spawns
-    // or any robocopy runs — /MIR deletes, so this must be a hard gate.
+    // or any robocopy runs, /MIR deletes, so this must be a hard gate.
     validate_backup_paths(&sources, &destinations)?;
 
     // Refuse to start if a run is already in flight. swap() makes the
@@ -886,7 +886,7 @@ pub fn run_backup(
         run_backup_thread(app, sources, destinations, show_details);
         // run_backup_thread returns on every completion path (success, failure,
         // cancel), so clearing the flags here covers all of them. The cancel
-        // flag MUST be cleared once it has served its purpose — preflight_pair
+        // flag MUST be cleared once it has served its purpose, preflight_pair
         // is also used by estimate_backup, and a stale true here would
         // instantly abort every estimate scan after a cancelled backup.
         CANCEL_REQUESTED.store(false, Ordering::SeqCst);
@@ -906,7 +906,7 @@ fn run_backup_thread(
 ) {
     let run_start    = std::time::Instant::now();
     // These four report the Phase-1 (preflight) numbers if a cancel lands
-    // during planning — always zero at that point, since no copying has
+    // during planning, always zero at that point, since no copying has
     // started yet. The REAL run's totals are computed after Phase 2's
     // destination threads all join (see the aggregation below), which
     // shadows these with the actual per-destination sums.
@@ -917,8 +917,8 @@ fn run_backup_thread(
     let dest_total    = destinations.len();
     let source_total  = sources.len();
     let folders_total = dest_total * source_total;
-    // One robocopy summary log per destination. Empty here — nothing has run
-    // yet — and only relevant if a cancel lands during planning; Phase 2
+    // One robocopy summary log per destination. Empty here (nothing has run
+    // yet) and only relevant if a cancel lands during planning; Phase 2
     // builds the real list from each destination thread's own result.
     let log_paths: Vec<String> = Vec::new();
 
@@ -1038,7 +1038,7 @@ fn run_backup_thread(
     });
 
     /* ── PHASE 2: REAL RUN (destinations run one after another) ────────────
-       Destinations are mirrored SEQUENTIALLY — one fully finishes before the
+       Destinations are mirrored SEQUENTIALLY. One fully finishes before the
        next begins. This is simpler and more predictable than running them at
        once, and avoids the whole class of hazards concurrency introduces
        (two /MIR passes racing on overlapping folders, the source disk being
@@ -1066,7 +1066,7 @@ fn run_backup_thread(
         );
         let stop = result.cancelled;
         results.push(result);
-        // A cancelled destination ends the whole run — don't start the rest.
+        // A cancelled destination ends the whole run, don't start the rest.
         if stop {
             break;
         }
@@ -1090,7 +1090,7 @@ fn run_backup_thread(
     let any_cancelled = results.iter().any(|r| r.cancelled);
     let failed: Vec<&DestinationResult> =
         results.iter().filter(|r| !r.success && !r.cancelled).collect();
-    // First interrupted file across destinations, if any — same "one
+    // First interrupted file across destinations, if any. Same "one
     // representative example" spirit as the single-destination version.
     let aborted_file = results.iter().find_map(|r| r.aborted_file.clone());
 
@@ -1152,7 +1152,7 @@ fn run_backup_thread(
     });
 }
 
-/// One destination's outcome from the real-run phase — returned by
+/// One destination's outcome from the real-run phase, returned by
 /// run_destination and folded into the run-level backup-complete summary
 /// after every destination has run.
 struct DestinationResult {
@@ -1175,7 +1175,7 @@ struct DestinationResult {
 
 /// Mirrors every source into ONE destination, one source folder after
 /// another. Called once per destination from run_backup_thread's sequential
-/// Phase-2 loop — destinations do NOT overlap, so this fully finishes one
+/// Phase-2 loop, destinations do NOT overlap, so this fully finishes one
 /// destination before the next is started.
 ///
 /// `live_bytes_g` / `live_files_g` / `live_dirs_g` / `folders_done_g` are the
@@ -1237,12 +1237,12 @@ fn run_destination(
         };
     }
 
-    // This destination's own summary log — lives inside the destination
+    // This destination's own summary log, lives inside the destination
     // folder itself and only ever receives output for copies into this
     // destination, regardless of how many other destinations are in the run.
     let dest_log_file = format!("{}/robocopy_log_{}.txt", destination, timestamp);
     // Separate log listing only the files this destination COULDN'T copy
-    // (locked/access error) — created lazily, only if a skip actually
+    // (locked/access error), created lazily, only if a skip actually
     // happens, using the same timestamp so it's easy to pair with the run.
     let skipped_log_file = format!("{}/robocopy_log_{}_SKIPPED_FILES.txt", destination, timestamp);
     // This destination's running list of files that failed to copy. Every
@@ -1253,7 +1253,7 @@ fn run_destination(
     let mut total_dirs:  u64 = 0;
     let mut total_bytes: u64 = 0;
     let mut total_extras: u64 = 0;
-    // This destination's own running byte total — the numerator for its own
+    // This destination's own running byte total. The numerator for its own
     // progress bar, separate from the shared global counters. Declared HERE
     // (once per destination, not once per source folder) so it accumulates
     // across every folder this destination copies instead of resetting to 0
@@ -1313,11 +1313,11 @@ fn run_destination(
         // /Z (restartable mode) is deliberately NOT used: it roughly halves
         // throughput on local drives, and the per-file percentage output it
         // produces was never surfaced in the UI anyway. Without it, piped
-        // stdout arrives in buffered chunks rather than perfectly live —
-        // the frontend's animation layer interpolates across those bursts.
-        // (The percentage-line parser below is kept — it tolerates /Z-style
+        // stdout arrives in buffered chunks rather than perfectly live.
+        // The frontend's animation layer interpolates across those bursts.
+        // (The percentage-line parser below is kept (it tolerates /Z-style
         // output harmlessly if the flag ever returns.)
-        // /BYTES prints exact integer byte sizes on every file line — the
+        // /BYTES prints exact integer byte sizes on every file line) the
         // default "1.23 m" style tokens are approximations, and their unit
         // suffixes are locale-sensitive; exact integers are neither.
         // /NDL suppresses directory listing lines.
@@ -1376,7 +1376,7 @@ fn run_destination(
         let mut reader = BufReader::new(stdout);
 
         // Streams robocopy's output to the log as it arrives and keeps only a
-        // bounded tail in memory for the summary parse — see FolderLog.
+        // bounded tail in memory for the summary parse, see FolderLog.
         let mut folder_log = FolderLog::open(&dest_log_file, source, &dest_path);
         let mut files_this_folder: u64 = 0;
         let mut dirs_this_folder:  u64 = 0;
@@ -1391,13 +1391,13 @@ fn run_destination(
         const EMIT_INTERVAL: std::time::Duration = std::time::Duration::from_millis(40);
         let mut bytes_this_folder: u64 = 0;
         // With /Z, robocopy output order per file is:
-        //   1. "\t  1.23 m\tfilename.ext\n"  — size+filename line (no pct yet)
-        //   2. "  0%\r  5%\r ... 100%\r\n"   — percentage updates (CR-rewritten)
+        //   1. "\t  1.23 m\tfilename.ext\n":  size+filename line (no pct yet)
+        //   2. "  0%\r  5%\r ... 100%\r\n":   percentage updates (CR-rewritten)
         // We emit immediately on the filename line (pct=None), then re-emit
         // on each percentage line to update the per-file bar in real time.
         let mut last_current_file = String::new();
         // True once an ERROR line has been seen for the file currently in
-        // last_current_file — reset every time a NEW file line starts. Stops
+        // last_current_file, reset every time a NEW file line starts. Stops
         // that file's bytes from being credited as copied, and stops a
         // second retry's ERROR line from double-logging the same skip.
         let mut current_file_failed = false;
@@ -1406,12 +1406,12 @@ fn run_destination(
         // the frontend gets live per-file progress. The cost is that this
         // parsing must keep pace with robocopy; on trees full of tiny files
         // robocopy can out-produce the parser, fill the pipe, and BLOCK
-        // waiting for us — which is exactly why "fast" mode exists below.
+        // waiting for us, which is exactly why "fast" mode exists below.
         if show_details {
         // Read raw bytes, not .lines(): robocopy writes piped output in
         // the console codepage (NOT UTF-8), so any filename containing a
         // non-ASCII character produces a line that .lines() rejects as
-        // invalid UTF-8 — silently dropping that file from the live
+        // invalid UTF-8, silently dropping that file from the live
         // counts and byte totals. Lossy decoding keeps every line; the
         // affected characters render as U+FFFD in the transient
         // "Copying…" label, while sizes and tabs (pure ASCII) parse
@@ -1420,9 +1420,9 @@ fn run_destination(
         loop {
             raw_buf.clear();
             match reader.read_until(b'\n', &mut raw_buf) {
-                Ok(0) => break,     // EOF — robocopy closed stdout
+                Ok(0) => break,     // EOF: robocopy closed stdout
                 Ok(_) => {}
-                Err(_) => break,    // stream error — stop, don't spin
+                Err(_) => break,    // stream error, stop, don't spin
             }
             let raw_line = String::from_utf8_lossy(&raw_buf)
                 .trim_end_matches(['\r', '\n'])
@@ -1470,7 +1470,7 @@ fn run_destination(
                 continue;
             }
 
-            // Normal line — take first non-empty CR segment as canonical content.
+            // Normal line, take first non-empty CR segment as canonical content.
             let line = cr_segments.first().copied().unwrap_or(raw_line.trim()).to_string();
 
             folder_log.line(&line);
@@ -1479,13 +1479,13 @@ fn run_destination(
 
             // Directory-creation lines are NOT visible here: /NDL (passed
             // below) suppresses them, same as it would in the preflight
-            // scan if that scan also passed it (it deliberately doesn't —
+            // scan if that scan also passed it (it deliberately doesn't,
             // see preflight_pair). So dirs_this_folder stays under-counted
             // through this loop; the authoritative number comes from
             // parse_robocopy_summary once this folder's robocopy exits.
 
             if is_robocopy_dir_line(trimmed) {
-                // Dir lines classified BEFORE file parsing — an untagged
+                // Dir lines classified BEFORE file parsing, an untagged
                 // (existing) dir line is a bare number + path, which the
                 // file parser would misread as a file. With /NDL these
                 // barely occur here, but the ordering keeps this loop
@@ -1494,10 +1494,10 @@ fn run_destination(
                     dirs_this_folder += 1;
                 }
             } else if is_robocopy_error_line(trimmed) {
-                // Robocopy couldn't copy the file currently in flight — most
+                // Robocopy couldn't copy the file currently in flight. Most
                 // commonly because it's locked (open in Excel/Word/etc).
                 // /R:1 means this can print an ERROR twice, and robocopy also
-                // RE-PRINTS the file line before the retry — which resets
+                // RE-PRINTS the file line before the retry, which resets
                 // current_file_failed, so that flag alone isn't enough to
                 // stop a double entry. Dedup by source path (same guard the
                 // fast path uses) to record each skipped file exactly once.
@@ -1518,7 +1518,7 @@ fn run_destination(
                 }
             } else if let Some(file_bytes) = parse_robocopy_file_line(trimmed) {
                 // A new file line means the PREVIOUS file finished being
-                // attempted — fold its bytes into the completed totals now
+                // attempted, fold its bytes into the completed totals now
                 // (both this destination's own total and the shared global
                 // one), UNLESS it just failed (an ERROR line arrived while it
                 // was in flight), in which case nothing was actually written
@@ -1546,7 +1546,7 @@ fn run_destination(
 
                 last_current_file = current_file.clone();
 
-                // Emit (throttled) with no percentage — the frontend's
+                // Emit (throttled) with no percentage. The frontend's
                 // animation layer interpolates between events, and the
                 // folder-done event reconciles authoritative totals, so a
                 // suppressed final emit costs nothing.
@@ -1569,7 +1569,7 @@ fn run_destination(
         } else {
             // ── FAST MODE: drain robocopy's output with NO progress parsing
             // and no IPC emits while it runs, so robocopy never blocks waiting
-            // on us and runs at full speed — the whole point of this mode.
+            // on us and runs at full speed. The whole point of this mode.
             //
             // Reads line-at-a-time rather than the previous single
             // read_to_end(): that call buffered every byte of output in memory
@@ -1577,7 +1577,7 @@ fn run_destination(
             // allocated a second full copy. read_until() on an already-buffered
             // BufReader is a scan for '\n' inside memory the reader has
             // fetched anyway, so this is still far faster than robocopy can
-            // produce output — while peak memory becomes one line instead of
+            // produce output, while peak memory becomes one line instead of
             // the entire run's stdout.
             //
             // The work per line is deliberately minimal: append to the log
@@ -1597,9 +1597,9 @@ fn run_destination(
             loop {
                 raw_buf.clear();
                 match reader.read_until(b'\n', &mut raw_buf) {
-                    Ok(0) => break,  // EOF — robocopy closed stdout
+                    Ok(0) => break,  // EOF: robocopy closed stdout
                     Ok(_) => {}
-                    Err(_) => break, // stream error — stop, don't spin
+                    Err(_) => break, // stream error, stop, don't spin
                 }
                 // Lossy decode for the same reason as the live path: robocopy
                 // writes console-codepage bytes, and strict UTF-8 would drop
@@ -1644,7 +1644,7 @@ fn run_destination(
 
         // Mid-folder cancel: cancel_backup kills the child, the pipe
         // closes, and we land here with the flag set. The in-flight file
-        // was interrupted mid-write — do NOT credit its bytes; remove its
+        // was interrupted mid-write, do NOT credit its bytes; remove its
         // half-copied destination so nothing corrupt lingers (it's simply
         // absent, and the next /MIR run copies it fresh), then report a
         // clean cancellation for THIS destination (the others keep running).
@@ -1671,7 +1671,7 @@ fn run_destination(
             // Credit this folder's PARTIAL progress before reporting it.
             // files_this_folder/dirs_this_folder/bytes_this_folder already
             // exclude the interrupted file itself (its bytes were never
-            // folded out of pending_file_bytes — see the file-line branch
+            // folded out of pending_file_bytes, see the file-line branch
             // above), so this is exactly "what got copied", no more.
             total_files += files_this_folder;
             total_dirs  += dirs_this_folder;
@@ -1711,8 +1711,8 @@ fn run_destination(
             };
         }
 
-        // Robocopy has closed stdout — the last in-flight file is done
-        // (unless an ERROR line marked it failed — see the file-line branch).
+        // Robocopy has closed stdout (the last in-flight file is done
+        // (unless an ERROR line marked it failed) see the file-line branch).
         if !current_file_failed {
             dest_bytes_done += pending_file_bytes;
             live_bytes_g.fetch_add(pending_file_bytes, Ordering::SeqCst);
@@ -1734,13 +1734,13 @@ fn run_destination(
 
         // Parse the summary from the retained tail. Robocopy prints its
         // Files:/Dirs:/Bytes: block last, so the bounded tail always contains
-        // it — no need to have kept the whole run's output around for this.
+        // it. No need to have kept the whole run's output around for this.
         let (files_parsed, dirs_parsed, bytes_parsed, extras_parsed) =
             parse_robocopy_summary(&folder_log.tail_text());
         // Use parsed values for the totals (more accurate than our live count).
         // Fall back to our live count if parsing returned zeros. Extras have
         // no live counterpart to fall back to (the real-time loop doesn't
-        // track them — see is_robocopy_extra_line's call site above), so the
+        // track them, see is_robocopy_extra_line's call site above), so the
         // summary is the only source; 0 there means 0 deletions, not "unknown".
         let files_final  = if files_parsed > 0 { files_parsed } else { files_this_folder };
         let dirs_final   = if dirs_parsed  > 0 { dirs_parsed  } else { dirs_this_folder  };
@@ -1775,8 +1775,8 @@ fn run_destination(
 
         // Exit code is a BITMASK, not a severity scale: 1=copied, 2=extra
         // files present, 4=mismatch, 8=SOME FILES COULDN'T BE COPIED (e.g.
-        // locked), 16=SERIOUS error (robocopy couldn't even start — bad
-        // path, no access at all). Only 16 is fatal to this destination —
+        // locked), 16=SERIOUS error (robocopy couldn't even start, bad
+        // path, no access at all). Only 16 is fatal to this destination,
         // bit 8 just means "one or more files were skipped", which is
         // already handled per-file above (logged, not credited, and NOT a
         // reason to abort the rest of this destination's folders).
@@ -1832,7 +1832,7 @@ fn run_destination(
         format!("{} → {} complete.", sources.len(), destination)
     } else {
         format!(
-            "{} → {} complete, but {} file{} couldn't be copied (locked or access error) — see Skipped Files.",
+            "{} → {} complete, but {} file{} couldn't be copied (locked or access error). See Skipped Files.",
             sources.len(), destination, skipped.total, if skipped.total == 1 { "" } else { "s" }
         )
     };
@@ -1865,13 +1865,13 @@ fn run_destination(
 
 /// Returns true if a robocopy output line is a DIRECTORY entry of any kind
 /// (new, existing, or extra). NOTE: these lines only appear when /NDL is NOT
-/// passed — /NDL suppresses them entirely, which is why the real run (which
+/// passed, /NDL suppresses them entirely, which is why the real run (which
 /// passes /NDL) takes its dir count from the summary instead.
 ///
 /// The reliable discriminator is the trailing path separator: robocopy
 /// prints directory paths WITH a trailing backslash, and file paths never
 /// have one. Header/summary key-value lines ("   Source : C:\A\") also end
-/// with a separator, but they contain " : " — and since Windows forbids ':'
+/// with a separator, but they contain " : ", and since Windows forbids ':'
 /// in file/folder names, that token can never occur inside a real path.
 fn is_robocopy_dir_line(line: &str) -> bool {
     let t = line.trim_end();
@@ -1881,7 +1881,7 @@ fn is_robocopy_dir_line(line: &str) -> bool {
     t.ends_with('\\') || t.ends_with('/')
 }
 
-/// True only for directory lines robocopy has tagged "New Dir" — directories
+/// True only for directory lines robocopy has tagged "New Dir", directories
 /// that WOULD BE CREATED by the run. Without /NDL, robocopy also lists every
 /// EXISTING directory it walks (bare file-count + path, no tag); those are
 /// neither copy work nor new, and must count as nothing at all.
@@ -1893,12 +1893,12 @@ fn is_robocopy_new_dir_line(line: &str) -> bool {
 }
 
 /// True for a robocopy per-file ERROR line, printed after retries are
-/// exhausted on a file it couldn't access — e.g. it was open in Excel/Word.
+/// exhausted on a file it couldn't access, e.g. it was open in Excel/Word.
 /// Robocopy's real format is a fixed pattern like:
 ///   "2024/01/15 10:23:45 ERROR 32 (0x00000020) Copying File S:\...\file.xlsx"
 /// followed by a plain-English message line on its own. Both the literal
 /// " ERROR " marker and the "(0x" hex error-code marker are required together
-/// — that combination essentially can't occur in a real file/directory name,
+///. That combination essentially can't occur in a real file/directory name,
 /// which keeps this from ever misfiring on an oddly-named file.
 fn is_robocopy_error_line(line: &str) -> bool {
     line.contains(" ERROR ") && line.contains("(0x")
@@ -1916,13 +1916,13 @@ enum PreflightOutcome {
 
 /// Runs robocopy in list-only mode (/L) for one folder pair and sums the
 /// exact byte sizes of every file it WOULD copy. This is a pure directory
-/// walk — no file data is read or written — so it's fast even on large trees
+/// walk (no file data is read or written) so it's fast even on large trees
 /// (it's the same enumeration robocopy performs internally anyway, and the
 /// same thing Windows Explorer does during its "Calculating…" phase).
 ///
 /// The selection flags (/MIR /COPYALL) must match the real run exactly so
 /// robocopy makes identical copy/skip decisions in both passes. /NJH /NJS
-/// strip the header and summary, leaving pure file lines — which sidesteps
+/// strip the header and summary, leaving pure file lines, which sidesteps
 /// the localized summary labels entirely. /R:0 /W:0: never sit retrying a
 /// locked file during a pass whose only job is counting.
 fn preflight_pair(
@@ -1949,8 +1949,8 @@ fn preflight_pair(
             // Deliberately NO /NDL here (unlike the real run below): /NDL
             // suppresses exactly the "New Dir" lines is_robocopy_dir_line()
             // depends on, which made this scan's dir count structurally
-            // always zero. This pass also skips /NJS's cousin — the summary
-            // — via /NJS itself, so directory lines are the ONLY source of
+            // always zero. This pass also skips /NJS's cousin (the summary
+            //) via /NJS itself, so directory lines are the ONLY source of
             // truth for dirs here; there's no summary fallback to catch a
             // suppressed count the way the real run's total_dirs can.
         ])
@@ -1975,7 +1975,7 @@ fn preflight_pair(
     let mut extras: u64 = 0;
     let mut lines_since_cancel_check: u32 = 0;
 
-    // Raw-byte reads with lossy decoding — see the identical note in
+    // Raw-byte reads with lossy decoding, see the identical note in
     // run_backup_thread. Robocopy's piped output is console-codepage, so
     // .lines() would silently drop every file whose name isn't pure ASCII,
     // undercounting the plan.
@@ -1988,7 +1988,7 @@ fn preflight_pair(
             Err(_) => break,
         }
 
-        // Abortability must work DURING a pair's walk too — a huge tree can
+        // Abortability must work DURING a pair's walk too, a huge tree can
         // take a while, and a cancel that only works between pairs is a lie.
         // The condition is caller-supplied: the run thread aborts on the
         // backup cancel flag, estimates abort when their generation is
@@ -2014,13 +2014,13 @@ fn preflight_pair(
         }
         // Directory lines MUST be classified before the file parser sees the
         // line: without /NDL, robocopy lists EXISTING directories as a bare
-        // number (that dir's file count) plus a path — a shape the file
+        // number (that dir's file count) plus a path, a shape the file
         // parser happily reads as "one file of N bytes". That misparse is
         // exactly what made a fully up-to-date destination report its whole
         // directory tree as files-to-copy after a completed run.
         if is_robocopy_dir_line(trimmed) {
             if is_robocopy_new_dir_line(trimmed) {
-                // Tagged "New Dir" — a directory the run would CREATE.
+                // Tagged "New Dir", a directory the run would CREATE.
                 dirs += 1;
             }
             // Untagged dir line = an existing directory being walked. Not
@@ -2037,7 +2037,7 @@ fn preflight_pair(
     PreflightOutcome::Ok { bytes, files, dirs, extras }
 }
 
-/// True for robocopy lines tagged "*EXTRA File" / "*EXTRA Dir" — items that
+/// True for robocopy lines tagged "*EXTRA File" / "*EXTRA Dir", items that
 /// exist only in the destination and will be DELETED by /MIR, not copied.
 fn is_robocopy_extra_line(line: &str) -> bool {
     line.split('\t')
@@ -2069,19 +2069,19 @@ pub struct BackupEstimate {
 }
 
 /// Error sentinel for a scan aborted because a newer one replaced it. The
-/// frontend matches on this exact string to stay silent — a superseded scan
+/// frontend matches on this exact string to stay silent, a superseded scan
 /// is routine, not an error worth surfacing.
 pub const ESTIMATE_SUPERSEDED: &str = "__ESTIMATE_SUPERSEDED__";
 
 /// Computes the exact delta a backup would copy/delete right now, by running
-/// the same robocopy /L preflight the real backup uses — one list-only pass
+/// the same robocopy /L preflight the real backup uses. One list-only pass
 /// per source×destination pair. Powers the Summary panel's "Next Backup"
 /// stats, so they stay honest for incremental runs where the real workload is
 /// a small fraction of the source size.
 ///
 /// The unsafe-path validation runs here too, so a bad configuration surfaces
 /// in the Summary panel the moment it's created instead of waiting for Run.
-/// Async + blocking-thread — this is the big one: the estimate walks every
+/// Async + blocking-thread. This is the big one: the estimate walks every
 /// source×destination pair through robocopy /L, which on a large tree takes
 /// long enough that running it on the main thread froze the entire app.
 #[tauri::command]
@@ -2098,7 +2098,7 @@ fn estimate_backup_blocking(
     sources: Vec<String>,
     destinations: Vec<String>,
 ) -> Result<BackupEstimate, String> {
-    // Never scan while a backup is running — the two would contend for disk,
+    // Never scan while a backup is running. The two would contend for disk,
     // and the estimate would be describing a moving target anyway. (The
     // frontend refreshes automatically when the run completes.)
     if BACKUP_RUNNING.load(Ordering::SeqCst) {
@@ -2107,7 +2107,7 @@ fn estimate_backup_blocking(
 
     validate_backup_paths(&sources, &destinations)?;
 
-    // Claim a fresh generation — this alone aborts any estimate already in
+    // Claim a fresh generation. This alone aborts any estimate already in
     // flight. Remember it; the moment anything bumps past it (a newer
     // estimate, an explicit cancel, a backup launching), this scan dies.
     let my_generation = ESTIMATE_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
@@ -2175,7 +2175,7 @@ fn estimate_backup_blocking(
 ///
 /// We detect file lines by looking for a tab-delimited size token.
 fn parse_robocopy_file_line(line: &str) -> Option<u64> {
-    // "*EXTRA" lines are destination-only items being DELETED by /MIR — they
+    // "*EXTRA" lines are destination-only items being DELETED by /MIR. They
     // carry a size token too, but they are not copy work and must never count
     // toward copied files/bytes.
     if is_robocopy_extra_line(line) {
@@ -2216,7 +2216,7 @@ fn parse_size_token(s: &str) -> Option<u64> {
             "mb" | "m" => 1_048_576,
             "gb" | "g" => 1_073_741_824,
             "tb" | "t" => 1_099_511_627_776,
-            _ => return None, // not a unit — not a size line
+            _ => return None, // not a unit, not a size line
         }
     } else {
         // No unit: must be a plain integer (bytes). Non-integers rejected.
@@ -2246,8 +2246,8 @@ fn parse_size_token(s: &str) -> Option<u64> {
 
    LOCALE NOTE: the "Files :" / "Dirs :" / "Bytes :" labels are localized on
    non-English Windows, so this parser returns zeros there. That's handled
-   gracefully — the caller falls back to the live per-file counts tallied
-   during the run — so non-English users get slightly-less-authoritative
+   gracefully (the caller falls back to the live per-file counts tallied
+   during the run) so non-English users get slightly-less-authoritative
    totals rather than broken ones.
 ============================================================================= */
 

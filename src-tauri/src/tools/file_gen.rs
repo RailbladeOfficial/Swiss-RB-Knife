@@ -1,5 +1,5 @@
 /* =============================================================================
-   DUMMY FILE GENERATOR  — batch file creation
+   DUMMY FILE GENERATOR: batch file creation
    -----------------------------------------------------------------------------
    Tauri command for the Dummy File Generator tool. Creates batches of dummy
    files in a timestamped output folder, with support for three naming modes
@@ -91,7 +91,7 @@ fn is_valid_extension(ext: &str) -> bool {
 }
 
 /// Validates a user-supplied filename fragment (prefix or suffix). Empty is
-/// fine — both fields are optional — but anything present must be safe to
+/// fine (both fields are optional) but anything present must be safe to
 /// embed in a filename: no path separators, no "..", no Windows-illegal or
 /// control characters.
 fn validate_name_part(part: &str, field: &str) -> Result<(), String> {
@@ -107,8 +107,8 @@ fn validate_name_part(part: &str, field: &str) -> Result<(), String> {
         ));
     }
     // Deliberately NOT checked here: whether this part is a reserved Windows
-    // device name. A prefix/suffix is never the whole filename stem — the
-    // sequence identifier is always appended — so rejecting "con" here would
+    // device name. A prefix/suffix is never the whole filename stem (the
+    // sequence identifier is always appended) so rejecting "con" here would
     // refuse a perfectly valid prefix that generates con001.txt. The composed
     // filename is what has to be legal, and that is checked at the point it is
     // built (see the generation loop).
@@ -185,7 +185,7 @@ fn build_content(mode: &NamingMode, ext: &str, number: u32, total: u32) -> Strin
 ============================================================================= */
 
 /// Ceiling on rows per run. The per-row count cap alone doesn't bound the
-/// batch — nothing stops a caller sending a thousand rows of 10,000 — and the
+/// batch (nothing stops a caller sending a thousand rows of 10,000) and the
 /// frontend imposes no row limit of its own, so this is the only gate.
 const MAX_ENTRIES: usize = 100;
 /// Ceiling on total files per run, checked after summing every row. Bounds the
@@ -209,7 +209,7 @@ pub fn dfg_generate_files(
         ));
     }
 
-    // u64 so the sum can't overflow before the cap is checked — 100 rows of
+    // u64 so the sum can't overflow before the cap is checked, 100 rows of
     // u32::MAX would wrap a u32 accumulator and slip past the comparison.
     let requested_total: u64 = entries.iter().map(|e| e.count as u64).sum();
     if requested_total > MAX_TOTAL_FILES {
@@ -228,7 +228,7 @@ pub fn dfg_generate_files(
             return Err(format!("{label}Count cannot exceed 10,000 per type."));
         }
         // Prefix/suffix become part of filenames joined onto the output
-        // folder — path separators or ".." in them would let generated files
+        // folder, path separators or ".." in them would let generated files
         // land OUTSIDE the timestamped folder, and Windows-illegal characters
         // would fail with a cryptic OS error mid-batch. Reject both up front
         // with a message that names the offending field.

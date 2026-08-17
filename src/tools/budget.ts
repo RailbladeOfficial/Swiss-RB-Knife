@@ -8,18 +8,18 @@
 
    Architecture notes:
      • The entire dataset is one JSON blob persisted via save_budget_data /
-       load_budget_data — same shape on disk as in memory, no per-table files.
+       load_budget_data. Same shape on disk as in memory, no per-table files.
      • Categories, income sources, and expense sources share an
        {id, name, status} shape. "Retired" items stay referenced by historical
        entries but drop out of active pickers/quick-add.
-     • Recurring bills carry exactly one live `nextDue` date — the "current
+     • Recurring bills carry exactly one live `nextDue` date. The "current
        active instance". Paying a bill records a BillInstance (historical,
        anchored to the due date it was for) and advances `nextDue`.
      • Bill-row computation (getBillRowsForRange) implements the agreed model:
        browsing month M shows paid instances whose due date falls in M; only
        the CURRENT real-world month additionally shows each active bill's live
        `nextDue` as "pending" (or "overdue" if nextDue precedes this month's
-       start) — so a bill due next month but paid early still surfaces today,
+       start), so a bill due next month but paid early still surfaces today,
        and once paid it settles into its actual due month's history.
 
    Rust commands used: save_budget_data, load_budget_data
@@ -28,7 +28,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
-import { flash, escapeHtml } from "../shell";
+import { flash, escapeHtml, setToolAttention } from "../shell";
+import {
+  DAY_MS,
+  isReminderDue,
+  normalizeMonthDays,
+  parseMonthDaysInput,
+} from "../reminder-schedule";
 import { Modal } from "../modal";
 
 /* =============================================================================
@@ -101,7 +107,7 @@ export function describeRecurrence(r: Recurrence): string {
 
 /**
  * Display text for a bill's planned amount. Variable bills can still carry an
- * estimate (shown with a "~" to mark it as approximate) — "amount === null"
+ * estimate (shown with a "~" to mark it as approximate), "amount === null"
  * means "no estimate given", independent of Fixed vs Variable.
  */
 export function formatBillAmount(bill: RecurringBill): string {
@@ -121,7 +127,7 @@ export type RecurringBill = {
   /** Planned amount. Null for Variable bills whose amount isn't known ahead of time. */
   amount: number | null;
   recurrence: Recurrence;
-  /** The current unpaid due date — the single "active instance" for this bill. */
+  /** The current unpaid due date. The single "active instance" for this bill. */
   nextDue: string; // YYYY-MM-DD
   autopay: boolean;
   payMethod: string;
@@ -133,7 +139,7 @@ export type RecurringBill = {
 export type BillInstance = {
   id: string;
   billId: string;
-  dueDate: string; // YYYY-MM-DD — the due date this payment settles
+  dueDate: string; // YYYY-MM-DD: the due date this payment settles
   /** Snapshot of the planned amount at the time of payment (for Planned vs Actual stats). */
   plannedAmount: number | null;
   actualAmount: number;
@@ -175,11 +181,11 @@ export type BudgetData = {
 /**
  * Which top-level BudgetData fields live in which on-disk file. saveToDisk()
  * builds each file's payload from these two lists instead of separate
- * hand-written object literals — add a new array to BudgetData, and the
+ * hand-written object literals, add a new array to BudgetData, and the
  * compile-time check right below will fail the build if you forget to add
  * its name to exactly one of these lists too. Without that check, a forgotten
  * field would still work fine for the rest of the session (it's on `data`,
- * every render function sees it) and then silently fail to persist at all —
+ * every render function sees it) and then silently fail to persist at all,
  * gone on next launch, no error, nothing to point at.
  */
 const ENTITY_FIELDS = ["categories", "incomeSources", "expenseSources", "recurringBills"] as const;
@@ -187,7 +193,7 @@ const ENTRY_FIELDS = ["billInstances", "incomeEntries", "fluctuatingExpenses"] a
 
 type _CoveredFields = (typeof ENTITY_FIELDS)[number] | (typeof ENTRY_FIELDS)[number];
 // If this line shows a type error, a field exists on BudgetData that isn't
-// in ENTITY_FIELDS or ENTRY_FIELDS above — add it to one of them before
+// in ENTITY_FIELDS or ENTRY_FIELDS above, add it to one of them before
 // doing anything else, or it will never be written to disk.
 type _AssertAllBudgetFieldsRouted = keyof BudgetData extends _CoveredFields ? true : never;
 const _assertAllBudgetFieldsRouted: _AssertAllBudgetFieldsRouted = true;
@@ -231,7 +237,7 @@ const SAVE_DEBOUNCE_MS = 400;
 
 /* =============================================================================
    ENCRYPTION STATE
-   sessionPassword is held in memory only — never written anywhere.
+   sessionPassword is held in memory only, never written anywhere.
    It is cleared when the tool is locked (session-unlock mode only).
 ============================================================================= */
 
@@ -281,8 +287,8 @@ function todayInRange(start: string, end: string): boolean {
 
 /**
  * Advances a due date by one cycle of the given recurrence.
- * Used to compute the suggested next due date when a bill is marked paid —
- * the result is shown for review/edit, never committed silently.
+ * Used to compute the suggested next due date when a bill is marked paid.
+ * The result is shown for review/edit, never committed silently.
  */
 export function advanceDate(dateStr: string, recurrence: Recurrence): string {
   const d = parseDate(dateStr);
@@ -309,7 +315,7 @@ export function advanceDate(dateStr: string, recurrence: Recurrence): string {
 ============================================================================= */
 
 /* =============================================================================
-   PERSISTENCE — migration, sanitization, and blast-door error handling
+   PERSISTENCE: migration, sanitization, and blast-door error handling
    -----------------------------------------------------------------------------
    Schema changes happen regularly during development. Rather than crashing
    (and hiding the window because initBudget throws before window.show()), we:
@@ -320,7 +326,7 @@ export function advanceDate(dateStr: string, recurrence: Recurrence): string {
         downstream rendering never hits a null it didn't expect.
      3. If anything at any step fails, fall back to empty data and record the
         reason. After init, the UI shows an inline warning that lets the user
-        acknowledge and optionally wipe the bad file — the window always opens.
+        acknowledge and optionally wipe the bad file. The window always opens.
 ============================================================================= */
 
 /** Maps the old fixed recurrence strings to the new {interval, unit} shape. */
@@ -518,7 +524,7 @@ function sanitizeData(raw: unknown): BudgetData {
     unknown
   >;
 
-  // "descriptions" was the old name for expenseSources — merge both if present
+  // "descriptions" was the old name for expenseSources, merge both if present
   const expenseSourceRaw = Array.isArray(r.expenseSources)
     ? r.expenseSources
     : Array.isArray(r.descriptions)
@@ -562,7 +568,7 @@ async function loadFromDisk(): Promise<void> {
     let entitiesRaw: string;
     let entriesRaw: string;
     if (encryptionEnabled) {
-      // Decrypt into memory — plaintext never touches disk
+      // Decrypt into memory, plaintext never touches disk
       entitiesRaw = await invoke<string>("budget_decrypt_entities_to_memory", { password: sessionPassword });
       entriesRaw = await invoke<string>("budget_decrypt_to_memory", { password: sessionPassword });
     } else {
@@ -572,7 +578,7 @@ async function loadFromDisk(): Promise<void> {
 
     const entitiesEmpty = !entitiesRaw || entitiesRaw.trim() === "" || entitiesRaw.trim() === "{}";
     const entriesEmpty = !entriesRaw || entriesRaw.trim() === "" || entriesRaw.trim() === "{}";
-    // Empty on both sides / first run — backend returns "{}" for each, which is fine
+    // Empty on both sides / first run, backend returns "{}" for each, which is fine
     if (entitiesEmpty && entriesEmpty) {
       data = emptyData();
       return;
@@ -591,7 +597,7 @@ async function loadFromDisk(): Promise<void> {
 
     // The two files' field sets never overlap (categories/incomeSources/
     // expenseSources/recurringBills vs. billInstances/incomeEntries/
-    // fluctuatingExpenses) — sanitizeData validates and defaults each field
+    // fluctuatingExpenses), sanitizeData validates and defaults each field
     // independently regardless of which file it came from, so a plain merge
     // here is enough; nothing downstream needs to know there were two files.
     data = sanitizeData({
@@ -608,7 +614,7 @@ async function saveToDisk(): Promise<void> {
   const entities = JSON.stringify(pickFields(data, ENTITY_FIELDS));
   const entries = JSON.stringify(pickFields(data, ENTRY_FIELDS));
 
-  // Snapshot the password NOW, synchronously — the second invoke below runs
+  // Snapshot the password NOW, synchronously. The second invoke below runs
   // after an await, and a flush-then-relock sequence may have blanked
   // sessionPassword by then. Everything this function needs is captured
   // before the first await, so callers may safely reset module state the
@@ -618,7 +624,7 @@ async function saveToDisk(): Promise<void> {
   if (encryptionEnabled) {
     // A queued save can outlive the session that scheduled it (tool re-lock,
     // navigating away, disabling encryption). If that happens, the password
-    // was already cleared before this ran — never send an empty password to
+    // was already cleared before this ran, never send an empty password to
     // the backend, since that would silently re-encrypt the file under the
     // wrong key. (The Rust side rejects this too; this is the first line of
     // defense.)
@@ -631,12 +637,17 @@ async function saveToDisk(): Promise<void> {
   }
 }
 
-/** Debounced save — call after any mutation.
+/** Debounced save, call after any mutation.
  *  The saveToDisk() promise MUST be caught here: this fires from a timer, so
- *  a rejection has no caller to bubble to — a disk-full or locked-file error
+ *  a rejection has no caller to bubble to, a disk-full or locked-file error
  *  would otherwise vanish as an unhandled rejection while the user keeps
  *  editing, believing everything is persisting. */
 function queueSave(): void {
+  // Stamped here rather than in saveToDisk(): this is the point where the user
+  // actually changed something, and it's the one call every mutation path
+  // already goes through. saveToDisk() also runs from the flush path, which
+  // would re-stamp an edit that was already counted.
+  markBudgetUpdated();
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
     saveTimer = null;
@@ -650,7 +661,7 @@ function queueSave(): void {
  * If an edit is still sitting in the debounce queue, writes it NOW instead
  * of letting it be discarded. Must be called BEFORE clearing sessionPassword
  * or resetting `data` (tool re-lock, disabling encryption, navigating away,
- * quitting) — saveToDisk() captures everything it needs synchronously, so
+ * quitting), saveToDisk() captures everything it needs synchronously, so
  * callers may reset state immediately after this returns without awaiting
  * the promise. Safe to call at any time: a no-op when nothing is queued.
  */
@@ -667,7 +678,7 @@ async function flushQueuedSave(): Promise<void> {
 
 /**
  * Called by shell.ts when the user navigates AWAY from the Budget tool, and
- * on app quit — flushes any pending debounced save so an edit made within
+ * on app quit, flushes any pending debounced save so an edit made within
  * SAVE_DEBOUNCE_MS of leaving the tool isn't silently lost.
  */
 export async function onBudgetToolExit(): Promise<void> {
@@ -675,7 +686,7 @@ export async function onBudgetToolExit(): Promise<void> {
 }
 
 /* =============================================================================
-   LOOKUP HELPERS — status-aware
+   LOOKUP HELPERS: status-aware
 ============================================================================= */
 
 export function getActiveCategories(): Category[] {
@@ -709,7 +720,7 @@ export function getIncomeSourceById(id: string): IncomeSource | undefined {
 /**
  * Finds an active category/source/expense-source by exact name (case-insensitive),
  * or creates a new active one and returns its id. Used for quick-add from the
- * main view entry form — no confirmation prompt, full editing happens later in
+ * main view entry form. No confirmation prompt, full editing happens later in
  * the Setup modal.
  */
 function findOrCreate(
@@ -760,7 +771,7 @@ export type BillRow = {
  * Historical paid instances whose due date falls in [start, end] always show,
  * regardless of which range is being browsed. If today falls within
  * [start, end], each active bill's live `nextDue` additionally shows as
- * "pending" (or "overdue" if nextDue is before today) — surfacing bills due
+ * "pending" (or "overdue" if nextDue is before today), surfacing bills due
  * soon (this period or next) so they can be paid ahead, and flagging anything
  * that slipped past due. Once paid, it settles into its actual due date's
  * history.
@@ -804,7 +815,7 @@ export function getBillRowsForRange(start: string, end: string): BillRow[] {
 
 /**
  * Active bills that are overdue right now (unpaid, nextDue before today).
- * Independent of the browsed range — used to drive a persistent "Overdue"
+ * Independent of the browsed range, used to drive a persistent "Overdue"
  * indicator regardless of navigation.
  */
 export function getOverdueBills(): RecurringBill[] {
@@ -827,7 +838,7 @@ export type RangeTotals = {
 
 /**
  * Live totals for a given browsed range. Recurring totals only count bills
- * that have actually been paid (kind === "paid", using actualAmount) —
+ * that have actually been paid (kind === "paid", using actualAmount),
  * pending/overdue bills still show in the bills panel so you know what's
  * coming, but don't affect Net until they're settled.
  */
@@ -863,7 +874,7 @@ export function computeTotals(start: string, end: string): RangeTotals {
 }
 
 /* =============================================================================
-   VIEW RANGE  — Day / Week / Month / Year navigation
+   VIEW RANGE: Day / Week / Month / Year navigation
 ============================================================================= */
 
 function computeMonthRange(
@@ -1047,7 +1058,7 @@ function restoreLastView(): void {
   }
 }
 
-/** Inline-edit commit — parses the text input and jumps to that period. */
+/** Inline-edit commit, parses the text input and jumps to that period. */
 function commitRangeInput(): void {
   const raw = monthInputEl.value.trim();
   let jumped = false;
@@ -1102,7 +1113,7 @@ function commitRangeInput(): void {
   }
 }
 
-// Keep the old name for the single caller that used it — now an alias
+// Keep the old name for the single caller that used it, now an alias
 function renderMonthNav(): void {
   renderRangeNav();
 }
@@ -1111,7 +1122,7 @@ function shiftMonth(delta: number): void {
 }
 
 /* =============================================================================
-   APP SETTINGS  (read-only here — shell.ts owns writing settings.json)
+   APP SETTINGS  (read-only here, shell.ts owns writing settings.json)
 ============================================================================= */
 
 type BudgetAppSettings = {
@@ -1119,18 +1130,47 @@ type BudgetAppSettings = {
   quickDelete: boolean;
   showCleared: boolean;
   startupMode: "current-month" | "last-view";
+  /* ── Budget reminders (see the BUDGET REMINDERS section) ───────────────── */
+  reminderEnabled: boolean;
+  /** "interval" counts days since the last change; "monthly" fires on fixed
+   *  days of the month (payday, the 1st, whenever the bills land). */
+  reminderMode: BudgetReminderMode;
+  /** Days between nudges in interval mode. Integer, 1–366. */
+  reminderDays: number;
+  /** Days of the month that trigger a nudge in monthly mode. Integers 1–31,
+   *  sorted and de-duplicated; a day past the end of a short month folds to
+   *  that month's last day. */
+  reminderMonthDays: number[];
+  /** false = Gentle (toast), true = Aggressive (startup modal). */
+  reminderAggressive: boolean;
+  /** Epoch ms of the last change to any budget data. 0 = never recorded. */
+  lastUpdatedAt: number;
+  /** Cached newestBudgetDataAt() from the last time the data was readable.
+   *  Denormalized on purpose: on an encrypted budget the data can't be read at
+   *  startup, which is exactly when the reminder needs to know how current it
+   *  is. Refreshed whenever the data IS readable. 0 = never computed. */
+  dataNewestAt: number;
 };
+
+type BudgetReminderMode = "interval" | "monthly";
 
 let appSettings: BudgetAppSettings = {
   americanDates: false,
   quickDelete: false,
   showCleared: true,
   startupMode: "current-month",
+  reminderEnabled: false,
+  reminderMode: "interval",
+  reminderDays: 7,
+  reminderMonthDays: [1],
+  reminderAggressive: false, // Gentle by default
+  lastUpdatedAt: 0,
+  dataNewestAt: 0,
 };
 
 async function loadAppSettings(): Promise<void> {
   try {
-    // americanDates is SHELL-owned (General Settings' Date Format) — read it
+    // americanDates is SHELL-owned (General Settings' Date Format), read it
     // from the shared settings.json; everything else Budget owns lives in
     // Budget's own settings file.
     const sharedRaw = await invoke<string>("load_settings");
@@ -1148,6 +1188,7 @@ async function loadAppSettings(): Promise<void> {
       appSettings.showCleared = own.showCleared !== false; // default on
       appSettings.startupMode =
         own.startupMode === "last-view" ? "last-view" : "current-month";
+      readReminderSettings(own);
     } else {
       // First run after the settings split: adopt any legacy budget* keys
       // still in settings.json, then persist them to the new home so the
@@ -1167,18 +1208,276 @@ async function loadAppSettings(): Promise<void> {
   }
 }
 
+/** Pulls the reminder keys out of Budget's own settings file, clamping every
+ *  one. This file is user-editable and a bad value here would otherwise reach
+ *  the due-date arithmetic. Missing keys fall back to the defaults already on
+ *  appSettings, so a settings file written before reminders existed loads with
+ *  reminders simply off. */
+function readReminderSettings(own: Record<string, unknown>): void {
+  appSettings.reminderEnabled = own.reminderEnabled === true;
+  appSettings.reminderMode =
+    own.reminderMode === "monthly" ? "monthly" : "interval";
+  appSettings.reminderDays =
+    typeof own.reminderDays === "number" &&
+    Number.isInteger(own.reminderDays) &&
+    own.reminderDays >= 1 &&
+    own.reminderDays <= 366
+      ? own.reminderDays
+      : 7;
+  appSettings.reminderMonthDays = Array.isArray(own.reminderMonthDays)
+    ? normalizeMonthDays(own.reminderMonthDays)
+    : [1];
+  // An empty list would mean "monthly mode that can never fire", a setting
+  // with no way to reach it from the UI, so treat it as unset.
+  if (appSettings.reminderMonthDays.length === 0) appSettings.reminderMonthDays = [1];
+  appSettings.reminderAggressive = own.reminderAggressive === true;
+  appSettings.lastUpdatedAt =
+    typeof own.lastUpdatedAt === "number" && own.lastUpdatedAt > 0
+      ? own.lastUpdatedAt
+      : 0;
+  appSettings.dataNewestAt =
+    typeof own.dataNewestAt === "number" && own.dataNewestAt > 0
+      ? own.dataNewestAt
+      : 0;
+}
+
 async function saveAppSettings(): Promise<void> {
   try {
-    // Budget's own file, Budget's own keys — no shared-file merge dance, no
+    // Budget's own file, Budget's own keys. No shared-file merge dance, no
     // possibility of another writer's save erasing these (or vice versa).
     const own = {
       quickDelete: appSettings.quickDelete,
       showCleared: appSettings.showCleared,
       startupMode: appSettings.startupMode,
+      reminderEnabled: appSettings.reminderEnabled,
+      reminderMode: appSettings.reminderMode,
+      reminderDays: appSettings.reminderDays,
+      reminderMonthDays: appSettings.reminderMonthDays,
+      reminderAggressive: appSettings.reminderAggressive,
+      lastUpdatedAt: appSettings.lastUpdatedAt,
+      dataNewestAt: appSettings.dataNewestAt,
     };
     await invoke("save_tool_settings", { toolId: "budget", data: JSON.stringify(own) });
   } catch {
     /* non-critical */
+  }
+}
+
+/* =============================================================================
+   BUDGET REMINDERS
+   -----------------------------------------------------------------------------
+   A nudge to go put your actual numbers in, modelled on Auto-Backup's reminder
+   and the new-version notifier. Same three parts, so all three behave alike:
+
+     • a persistent signal while something is owed (sidebar row pulse + a line
+       in the tool header), which stays up until it's dealt with;
+     • a one-shot startup nudge, Gentle (toast) or Aggressive (modal);
+     • an enable toggle with its own schedule settings, in this tool's Setup.
+
+   Everything measures from ONE number, budgetBaselineAt():
+
+       max(lastUpdatedAt, cached data date, newest non-future date in the data)
+
+   Two real sources (the third is just a cache of the second) because neither
+   alone is right:
+
+     • lastUpdatedAt (a stamp written on every save) knows when you last
+       touched the tool, but it starts at zero, so a budget that's been
+       sitting untouched for a month has no stamp at all, and measuring from
+       "whenever the stamp got created" would tell a brand-new reminder that
+       everything is perfectly up to date. That was the original bug here.
+     • The data's own newest date knows how current your numbers actually are,
+       which is the thing being asked about, but it can't see a review that
+       added nothing (Mark Reviewed) or an edit to an existing entry.
+
+   Taking the later of the two means both answers count, and whichever is more
+   recent wins. Future-dated records are ignored, entering next month's rent
+   today shouldn't buy you a month of silence.
+
+   Two schedules read the baseline:
+
+     interval  every N days since it.
+     monthly   on given days of the month (payday, the 1st, whenever bills
+               land), due if the baseline predates the most recent one.
+
+   Both live in Budget's own (unencrypted) settings file rather than in the
+   budget data, which is what makes this work when encryption is on: the data
+   itself can't be read at startup, which is precisely when the reminder needs
+   to know how current it is. The cached data date is refreshed at every point
+   where the data IS readable (after load, and after any mutation) so an
+   encrypted budget is measured correctly from the launch after its first
+   unlock.
+
+   There's deliberately no "dismissed" state. Like Auto-Backup's, the reminder
+   is owed until the thing it's asking for actually happens, dismissing the
+   modal quiets this run, not the next one. Mark Reviewed is the way to say
+   "I looked, there was nothing to add"; see markBudgetReviewed().
+============================================================================= */
+
+/** Reminder status when a nudge is owed, null otherwise (reminders off, no
+ *  baseline recorded yet, or simply not time). Read by shell.ts's startup
+ *  sequence and by refreshBudgetDueUI(). */
+export interface BudgetReminderStatus {
+  aggressive: boolean;
+  /** Whole days since the budget was last changed. */
+  elapsedDays: number;
+}
+
+/** Local-midnight epoch ms for a YYYY-MM-DD string, or 0 if it isn't one.
+ *  Parsed by hand rather than through `new Date(str)`, which reads a bare
+ *  YYYY-MM-DD as UTC midnight and lands on the previous day west of Greenwich. */
+function dateStrToLocalMs(dateStr: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!m) return 0;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+}
+
+/** Newest date in the budget that isn't in the future, as local-midnight epoch
+ *  ms, 0 when there's nothing to measure (no data, or none of it loaded).
+ *
+ *  Reads the three record types that represent the user actually putting
+ *  numbers in: logged income, logged expenses, and paid bills. Recurring bill
+ *  DEFINITIONS are deliberately excluded, a bill's nextDue is a schedule the
+ *  app maintains on its own, so counting it would let a budget with one
+ *  recurring bill in it look permanently up to date. */
+function newestBudgetDataAt(): number {
+  let newest = 0;
+  const consider = (dateStr: string): void => {
+    const ms = dateStrToLocalMs(dateStr);
+    if (ms > newest) newest = ms;
+  };
+
+  for (const e of data.incomeEntries) consider(e.date);
+  for (const e of data.fluctuatingExpenses) consider(e.date);
+  for (const b of data.billInstances) consider(b.paidDate);
+
+  // Entering next month's rent today shouldn't buy a month of silence, so a
+  // future-dated record doesn't count as "up to date as of then".
+  return newest > Date.now() ? 0 : newest;
+}
+
+/** Refreshes the cached data date. Only ever called from points where `data`
+ *  is known to hold the real thing, an encrypted budget looks empty until it's
+ *  unlocked, and caching a 0 from that state would erase what the reminder
+ *  knows about it. */
+function syncDataNewestAt(): void {
+  const newest = newestBudgetDataAt();
+  if (newest === appSettings.dataNewestAt) return;
+  appSettings.dataNewestAt = newest;
+  void saveAppSettings();
+}
+
+/** The single point every schedule measures from, see the section header for
+ *  why it's the later of these rather than any one alone. The cache and the
+ *  live read are both here so it's correct before the data is readable (cache)
+ *  and immediately after it changes (live), without waiting for a save. */
+function budgetBaselineAt(): number {
+  return Math.max(
+    appSettings.lastUpdatedAt,
+    appSettings.dataNewestAt,
+    newestBudgetDataAt(),
+  );
+}
+
+export function getDueBudgetReminder(): BudgetReminderStatus | null {
+  if (!appSettings.reminderEnabled) return null;
+
+  const baseline = budgetBaselineAt();
+  // Nothing to measure from: an empty budget that has never been saved. There's
+  // no "you're behind" to report when there's no history at all.
+  if (!baseline) return null;
+
+  const now = Date.now();
+  const due = isReminderDue(
+    baseline,
+    appSettings.reminderMode,
+    appSettings.reminderDays,
+    appSettings.reminderMonthDays,
+    now,
+  );
+  if (!due) return null;
+
+  return {
+    aggressive: appSettings.reminderAggressive,
+    elapsedDays: Math.floor((now - baseline) / DAY_MS),
+  };
+}
+
+/** How stale the persisted stamp is allowed to get. Everything reading it works
+ *  in whole days, so writing the settings file on every single mutation would
+ *  be a lot of disk churn to record a difference nothing can observe. */
+const STAMP_PERSIST_INTERVAL_MS = 60_000;
+
+/** Stamps "the budget just changed" and clears any owed reminder with it.
+ *  Called from queueSave(), so it covers every mutation path without each one
+ *  having to remember. */
+function markBudgetUpdated(): void {
+  const now = Date.now();
+  const shouldPersist = now - appSettings.lastUpdatedAt >= STAMP_PERSIST_INTERVAL_MS;
+  appSettings.lastUpdatedAt = now;
+  if (shouldPersist) void saveAppSettings();
+  // A mutation means the data is loaded, so this is a safe point to re-cache.
+  syncDataNewestAt();
+  refreshBudgetDueUI();
+}
+
+/* Confirmation for the header's Mark Reviewed button. Lazily constructed on
+   first use, matching how the other Budget modals are built. The tool's DOM
+   exists from the start, but there's no reason to instantiate a Modal nobody
+   has asked for yet.
+
+   Only the header button is guarded. The Aggressive reminder modal's "Nothing
+   to add, mark it reviewed" is already a deliberate pick from three labelled
+   options, and stacking a second modal on top of a choice the user just read
+   and made would be noise, not safety. The header button is a single click
+   with no surrounding context, which is the case worth catching. */
+let reviewConfirmModal: Modal | null = null;
+
+function getReviewConfirmModal(): Modal {
+  if (!reviewConfirmModal) {
+    reviewConfirmModal = new Modal(
+      document.getElementById("budgetReviewConfirmBackdrop")!,
+      { closeOnEsc: true },
+    );
+  }
+  return reviewConfirmModal;
+}
+
+/** Clears an owed reminder without touching any budget data.
+ *
+ *  Budget is the one of the three reminders with no natural clearing event.
+ *  A backup reminder clears when a backup runs and a version notice clears
+ *  when you're on the latest release, but "go update your budget" can be
+ *  correctly answered with "I looked, there was nothing to add", and there'd
+ *  otherwise be no way to say so short of inventing an entry.
+ *
+ *  Restarts the same clock a real edit would, so the next nudge lands a full
+ *  interval from now rather than immediately. Persists unconditionally (unlike
+ *  markBudgetUpdated's throttle): this is a deliberate one-shot action, and it
+ *  has to survive a close right after it. */
+export function markBudgetReviewed(): void {
+  appSettings.lastUpdatedAt = Date.now();
+  void saveAppSettings();
+  refreshBudgetDueUI();
+}
+
+/** Lights or clears the persistent signals: the sidebar row pulse, the line in
+ *  the tool header, and the Mark Reviewed button beside it. Safe to call
+ *  anytime and from anywhere. Every element is looked up per call, since this
+ *  runs from paths that can precede the init that would have cached them. */
+function refreshBudgetDueUI(): void {
+  const status = getDueBudgetReminder();
+  const due = status !== null;
+
+  setToolAttention("finance", "budget", due);
+
+  // The Mark Reviewed button lives inside this wrapper, so it appears and
+  // disappears with the notice without needing its own toggle.
+  const notice = document.getElementById("budgetDueNotice");
+  const daysEl = document.getElementById("budgetDueDays");
+  if (notice && daysEl) {
+    if (due) daysEl.textContent = String(status.elapsedDays);
+    notice.style.display = due ? "" : "none";
   }
 }
 
@@ -1260,7 +1559,7 @@ function getLedgerForRange(start: string, end: string): LedgerItem[] {
   return items;
 }
 
-/** Signed contribution of a single ledger item to a "net" subtotal — income
+/** Signed contribution of a single ledger item to a "net" subtotal, income
  *  adds (money in), expenses and bill payments subtract (money out). Mirrors
  *  the sign convention already used for ledger row coloring above. */
 function itemNetAmount(item: LedgerItem): number {
@@ -1269,7 +1568,7 @@ function itemNetAmount(item: LedgerItem): number {
   return -item.instance.actualAmount;
 }
 
-/** Net total across a list of ledger items — used for the totals shown next
+/** Net total across a list of ledger items, used for the totals shown next
  *  to date/type/source subheadings in the ledger. */
 function sumNetAmount(items: LedgerItem[]): number {
   return items.reduce((sum, item) => sum + itemNetAmount(item), 0);
@@ -1286,16 +1585,16 @@ let monthNextBtn: HTMLButtonElement;
 let snapBtnEl: HTMLButtonElement;
 let viewModeBtns: HTMLButtonElement[];
 
-// Budget Settings tab — startup mode select (item 4)
+// Budget Settings tab, startup mode select (item 4)
 let budgetStartupModeSelect: HTMLSelectElement;
 
-// Bill Editor modal — autopay toggle label (item 7)
+// Bill Editor modal, autopay toggle label (item 7)
 let billAutopayLabelEl: HTMLElement;
 
-// Bill Pay modal — cleared toggle label (item 7)
+// Bill Pay modal, cleared toggle label (item 7)
 let billActionClearedLabelEl: HTMLElement;
 
-// Delete entry confirm modal — specific message (item 8)
+// Delete entry confirm modal, specific message (item 8)
 let deleteMessageEl: HTMLElement;
 
 // Budget Settings tab (item 10)
@@ -1303,6 +1602,18 @@ let budgetQuickDeleteToggle: HTMLInputElement;
 let budgetQuickDeleteLabel: HTMLElement;
 let budgetShowClearedToggle: HTMLInputElement;
 let budgetShowClearedLabel: HTMLElement;
+
+// Budget Settings tab, reminders
+let budgetReminderToggle: HTMLInputElement;
+let budgetReminderLabel: HTMLElement;
+let budgetReminderSubsettings: HTMLElement;
+let budgetReminderModeSelect: HTMLSelectElement;
+let budgetReminderDaysRow: HTMLElement;
+let budgetReminderDaysInput: HTMLInputElement;
+let budgetReminderMonthDaysRow: HTMLElement;
+let budgetReminderMonthDaysInput: HTMLInputElement;
+let budgetReminderAggressiveToggle: HTMLInputElement;
+let budgetReminderModeLabel: HTMLElement;
 
 let typeIncomeBtn: HTMLButtonElement;
 let typeExpenseBtn: HTMLButtonElement;
@@ -1374,7 +1685,7 @@ let billActionUndoBtn: HTMLButtonElement;
 let billActionCancelBtn: HTMLButtonElement;
 let billActionCloseBtn: HTMLButtonElement;
 
-// Setup modal — Categories / Income Sources / Expense Sources (simple lists)
+// Setup modal. Categories / Income Sources / Expense Sources (simple lists)
 let categoriesListEl: HTMLElement;
 let sourcesListEl: HTMLElement;
 let expenseSourcesListEl: HTMLElement;
@@ -1382,7 +1693,7 @@ let categoryNewBtn: HTMLButtonElement;
 let sourceNewBtn: HTMLButtonElement;
 let expenseSourceNewBtn: HTMLButtonElement;
 
-// Setup modal — Recurring Bills list
+// Setup modal. Recurring Bills list
 let billsListEl: HTMLElement;
 let billNewBtn: HTMLButtonElement;
 
@@ -1552,7 +1863,7 @@ function safeColor(raw: string, fallback: string): string {
 
 /**
  * Computes relative luminance of a hex color and returns a contrasting
- * text color — dark (#1a1a1a) for light backgrounds, light (#f0f0f0) for dark.
+ * text color, dark (#1a1a1a) for light backgrounds, light (#f0f0f0) for dark.
  * Used for pie slice percentage labels so text is always readable.
  */
 function contrastTextColor(hex: string): string {
@@ -1568,7 +1879,7 @@ function contrastTextColor(hex: string): string {
 }
 
 function getChartPalette(): string[] {
-  // Dedicated chart color vars — themes define these for curated chart palettes.
+  // Dedicated chart color vars, themes define these for curated chart palettes.
   // If a theme doesn't define them (or they're invalid), fall back to the
   // hardcoded set below which ensures good contrast and visual variety.
   const chartVars = [
@@ -1851,8 +2162,8 @@ function attachChartTooltip(
         const na = norm(a), ns = norm(seg.startAngle), ne = norm(seg.endAngle);
         if (na >= ns && na <= ne) {
           label = showCost
-            ? `${seg.name} — ${formatCurrency(seg.value)} (${Math.round(seg.pct * 100)}%)`
-            : `${seg.name} — ${Math.round(seg.pct * 100)}%`;
+            ? `${seg.name}: ${formatCurrency(seg.value)} (${Math.round(seg.pct * 100)}%)`
+            : `${seg.name}: ${Math.round(seg.pct * 100)}%`;
           break;
         }
       }
@@ -1860,11 +2171,11 @@ function attachChartTooltip(
       for (const seg of result.bar) {
         if (mx >= seg.x && mx <= seg.x + seg.w && my >= seg.y && my <= seg.y + seg.h) {
           if (seg.isNeg) {
-            label = showCost ? `${seg.name} — ${formatCurrency(seg.value)}` : seg.name;
+            label = showCost ? `${seg.name}: ${formatCurrency(seg.value)}` : seg.name;
           } else {
             label = showCost
-              ? `${seg.name} — ${formatCurrency(seg.value)} (${Math.round((seg.pct ?? 0) * 100)}%)`
-              : `${seg.name} — ${Math.round((seg.pct ?? 0) * 100)}%`;
+              ? `${seg.name}: ${formatCurrency(seg.value)} (${Math.round((seg.pct ?? 0) * 100)}%)`
+              : `${seg.name}: ${Math.round((seg.pct ?? 0) * 100)}%`;
           }
           break;
         }
@@ -1926,7 +2237,7 @@ function drawModalChart(): void {
 
   // Keep title, subtitle, and cycle button label in sync
   (document.getElementById("budgetChartExpandTitle") as HTMLElement).textContent =
-    `Expense by ${grpLabel} — ${typeLabel} Chart`;
+    `Expense by ${grpLabel}: ${typeLabel} Chart`;
   (document.getElementById("budgetChartExpandSubtitle") as HTMLElement).textContent =
     `${formatDate(viewStart)} – ${formatDate(viewEnd)}`;
   const cycleBtn = document.getElementById("budgetChartExpandCycleBtn") as HTMLButtonElement;
@@ -1936,7 +2247,7 @@ function drawModalChart(): void {
   const modalPanel  = document.getElementById("budgetChartExpandModal");
   if (!modalPanel) return;
 
-  // Measure the modal panel (block element — reliable clientWidth).
+  // Measure the modal panel (block element, reliable clientWidth).
   // Cap height so the chart fits on screen: viewport height minus header/subtitle/padding.
   const w = Math.max(0, (modalPanel.clientWidth || modalPanel.offsetWidth) - 40);
   const maxH = Math.max(200, window.innerHeight - 220);
@@ -1961,12 +2272,12 @@ function openChartModal(grouping: "category" | "source"): void {
   const cycleBtn = document.getElementById("budgetChartExpandCycleBtn") as HTMLButtonElement;
   cycleBtn.textContent = type === "bar" ? "Bar" : "Pie";
   (document.getElementById("budgetChartExpandTitle") as HTMLElement).textContent =
-    `Expense by ${grouping === "category" ? "Category" : "Source"} — ${type === "bar" ? "Bar" : "Pie"} Chart`;
+    `Expense by ${grouping === "category" ? "Category" : "Source"}: ${type === "bar" ? "Bar" : "Pie"} Chart`;
   (document.getElementById("budgetChartExpandSubtitle") as HTMLElement).textContent =
     `${formatDate(viewStart)} – ${formatDate(viewEnd)}`;
 
   // Clear the canvas before opening so the old graph never shows during the
-  // open transition — the new graph draws after the transition completes.
+  // open transition. The new graph draws after the transition completes.
   const modalCanvas = document.getElementById("budgetChartExpandCanvas") as HTMLCanvasElement;
   const ctx = modalCanvas.getContext("2d");
   if (ctx) ctx.clearRect(0, 0, modalCanvas.width, modalCanvas.height);
@@ -1991,7 +2302,7 @@ function drawWhenReady(
   draw: (c: HTMLCanvasElement) => void,
 ): void {
   function sizeAndDraw(): void {
-    // Walk up to the nearest panel — it's a block with a real clientWidth.
+    // Walk up to the nearest panel, it's a block with a real clientWidth.
     const panel = canvas.closest<HTMLElement>(".panel");
     if (!panel) return;
     const panelW = panel.clientWidth || panel.offsetWidth;
@@ -2010,7 +2321,7 @@ function drawWhenReady(
     draw(canvas);
   }
 
-  // Always use setTimeout(0) — gives the browser one full macrotask to commit
+  // Always use setTimeout(0), gives the browser one full macrotask to commit
   // block layout on the panel before we measure it.
   setTimeout(sizeAndDraw, 0);
 }
@@ -2134,7 +2445,7 @@ const EXPECT_COLOR_GREEN = "#00FF00";
 const EXPECT_COLOR_YELLOW = "#FFFF00";
 const EXPECT_COLOR_RED = "#FF0000";
 
-/** Pure black/white contrast pick (vs. contrastTextColor's softened near-black/near-white) — used
+/** Pure black/white contrast pick (vs. contrastTextColor's softened near-black/near-white), used
  *  for the percentage label stamped directly on a solid progress-bar fill color. */
 function pureContrastColor(hex: string): string {
   const h = hex.replace("#", "");
@@ -2244,7 +2555,7 @@ function renderExpectSummary(): void {
     const p = document.createElement("p");
     p.className = "placeholder-text";
     p.textContent =
-      "No Expectations or Thresholds set yet — configure them per item in Setup.";
+      "No Expectations or Thresholds set yet. Configure them per item in Setup.";
     container.appendChild(p);
     return;
   }
@@ -2329,7 +2640,7 @@ function renderTotals(): void {
      • Income Summary by Source (expected, actual, delta, monthly avg)
      • Recurring Bills Summary (planned, paid YTD, late payments)
      • Fluctuating Expenses by Category (charges, total, monthly avg, avg charge, highest, highest month)
-     • Fluctuating Expenses by Source (same columns — new vs. Excel)
+     • Fluctuating Expenses by Source (same columns, new vs. Excel)
      • Month by Month (all totals + averages row)
 ============================================================================= */
 
@@ -2535,7 +2846,7 @@ function renderAnnualStats(): void {
   const year = viewYear;
   (
     document.getElementById("budgetAnnualStatsTitle") as HTMLElement
-  ).textContent = `Annual Stats — ${year}`;
+  ).textContent = `Annual Stats: ${year}`;
 
   const stats = computeAnnualStats(year);
 
@@ -2719,7 +3030,7 @@ function renderAnnualStats(): void {
 }
 
 /** Toggles between Annual Stats view and the main tool panels. */
-// The view mode the user was in before entering Annual Stats — restored on exit.
+// The view mode the user was in before entering Annual Stats, restored on exit.
 let _preStatsViewMode: ViewMode | null = null;
 
 function toggleAnnualStats(): void {
@@ -2733,7 +3044,7 @@ function toggleAnnualStats(): void {
     ".budget-view-mode-btn",
   );
 
-  const HALF = 400; // ms — matches the CSS animation duration
+  const HALF = 400; // ms, matches the CSS animation duration
 
   // Prevent double-clicks mid-transition
   if (flipCard.dataset.flipping === "1") return;
@@ -2761,7 +3072,7 @@ function toggleAnnualStats(): void {
 
   // The outgoing face fades out. At the midpoint (when opacity has reached 0),
   // we hide it, show the incoming face, and fade it in. Only one face is ever
-  // in normal flow, so container height is always exact — no gap possible.
+  // in normal flow, so container height is always exact. No gap possible.
   const outgoing = annualStatsVisible ? front : back;
   const incoming = annualStatsVisible ? back : front;
 
@@ -2816,13 +3127,13 @@ function buildBillRow(row: BillRow): HTMLElement {
   name.textContent = row.bill.name;
   el.appendChild(name);
 
-  // Column 2: Due date — always shown
+  // Column 2: Due date, always shown
   const dueCol = document.createElement("span");
   dueCol.className = "budget-bill-date-col";
   dueCol.innerHTML = `<span class="budget-bill-date-label">Due</span>${formatDate(row.dueDate)}`;
   el.appendChild(dueCol);
 
-  // Column 3: Paid date — shown for paid rows, placeholder dash for others
+  // Column 3: Paid date, shown for paid rows, placeholder dash for others
   const paidCol = document.createElement("span");
   paidCol.className = "budget-bill-date-col";
   if (row.kind === "paid") {
@@ -2832,7 +3143,7 @@ function buildBillRow(row: BillRow): HTMLElement {
   }
   el.appendChild(paidCol);
 
-  // Column 4: Cleared date — only rendered when the setting is on
+  // Column 4: Cleared date, only rendered when the setting is on
   if (appSettings.showCleared) {
     const clearedCol = document.createElement("span");
     clearedCol.className = "budget-bill-date-col";
@@ -2946,7 +3257,7 @@ function makeDeleteBtn(
   btn.title = "Delete entry";
   btn.addEventListener("click", () => {
     if (appSettings.quickDelete) {
-      // Skip the confirm modal — delete immediately
+      // Skip the confirm modal, delete immediately
       pendingDelete = { kind, id };
       confirmDelete();
     } else {
@@ -2957,7 +3268,7 @@ function makeDeleteBtn(
 }
 
 /* =============================================================================
-   LEDGER — INLINE EDITING
+   LEDGER: INLINE EDITING
    -----------------------------------------------------------------------------
    Double-click any editable cell to edit in place. Enter or Tab commits the
    edit; Escape discards it. Category/income-source/expense-source edits resolve through
@@ -3017,7 +3328,7 @@ function makeLedgerEditable(
       }
       if (item.kind === "income") item.entry.actual = num;
       else if (item.kind === "expense") item.entry.amount = num;
-      // bill rows aren't inline-editable — they open the Pay modal on click
+      // bill rows aren't inline-editable. They open the Pay modal on click
     } else if (column === "category") {
       if (!raw || item.kind !== "expense") {
         cancel();
@@ -3036,7 +3347,7 @@ function makeLedgerEditable(
         findOrCreateExpenseSource(raw);
       }
     } else {
-      // notes — empty is a valid value (clears the note)
+      // notes, empty is a valid value (clears the note)
       if (item.kind === "income") item.entry.notes = raw;
       else if (item.kind === "expense") item.entry.notes = raw;
       // bill rows: not editable inline
@@ -3073,11 +3384,11 @@ function makeLedgerEditable(
 
 /**
  * Ledger rows share one column layout regardless of entry type:
- *   1. Category   — expense category name, or bill name (bold), or "—" for income
- *   2. Name        — income source, expense source text, or bill pay method
- *   3. Amount      — e.actual for income, e.amount for expense, inst.actualAmount for bill
+ *   1. Category:   expense category name, or bill name (bold), or ", " for income
+ *   2. Name:        income source, expense source text, or bill pay method
+ *   3. Amount:      e.actual for income, e.amount for expense, inst.actualAmount for bill
  *   4. Notes
- *   5. Delete (income/expense only — bills use the Pay modal for edits)
+ *   5. Delete (income/expense only, bills use the Pay modal for edits)
  */
 function buildLedgerRow(item: LedgerItem): HTMLElement {
   const row = document.createElement("div");
@@ -3117,8 +3428,8 @@ function buildLedgerRow(item: LedgerItem): HTMLElement {
   const notes = document.createElement("span");
   notes.className = "entry-field entry-col-notes";
 
-  // 5th column: action buttons. Always present so every row — including
-  // read-only bill payments, which have no buttons — occupies the same
+  // 5th column: action buttons. Always present so every row (including
+  // read-only bill payments, which have no buttons) occupies the same
   // five grid cells and stays aligned with the rest of the ledger.
   const actions = document.createElement("span");
   actions.className = "entry-col-actions";
@@ -3136,7 +3447,7 @@ function buildLedgerRow(item: LedgerItem): HTMLElement {
     amount.textContent = formatCurrency(e.actual);
     amount.title =
       e.actual !== e.expected
-        ? `Expected ${formatCurrency(e.expected)} — double-click to edit`
+        ? `Expected ${formatCurrency(e.expected)}, double-click to edit`
         : "Double-click to edit";
     amount.addEventListener("dblclick", () =>
       makeLedgerEditable(amount, item, "amount"),
@@ -3180,7 +3491,7 @@ function buildLedgerRow(item: LedgerItem): HTMLElement {
     actions.append(makeCalBtn(item), makeDeleteBtn("expense", e.id));
     row.append(category, name, amount, notes, actions);
   } else {
-    // Bill payment — read-only in the ledger, click opens Pay modal
+    // Bill payment, read-only in the ledger, click opens Pay modal
     const inst = item.instance;
     row.title = "Click to view/edit this payment";
     row.addEventListener("click", () => {
@@ -3204,7 +3515,7 @@ function buildLedgerRow(item: LedgerItem): HTMLElement {
 
     notes.textContent = inst.notes;
 
-    // No buttons for bill payments — the cell stays empty as a spacer
+    // No buttons for bill payments. The cell stays empty as a spacer
     // so the row still lines up with the other five-column rows.
     row.append(category, name, amount, notes, actions);
   }
@@ -3226,13 +3537,13 @@ function renderEntries(): void {
 
   // `total` is optional so plain section labels (or any future subheader
   // that has no meaningful sum) can still be rendered without one. When
-  // given, it's appended the same way Time Tracker appends its day total —
+  // given, it's appended the same way Time Tracker appends its day total,
   // trailing the label on the same line.
   function appendSubheader(text: string, total?: number): void {
     const subheader = document.createElement("div");
     subheader.className = "entry-date-subheader";
     subheader.textContent =
-      total === undefined ? text : `${text} — ${formatCurrency(total)}`;
+      total === undefined ? text : `${text}: ${formatCurrency(total)}`;
     entriesEl.appendChild(subheader);
   }
 
@@ -3241,7 +3552,7 @@ function renderEntries(): void {
   }
 
   /** Buckets an already-chronologically-sorted list of items by date,
-   *  preserving order — used so every date subheader can carry a total. */
+   *  preserving order, used so every date subheader can carry a total. */
   function groupByDate(list: LedgerItem[]): Map<string, LedgerItem[]> {
     const map = new Map<string, LedgerItem[]>();
     for (const item of list) {
@@ -3267,7 +3578,7 @@ function renderEntries(): void {
 
   } else if (ledgerSortMode === "grouped") {
     // Income chronologically, then recurring bill payments chronologically,
-    // then fluctuating expenses chronologically — three separate sections.
+    // then fluctuating expenses chronologically, three separate sections.
     const incomeItems = items.filter((i) => i.kind === "income");
     const billItems   = items.filter((i) => i.kind === "bill");
     const expenseItems = items.filter((i) => i.kind === "expense");
@@ -3322,7 +3633,7 @@ function renderAll(): void {
 }
 
 /* =============================================================================
-   MODAL — DELETE CONFIRM
+   MODAL: DELETE CONFIRM
 ============================================================================= */
 
 function getDeleteModal(): Modal {
@@ -3391,16 +3702,16 @@ function confirmDelete(): void {
 }
 
 /* =============================================================================
-   MODAL — MARK BILL PAID / EDIT PAYMENT
+   MODAL: MARK BILL PAID / EDIT PAYMENT
    -----------------------------------------------------------------------------
    Clicking a pending/overdue bill row opens this in "pay" mode: enter the
    actual amount/date/cleared/notes, review (and optionally edit) the
-   suggested next due date, and confirm — this records a BillInstance and
+   suggested next due date, and confirm. This records a BillInstance and
    advances the bill's nextDue.
 
    Clicking an already-paid row opens it in "edit" mode against that
    instance: amount/date/cleared/notes are editable, and "Undo Payment"
-   removes the instance — restoring the bill to pending for that due date if
+   removes the instance, restoring the bill to pending for that due date if
    no later payment has already moved nextDue past it.
 ============================================================================= */
 
@@ -3464,7 +3775,7 @@ function openBillAction(row: BillRow): void {
   for (const [label, value] of details) {
     const row = document.createElement("div");
     row.className = "budget-bill-action-detail";
-    // `value` can carry user-entered text (Pay Method, Notes) — escape it.
+    // `value` can carry user-entered text (Pay Method, Notes), escape it.
     row.innerHTML = `<span class="budget-bill-action-detail-label">${label}</span><span>${escapeHtml(value)}</span>`;
     billActionDetailsEl.appendChild(row);
   }
@@ -3570,7 +3881,7 @@ function saveBillAction(): void {
 /**
  * Removes the payment instance. If it's the most recent payment recorded for
  * this bill (no other instance has a later due date), the bill's nextDue is
- * restored to this instance's due date — i.e. it becomes pending again.
+ * restored to this instance's due date, i.e. it becomes pending again.
  * Otherwise nextDue is left as-is, since a later payment already moved it.
  */
 function undoBillAction(): void {
@@ -3596,7 +3907,7 @@ function undoBillAction(): void {
 }
 
 /* =============================================================================
-   DATALISTS — quick-add source for category / source / expense-source fields
+   DATALISTS: quick-add source for category / source / expense-source fields
 ============================================================================= */
 
 function fillDatalist(el: HTMLDataListElement, values: string[]): void {
@@ -3733,7 +4044,7 @@ function bindEnterToSubmit(
 }
 
 /* =============================================================================
-   SETUP MODAL — Categories / Income Sources / Expense Sources (simple lists)
+   SETUP MODAL: Categories / Income Sources / Expense Sources (simple lists)
    -----------------------------------------------------------------------------
    All three share the {id, name, status} shape and the same list UI: double-
    click a name to rename it, a status button to retire/reactivate. "Retired"
@@ -3756,7 +4067,7 @@ const SIMPLE_KIND_LABEL: Record<SimpleListKind, string> = {
   expenseSources: "Expense source",
 };
 
-// Plural, lowercase — used in the "No ___ yet — add one above." empty-state
+// Plural, lowercase (used in the "No ___ yet) add one above." empty-state
 // message so it reads naturally for each tab (mirrors the Recurring Bills
 // empty state at renderRecurringBillsList()).
 const SIMPLE_EMPTY_LABEL: Record<SimpleListKind, string> = {
@@ -3825,7 +4136,7 @@ function buildSimpleItemRow(
   }
   row.appendChild(nameSpan);
 
-  // Col 2: budget badge — always rendered so bars left-align consistently;
+  // Col 2: budget badge, always rendered so bars left-align consistently;
   // empty when no expectation/threshold is set for this item. Budget-only
   // concept, so this class stays local to budget.css.
   const badge = document.createElement("span");
@@ -3850,7 +4161,7 @@ function buildSimpleItemRow(
 }
 
 /* =============================================================================
-   INCOME SOURCE MODALS — Add + Edit (fully independent)
+   INCOME SOURCE MODALS: Add + Edit (fully independent)
 ============================================================================= */
 
 let _sourceAddModal: Modal | null = null;
@@ -4014,7 +4325,7 @@ function openSourceEdit(item: SimpleEntity): void {
 }
 
 /* =============================================================================
-   EXPENSE CATEGORY MODALS — Add + Edit (fully independent)
+   EXPENSE CATEGORY MODALS: Add + Edit (fully independent)
 ============================================================================= */
 
 let _categoryAddModal: Modal | null = null;
@@ -4214,7 +4525,7 @@ function openCategoryEdit(item: SimpleEntity): void {
 }
 
 /* =============================================================================
-   EXPENSE SOURCE MODALS — Add + Edit (fully independent)
+   EXPENSE SOURCE MODALS: Add + Edit (fully independent)
 ============================================================================= */
 
 let _expSourceAddModal: Modal | null = null;
@@ -4421,7 +4732,7 @@ function renderSimpleList(kind: SimpleListKind): void {
   if (list.length === 0) {
     const p = document.createElement("p");
     p.className = "placeholder-text";
-    p.textContent = `No ${SIMPLE_EMPTY_LABEL[kind]} yet — add one above.`;
+    p.textContent = `No ${SIMPLE_EMPTY_LABEL[kind]} yet. Add one above.`;
     container.appendChild(p);
     return;
   }
@@ -4443,7 +4754,7 @@ const SIMPLE_ADD_LABEL: Record<SimpleListKind, string> = {
 /**
  * Adds a new active entry, or reactivates an existing one (active or retired)
  * with a case-insensitive matching name. Used by the Setup modal's "Add"
- * buttons — an explicit add action, so reactivating a matching retired item
+ * buttons, an explicit add action, so reactivating a matching retired item
  * makes more sense here than the silent-duplicate behaviour of findOrCreateX
  * (which only matches active items, for in-form quick-add).
  */
@@ -4471,13 +4782,13 @@ function addOrReactivateSimple(kind: SimpleListKind, name: string): void {
 }
 
 /* =============================================================================
-   BILL EDITOR MODAL — Add/Edit Recurring Bill
+   BILL EDITOR MODAL: Add/Edit Recurring Bill
    -----------------------------------------------------------------------------
-   Its own modal (not an inline accordion) — opening it closes the Setup
+   Its own modal (not an inline accordion), opening it closes the Setup
    modal and vice versa, following the same "replace, don't stack" pattern
    used elsewhere (e.g. README/Licensing <-> Full License). The back-arrow
    and Cancel return to Setup; the X dismisses entirely without reopening it
-   (matches the established convention — only Escape/X are "no return").
+   (matches the established convention, only Escape/X are "no return").
 ============================================================================= */
 
 let editingBillId: string | "new" | null = null;
@@ -4650,10 +4961,10 @@ function deleteBillEdit(): void {
 }
 
 /* =============================================================================
-   SETUP MODAL — Recurring Bills list
+   SETUP MODAL: Recurring Bills list
 ============================================================================= */
 
-/** One bill's row in the Setup modal's Recurring Bills list — clicking it opens the Bill Editor. */
+/** One bill's row in the Setup modal's Recurring Bills list, clicking it opens the Bill Editor. */
 function buildBillItemCard(bill: RecurringBill): HTMLElement {
   const card = document.createElement("div");
   card.className = "budget-setup-bill-item";
@@ -4694,7 +5005,7 @@ function renderBillsList(): void {
   if (sorted.length === 0) {
     const p = document.createElement("p");
     p.className = "placeholder-text";
-    p.textContent = "No recurring bills yet — add one above.";
+    p.textContent = "No recurring bills yet. Add one above.";
     billsListEl.appendChild(p);
     return;
   }
@@ -4709,7 +5020,7 @@ function startNewBill(): void {
 }
 
 /* =============================================================================
-   SETUP MODAL — DELETE CONFIRM (shared across all four tabs + Bill Editor)
+   SETUP MODAL: DELETE CONFIRM (shared across all four tabs + Bill Editor)
    -----------------------------------------------------------------------------
    Only reachable for already-retired items (the delete icon is hidden until
    then), but permanent deletion still gets its own confirmation. Deleting a
@@ -4718,7 +5029,7 @@ function startNewBill(): void {
 
    Follows the "replace, don't stack" pattern: the caller closes its own modal
    before calling openSetupDelete, which opens this one in its place. Cancel
-   and Confirm each close this modal and run a captured "return to" callback —
+   and Confirm each close this modal and run a captured "return to" callback.
    Cancel goes back to where the request came from, Confirm goes back to the
    relevant Setup list. Escape/X are full dismissals with no return, matching
    the convention used by the README/Licensing modals.
@@ -4844,7 +5155,7 @@ function confirmSetupDelete(): void {
 }
 
 /* =============================================================================
-   SETUP MODAL — chrome (tabs + open/close)
+   SETUP MODAL: chrome (tabs + open/close)
 ============================================================================= */
 
 const SETUP_TABS = [
@@ -4893,7 +5204,31 @@ function applyBudgetSettings(): void {
   budgetShowClearedToggle.checked = appSettings.showCleared;
   budgetShowClearedLabel.textContent = appSettings.showCleared ? "On" : "Off";
   budgetStartupModeSelect.value = appSettings.startupMode;
+  applyBudgetReminderSettings();
   _applyEncryptionSettingsUI();
+}
+
+/** Syncs every reminder control to appSettings: the enable toggle and its
+ *  collapse, which schedule row is showing, and the Gentle/Aggressive label. */
+function applyBudgetReminderSettings(): void {
+  budgetReminderToggle.checked = appSettings.reminderEnabled;
+  budgetReminderLabel.textContent = appSettings.reminderEnabled ? "On" : "Off";
+  // Room for the schedule select, one schedule row, the mode row, and the hint.
+  budgetReminderSubsettings.style.maxHeight = appSettings.reminderEnabled
+    ? "300px"
+    : "0";
+
+  const monthly = appSettings.reminderMode === "monthly";
+  budgetReminderModeSelect.value = appSettings.reminderMode;
+  budgetReminderDaysRow.style.display = monthly ? "none" : "";
+  budgetReminderMonthDaysRow.style.display = monthly ? "" : "none";
+  budgetReminderDaysInput.value = String(appSettings.reminderDays);
+  budgetReminderMonthDaysInput.value = appSettings.reminderMonthDays.join(", ");
+
+  budgetReminderAggressiveToggle.checked = appSettings.reminderAggressive;
+  budgetReminderModeLabel.textContent = appSettings.reminderAggressive
+    ? "Aggressive"
+    : "Gentle";
 }
 
 function openSetupModalOnTab(tab?: SetupTab): void {
@@ -4914,7 +5249,7 @@ function getSetupModal(): Modal {
       closeOnEsc: true,
       onOpen: () => {
         // Scroll reset is handled inside activateSetupTab() as each pane is
-        // made visible — the only point where scrollTop assignment is reliable.
+        // made visible. The only point where scrollTop assignment is reliable.
         activateSetupTab(activeSetupTab);
         renderSimpleList("sources");
         renderBillsList();
@@ -4953,7 +5288,7 @@ function getSetupModal(): Modal {
    DATA LOAD WARNING MODAL
    -----------------------------------------------------------------------------
    Shown when loadFromDisk() encountered bad data. The window always opens
-   normally — this modal appears shortly after as a non-blocking notification.
+   normally. This modal appears shortly after as a non-blocking notification.
    "Reset Data" wipes the bad file and saves a clean empty state so it never
    shows again. "Keep Working" dismisses and lets the user continue with the
    empty-data fallback for this session.
@@ -4975,7 +5310,7 @@ function getDataLoadWarningModal(): Modal {
           await saveToDisk();
         } catch (e) {
           flash(`Failed to save the reset budget: ${e}`, "error", 8000);
-          return; // keep the warning modal open — nothing was written
+          return; // keep the warning modal open. Nothing was written
         }
         loadError = null;
         dataLoadWarningModal!.close();
@@ -4998,7 +5333,7 @@ function openDataLoadWarning(reason: string): void {
 }
 
 /* =============================================================================
-   INIT — EXPORTED ENTRY POINT
+   INIT: EXPORTED ENTRY POINT
 ============================================================================= */
 
 export async function initBudget(): Promise<void> {
@@ -5010,6 +5345,14 @@ export async function initBudget(): Promise<void> {
   encryptionEnabled = lockStatus.enabled;
   sessionUnlockMode = lockStatus.sessionUnlock;
 
+  // Ahead of the encryption gate on purpose. Reminder state lives in Budget's
+  // (unencrypted) settings file precisely so an encrypted budget can still say
+  // "you haven't updated me in a while" at startup, with this after the gate,
+  // that would never happen until the user typed their password. _continueInit
+  // loads these again; the read is cheap and idempotent.
+  await loadAppSettings();
+  refreshBudgetDueUI();
+
   if (encryptionEnabled) {
     // Bind gate listeners now (once). The gate itself stays hidden until
     // shown below or by a later onBudgetToolEntry() navigation call.
@@ -5017,7 +5360,7 @@ export async function initBudget(): Promise<void> {
 
     // loadShellState() (called in parallel with initBudget() during app
     // startup) may have already restored the Budget tool as the active view
-    // BEFORE encryptionEnabled was known — in which case onBudgetToolEntry()
+    // BEFORE encryptionEnabled was known, in which case onBudgetToolEntry()
     // ran too early and saw encryptionEnabled === false, so it no-opped and
     // the gate never appeared. Detect that race here: if the Budget tool
     // view is currently the visible one, treat this as tool entry now.
@@ -5038,11 +5381,11 @@ export async function initBudget(): Promise<void> {
  * Called after authentication is confirmed (or immediately on first run
  * when encryption is off). Loads data every time (it needs to reflect
  * whatever was just decrypted), but binds DOM/event listeners exactly once
- * — this used to run its entire body, listeners included, on every
+ *. This used to run its entire body, listeners included, on every
  * re-entry. Since the Budget tool's DOM is never destroyed (shell.ts just
  * toggles display:none), every re-auth was stacking a fresh, uncleared
  * listener onto the same buttons: 2 clicks did 2x, 3 re-entries did 3x, and
- * so on, on every button bound here — not just the ones anyone happened to
+ * so on, on every button bound here, not just the ones anyone happened to
  * notice. _continueInitBound below is the fix, same pattern as
  * _authGateBound just below it.
  */
@@ -5193,7 +5536,7 @@ async function _continueInit(): Promise<void> {
       "budgetBillActionClose",
     ) as HTMLButtonElement;
 
-    // Setup modal — simple lists
+    // Setup modal, simple lists
     categoriesListEl = document.getElementById("budgetCategoriesList")!;
     sourcesListEl = document.getElementById("budgetSourcesList")!;
     expenseSourcesListEl = document.getElementById("budgetExpenseSourcesList")!;
@@ -5201,7 +5544,7 @@ async function _continueInit(): Promise<void> {
     sourceNewBtn = document.getElementById("budgetSourceNewBtn") as HTMLButtonElement;
     expenseSourceNewBtn = document.getElementById("budgetExpenseSourceNewBtn") as HTMLButtonElement;
 
-    // Setup modal — recurring bills list
+    // Setup modal, recurring bills list
     billsListEl = document.getElementById("budgetBillsList")!;
     billNewBtn = document.getElementById("budgetBillNewBtn") as HTMLButtonElement;
 
@@ -5231,12 +5574,12 @@ async function _continueInit(): Promise<void> {
     ) as HTMLInputElement;
     billAutopayLabelEl = document.getElementById("budgetBillAutopayLabel")!;
 
-    // Mark Paid modal — cleared toggle label
+    // Mark Paid modal, cleared toggle label
     billActionClearedLabelEl = document.getElementById(
       "budgetBillActionClearedLabel",
     )!;
 
-    // Delete entry confirm modal — specific message
+    // Delete entry confirm modal, specific message
     deleteMessageEl = document.getElementById("budgetDeleteMessage")!;
 
     // Budget Settings tab
@@ -5248,6 +5591,26 @@ async function _continueInit(): Promise<void> {
       "budgetShowClearedToggle",
     ) as HTMLInputElement;
     budgetShowClearedLabel = document.getElementById("budgetShowClearedLabel")!;
+    budgetReminderToggle = document.getElementById(
+      "budgetReminderToggle",
+    ) as HTMLInputElement;
+    budgetReminderLabel = document.getElementById("budgetReminderLabel")!;
+    budgetReminderSubsettings = document.getElementById("budgetReminderSubsettings")!;
+    budgetReminderModeSelect = document.getElementById(
+      "budgetReminderModeSelect",
+    ) as HTMLSelectElement;
+    budgetReminderDaysRow = document.getElementById("budgetReminderDaysRow")!;
+    budgetReminderDaysInput = document.getElementById(
+      "budgetReminderDays",
+    ) as HTMLInputElement;
+    budgetReminderMonthDaysRow = document.getElementById("budgetReminderMonthDaysRow")!;
+    budgetReminderMonthDaysInput = document.getElementById(
+      "budgetReminderMonthDays",
+    ) as HTMLInputElement;
+    budgetReminderAggressiveToggle = document.getElementById(
+      "budgetReminderAggressiveToggle",
+    ) as HTMLInputElement;
+    budgetReminderModeLabel = document.getElementById("budgetReminderModeLabel")!;
     billNotesInput = document.getElementById(
       "budgetBillNotes",
     ) as HTMLInputElement;
@@ -5340,7 +5703,7 @@ async function _continueInit(): Promise<void> {
     -------------------------------------------------------------------------- */
 
     document.getElementById("budgetSetupBtn")!.addEventListener("click", () => {
-      // Fresh open from the main view always starts on Income Sources —
+      // Fresh open from the main view always starts on Income Sources,
       // only intra-modal transitions (bill editor, delete confirm) restore
       // the previously active tab via openSetupModalOnTab().
       activeSetupTab = "sources";
@@ -5361,7 +5724,7 @@ async function _continueInit(): Promise<void> {
         );
       });
 
-    // Chart cycle buttons — toggle bar ↔ pie, update label, redraw
+    // Chart cycle buttons, toggle bar ↔ pie, update label, redraw
     document.getElementById("budgetCategoryChartCycleBtn")!.addEventListener("click", () => {
       categoryChartType = categoryChartType === "bar" ? "pie" : "bar";
       renderCategorySummary();
@@ -5371,7 +5734,7 @@ async function _continueInit(): Promise<void> {
       renderSourceSummary();
     });
 
-    // Chart expand buttons — open the chart in a modal
+    // Chart expand buttons, open the chart in a modal
     document.getElementById("budgetCategoryChartExpandBtn")!.addEventListener("click", () => {
       openChartModal("category");
     });
@@ -5379,7 +5742,7 @@ async function _continueInit(): Promise<void> {
       openChartModal("source");
     });
 
-    // Modal chart cycle button — toggles type and redraws without closing
+    // Modal chart cycle button, toggles type and redraws without closing
     document.getElementById("budgetChartExpandCycleBtn")!.addEventListener("click", () => {
       if (_chartModalGrouping === "category") {
         categoryChartType = categoryChartType === "bar" ? "pie" : "bar";
@@ -5392,12 +5755,12 @@ async function _continueInit(): Promise<void> {
       else renderSourceSummary();
     });
 
-    // Categories / Income Sources / Expense Sources — "+ New" buttons open per-type add modals
+    // Categories / Income Sources / Expense Sources, "+ New" buttons open per-type add modals
     sourceNewBtn.addEventListener("click", openSourceAdd);
     categoryNewBtn.addEventListener("click", openCategoryAdd);
     expenseSourceNewBtn.addEventListener("click", openExpSourceAdd);
 
-    // Recurring bills — "+ New Bill" opens the Bill Editor modal blank, in
+    // Recurring bills, "+ New Bill" opens the Bill Editor modal blank, in
     // place of the Setup modal (closes Setup, opens the editor).
     billNewBtn.addEventListener("click", startNewBill);
 
@@ -5431,11 +5794,79 @@ async function _continueInit(): Promise<void> {
       if (appSettings.startupMode === "last-view") saveLastView();
     });
 
+    /* -------------------------------------------------------------------------
+       BUDGET REMINDERS
+       Every handler ends the same way, persist, re-sync the controls (which
+       also swaps the schedule row), and refresh the due signals so a settings
+       change is reflected in the sidebar and header immediately rather than at
+       next launch.
+    -------------------------------------------------------------------------- */
+
+    budgetReminderToggle.addEventListener("change", () => {
+      appSettings.reminderEnabled = budgetReminderToggle.checked;
+      // Deliberately does NOT stamp lastUpdatedAt. Starting the clock at the
+      // moment you switch this on tells a budget that's been untouched for a
+      // month that it's perfectly current, which is the opposite of what
+      // turning on a reminder is for, budgetBaselineAt() reads the real state
+      // from the data instead.
+      saveAppSettings();
+      applyBudgetReminderSettings();
+      refreshBudgetDueUI();
+    });
+
+    budgetReminderModeSelect.addEventListener("change", () => {
+      appSettings.reminderMode =
+        budgetReminderModeSelect.value === "monthly" ? "monthly" : "interval";
+      saveAppSettings();
+      applyBudgetReminderSettings();
+      refreshBudgetDueUI();
+    });
+
+    budgetReminderDaysInput.addEventListener("change", () => {
+      const n = Math.round(parseFloat(budgetReminderDaysInput.value));
+      appSettings.reminderDays = Number.isFinite(n)
+        ? Math.min(366, Math.max(1, n))
+        : 7;
+      saveAppSettings();
+      applyBudgetReminderSettings(); // reflects any clamping back into the field
+      refreshBudgetDueUI();
+    });
+
+    budgetReminderMonthDaysInput.addEventListener("change", () => {
+      // An entry that yields nothing usable falls back to the 1st rather than
+      // leaving a schedule that can't fire.
+      const parsed = parseMonthDaysInput(budgetReminderMonthDaysInput.value);
+      appSettings.reminderMonthDays = parsed.length > 0 ? parsed : [1];
+      saveAppSettings();
+      applyBudgetReminderSettings(); // rewrites the field in its cleaned form
+      refreshBudgetDueUI();
+    });
+
+    budgetReminderAggressiveToggle.addEventListener("change", () => {
+      appSettings.reminderAggressive = budgetReminderAggressiveToggle.checked;
+      saveAppSettings();
+      applyBudgetReminderSettings();
+    });
+
+    document
+      .getElementById("budgetDueClearBtn")!
+      .addEventListener("click", () => getReviewConfirmModal().open());
+
+    document.getElementById("budgetReviewConfirmBtn")!.addEventListener("click", () => {
+      getReviewConfirmModal().close();
+      markBudgetReviewed();
+      flash("Budget marked as reviewed", "success");
+    });
+
+    document
+      .getElementById("budgetReviewCancelBtn")!
+      .addEventListener("click", () => getReviewConfirmModal().close());
+
     // Encryption settings
     document.getElementById("budgetEncryptEnableBtn")?.addEventListener("click", openEncryptionEnableModal);
     document.getElementById("budgetEncryptDisableBtn")?.addEventListener("click", openEncryptionDisableModal);
 
-    // Theme change listener — redraws chart canvases whenever the active theme
+    // Theme change listener, redraws chart canvases whenever the active theme
     // changes, since chart colors are read from CSS vars at draw time.
     window.addEventListener("themechange", () => {
       // Defer one rAF so the browser has committed the new CSS custom properties
@@ -5460,7 +5891,7 @@ async function _continueInit(): Promise<void> {
       });
     });
 
-    // Resize listener — redraws charts when the window size changes so the
+    // Resize listener, redraws charts when the window size changes so the
     // canvas always fits without overflow or blank space.
     // Debounced at 150ms so rapid resize events don't cause excessive redraws.
     let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -5505,6 +5936,13 @@ async function _continueInit(): Promise<void> {
   renderRangeNav();
   renderAll();
 
+  // The data half of the baseline is readable from here on. On an encrypted
+  // budget this is the first point where it is (initBudget() ran its refresh
+  // before the auth gate, when `data` was still empty) so cache it for the
+  // next startup and re-evaluate the signals against the real numbers.
+  syncDataNewestAt();
+  refreshBudgetDueUI();
+
   // If the saved data file was unreadable or had an unrecoverable structure,
   // show the in-app warning. This runs AFTER the window is visible (shell.ts
   // calls window.show() after awaiting initBudget), so we use a short
@@ -5517,7 +5955,7 @@ async function _continueInit(): Promise<void> {
 /* =============================================================================
    BUDGET AUTH GATE
    -----------------------------------------------------------------------------
-   A view within the Budget tool itself — a sibling of #budgetToolContent
+   A view within the Budget tool itself, a sibling of #budgetToolContent
    inside #finance-tool-budget, exactly like any other internal tool panel.
    It lives and dies with the tool's own visibility: shell.ts shows/hides
    #finance-tool-budget exactly as it always has, and the gate (or the tool
@@ -5533,7 +5971,7 @@ async function _continueInit(): Promise<void> {
 
 let _authGateBound = false;
 
-// Cached DOM refs for the auth gate — resolved once on first bind.
+// Cached DOM refs for the auth gate, resolved once on first bind.
 let _agGate: HTMLElement;
 let _agToolContent: HTMLElement;
 let _agAuthView: HTMLElement;
@@ -5545,7 +5983,7 @@ let _agIconUnlocked: HTMLElement;
 
 /**
  * Wires all auth gate event listeners exactly once during initBudget().
- * Does NOT show the gate — that's _showAuthGate()'s job.
+ * Does NOT show the gate, that's _showAuthGate()'s job.
  */
 function _bindAuthGate(): void {
   if (_authGateBound) return;
@@ -5569,7 +6007,7 @@ function _bindAuthGate(): void {
 
   homeBtn.addEventListener("click", () => {
     // Clicking the Home nav item hides #finance-tool-budget, which takes
-    // this gate down with it automatically — no manual hide needed.
+    // this gate down with it automatically. No manual hide needed.
     const homeNavItem = document.querySelector<HTMLElement>(".nav-item[data-section='home']");
     homeNavItem?.click();
   });
@@ -5591,7 +6029,7 @@ function _bindAuthGate(): void {
         _agAuthView.style.display = "none";
         _agSpinner.style.display = "";
         await _continueInit();
-        // Data loaded — hide gate, show tool
+        // Data loaded, hide gate, show tool
         _agGate.style.display = "none";
         _agToolContent.style.display = "";
         // Reset gate state for next entry
@@ -5601,7 +6039,7 @@ function _bindAuthGate(): void {
         _agIconUnlocked.style.display = "none";
         _agSubmitBtn.disabled = false;
       } else {
-        flash("Incorrect password.", "error");
+        flash("Incorrect password", "error");
         _agInput.classList.add("lock-input-error");
         _agInput.select();
         _agSubmitBtn.disabled = false;
@@ -5629,7 +6067,7 @@ function _bindAuthGate(): void {
 /**
  * Shows the auth gate over the tool content. Always resets visual state
  * so it looks clean whether this is the first or a subsequent entry.
- * Called by onBudgetToolEntry() only — never called during startup.
+ * Called by onBudgetToolEntry() only, never called during startup.
  */
 function _showAuthGate(): void {
   _agGate.style.display = "flex";
@@ -5655,7 +6093,7 @@ export function onBudgetToolEntry(): void {
 
   // Flush any pending debounced save BEFORE clearing state below. Navigation
   // away from the tool already flushes (shell.ts switchSection), but this
-  // covers re-entry paths that never leave the view — e.g. re-clicking the
+  // covers re-entry paths that never leave the view, e.g. re-clicking the
   // Budget sidebar icon within SAVE_DEBOUNCE_MS of an edit. saveToDisk()
   // snapshots the data and password synchronously, so wiping them on the
   // next lines cannot corrupt the write that was just kicked off.
@@ -5673,10 +6111,10 @@ export function onBudgetToolEntry(): void {
    -----------------------------------------------------------------------------
    Windows session lock/unlock (Win+L, the lock key, idle lock) isn't visible
    to the DOM in any reliable way, so the Rust side watches for it directly
-   (WM_WTSSESSION_CHANGE — see src-tauri/src/session_watch.rs) and emits
+   (WM_WTSSESSION_CHANGE, see src-tauri/src/session_watch.rs) and emits
    "session-lock-changed". When re-auth-on-every-entry is the active
    encryption mode and there's a live authenticated session, an OS lock
-   force-relocks the budget exactly like navigating away and back — and on
+   force-relocks the budget exactly like navigating away and back, and on
    unlock, flashes the taskbar so the re-auth prompt isn't missed (without
    stealing focus outright). Mirrors how a password manager like Bitwarden
    re-locks its vault with the machine.
@@ -5697,7 +6135,7 @@ listen<boolean>("session-lock-changed", async (event) => {
 }).catch(() => {});
 
 /* =============================================================================
-   ENCRYPTION SETTINGS — Enable / Disable flows
+   ENCRYPTION SETTINGS: Enable / Disable flows
    -----------------------------------------------------------------------------
    These modals replace the Setup modal (replaceModal option) rather than
    stacking on top of it. Back-arrow and Cancel return to Setup; the X closes
@@ -5756,7 +6194,7 @@ function getEncryptionEnableModal(): Modal {
       const t = confirmInput.type === "password" ? "text" : "password";
       confirmInput.type = t;
     });
-    // Re-auth toggle — update the descriptive label as it changes
+    // Re-auth toggle, update the descriptive label as it changes
     sessionToggleEl?.addEventListener("change", () => {
       if (sessionLabelEl) {
         sessionLabelEl.textContent = sessionToggleEl.checked
@@ -5777,9 +6215,9 @@ function getEncryptionEnableModal(): Modal {
     confirmBtn.addEventListener("click", async () => {
       const pw = pwInput.value;
       const confirm = confirmInput.value;
-      if (!pw) { flash("Enter a password.", "error"); return; }
-      if (pw.length < 8) { flash("Password must be at least 8 characters.", "error"); return; }
-      if (pw !== confirm) { flash("Passwords do not match.", "error"); return; }
+      if (!pw) { flash("Enter a password", "error"); return; }
+      if (pw.length < 8) { flash("Password must be at least 8 characters", "error"); return; }
+      if (pw !== confirm) { flash("Passwords do not match", "error"); return; }
 
       // Read the session-unlock preference from the modal toggle before encrypting.
       // Toggle label: "Re-auth on every entry". checked=true → every entry → sessionUnlock=false.
@@ -5789,17 +6227,17 @@ function getEncryptionEnableModal(): Modal {
 
       confirmBtn.disabled = true;
       try {
-        // Flush any queued edit FIRST — the enable command reads the
+        // Flush any queued edit FIRST. The enable command reads the
         // plaintext files from DISK to build the encrypted envelopes, so an
         // edit still in the debounce queue would be missing from them (and
         // the plaintext files it lived in are deleted right after).
         await flushQueuedSave();
         await invoke("budget_enable_encryption", { password: pw });
         // Bind the gate NOW. initBudget() only binds it if encryption was
-        // already on at launch — if it's being turned on live, mid-session,
+        // already on at launch, if it's being turned on live, mid-session,
         // that never happens, and the next onBudgetToolEntry() throws trying
         // to touch an unbound _agGate, silently leaving stale content on
-        // screen instead of showing the gate. Idempotent — safe either way.
+        // screen instead of showing the gate. Idempotent, safe either way.
         _bindAuthGate();
         // Only write if non-default (default is every-entry / sessionUnlock=false)
         if (newSessionUnlockMode) {
@@ -5861,11 +6299,11 @@ function getEncryptionDisableModal(): Modal {
 
     confirmBtn.addEventListener("click", async () => {
       const pw = pwInput.value;
-      if (!pw) { flash("Enter your current password.", "error"); return; }
+      if (!pw) { flash("Enter your current password", "error"); return; }
 
       confirmBtn.disabled = true;
       try {
-        // Flush any queued edit FIRST — the disable command below decrypts
+        // Flush any queued edit FIRST. The disable command below decrypts
         // whatever is on disk and rewrites it as plaintext, so an edit still
         // in the debounce queue at this moment would be missing from it.
         await flushQueuedSave();

@@ -1,13 +1,13 @@
 /* =============================================================================
-   IMAGE CCR  — Combine / Compress / Resize
+   IMAGE CCR: Combine / Compress / Resize
    -----------------------------------------------------------------------------
    Frontend logic for the Image CCR tool. All image processing runs in Rust
    via invoke(); this file owns UI state, event wiring, and result display.
 
    Tabs:
-     Combine  — stack multiple images into one (with gap, border, format options)
-     Compress — scale a single image down by percentage
-     Resize   — batch-resize a folder of images to a target dimension / canvas
+     Combine:  stack multiple images into one (with gap, border, format options)
+     Compress, scale a single image down by percentage
+     Resize:   batch-resize a folder of images to a target dimension / canvas
 
    Rust commands used:
      get_image_info, preview_combine, combine_images,
@@ -21,7 +21,7 @@ import { Modal }          from "../modal";
 import { flash, escapeHtml } from "../shell";
 
 // =============================================================================
-//  TYPES  — mirror Rust structs exactly
+//  TYPES: mirror Rust structs exactly
 // =============================================================================
 
 interface ImageInfo {
@@ -246,7 +246,7 @@ function renderCombinePreview() {
     card.draggable   = true;
 
     // img.name is a user-controlled filename and pathToSrc() output embeds
-    // the user's directory names — both are escaped so a crafted filename
+    // the user's directory names. Both are escaped so a crafted filename
     // can't break out of the attribute or inject markup. The image-load
     // fallback is wired via addEventListener rather than an inline onerror
     // attribute, which the app's CSP (script-src 'self') would block.
@@ -359,7 +359,7 @@ function showCombineResult(result: CombineResult) {
 /**
  * Transparency only survives in PNG. When a transparent fill is active but the
  * output format is JPG, show a note that transparent areas will flatten to
- * black — non-blocking, so the user can proceed if that's what they want.
+ * black, non-blocking, so the user can proceed if that's what they want.
  */
 function updateCombineTransparentHint() {
   const hint = document.getElementById("combine-transparent-hint");
@@ -479,7 +479,7 @@ function showCompressResult(result: CompressResult) {
 }
 
 // =============================================================================
-//  INIT  — called by shell.ts after the DOM is ready
+//  INIT: called by shell.ts after the DOM is ready
 // =============================================================================
 
 export async function initImageCCR(): Promise<void> {
@@ -673,7 +673,7 @@ export async function initImageCCR(): Promise<void> {
       });
       combineState.resultPath = result.output_path;
       showCombineResult(result);
-      flash("Images combined successfully!", "success");
+      flash("Images combined", "success");
     } catch (err) {
       flash(`Combine failed: ${err}`, "error");
     } finally {
@@ -762,7 +762,7 @@ export async function initImageCCR(): Promise<void> {
       });
       compressState.resultPath = result.output_path;
       showCompressResult(result);
-      flash("Image compressed successfully!", "success");
+      flash("Image compressed", "success");
     } catch (err) {
       flash(`Compress failed: ${err}`, "error");
     } finally {
@@ -885,8 +885,8 @@ export async function initImageCCR(): Promise<void> {
       document.getElementById("resize-progress-section")!.style.display = "none";
 
       if (res.count === 0) {
-        gateResizeOptions(false, "No supported images — select a folder or files with images");
-        flash("No supported images found.", "error");
+        gateResizeOptions(false, "No supported images. Select a folder or files with images");
+        flash("No supported images found", "error");
       } else {
         gateResizeOptions(true);
       }
@@ -919,7 +919,7 @@ export async function initImageCCR(): Promise<void> {
     await runResizeScan({ files });
   });
 
-  // ── Resize: manual folder path — scan on Enter or blur ──
+  // ── Resize: manual folder path, scan on Enter or blur ──
   // The input is readOnly in files mode (it shows a synthetic "N files selected"
   // label), so these only ever act on a genuinely typed folder path.
   resizeSourceInput.addEventListener("keydown", async (e) => {
@@ -1055,7 +1055,7 @@ export async function initImageCCR(): Promise<void> {
           document.getElementById("resize-result-text")!.textContent =
             `${payload.count} image${payload.count !== 1 ? "s" : ""} saved to ${payload.output_folder}`;
           document.getElementById("resize-result-inline")!.style.display = "";
-          flash(`${payload.count} images resized successfully!`, "success");
+          flash(`${payload.count} images resized`, "success");
         } else {
           document.getElementById("resize-progress-file")!.textContent = "";
           flash(`Resize failed: ${payload.message}`, "error");
@@ -1075,17 +1075,17 @@ export async function initImageCCR(): Promise<void> {
   document.getElementById("resize-run")!.addEventListener("click", async () => {
     if (resizeRunning) return;
     if (resizeState.sourcePaths.length === 0) {
-      flash("No source images selected.", "error");
+      flash("No source images selected", "error");
       return;
     }
     const hasResize = resizeState.targetW !== null || resizeState.targetH !== null;
     const hasCanvas = resizeState.canvasManual && (resizeState.canvasW !== null || resizeState.canvasH !== null);
     if (!hasResize && !hasCanvas) {
-      flash("Set a resize target, a canvas size, or both.", "error");
+      flash("Set a resize target, a canvas size, or both", "error");
       return;
     }
     if (resizeState.canvasManual && (resizeState.canvasW === null || resizeState.canvasH === null)) {
-      flash("Canvas size requires both width and height.", "error");
+      flash("Canvas size requires both width and height", "error");
       return;
     }
 

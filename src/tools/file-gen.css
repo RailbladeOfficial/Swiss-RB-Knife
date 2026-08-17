@@ -202,7 +202,7 @@
   border-color: transparent;
 }
 
-/* Remove button — right edge of Row A */
+/* Remove button, right edge of Row A */
 .dfg-entry-row-a .dfg-batch-remove {
   border: none;
   border-left: 1px solid var(--color-border);
@@ -235,7 +235,7 @@
   color: var(--color-text-muted);
 }
 
-/* Row B: prefix | extension | suffix — equal thirds, labelled */
+/* Row B: prefix | extension | suffix, equal thirds, labelled */
 .dfg-entry-row-b {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -279,7 +279,7 @@
 
 /* ── Extension field row (input + picker button) ────────────────────────────── */
 
-/* Wrapper inside the Extension dfg-entry-field — input + ⊞ button side by side */
+/* Wrapper inside the Extension dfg-entry-field, input + ⊞ button side by side */
 .dfg-ext-field-row {
   display: flex;
   align-items: stretch;
@@ -329,7 +329,7 @@
   flex: 1;
 }
 
-/* ── Extension quick-pick — two-column layout (used inside modal) ───────────── */
+/* ── Extension quick-pick. Two-column layout (used inside modal) ───────────── */
 
 .dfg-ext-panel {
   display: flex;

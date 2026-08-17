@@ -1,5 +1,5 @@
 /* =============================================================================
-   THEME EDITOR  — custom theme creation/editing modal + storage
+   THEME EDITOR: custom theme creation/editing modal + storage
    -----------------------------------------------------------------------------
    Owns the Theme Editor modal (color pickers, gradients, glow controls, live
    preview), custom theme storage (load/save/generate-id), and the delete
@@ -8,7 +8,7 @@
    Split out of shell.ts (Tier 6). Genuinely two-way coupled with
    theme-core.ts: this file calls applyTheme() (e.g. reverting a live preview),
    and theme-core.ts calls applyCustomThemeById()/clearCustomTheme() (applying
-   a stored custom theme). Standard ES module circular import — both
+   a stored custom theme). Standard ES module circular import. Both
    directions are plain function references only invoked from event
    handlers/later calls, never at module top-level, so load order is never
    actually a problem.
@@ -166,7 +166,7 @@ export function genThemeId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-/** Sanitises a proposed theme name — returns null if it would cause file/JSON issues. */
+/** Sanitises a proposed theme name, returns null if it would cause file/JSON issues. */
 function sanitiseThemeName(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -334,8 +334,8 @@ export function applyCustomThemeById(id: string): void {
     root.style.setProperty(key, value);
   }
   // --color-accent (the bright highlight for active tabs/titles/slider values)
-  // isn't a custom-editor swatch. Derive it from --color-btn so custom themes —
-  // including ones saved before this var existed — get a sensible highlight
+  // isn't a custom-editor swatch. Derive it from --color-btn so custom themes (
+  // including ones saved before this var existed) get a sensible highlight
   // without an extra picker. Only set if the theme didn't explicitly provide one.
   if (!theme.vars["--color-accent"]) {
     const btn = theme.vars["--color-btn"];
@@ -578,7 +578,7 @@ function teSyncAdvAndPreview(): void {
   teLivePreview();
 }
 
-// Theme editor Modal instance — declared before openThemeEditor so the function
+// Theme editor Modal instance, declared before openThemeEditor so the function
 // body can safely reference it (called only from event listeners, but tsc checks
 // the declaration order for const references inside closures).
 // closeOnEsc is true so Escape works like any other close path. onClosed handles
@@ -596,7 +596,7 @@ const themeEditorModal = new Modal(themeEditorBackdrop, {
   },
   onClosed: () => {
     if (!_teSaveCompleted) {
-      // Cancel / Escape / X / back — revert the preview and return to Choose
+      // Cancel / Escape / X / back, revert the preview and return to Choose
       // Theme (this modal is only ever reached from there now).
       teRevertPreview();
       reopenThemePickerOnCustomTab();
@@ -703,7 +703,7 @@ teBaseSelect.addEventListener("change", async () => {
   teLivePreview();
 });
 
-// Swatch and hex input changes — wire after DOM is ready (they're static in HTML)
+// Swatch and hex input changes, wire after DOM is ready (they're static in HTML)
 document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
   const varName = row.dataset.var!;
   const swatch = row.querySelector<HTMLInputElement>(".te-swatch")!;
@@ -711,7 +711,7 @@ document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
 
   // Swatch moved by colour picker: update vars + preview, and update the hex
   // display only when the hex input doesn't have focus (i.e. the user isn't
-  // mid-typing — writing back would stomp what they're entering).
+  // mid-typing, writing back would stomp what they're entering).
   swatch.addEventListener("input", () => {
     _teWorkingVars[varName] = swatch.value;
     if (document.activeElement !== hexInput) {
@@ -721,7 +721,7 @@ document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
   });
 
   // Hex input: only update the swatch + preview when the value is a valid full
-  // hex. Never write back to hexInput here — let blur handle normalisation.
+  // hex. Never write back to hexInput here, let blur handle normalisation.
   hexInput.addEventListener("input", () => {
     const raw = hexInput.value.trim();
     const normalised = raw.startsWith("#") ? raw : "#" + raw;
@@ -844,7 +844,7 @@ document.querySelectorAll<HTMLElement>(".te-intensity-btn").forEach((btn) => {
   });
 });
 
-// CSS var name tooltip — 2-second hover delay, fires only over the label text
+// CSS var name tooltip, 2-second hover delay, fires only over the label text
 const teVarTooltip = document.getElementById("teVarTooltip")!;
 let _teTooltipTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -879,7 +879,7 @@ document.querySelectorAll<HTMLElement>(".te-label-text").forEach((text) => {
 });
 
 // Theme editor tab switching. Scoped to #themeEditorModal because .setup-tab
-// is now shared across Budget/Time Tracker/Theme Editor — an unscoped query
+// is now shared across Budget/Time Tracker/Theme Editor, an unscoped query
 // would toggle every tool's tabs at once.
 function teActivateTab(tab: "general" | "advanced"): void {
   document.querySelectorAll<HTMLElement>("#themeEditorModal .setup-tab").forEach((btn) => {
@@ -903,7 +903,7 @@ teSave.addEventListener("click", async () => {
   const raw = teNameInput.value;
   const name = sanitiseThemeName(raw);
   if (!name) {
-    flash("Please enter a valid theme name.", "error");
+    flash("Please enter a valid theme name", "error");
     return;
   }
   // Check for duplicate name (excluding self when editing)
@@ -954,7 +954,7 @@ teSave.addEventListener("click", async () => {
 
 // ── Custom theme delete confirm modal ───────────────────────────────────────
 // Reached from a delete icon on a theme tile in the Choose Theme modal (see
-// requestDeleteCustomTheme, exported below) — there's no dropdown anymore to
+// requestDeleteCustomTheme, exported below), there's no dropdown anymore to
 // read a selection from, so the pending id is tracked here instead.
 
 let _pendingCustomThemeDeleteId: string | null = null;
@@ -996,7 +996,7 @@ customThemeDeleteConfirmBtn.addEventListener("click", async () => {
   await saveCustomThemes();
   customThemeDeleteModal.close();
   if (wasActive) {
-    // Deleted the active theme — revert to default
+    // Deleted the active theme, revert to default
     settings.theme = "default";
     setActiveCustomId(null);
     themeSelect.value = "default";

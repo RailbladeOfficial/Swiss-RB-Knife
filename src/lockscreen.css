@@ -1,11 +1,12 @@
 /* =============================================================================
-   LOCK SCREEN  — app-lock PIN/password overlay + Settings/Security section
+   LOCK SCREEN: app-lock PIN/password overlay + Settings/Security section
    -----------------------------------------------------------------------------
    Split out of shell.css (Tier 6). Mirrors lockscreen.ts.
 ============================================================================= */
 
+/* =============================================================================
    APP LOCK SCREEN
-   Full-window overlay shown before the app is usable. Not a Modal — no Escape,
+   Full-window overlay shown before the app is usable. Not a Modal: no Escape,
    no drag, no close button. Removed on correct credential entry.
 ============================================================================= */
 
@@ -60,7 +61,7 @@
   margin-top: -16px;
 }
 
-/* Spacer elements — replace fixed inline-style heights so the gaps inside
+/* Spacer elements, replace fixed inline-style heights so the gaps inside
    the PIN/password views can scale down on short windows like everything
    else here, instead of holding their full size and forcing an overflow. */
 .lock-spacer-sm {
@@ -146,7 +147,7 @@
   border-color: var(--color-btn);
 }
 
-/* The ⌫ backspace key spans the last column in its row — placed via auto-flow */
+/* The ⌫ backspace key spans the last column in its row, placed via auto-flow */
 .lock-numpad-btn.lock-backspace {
   font-size: 1.3rem;
 }
@@ -223,7 +224,7 @@
 
 .lock-submit-btn:hover { background: var(--color-btn-hover); }
 
-/* Exit app button — muted danger style, sits in the numpad grid (PIN) or
+/* Exit app button, muted danger style, sits in the numpad grid (PIN) or
    below Unlock (password). Smaller and less prominent than Unlock. */
 .lock-exit-btn {
   background: transparent;
@@ -244,7 +245,7 @@
   border-color: var(--color-danger);
 }
 
-/* Standalone version (password view — full width, fixed height like submit btn) */
+/* Standalone version (password view, full width, fixed height like submit btn) */
 .lock-exit-standalone {
   width: min(260px, 84vw);
   padding: clamp(5px, 1.2vh, 8px);
@@ -259,7 +260,7 @@
 }
 
 /* =============================================================================
-   SETTINGS — SECURITY SECTION
+   SETTINGS: SECURITY SECTION
 ============================================================================= */
 
 .lock-credential-type {
@@ -312,7 +313,7 @@
     color var(--hover-transition);
 }
 
-/* "Change" — accent-coloured text, hover gets a hover-bg tint */
+/* "Change", accent-coloured text, hover gets a hover-bg tint */
 .lock-cred-link.change {
   color: color-mix(in srgb, var(--color-btn) 80%, white);
 }
@@ -322,7 +323,7 @@
   color: var(--color-btn);
 }
 
-/* "Remove" — danger-coloured text, hover gets a subtle danger tint */
+/* "Remove", danger-coloured text, hover gets a subtle danger tint */
 .lock-cred-link.danger {
   color: var(--color-danger);
 }

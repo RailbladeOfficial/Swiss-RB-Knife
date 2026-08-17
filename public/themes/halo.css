@@ -1,14 +1,14 @@
 /* =============================================================================
-   HALO  —  Special theme
+   HALO:  Special theme
    -----------------------------------------------------------------------------
    The mouse-reactive swirl (see startHaloSwirl() in theme-core.ts) is
    inspired by obfuscator.io's WebGL hero background. The COLOR PALETTE below
    is separately sourced from a Halo 3 main-menu screenshot (demo.png in the
-   repo root) — a happy coincidence once the swirl theme ended up named
+   repo root), a happy coincidence once the swirl theme ended up named
    "Halo": deep navy-blue sampled from the menu's background/panel fog drives
    almost everything here, and the burnt orange of its highlighted "START
    SOLO GAME" row (sampled directly off that pixel, ~#6b441e) is reserved for
-   exactly the same job it does there — marking the active/selected/primary
+   exactly the same job it does there, marking the active/selected/primary
    thing, not painted across the whole UI. See --color-accent-totals below
    and the handful of .active/.primary-btn rules that key off it instead of
    the ambient --color-btn blue.
@@ -33,7 +33,7 @@
   --color-danger-subtle:       rgba(255, 95, 95, 0.12);
   --color-success:             #55d97e;
 
-  /* accent-totals is this theme's one deliberate orange — see file header */
+  /* accent-totals is this theme's one deliberate orange, see file header */
   --color-accent-input:        #6fa0e0;
   --color-accent-view:         #9dc0ec;
   --color-accent-totals:       #cf8a3a;
@@ -66,7 +66,7 @@
   --color-chart-8:             #6b441e;
 }
 
-/* ── Time Tracker panels — accent borders drive off the panel-accent vars, glow added ── */
+/* ── Time Tracker panels, accent borders drive off the panel-accent vars, glow added ── */
 .input-panel    { border-left: 4px solid var(--color-accent-input); box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-input) 12%, transparent); }
 .controls-panel { border-left: 4px solid var(--color-accent-view);  box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-view) 12%, transparent); }
 .totals-panel   { border-left: 4px solid var(--color-accent-totals);box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-totals) 12%, transparent); }
@@ -86,14 +86,14 @@
   text-shadow: 0 0 16px color-mix(in srgb, var(--color-btn) 55%, transparent);
 }
 
-/* ── Modal — solid: deep panel with blue glow ── */
+/* ── Modal, solid: deep panel with blue glow ── */
 body.solid-modals .modal {
   background: var(--color-panel);
   border-color: color-mix(in srgb, var(--color-btn) 30%, transparent);
   box-shadow: 0 0 30px color-mix(in srgb, var(--color-btn) 12%, transparent), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Modal — translucent: frosted glass over the swirl ── */
+/* ── Modal, translucent: frosted glass over the swirl ── */
 body:not(.solid-modals) .modal {
   background: color-mix(in srgb, var(--color-panel) 30%, transparent);
   backdrop-filter: blur(24px);
@@ -102,7 +102,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 30px color-mix(in srgb, var(--color-btn) 12%, transparent), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Primary button — the theme's one deliberate orange fill, straight off
+/* ── Primary button. The theme's one deliberate orange fill, straight off
    the "START SOLO GAME" highlight bar, glow on hover ── */
 .primary-btn {
   background: var(--color-accent-totals);
@@ -116,7 +116,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-totals) 45%, transparent);
 }
 
-/* ── Buttons — quiet resting glow so they lift off the dark panels ── */
+/* ── Buttons, quiet resting glow so they lift off the dark panels ── */
 button {
   box-shadow: 0 0 8px color-mix(in srgb, var(--color-btn) 10%, transparent);
 }
@@ -124,7 +124,7 @@ button:hover {
   box-shadow: 0 0 14px color-mix(in srgb, var(--color-btn) 22%, transparent);
 }
 
-/* ── Inputs — blue focus glow ── */
+/* ── Inputs, blue focus glow ── */
 input:focus {
   outline: none;
   border-color: var(--color-btn);

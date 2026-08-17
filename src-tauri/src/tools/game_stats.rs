@@ -1,5 +1,5 @@
 /* =============================================================================
-   GAME STATS  — persistence commands
+   GAME STATS: persistence commands
    -----------------------------------------------------------------------------
    Tauri commands for loading/saving Game Stats data (profiles, game instances,
    settings) and the in-progress New Game draft. All file I/O uses
@@ -7,8 +7,8 @@
    in exactly one place.
 
    Data files:
-     game-stats.json        — { profiles, games, settings } root object
-     game-stats-draft.json  — in-progress New Game entry state
+     game-stats.json:        { profiles, games, settings } root object
+     game-stats-draft.json:  in-progress New Game entry state
 
    Rust commands exposed:
      save_data, load_data, save_draft, load_draft,
@@ -19,7 +19,7 @@ use std::fs;
 
 /// Import ceiling. A real .xlsx game log is measured in single-digit MB (the
 /// author's own 175-game workbook, charts and all, is 1.4 MB), so this is
-/// generous — its job is to turn "picked the wrong file" into a clear message
+/// generous. Its job is to turn "picked the wrong file" into a clear message
 /// instead of an out-of-memory crash. The file is base64'd for transport,
 /// which inflates it by a further ~33% before the frontend ever sees it.
 const MAX_IMPORT_WORKBOOK_BYTES: u64 = 64 * 1024 * 1024;
@@ -67,8 +67,8 @@ pub fn load_game_stats_draft(app: tauri::AppHandle) -> Result<String, String> {
    SPREADSHEET IMPORT / TEMPLATE EXPORT
 
    Both commands move raw bytes, because .xlsx is a ZIP archive rather than
-   text. They deliberately know nothing about the spreadsheet format itself —
-   the ZIP and sheet-XML handling all lives in the frontend (game-stats-xlsx.ts),
+   text. They deliberately know nothing about the spreadsheet format itself.
+   The ZIP and sheet-XML handling all lives in the frontend (game-stats-xlsx.ts),
    where the WebView already provides DecompressionStream for the inflate.
 
    Bytes cross the IPC boundary base64-encoded. Tauri serialises a Vec<u8> as a
@@ -90,7 +90,7 @@ pub fn read_game_stats_workbook(path: String) -> Result<String, String> {
         .len();
     if size > MAX_IMPORT_WORKBOOK_BYTES {
         return Err(format!(
-            "That file is {:.1} MB. The import limit is {} MB — check you picked the right file.",
+            "That file is {:.1} MB. The import limit is {} MB. Check you picked the right file.",
             size as f64 / (1024.0 * 1024.0),
             MAX_IMPORT_WORKBOOK_BYTES / (1024 * 1024)
         ));
@@ -152,7 +152,7 @@ fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
             b'0'..=b'9' => ch - b'0' + 52,
             b'+' => 62,
             b'/' => 63,
-            _ => return Err("Malformed data — the file could not be written.".to_string()),
+            _ => return Err("Malformed data: the file could not be written.".to_string()),
         } as u32;
         acc = (acc << 6) | value;
         bits += 6;

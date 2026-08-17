@@ -1,9 +1,9 @@
 /* =============================================================================
-   LIB  — Swiss RB Knife Tauri backend
+   LIB: Swiss RB Knife Tauri backend
    -----------------------------------------------------------------------------
    Application entry point and command registry. Owns:
 
-     • get_data_path()  — resolves the per-user data directory (dev vs release);
+     • get_data_path(): resolves the per-user data directory (dev vs release);
                           pub(crate) so tool modules can call it directly without
                           duplicating the dev/release branching logic
      • Shell-level commands: settings, window size, shell state (save/load)
@@ -18,7 +18,7 @@ use std::fs;
 use std::path::PathBuf;
 use chrono::{TimeZone, Utc};
 // Manager is only referenced inside the #[cfg(not(debug_assertions))] branch of
-// get_data_path() — the compiler sees it as unused in debug builds and warns.
+// get_data_path(): the compiler sees it as unused in debug builds and warns.
 // The allow suppresses that spurious warning without removing the import.
 #[allow(unused_imports)]
 use tauri::Manager;
@@ -73,7 +73,7 @@ pub(crate) fn get_data_path(app: &tauri::AppHandle, filename: &str) -> PathBuf {
    This app ships with an elevated (requireAdministrator) manifest, so every
    child process it launches inherits the admin token. Spawning system tools by
    bare name ("robocopy", "powershell", …) resolves them through the normal
-   Windows search order — which includes the application directory and the
+   Windows search order, which includes the application directory and the
    current working directory BEFORE System32. A same-named binary planted in
    either would therefore run as admin. Resolving these tools to their absolute
    System32 paths removes that vector entirely.
@@ -109,7 +109,7 @@ pub(crate) fn powershell_exe() -> String {
 ============================================================================= */
 
 /// MS-DOS device names that Windows still reserves. Opening any of these as a
-/// file path talks to the DEVICE, not the filesystem — and the reservation
+/// file path talks to the DEVICE, not the filesystem, and the reservation
 /// applies with any extension and any casing, so "con", "CON.jpg" and
 /// "Con.tar.gz" are all the console.
 const RESERVED_DEVICE_NAMES: [&str; 22] = [
@@ -124,7 +124,7 @@ const RESERVED_DEVICE_NAMES: [&str; 22] = [
 /// not fail loudly, it succeeds against the device and no file ever appears.
 /// The user sees a tool report success with nothing on disk, which is far
 /// harder to diagnose than a rejected filename. "con" in particular is a
-/// realistic thing to type — short for "concatenated" — when naming the output
+/// realistic thing to type (short for "concatenated") when naming the output
 /// of the Combine tool.
 pub(crate) fn is_reserved_device_name(name: &str) -> bool {
     let stem = name.split('.').next().unwrap_or("").trim();
@@ -139,8 +139,8 @@ pub(crate) fn is_reserved_device_name(name: &str) -> bool {
 ///
 /// Lives here rather than in a tool module because every "write a file to
 /// Downloads" command needs exactly this check, and a second copy is a second
-/// thing to keep correct. The frontends only ever send generated names today —
-/// this guard exists so that never has to stay true.
+/// thing to keep correct. The frontends only ever send generated names today.
+/// This guard exists so that never has to stay true.
 pub(crate) fn sanitize_filename(filename: &str) -> Result<String, String> {
     let name = filename.trim();
     if name.is_empty() {
@@ -165,13 +165,13 @@ pub(crate) fn sanitize_filename(filename: &str) -> Result<String, String> {
 
 /// Writes `bytes` to `path` without ever leaving a half-written file behind.
 /// Writes to a sibling temp file first, fsyncs it, then renames it over the
-/// real path — the rename is a single atomic filesystem operation (on Windows
+/// real path. The rename is a single atomic filesystem operation (on Windows
 /// this uses MoveFileExW with MOVEFILE_REPLACE_EXISTING under the hood).
 ///
 /// This matters specifically because of how Windows installers upgrade an
 /// app: the old process is force-terminated (not asked to close gracefully)
 /// so the installer can overwrite the .exe. If that termination lands mid
-/// fs::write(), a plain write leaves a truncated file — the previous good
+/// fs::write(), a plain write leaves a truncated file. The previous good
 /// data is gone and the new data never fully landed either. Every tool's
 /// save path must go through this helper, not fs::write() directly.
 ///
@@ -179,13 +179,13 @@ pub(crate) fn sanitize_filename(filename: &str) -> Result<String, String> {
 ///
 /// • sync_all() before the rename. Without it, a power loss can leave the
 ///   RENAME on disk while the temp file's CONTENTS never made it out of the
-///   OS cache — a valid-looking but truncated file sitting behind the very
+///   OS cache, a valid-looking but truncated file sitting behind the very
 ///   mechanism meant to prevent exactly that. The fsync forces the bytes to
 ///   storage before the name swap can possibly land.
 ///
 /// • A unique temp name per call (pid + counter) instead of a fixed ".tmp"
 ///   suffix. Tauri runs sync commands on a thread pool, so two overlapping
-///   saves targeting the same file are possible — with a shared temp name
+///   saves targeting the same file are possible, with a shared temp name
 ///   they'd interleave writes into one temp file and rename garbage into
 ///   place. Unique names mean the worst case is just last-rename-wins.
 pub(crate) fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
@@ -198,13 +198,13 @@ pub(crate) fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> Result<(), S
     tmp_name.push(format!(".tmp-{}-{}", std::process::id(), n));
     let tmp_path = PathBuf::from(tmp_name);
 
-    // Any failure past this point must clean up the temp file — a graveyard
+    // Any failure past this point must clean up the temp file, a graveyard
     // of orphaned .tmp-* files in the data dir helps nobody.
     let write_result = (|| -> Result<(), String> {
         let mut file = fs::File::create(&tmp_path).map_err(|e| e.to_string())?;
         file.write_all(bytes).map_err(|e| e.to_string())?;
         file.sync_all().map_err(|e| e.to_string())?;
-        drop(file); // release the handle before rename — required on Windows
+        drop(file); // release the handle before rename, required on Windows
         fs::rename(&tmp_path, path).map_err(|e| e.to_string())
     })();
 
@@ -215,7 +215,7 @@ pub(crate) fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> Result<(), S
 }
 
 /// Width of each backup bucket, in seconds. Every write within the same
-/// bucket refreshes that bucket's snapshot rather than creating a new one —
+/// bucket refreshes that bucket's snapshot rather than creating a new one,
 /// deliberately coarse, since the goal is surviving corruption discovered
 /// days or weeks later, not per-edit undo history.
 const BACKUP_MIN_INTERVAL_SECS: i64 = 3600;
@@ -224,7 +224,7 @@ const BACKUP_KEEP_COUNT: usize = 30;
 
 /// Folder-name format for backup snapshots: sorts correctly as plain strings
 /// (matches chronological order) and is readable in a file browser without
-/// translating a Unix timestamp. Always UTC — a snapshot taken at 2pm local
+/// translating a Unix timestamp. Always UTC, a snapshot taken at 2pm local
 /// won't necessarily show "14" here unless you're on UTC.
 const BACKUP_FOLDER_FORMAT: &str = "%Y-%m-%d_%H-%M-%S";
 
@@ -234,7 +234,7 @@ const BACKUP_FOLDER_FORMAT: &str = "%Y-%m-%d_%H-%M-%S";
 /// each file that currently exists.
 ///
 /// Snapshots are bucketed into BACKUP_MIN_INTERVAL_SECS-wide windows rather
-/// than "skip for an hour after the last one" — every write within the same
+/// than "skip for an hour after the last one". Every write within the same
 /// bucket overwrites that bucket's snapshot with the latest pre-write state,
 /// so the folder always reflects the MOST RECENT state as of the end of
 /// that window, not whatever was on disk when the window started. A cooldown
@@ -244,7 +244,7 @@ const BACKUP_FOLDER_FORMAT: &str = "%Y-%m-%d_%H-%M-%S";
 /// backed up, not the state from before it started.
 ///
 /// The whole point of grouping is that files like budget-data.enc and
-/// budget-lock.json only mean anything as a matched pair — the salt in one
+/// budget-lock.json only mean anything as a matched pair. The salt in one
 /// has to correspond to the ciphertext in the other. Keeping every
 /// snapshot's files together in one folder means restoring is always
 /// "take everything from one timestamp folder," never mixing.
@@ -277,7 +277,7 @@ fn snapshot_group(group_paths: &[PathBuf]) {
         return;
     }
 
-    // Only files that actually exist get captured — e.g. on the very
+    // Only files that actually exist get captured, e.g. on the very
     // first-ever write there's nothing to back up yet.
     let files_to_snapshot: Vec<(PathBuf, Vec<u8>)> = group_paths
         .iter()
@@ -302,7 +302,7 @@ fn snapshot_group(group_paths: &[PathBuf]) {
             Some(f) => f,
             None => continue,
         };
-        // Overwrites on purpose — every write within this bucket refreshes
+        // Overwrites on purpose. Every write within this bucket refreshes
         // it to the latest pre-write state, so by the time the bucket
         // closes it holds the last state before the gap, not the first.
         let _ = fs::write(snapshot_dir.join(format!("{filename}.bak")), bytes);
@@ -354,7 +354,7 @@ fn load_window_size(app: tauri::AppHandle) -> Result<String, String> {
 
 /* Removed: save_settings (whole-file write of settings.json).
    settings.json has several writers (shell, Time Tracker, Budget), and a
-   whole-file write from any one of them clobbers the others' keys — the exact
+   whole-file write from any one of them clobbers the others' keys. The exact
    bug merge_settings exists to fix. It was kept registered for backward
    compatibility long after the last caller was gone; leaving a footgun IPC
    command exposed to the webview earns nothing when nothing invokes it.
@@ -365,7 +365,7 @@ fn load_window_size(app: tauri::AppHandle) -> Result<String, String> {
 ///
 /// This is the only safe way to write a file with multiple owners. Each
 /// subsystem (shell, Time Tracker, Budget) patches exactly the keys it owns,
-/// so none of them can erase another's — which is precisely the bug this
+/// so none of them can erase another's, which is precisely the bug this
 /// replaces: the shell's whole-file saves were silently wiping the tools'
 /// settings keys on every Settings-modal change.
 ///
@@ -405,7 +405,7 @@ fn merge_settings(app: tauri::AppHandle, patch: String) -> Result<(), String> {
 }
 
 /// Loads the saved settings JSON from disk.
-/// Returns `"{}"` (empty object) if the file doesn't exist — shell.ts then
+/// Returns `"{}"` (empty object) if the file doesn't exist, shell.ts then
 /// merges over DEFAULT_SETTINGS so every key gets a safe fallback value.
 #[tauri::command]
 fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
@@ -418,7 +418,7 @@ fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
 /* =============================================================================
    PER-TOOL SETTINGS COMMANDS
    -----------------------------------------------------------------------------
-   Each tool's settings live in that tool's OWN file — settings.json belongs
+   Each tool's settings live in that tool's OWN file, settings.json belongs
    to the shell (General Settings) alone. One file, one owner: the entire
    class of "writer A's save erases writer B's keys" becomes structurally
    impossible, instead of merely being avoided by merge discipline.
@@ -441,7 +441,7 @@ fn save_tool_settings(app: tauri::AppHandle, tool_id: String, data: String) -> R
     atomic_write(&get_data_path(&app, filename), data.as_bytes())
 }
 
-/// Loads a tool's settings JSON. Returns "{}" if the file doesn't exist —
+/// Loads a tool's settings JSON. Returns "{}" if the file doesn't exist,
 /// callers merge over their defaults (and fall back to migrating any legacy
 /// keys still living in settings.json from before the split).
 #[tauri::command]
@@ -465,7 +465,7 @@ fn save_custom_themes(app: tauri::AppHandle, data: String) -> Result<(), String>
 }
 
 /// Loads the saved custom themes JSON from disk.
-/// Returns "[]" (empty array) if no file exists yet — shell.ts treats this
+/// Returns "[]" (empty array) if no file exists yet, shell.ts treats this
 /// as a signal that no custom themes have been created.
 #[tauri::command]
 fn load_custom_themes(app: tauri::AppHandle) -> Result<String, String> {
@@ -521,7 +521,7 @@ fn save_lock_hash(app: tauri::AppHandle, credential: String) -> Result<(), Strin
 
 /// Verifies a supplied credential against the stored Argon2id hash.
 /// Returns `true` if it matches, `false` if it doesn't or no hash is stored.
-/// The credential is zeroized on return — see save_lock_hash.
+/// The credential is zeroized on return, see save_lock_hash.
 #[tauri::command]
 fn verify_lock(app: tauri::AppHandle, credential: String) -> Result<bool, String> {
     let credential = zeroize::Zeroizing::new(credential);
@@ -562,7 +562,7 @@ fn clear_lock_hash(app: tauri::AppHandle) -> Result<(), String> {
 
    Deliberately narrow: unauthenticated, read-only, and aimed at exactly one
    hardcoded host. There's no token to store, no capability glob to misconfigure,
-   and nothing the webview can reach on its own — the request is made here in
+   and nothing the webview can reach on its own. The request is made here in
    Rust, so the locked-down CSP (connect-src 'self' ipc:) still holds. Runs only
    when the user has opted in (the frontend gates the call on a setting), and it
    fails soft: any network or parse error comes back as Err and the frontend
@@ -570,11 +570,11 @@ fn clear_lock_hash(app: tauri::AppHandle) -> Result<(), String> {
 ============================================================================= */
 
 /// Repo slug ("owner/name") the update check queries. This single constant is
-/// the app's entire network footprint — the one place to edit if the repo moves.
+/// the app's entire network footprint. The one place to edit if the repo moves.
 const GITHUB_REPO: &str = "RailbladeOfficial/Swiss-RB-Knife";
 
 /// GitHub rejects API requests that omit a User-Agent (HTTP 403), so one is
-/// always sent. Identifies the app + version — nothing user-specific.
+/// always sent. Identifies the app + version. Nothing user-specific.
 const UPDATE_CHECK_UA: &str =
     concat!("SwissRBKnife/", env!("CARGO_PKG_VERSION"), " (+update-check)");
 
@@ -582,7 +582,7 @@ const UPDATE_CHECK_UA: &str =
 #[derive(serde::Serialize)]
 struct UpdateInfo {
     /// Running version, baked in from Cargo at compile time
-    /// (e.g. "0.3.3" — no leading "v").
+    /// (e.g. "0.3.3". No leading "v").
     current: String,
     /// Latest release tag exactly as published (e.g. "v0.3.4").
     latest: String,
@@ -593,7 +593,7 @@ struct UpdateInfo {
 /// Fetches the latest GitHub release and returns it with the running version.
 /// Blocking (ureq) with short connect/read timeouts; Tauri runs commands on a
 /// thread pool, so this never blocks the UI thread. Non-2xx responses (e.g. a
-/// 404 when no release exists yet) surface as Err — which the frontend treats
+/// 404 when no release exists yet) surface as Err, which the frontend treats
 /// as "no update info" and ignores, exactly like a network failure.
 #[tauri::command]
 fn check_for_updates() -> Result<UpdateInfo, String> {
@@ -648,7 +648,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        // tauri-plugin-fs intentionally NOT registered — nothing in the
+        // tauri-plugin-fs intentionally NOT registered. Nothing in the
         // frontend uses it (all file I/O goes through custom commands), so
         // shipping it would only widen the attack surface for no benefit.
         .setup(|app| {
@@ -724,6 +724,16 @@ pub fn run() {
             tools::game_stats::load_game_stats_draft,
             tools::game_stats::read_game_stats_workbook,
             tools::game_stats::write_game_stats_download,
+            // TTS Repeater
+            tools::tts_repeater::save_tts_repeater_data,
+            tools::tts_repeater::load_tts_repeater_data,
+            tools::tts_repeater::tts_repeater_start_timer,
+            tools::tts_repeater::tts_repeater_stop_timer,
+            // Countdown
+            tools::countdown::save_countdown_data,
+            tools::countdown::load_countdown_data,
+            tools::countdown::countdown_start_ticker,
+            tools::countdown::countdown_stop_ticker,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -747,7 +757,7 @@ mod filename_tests {
     #[test]
     fn allows_names_that_merely_start_with_a_reserved_word() {
         // These are the false positives a naive "starts_with" check would
-        // produce. They are ordinary filenames and must be accepted — the
+        // produce. They are ordinary filenames and must be accepted. The
         // Dummy File Generator composes names exactly like con001.txt from a
         // legitimate "con" prefix.
         for n in [

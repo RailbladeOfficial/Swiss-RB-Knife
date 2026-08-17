@@ -1,13 +1,13 @@
 /* =============================================================================
-   BUDGET TRACKER — COMPONENT STYLES
+   BUDGET TRACKER: COMPONENT STYLES
    Shell-level styles (panels, inputs, buttons, modals, the collapsible
-   .subsettings block, and the ledger row primitives — .entry-row,
+   .subsettings block, and the ledger row primitives, .entry-row,
    .entry-date-subheader, .entry-field, .entry-delete-btn, etc.) live in
    shell.css. Budget's ledger uses those directly and adds only its own
    column types (.entry-col-category/-name/-amount/-notes/-actions) below.
 ============================================================================= */
 
-/* Pay / Edit Payment modal — read-only bill details block (item 8) */
+/* Pay / Edit Payment modal, read-only bill details block (item 8) */
 .budget-bill-action-details {
   display: flex;
   flex-direction: column;
@@ -141,7 +141,7 @@
 .budget-summary-chart {
   display: block;
   /* Width and height are set explicitly by JS measuring the column container.
-     Do NOT set width:100% or aspect-ratio on canvas — they don't give canvas
+     Do NOT set width:100% or aspect-ratio on canvas. They don't give canvas
      a concrete clientWidth to measure, so JS sizing fails. */
 }
 
@@ -301,7 +301,7 @@
 
 
 /* =============================================================================
-   FACE SWITCHER  — cross-fade transition
+   FACE SWITCHER: cross-fade transition
    Only one face is ever in normal flow at a time, so height is always exact
    with zero leftover gap. JS fades the outgoing face out, swaps which face is
    visible at the midpoint, then fades the incoming face in.
@@ -310,7 +310,7 @@
    JS drives the swap via the .budget-face-hiding / .budget-face-showing classes.
 ============================================================================= */
 
-/* Transparent wrapper — faces behave as direct children of the container */
+/* Transparent wrapper, faces behave as direct children of the container */
 .budget-flip-card {
   display: contents;
 }
@@ -505,7 +505,7 @@
   gap: 0;
 }
 
-/* Left zone: "Snap to:" label + snap button — left aligned */
+/* Left zone: "Snap to:" label + snap button, left aligned */
 .budget-range-nav-snap {
   display: flex;
   align-items: center;
@@ -570,7 +570,7 @@
   cursor: pointer;
 }
 
-/* Inline edit input — shown in place of the label */
+/* Inline edit input, shown in place of the label */
 .budget-month-input {
   width: 13rem;
   text-align: center;
@@ -601,7 +601,7 @@
 
 
 
-/* Type toggle row — "Add Entry:" label left, Income / Expense buttons right.
+/* Type toggle row, "Add Entry:" label left, Income / Expense buttons right.
    No &nbsp; hacks: gap handles spacing between label and buttons. */
 .budget-type-toggle {
   display: flex;
@@ -619,7 +619,7 @@
   white-space: nowrap;
 }
 
-/* Type toggle (Income / Fluctuating Expense) — own class so the Time Tracker's
+/* Type toggle (Income / Fluctuating Expense), own class so the Time Tracker's
    global document.querySelectorAll(".preset-btn") doesn't pick these up and
    clobber their active state when TT syncs its own preset selection. */
 /* Size delta only; shared look (.toggle-btn) is in shell.css. */
@@ -724,7 +724,7 @@
   white-space: nowrap;
 }
 
-/* Date columns — always equal-width grid cells; pending rows show "—" */
+/* Date columns, always equal-width grid cells; pending rows show ", " */
 .budget-bill-date-col {
   min-width: 0;
   font-size: 0.8rem;
@@ -782,10 +782,10 @@
 }
 
 /* =============================================================================
-   LEDGER ENTRIES — income vs. expense accent
+   LEDGER ENTRIES: income vs. expense accent
 ============================================================================= */
 
-/* Ledger row accent — exact colors, not theme variables, so they have
+/* Ledger row accent, exact colors, not theme variables, so they have
    unambiguous meaning regardless of the active theme.
    Green (#00FF00) = money coming in or expense credit (positive net effect).
    Red  (#FF0000) = money going out or income deficit (negative net effect). */
@@ -805,12 +805,12 @@
   border-left: 3px solid #00FF00;
 }
 
-/* Bill entries in the ledger are always outgoing money — always red */
+/* Bill entries in the ledger are always outgoing money, always red */
 .budget-row-bill {
   border-left: 3px solid #FF0000;
 }
 
-/* Ledger rows — 5 equidistant grid columns (Category, Source, Amount, Notes,
+/* Ledger rows, 5 equidistant grid columns (Category, Source, Amount, Notes,
    Buttons), scoped to #budgetEntries so the shared .entry-row flex layout
    used elsewhere in the shell is untouched. */
 #budgetEntries .entry-row {
@@ -826,12 +826,12 @@
   text-overflow: ellipsis;
 }
 
-/* Income rows have no category — shown as a non-editable placeholder dash. */
+/* Income rows have no category, shown as a non-editable placeholder dash. */
 span.entry-col-category:not(.entry-field) {
   opacity: 0.4;
 }
 
-/* Column 2 — income source name, or expense description/source text. */
+/* Column 2, income source name, or expense description/source text. */
 .entry-col-name {
   min-width: 0;
   white-space: normal;
@@ -861,16 +861,16 @@ span.entry-col-category:not(.entry-field) {
    files' rules are plain .entry-col-notes at equal specificity and budget.css
    is the later one in the bundle, so an unscoped align-self here would win
    everywhere and flip the Time Tracker's own notes to centred too. The id
-   keeps the correction on this ledger only — matching how #budgetEntries
+   keeps the correction on this ledger only, matching how #budgetEntries
    .entry-row above already scopes this grid.
-   (The Time Tracker rule also supplies this column's italic and its "—"
-   empty-state placeholder, which the ledger does want — so this counters one
+   (The Time Tracker rule also supplies this column's italic and its " ("
+   empty-state placeholder, which the ledger does want) so this counters one
    property rather than scoping the whole rule away.) */
 #budgetEntries .entry-col-notes {
   align-self: center;
 }
 
-/* Column 5 — action buttons (cal/delete), or an empty spacer for read-only
+/* Column 5, action buttons (cal/delete), or an empty spacer for read-only
    bill-payment rows so every row still occupies all five grid cells. */
 .entry-col-actions {
   min-width: 0;
@@ -881,7 +881,7 @@ span.entry-col-category:not(.entry-field) {
 }
 
 /* =============================================================================
-   SETUP MODAL — budget-specific bits
+   SETUP MODAL: budget-specific bits
    -----------------------------------------------------------------------------
    The shared tabbed list-editor chrome (.setup-body, .setup-tabs, .setup-tab,
    .setup-tab-pane, .setup-list, .setup-item*, .setup-new-btn, .setup-form,
@@ -913,7 +913,7 @@ span.entry-col-category:not(.entry-field) {
   flex-direction: column;
 }
 
-/* Summary panel's own tab strip — a different UI region from the Setup modal,
+/* Summary panel's own tab strip, a different UI region from the Setup modal,
    so it keeps its own rule rather than sharing .setup-tab. Same underline
    idiom, different sizing (equal-width, centered, smaller). */
 .budget-summary-tab {
@@ -946,7 +946,7 @@ span.entry-col-category:not(.entry-field) {
 }
 
 /* =============================================================================
-   SIMPLE LISTS — budget-specific list extras
+   SIMPLE LISTS: budget-specific list extras
    (row layout/item chrome is shared via .setup-list/.setup-item* in shell.css)
 ============================================================================= */
 
@@ -977,7 +977,7 @@ span.entry-col-category:not(.entry-field) {
   color: var(--color-text);
 }
 
-/* Delete icon — only ever shown for already-retired items (simple lists and
+/* Delete icon, only ever shown for already-retired items (simple lists and
    recurring bills alike), so its mere presence signals "this is permanent". */
 .budget-setup-delete-btn {
   flex-shrink: 0;
@@ -996,7 +996,7 @@ span.entry-col-category:not(.entry-field) {
 }
 
 /* =============================================================================
-   RECURRING BILLS — clickable list rows
+   RECURRING BILLS: clickable list rows
    Each row opens the Bill Editor modal (item 12) instead of expanding inline.
 ============================================================================= */
 
@@ -1037,7 +1037,7 @@ span.entry-col-category:not(.entry-field) {
   white-space: nowrap;
   /* Explicit, for the same reason .setup-item-name (shell.css) carries it:
      .modal-body sets text-align: center and, being later in the bundle, beats
-     .setup-body's text-align: left — so anything in a setup modal that should
+     .setup-body's text-align: left, so anything in a setup modal that should
      read left-aligned has to say so itself. Without this, bill names centre
      while the Income/Category/Expense-Source tabs (which use .setup-item-name)
      stay left, and the tabs look inconsistent with each other. */
@@ -1123,7 +1123,7 @@ span.entry-col-category:not(.entry-field) {
   font-size: 0.75rem;
   opacity: 0.7;
   /* .modal-body sets text-align: center and, being an inherited property,
-     cascades down to these labels unless overridden here — same issue
+     cascades down to these labels unless overridden here. Same issue
      documented above .budget-setup-bill-summary-name. */
   text-align: left;
 }
@@ -1159,7 +1159,7 @@ span.entry-col-category:not(.entry-field) {
 /* =============================================================================
    BUDGET AUTH GATE
    -----------------------------------------------------------------------------
-   Just another internal view of the Budget tool — a flex sibling of
+   Just another internal view of the Budget tool, a flex sibling of
    #budgetToolContent inside #finance-tool-budget. It lives and dies entirely
    with the tool's own visibility, exactly like every other tool-internal
    panel (Setup, bill editor, etc). No positioning tricks, no coupling to
@@ -1240,8 +1240,40 @@ span.entry-col-category:not(.entry-field) {
   margin: 6px 0;
 }
 
+/* ── Reminder schedule fields (Preferences tab) ────────────────────────────
+   Shaped to match Auto-Backup's equivalent field so the two reminder settings
+   read as the same control in two places. */
+
+.budget-reminder-days-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+#budgetReminderDays {
+  width: 60px;
+  text-align: right;
+  margin: 0;
+}
+
+/* Spinner arrows off: the field is typed into, and the arrows crowd a box this
+   narrow. Matches #ab-setup-reminder-days. */
+#budgetReminderDays::-webkit-inner-spin-button,
+#budgetReminderDays::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.budget-reminder-monthdays-field {
+  width: 110px;
+  text-align: right;
+  margin: 0;
+}
+
 /* =============================================================================
-   BUDGET AUTH GATE — loading spinner
+   BUDGET AUTH GATE: loading spinner
    Shown after correct password while data decrypts, so the tool appears
    fully populated rather than loading in front of the user.
 ============================================================================= */
@@ -1293,7 +1325,7 @@ span.entry-col-category:not(.entry-field) {
 }
 
 /* =============================================================================
-   SIMPLE ITEM ROWS — budget-specific badge only
+   SIMPLE ITEM ROWS: budget-specific badge only
    -----------------------------------------------------------------------------
    The clickable row itself (.setup-item + hover + cursor), the name column,
    the retired badge, and the chevron are all shared now (shell.css). The one
@@ -1301,7 +1333,7 @@ span.entry-col-category:not(.entry-field) {
    flex:1 column between the name and the chevron.
 ============================================================================= */
 
-/* Expectation/Threshold text — flex:1 column, same weight/size as the name
+/* Expectation/Threshold text, flex:1 column, same weight/size as the name
    but faded so it reads as secondary. Left-aligned within its column. */
 .budget-setup-item-budget-badge {
   flex: 1;

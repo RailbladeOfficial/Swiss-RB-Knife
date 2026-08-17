@@ -37,7 +37,7 @@
   --color-toast-error-bg:      #2a1a2a;
   --color-toast-error-border:  #ff44ff;
   --color-toast-error-text:    #ffe2ff;
-  /* ── Budget chart palette ── Blue / green / magenta / amber / teal / crimson / sky / orange — flat palette on dark purple-grey */
+  /* ── Budget chart palette ── Blue / green / magenta / amber / teal / crimson / sky / orange, flat palette on dark purple-grey */
   --color-chart-1:             #3498db;
   --color-chart-2:             #2ecc71;
   --color-chart-3:             #ff44ff;
@@ -48,13 +48,13 @@
   --color-chart-8:             #f39c12;
 }
 
-/* ── Time Tracker panels — flat, no gradients, accent left borders ── */
+/* ── Time Tracker panels, flat, no gradients, accent left borders ── */
 .input-panel   { border-left: 4px solid #3498db; }
 .controls-panel { border-left: 4px solid #2ecc71; }
 .totals-panel  { border-left: 4px solid #f0a500; }
 .entries-panel { border-left: 4px solid #ff44ff; }
 
-/* ── Tool / section header — flat blue-grey, no glow ── */
+/* ── Tool / section header, flat blue-grey, no glow ── */
 .tool-view-header,
 .section-header {
   background: #2a2a3b;
@@ -67,14 +67,14 @@
   opacity: 1;
 }
 
-/* ── Modal — solid: flat panel (original look) ── */
+/* ── Modal, solid: flat panel (original look) ── */
 body.solid-modals .modal {
   background: #2a2a3b;
   border-color: #3a3a4b;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
 }
 
-/* ── Modal — translucent: frosted dark glass ── */
+/* ── Modal, translucent: frosted dark glass ── */
 body:not(.solid-modals) .modal {
   background: rgba(42, 42, 59, 0.25);
   backdrop-filter: blur(24px);
@@ -96,7 +96,7 @@ body:not(.solid-modals) .modal {
   color: #ffffff;
 }
 
-/* ── Image CCR panels — flat with left border accent ── */
+/* ── Image CCR panels, flat with left border accent ── */
 #media-tool-image-ccr .panel {
   border-left: 3px solid #3498db;
 }
@@ -189,7 +189,7 @@ body:not(.solid-modals) .modal {
   border-bottom-color: #3498db;
 }
 
-/* View-mode toggle active — flat solid blue (matte deliberately avoids glows).
+/* View-mode toggle active, flat solid blue (matte deliberately avoids glows).
    Was missing entirely; every other theme styles this. */
 .budget-view-mode-btn.active {
   background: #3498db;

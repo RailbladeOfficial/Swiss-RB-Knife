@@ -1,0 +1,574 @@
+/* =============================================================================
+   COUNTDOWN  (countdown.css)
+   All color references use var(--color-*) from the active theme.
+   Tool-unique classes are prefixed `cd-`.
+
+   The clock is sized to be read from across a room / through a screen share,
+   which is the whole reason this tool exists, hence the clamp()ed display
+   type rather than the app's usual body scale.
+============================================================================= */
+
+.cd-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cd-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* ── The clock ─────────────────────────────────────────────────────────────── */
+
+.cd-clock-panel {
+  text-align: center;
+  padding: 22px 12px 18px;
+}
+
+/* Clock plus the hourglass figure beside it, centred as a pair. */
+.cd-clock-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+/* Positioning context for the ring, which is drawn to this box's exact pixel
+   size (see layoutRing) and sits behind the digits. Padding is what gives the
+   ring somewhere to run without touching the text. */
+.cd-clock-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 26px;
+  min-width: 0;
+}
+
+.cd-clock {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(3rem, 15vw, 8.5rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  /* Tabular figures alone don't stop the colon from shifting things around at
+     display sizes; a fixed-width font keeps the digits from dancing as they
+     count down, which is very visible to an audience. */
+  font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+  color: var(--color-accent);
+}
+
+/* Only while idle, a live countdown is extended, not edited. */
+.cd-clock.cd-clock-editable {
+  cursor: text;
+  user-select: none;
+}
+
+/* The duration field the clock becomes on double-click. Matched to the clock's
+   own type so the swap doesn't jump the layout around. */
+.cd-clock-edit {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 8ch);
+  font-size: clamp(2.2rem, 10vw, 5.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-clock-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  opacity: 0.55;
+}
+
+.cd-clock.cd-clock-paused {
+  opacity: 0.5;
+}
+
+.cd-clock.cd-clock-done {
+  color: var(--color-danger);
+}
+
+.cd-clock-memo {
+  display: block;
+  margin-top: 4px;
+  font-size: clamp(0.95rem, 2.4vw, 1.4rem);
+  font-weight: 600;
+  opacity: 0.8;
+  overflow-wrap: break-word;
+}
+
+/* ── Started / Ending readouts ─────────────────────────────────────────────── */
+
+.cd-times-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 32px;
+  margin-top: 16px;
+}
+
+.cd-time-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.cd-time-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.5;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cd-time-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Progress figures ──────────────────────────────────────────────────────
+   All three read the same way: full at the start, empty at zero.
+========================================================================== */
+
+.cd-bar-wrap {
+  height: 8px;
+  margin: 14px auto 0;
+  max-width: 520px;
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cd-bar {
+  height: 100%;
+  width: 100%;
+  background: var(--color-accent);
+  border-radius: 999px;
+  /* Matches the tick interval, so the bar glides between ticks instead of
+     stepping four times a second. */
+  transition: width 0.25s linear;
+}
+
+/* Geometry comes from JS (see layoutRing) which sets a viewBox matching this
+   box's pixel size so the stroke stays an even width the whole way round.
+   No width/height attributes and no transform: an earlier version rotated the
+   rect to move the trace's start point, which on a wide, short box swung it
+   right out of the frame. The trace simply starts at the top-left corner
+   instead, which is where a rect path begins anyway. */
+.cd-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cd-ring-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
+.cd-ring-progress {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-linecap: butt;
+  transition: stroke-dashoffset 0.25s linear;
+}
+
+.cd-hourglass {
+  width: clamp(46px, 9vw, 74px);
+  height: auto;
+  flex-shrink: 0;
+}
+
+.cd-hg-frame {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-text) 45%, transparent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.cd-hg-sand {
+  fill: var(--color-accent);
+  transition: y 0.25s linear, height 0.25s linear;
+}
+
+/* ── Setup ─────────────────────────────────────────────────────────────────── */
+
+.cd-unit {
+  font-size: 0.78rem;
+  opacity: 0.6;
+}
+
+/* Was overflowing its panel: the input inherits no width of its own, so
+   without an explicit box the flex parent let it push past the edge. */
+.cd-memo-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.cd-memo-field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.cd-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.cd-preset-btn,
+.cd-extend-btn,
+.cd-round-btn {
+  padding: 5px 11px;
+  font-size: 0.78rem;
+}
+
+.cd-round-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Divides the "Add" group from the "Round to" group without a hard rule that
+   would look heavy in a row of small buttons. */
+.cd-extend-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 6px;
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
+/* ── Actions ───────────────────────────────────────────────────────────────── */
+
+.cd-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  /* Clear of the progress bar above it. They were nearly touching. */
+  margin-top: 22px;
+}
+
+#cd-start-btn,
+#cd-pause-btn,
+#cd-stop-btn {
+  min-width: 120px;
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+#cd-pause-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cd-extend-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+/* ── Setup & Presets modals ────────────────────────────────────────────────── */
+
+.cd-setup-modal,
+.cd-presets-modal {
+  width: min(560px, 94vw);
+}
+
+.cd-setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.cd-seg-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cd-seg-group .toggle-btn {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
+.cd-setup-note {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  line-height: 1.5;
+}
+
+.cd-effect-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.cd-effect-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cd-effect-note {
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+.cd-effect-row .toggle-switch input:disabled + .toggle-slider {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cd-alarm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cd-alarm-row select {
+  flex: 1;
+  min-width: 150px;
+}
+
+.cd-inline {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#cd-sound-repeats {
+  width: 64px;
+}
+
+.cd-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.cd-preset-form {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.cd-preset-form input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.cd-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.cd-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+/* The row currently loaded into the form above, so it's obvious what Save
+   will overwrite. */
+.cd-preset-row.cd-preset-editing {
+  border-color: var(--color-btn);
+}
+
+.cd-preset-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cd-preset-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cd-preset-duration {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-preset-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cd-preset-actions button {
+  padding: 4px 9px;
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.cd-preset-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── History log ───────────────────────────────────────────────────────────── */
+
+.cd-log-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.cd-log-header .cd-label {
+  margin-right: auto;
+}
+
+.cd-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cd-log-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.cd-log-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cd-log-memo {
+  font-weight: 600;
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cd-log-meta {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-log-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cd-log-track {
+  font-size: 0.76rem;
+  padding: 5px 10px;
+}
+
+.cd-log-track:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cd-log-delete {
+  padding: 5px 9px;
+  line-height: 1;
+}
+
+@media (max-width: 560px) {
+  .cd-log-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cd-log-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* ── Sidebar "running" indicator ───────────────────────────────────────────
+   Same role as the TTS Repeater's dot and deliberately the same shape, since
+   both answer the same question: is this tool still doing something while I'm
+   somewhere else in the app? Paused counts as not running, a frozen clock
+   isn't something you need chasing.
+========================================================================== */
+
+.nav-item.cd-running .nav-icon {
+  position: relative;
+}
+
+.nav-item.cd-running .nav-icon::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-panel);
+  animation: cd-running-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cd-running-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-item.cd-running .nav-icon::after {
+    animation: none;
+  }
+}

@@ -1,8 +1,8 @@
 /* =============================================================================
-   GAME STATS — FIVE CROWNS
+   GAME STATS: FIVE CROWNS
    -----------------------------------------------------------------------------
    Everything specific to Five Crowns: round structure, the overtime tie-break
-   algorithm (the user's own house rule — official Five Crowns rules don't
+   algorithm (the user's own house rule, official Five Crowns rules don't
    define one), and round-label formatting. game-stats.ts owns the generic
    shell (profiles, persistence, views); this file only knows about rounds
    and scores.
@@ -10,7 +10,7 @@
    Rules encoded here (confirmed with the user):
      • Rounds 3-13 are fixed (11 rounds); card count == round index.
      • Overtime triggers ONLY on a tie in the final running total after
-       Round 13 is entered — not after any of the normal rounds.
+       Round 13 is entered, not after any of the normal rounds.
      • Only the currently-tied players play an overtime round.
      • After EVERY overtime round, running totals for ALL players are
        recomputed from scratch and tie groups are re-derived, so a player
@@ -18,7 +18,7 @@
        next one if they end up newly tied. This is a single continuous
        timeline (round 14, 15, 16...), not separate per-player tracks.
      • Overtime can add rounds automatically, or (per a Preferences toggle)
-       only after the user explicitly confirms — reconcileOvertimeRounds()
+       only after the user explicitly confirms, reconcileOvertimeRounds()
        reports the round it WOULD add without committing it, so the caller
        can gate that behind a confirm modal. A user who declines marks the
        game `tieAccepted`, which lets a tied result stand as complete.
@@ -44,7 +44,7 @@ export function buildFixedRounds(playerIds: string[]): RoundEntry[] {
 }
 
 /** "3" .. "13" for fixed rounds; "14 (OT)", "15 (2OT)", "16 (3OT)" ... for
- *  overtime rounds — matches the labels the user already uses. */
+ *  overtime rounds, matches the labels the user already uses. */
 export function roundLabel(round: RoundEntry): string {
   if (!round.isOvertime) return String(round.roundIndex);
   const otNumber = round.roundIndex - LAST_FIXED_ROUND;
@@ -52,7 +52,7 @@ export function roundLabel(round: RoundEntry): string {
   return `${round.roundIndex} (${suffix})`;
 }
 
-/** "Game 176" — the display label for a game, derived from its stable,
+/** "Game 176". The display label for a game, derived from its stable,
  *  auto-assigned, never-reused gameNumber rather than free-text title. */
 export function gameLabel(game: GameInstance): string {
   return `Game ${game.gameNumber}`;
@@ -82,12 +82,12 @@ function tiedPlayerIds(playerIds: string[], totals: Record<string, number>): str
  * Rebuilds a game's overtime tail (everything after round 13) from scratch
  * based on the fixed rounds' current scores, preserving any already-entered
  * OT scores that are still relevant. Called after every score change so
- * editing an earlier round always leaves the OT tail consistent — appending
+ * editing an earlier round always leaves the OT tail consistent, appending
  * a newly-needed round, or dropping one that's no longer justified.
  *
  * When `allowNewRounds` is false (the user's "confirm before adding
  * overtime" preference), a round that WOULD need to be created is not
- * added — instead it's returned so the caller can prompt for confirmation
+ * added, instead it's returned so the caller can prompt for confirmation
  * first. Rounds that already exist (already confirmed, or created before
  * the preference was turned on) are still preserved/dropped normally either
  * way, since that's just keeping existing structure consistent, not adding
@@ -161,7 +161,7 @@ export type GameState = {
    *  (game.tieAccepted) instead of playing overtime. */
   isComplete: boolean;
   /** Usually one id; two or more when a tie was accepted rather than
-   *  broken by overtime — every tied-for-lowest player counts as a winner. */
+   *  broken by overtime. Every tied-for-lowest player counts as a winner. */
   winnerIds: string[];
 };
 
@@ -202,7 +202,7 @@ export function deriveGameState(game: GameInstance): GameState {
 /* =============================================================================
    STATS ENGINE
    -----------------------------------------------------------------------------
-   Pure functions over a game list — no DOM, no module state. Only complete
+   Pure functions over a game list. No DOM, no module state. Only complete
    games count: an in-progress game has no defined winner or final score, so
    it can't contribute to any of these without skewing the numbers. A tied
    result that the user accepted (see GameState.isComplete) counts as a win
@@ -210,7 +210,7 @@ export function deriveGameState(game: GameInstance): GameState {
 
    Everything here is computed on demand from the raw game log, never stored,
    so editing or deleting a historical game just changes what these functions
-   return next time — there's nothing to keep in sync by hand.
+   return next time, there's nothing to keep in sync by hand.
 ============================================================================= */
 
 export function outsInGame(game: GameInstance, playerId: string): number {
@@ -220,7 +220,7 @@ export function outsInGame(game: GameInstance, playerId: string): number {
 }
 
 /** Longest run of CONSECUTIVE rounds (among the rounds the player actually
- *  played) with a score of 0 — going out over and over rather than just
+ *  played) with a score of 0, going out over and over rather than just
  *  often. Rounds the player sat out (an overtime round they weren't tied
  *  into) are skipped rather than breaking the streak, since they were never
  *  a chance to NOT go out either. */
@@ -239,7 +239,7 @@ export function mostOutsInARowInGame(game: GameInstance, playerId: string): numb
   return best;
 }
 
-/** Every player's running total after each round, in round order — the basis
+/** Every player's running total after each round, in round order. The basis
  *  for the round-entry grid's Total columns and for every stat that cares
  *  about the shape of a game over time (pace to a threshold, lead changes,
  *  comebacks) rather than just its final scores. */
@@ -266,7 +266,7 @@ function leadersAt(playerIds: string[], totals: Record<string, number>): string[
  * How many times the lead changed hands over a game.
  *
  * A change is counted whenever the set of players tied for the lowest running
- * total differs from the previous round's set — so a shared lead forming or
+ * total differs from the previous round's set, so a shared lead forming or
  * breaking counts, which is what "the lead changed" means at the table. The
  * first round only establishes a leader, so counting starts from the second.
  */
@@ -285,7 +285,7 @@ export function leadChangesInGame(game: GameInstance): number {
 /**
  * The deepest hole an eventual winner climbed out of: how far behind THE
  * LEADER they were at their worst, which winner it was, and the round it
- * happened in. All three travel together — a bare number leaves the reader
+ * happened in. All three travel together, a bare number leaves the reader
  * working out who it refers to and when, and the leader at that moment isn't
  * always the player who finished second.
  *
@@ -309,7 +309,7 @@ export function comebackInGame(
   return best;
 }
 
-/** True when one player held the lead outright — never tied, never passed —
+/** True when one player held the lead outright, never tied, never passed,
  *  from the first round through to the win. */
 export function isWireToWire(game: GameInstance): boolean {
   const state = deriveGameState(game);
@@ -321,7 +321,7 @@ export function isWireToWire(game: GameInstance): boolean {
   });
 }
 
-/** Standard competition ranking (1224) by final total, lowest first — so two
+/** Standard competition ranking (1224) by final total, lowest first, so two
  *  players tied for the lead both place 1st and the next player places 3rd. */
 export function finishPosition(game: GameInstance, playerId: string): number {
   const { totals } = deriveGameState(game);
@@ -346,7 +346,7 @@ export function roundReachingThreshold(
 }
 
 /**
- * A "table" is one exact roster playing one specific game — BOTH halves
+ * A "table" is one exact roster playing one specific game. BOTH halves
  * matter. Dropping a player changes the game (score variance, who could have
  * won), so {T,V} is a different table from {T,V,S}, not a subset of it. And a
  * different game type is a different scoresheet pad entirely, so the same
@@ -354,7 +354,7 @@ export function roundReachingThreshold(
  * continuing the Five Crowns sequence.
  *
  * This key is what game numbers count within, what head-to-head stats group
- * by, and what the win chart plots — see nextGameNumber() in game-stats.ts.
+ * by, and what the win chart plots, see nextGameNumber() in game-stats.ts.
  */
 export function tableKey(gameType: GameType, playerIds: string[]): string {
   return `${gameType}::${[...playerIds].sort().join("|")}`;
@@ -378,12 +378,12 @@ export function gamesForTable(
  * Play order for a list of games.
  *
  * Within a single table, `gameNumber` IS play order by construction (each new
- * game takes that table's highest number + 1), so it's used directly —
+ * game takes that table's highest number + 1), so it's used directly,
  * authoritative, and immune to games being left undated or re-entered later.
  * That matters because dates are optional and many users never set one.
  *
- * Across tables there's no shared counter — a T/V/S Game 40 and an A/B/C
- * Game 40 say nothing about each other — so those fall back to date, then to
+ * Across tables there's no shared counter (a T/V/S Game 40 and an A/B/C
+ * Game 40 say nothing about each other) so those fall back to date, then to
  * record creation time for undated games.
  */
 export function sortChronologically(list: GameInstance[]): GameInstance[] {
@@ -396,14 +396,14 @@ export function sortChronologically(list: GameInstance[]): GameInstance[] {
 
 // gameNumber travels alongside the display label so multi-game lists (ties
 // for a record) can be formatted compactly as "Games 5, 51, 77" instead of
-// "Game 5, Game 51, Game 77" — see game-stats.ts's formatGameRefs().
+// "Game 5, Game 51, Game 77", see game-stats.ts's formatGameRefs().
 export type GameReference = { gameId: string; gameNumber: number; gameTitle: string };
 
 function refFor(game: GameInstance): GameReference {
   return { gameId: game.id, gameNumber: game.gameNumber, gameTitle: gameLabel(game) };
 }
 
-/** Tracks every game tied for a record, not just the first one found —
+/** Tracks every game tied for a record, not just the first one found,
  *  `metric` extracts the comparable number from an entry (its own value for
  *  most records, `.margin` for MarginGame), `better(a, b)` says whether `a`
  *  should replace `b` outright (a strictly new record clears the list; an
@@ -423,7 +423,7 @@ function updateRecordList<T>(
 }
 
 // Every career record can be tied across multiple games (e.g. two games
-// both hit the player's all-time highest score), so each field is a list —
+// both hit the player's all-time highest score), so each field is a list,
 // usually one entry, occasionally more.
 export type CareerRecords = {
   highestScoreGame: (GameReference & { value: number })[];
@@ -434,7 +434,7 @@ export type CareerRecords = {
   mostOutsInARow: (GameReference & { value: number })[];
   highestWinningScore: (GameReference & { value: number })[];
   lowestLosingScore: (GameReference & { value: number })[];
-  /** Pace to each scoring milestone — see PaceStats. */
+  /** Pace to each scoring milestone, see PaceStats. */
   pace: Record<PaceThreshold, PaceStats>;
 };
 
@@ -452,7 +452,7 @@ export type PaceEntry = GameReference & { value: number; roundLabel: string };
  * rounds to cross the threshold), `slowest` their most disciplined game among
  * those that crossed it at all.
  *
- * Games that finished under the threshold are excluded from both — there's no
+ * Games that finished under the threshold are excluded from both, there's no
  * round number to report for a line that was never crossed, and treating them
  * as "infinitely slow" would make `slowest` a proxy for the lowest final
  * score, which Lowest Score (Game) already reports.
@@ -478,23 +478,23 @@ export type RateStats = {
   currentStreak: { type: "win" | "loss" | "none"; length: number };
   /** Mean points ahead of the closest opponent, over wins only. A tie
    *  accepted by every player (nobody left to be "ahead of") is excluded
-   *  rather than counted as 0 — same reasoning as avgMarginInLosses below. */
+   *  rather than counted as 0. Same reasoning as avgMarginInLosses below. */
   avgMarginInWins: number;
   /** Mean points behind the winner, over losses only. Wins are excluded
-   *  rather than counted as 0 — including them would just re-encode win %
+   *  rather than counted as 0, including them would just re-encode win %
    *  and flatten the number this is meant to expose. */
   avgMarginInLosses: number;
   /** How many times the player finished in each place (standard competition
-   *  ranking — ties for the lead both place 1st). Keyed by place number;
+   *  ranking, ties for the lead both place 1st). Keyed by place number;
    *  only entries the player has actually reached exist. Place 1 duplicates
-   *  `wins` and isn't displayed separately — this exists for "Runner Up",
+   *  `wins` and isn't displayed separately. This exists for "Runner Up",
    *  "Third Place", etc., which only make sense at a table big enough for
    *  that many distinct standings (see maxPlayersInAnyGame). */
   placeCounts: Record<number, number>;
   /** The most players in any single completed game this player appears in,
    *  within whatever scope computePlayerStats was called with (global
    *  history, or one table's games). Gates which place-count stats
-   *  (Runner Up, Third Place...) are worth showing at all — place N only
+   *  (Runner Up, Third Place...) are worth showing at all, place N only
    *  exists as a distinct standing once a game has had N+1 players. */
   maxPlayersInAnyGame: number;
 };
@@ -502,7 +502,7 @@ export type RateStats = {
 export type PlayerStats = { career: CareerRecords; rates: RateStats };
 
 /** Rate & Cumulative stats get best/worst highlighting in the Compare view
- *  (see game-stats.ts Phase 6); Career Records don't — they're "which game
+ *  (see game-stats.ts Phase 6); Career Records don't, they're "which game
  *  it happened in" facts, not a rate that's meaningful to rank. Polarity
  *  follows from Five Crowns' lower-total-wins rule; "neutral" stats (plain
  *  counts/totals) aren't ranked at all. longestWinStreak/longestLossStreak
@@ -534,8 +534,8 @@ export const RATE_STAT_POLARITY: Record<keyof RateStats, StatPolarity> = {
 
 type StreakSegment = { type: "win" | "loss"; length: number; fromGameId: string; toGameId: string };
 
-/** Every consecutive win/loss run in order, win and loss segments alike —
- *  the shared basis for both the longest-streak record (computeStreaks) and
+/** Every consecutive win/loss run in order, win and loss segments alike.
+ *  The shared basis for both the longest-streak record (computeStreaks) and
  *  the full per-type breakdown behind the Stats double-click detail
  *  (streakListDetail), so the two can't drift apart. */
 function computeStreakSegments(
@@ -589,7 +589,7 @@ function computeStreaks(
   };
 }
 
-/** Every win (or loss) streak the player has ever had, longest first — the
+/** Every win (or loss) streak the player has ever had, longest first. The
  *  ranked breakdown behind double-clicking Longest Win/Losing Streak in
  *  Stats, same pattern as the other career-record detail lists. */
 export function streakListDetail(
@@ -603,7 +603,7 @@ export function streakListDetail(
     .sort((a, b) => b.length - a.length);
 }
 
-/** `allGames` should already be scoped to whatever's being measured — pass
+/** `allGames` should already be scoped to whatever's being measured, pass
  *  the full log for a player's global stats, or gamesForTable(...) for their
  *  stats at one specific table. Either way this only looks at games the
  *  player actually appears in, so a table-scoped list "just works". */
@@ -653,7 +653,7 @@ export function computePlayerStats(allGames: GameInstance[], playerId: string): 
 
     if (isWinner) {
       wins++;
-      // The "field" for a margin is everyone NOT tied for the win — with a
+      // The "field" for a margin is everyone NOT tied for the win, with a
       // solo winner that's everyone else; with an accepted tie among all
       // players there's nobody left to have beaten, so it's excluded below
       // rather than scored as a 0-point margin.
@@ -761,17 +761,17 @@ export type TableStats = {
   /** The largest deficit an eventual winner dug themselves out of, who it
    *  was, and the round they were at their worst. */
   biggestComeback: (GameReference & { value: number; playerId: string; roundLabel: string })[];
-  /** Games led outright from the first round to the last — the opposite
+  /** Games led outright from the first round to the last. The opposite
    *  shape of a comeback, and the one a scoresheet never makes obvious. */
   wireToWireGames: GameReference[];
   /** Every point anyone has ever scored at this table, summed across its
-   *  whole history — unlike highest/lowestCombinedScore, which are each a
+   *  whole history, unlike highest/lowestCombinedScore, which are each a
    *  single game's total, this is the running grand total. */
   totalPointsAllTime: number;
 };
 
 /** Describes the table as a whole rather than any one player, so nothing
- *  here gets compare-highlighting — there's no "best" combined score. */
+ *  here gets compare-highlighting, there's no "best" combined score. */
 export function computeTableStats(
   allGames: GameInstance[],
   gameType: GameType,
@@ -858,7 +858,7 @@ export function computeTableStats(
 export type WinChartPoint = {
   gameId: string;
   gameNumber: number;
-  // Whoever won THIS specific game — mirrors the "1" in the winning
+  // Whoever won THIS specific game, mirrors the "1" in the winning
   // player's own column in the user's original Win Chart sheet.
   wonThisGame: Record<string, boolean>;
   cumulativeWins: Record<string, number>;
@@ -866,7 +866,7 @@ export type WinChartPoint = {
 
 /** One point per completed game at this table, in play order, carrying both
  *  who won that specific game and each player's running win total through
- *  that point — mirrors the user's original spreadsheet's "Win Chart" sheet
+ *  that point, mirrors the user's original spreadsheet's "Win Chart" sheet
  *  (table + line chart source). */
 export function computeWinChart(
   allGames: GameInstance[],
@@ -897,12 +897,12 @@ export function computeWinChart(
    back in. The shape is the one the author already keeps by hand, so an
    existing log imports without being reformatted first:
 
-     • One sheet per game, named "Game <n>" — the sheet NAME carries the game
+     • One sheet per game, named "Game <n>". The sheet NAME carries the game
        number. Sheets named anything else are ignored, which is what lets a
        workbook keep a Read Me, a Template, chart sheets and so on alongside.
      • Column A holds round labels: 3-13, then "14 (OT)", "15 (2OT)", ...
      • Each player owns a "<Name>▲" column of per-round scores. Anything
-       without the ▲ marker is ignored — in the author's own sheets the plain
+       without the ▲ marker is ignored, in the author's own sheets the plain
        "<Name>" column beside it is a running total, which is recomputed here
        rather than read, so a stale formula result can't contaminate an import.
      • A blank score in an overtime row means that player wasn't in that
@@ -934,26 +934,26 @@ export function templateGameRows(playerNames: string[]): string[][] {
 export function templateReadmeRows(): string[][] {
   const marker = SCORE_COLUMN_MARKER;
   return [
-    ["Five Crowns Game Log — import format"],
+    ["Five Crowns Game Log: import format"],
     [],
     ["1.", "Copy the Template sheet once per game."],
-    ["2.", 'Rename each copy "Game 1", "Game 2", and so on — the sheet NAME is the game number.'],
+    ["2.", 'Rename each copy "Game 1", "Game 2", and so on. The sheet NAME is the game number.'],
     ["3.", `Replace "Player 1" etc. in row 1 with real names, keeping the ${marker} on each score column.`],
     ["4.", "Enter every player's score for every round. Rounds 3-13 must all be filled in."],
     ["5.", "Import the finished workbook from Game Stats → Setup → Preferences."],
     [],
     ["Notes"],
-    ["", `Only columns whose heading ends in ${marker} are read — add your own totals or notes columns freely.`],
-    ["", "If players tie after round 13, keep adding rows with the round number going up — 14, 15, and so on."],
+    ["", `Only columns whose heading ends in ${marker} are read. Add your own totals or notes columns freely.`],
+    ["", "If players tie after round 13, keep adding rows with the round number going up: 14, 15, and so on."],
     ["", "In an overtime row, leave a player's cell blank if they weren't in that overtime."],
-    ["", "Every round needs one player with a score of 0 — whoever went out that round."],
+    ["", "Every round needs one player with a score of 0, whoever went out that round."],
     ["", 'Sheets not named "Game <number>" are ignored, so this sheet can stay where it is.'],
     ["", "Players are matched to profiles by name; a name that's new to the app gets a new profile."],
-    ["", "Nothing is imported unless every sheet passes — problems are listed for you to fix first."],
+    ["", "Nothing is imported unless every sheet passes. Problems are listed for you to fix first."],
   ];
 }
 
-/** A game recovered from a worksheet, still in spreadsheet terms — player
+/** A game recovered from a worksheet, still in spreadsheet terms, player
  *  NAMES rather than profile ids, because resolving those (and creating any
  *  profile that doesn't exist yet) must not happen until every sheet in the
  *  workbook has validated. */
@@ -1006,7 +1006,7 @@ export function parseGameSheet(sheetName: string, rows: string[][]): SheetParseR
   if (playerColumns.length < 2) {
     errors.push(
       where(
-        `needs at least 2 player columns in row 1, each headed "<Name>${SCORE_COLUMN_MARKER}" — found ${playerColumns.length}.`,
+        `needs at least 2 player columns in row 1, each headed "<Name>${SCORE_COLUMN_MARKER}". Found ${playerColumns.length}.`,
       ),
     );
   }
@@ -1028,7 +1028,7 @@ export function parseGameSheet(sheetName: string, rows: string[][]): SheetParseR
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     const label = (row[0] ?? "").trim();
-    // A wholly blank row is padding, not a mistake — spreadsheets accumulate them.
+    // A wholly blank row is padding, not a mistake, spreadsheets accumulate them.
     if (label === "" && playerColumns.every((p) => (row[p.column] ?? "").trim() === "")) continue;
 
     const roundIndex = roundIndexFromLabel(label);
@@ -1071,9 +1071,9 @@ export function parseGameSheet(sheetName: string, rows: string[][]): SheetParseR
     if (isOvertime && Object.keys(scores).length < 2) {
       errors.push(where(`overtime round ${roundIndex} needs at least 2 players' scores.`));
     } else if (!rowHasScoreError && !Object.values(scores).some((v) => v === 0)) {
-      // Every round ends when someone goes out, and going out scores 0 — a
+      // Every round ends when someone goes out, and going out scores 0, a
       // round where nobody has a 0 means a score was mistyped or misattributed.
-      errors.push(where(`round ${roundIndex} has no player with a score of 0 — someone always goes out.`));
+      errors.push(where(`round ${roundIndex} has no player with a score of 0, someone always goes out.`));
     }
     parsedRounds.push({ roundIndex, isOvertime, scores });
   }
@@ -1090,7 +1090,7 @@ export function parseGameSheet(sheetName: string, rows: string[][]): SheetParseR
     .forEach((index, i) => {
       const expected = LAST_FIXED_ROUND + 1 + i;
       if (index !== expected) {
-        errors.push(where(`overtime rounds must run consecutively — expected round ${expected}, found ${index}.`));
+        errors.push(where(`overtime rounds must run consecutively. Expected round ${expected}, found ${index}.`));
       }
     });
 

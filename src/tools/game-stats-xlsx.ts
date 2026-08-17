@@ -1,12 +1,12 @@
 /* =============================================================================
-   GAME STATS — SPREADSHEET (.xlsx) READ / WRITE
+   GAME STATS: SPREADSHEET (.xlsx) READ / WRITE
    -----------------------------------------------------------------------------
    A deliberately small, dependency-free .xlsx layer: just enough to read a
    workbook the user maintains by hand, and to write the template that teaches
    them its shape.
 
    Why hand-rolled rather than a library: the app ships no runtime JS
-   dependencies, and the slice of the format actually needed here is tiny —
+   dependencies, and the slice of the format actually needed here is tiny,
    read cell text from named sheets, write cell text to named sheets. No
    styles to interpret, no formulas to evaluate (Excel caches every formula's
    last result in the file, which is exactly what a reader wants), no dates.
@@ -15,25 +15,25 @@
      • Reading must cope with whatever Excel produced, so entries are
        DEFLATE-decompressed via the WebView's built-in DecompressionStream.
      • Writing only has to produce something Excel will open, so every entry is
-       STORED uncompressed — which means no compressor is needed at all, and a
+       STORED uncompressed, which means no compressor is needed at all, and a
        few KB of template is not worth one.
 
    Nothing here knows what a game is; see game-stats-five-crowns.ts for the
    sheet-shape rules and game-stats.ts for the import flow around them.
 ============================================================================= */
 
-/** A sheet reduced to text. `rows[r][c]` is 0-indexed and dense — short rows
+/** A sheet reduced to text. `rows[r][c]` is 0-indexed and dense, short rows
  *  and skipped cells are padded with "" so callers can index by column
  *  without bounds-checking every access. */
 export type SheetData = { name: string; rows: string[][] };
 
 /** Signals a file that isn't readable as a workbook at all (as opposed to one
- *  that reads fine but holds the wrong data — that's the caller's business).
+ *  that reads fine but holds the wrong data, that's the caller's business).
  *  Carries a message written for the user, not the console. */
 export class WorkbookError extends Error {}
 
 /* =============================================================================
-   ZIP — READING
+   ZIP: READING
    An .xlsx is a ZIP archive of XML parts. Only the central directory is walked
    up front; entry bodies are decompressed on demand, so a workbook carrying
    900 chart parts (as the author's own does) costs nothing to skip past.
@@ -50,7 +50,7 @@ function viewOf(bytes: Uint8Array): DataView {
 }
 
 /** The End of Central Directory record sits at the very end of the file, but
- *  a trailing comment can push it back by up to 64 KB — hence the scan rather
+ *  a trailing comment can push it back by up to 64 KB, hence the scan rather
  *  than a fixed offset. */
 function findEocd(bytes: Uint8Array): number {
   const view = viewOf(bytes);
@@ -64,14 +64,14 @@ function findEocd(bytes: Uint8Array): number {
 function readCentralDirectory(bytes: Uint8Array): Map<string, ZipEntry> {
   const eocd = findEocd(bytes);
   if (eocd < 0) {
-    throw new WorkbookError("That file isn't a spreadsheet — no ZIP directory was found in it.");
+    throw new WorkbookError("That file isn't a spreadsheet. No ZIP directory was found in it.");
   }
   const view = viewOf(bytes);
   const count = view.getUint16(eocd + 10, true);
   const cdOffset = view.getUint32(eocd + 16, true);
   // The all-ones sentinels mean the real values live in a ZIP64 record. Excel
   // only emits those past 65,535 parts or 4 GB, neither of which a game log
-  // will reach — so this reports the limit rather than implementing it.
+  // will reach, so this reports the limit rather than implementing it.
   if (count === 0xffff || cdOffset === 0xffffffff) {
     throw new WorkbookError("That workbook uses the ZIP64 format, which this importer can't read.");
   }
@@ -103,7 +103,7 @@ async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
 }
 
 /** Returns an entry's decompressed text, or null if the archive has no such
- *  part — absence is normal (sharedStrings.xml only exists if the workbook
+ *  part, absence is normal (sharedStrings.xml only exists if the workbook
  *  uses shared strings), so it isn't treated as an error here. */
 async function readEntryText(
   bytes: Uint8Array,
@@ -119,7 +119,7 @@ async function readEntryText(
     throw new WorkbookError(`That workbook's "${name}" section is damaged and can't be read.`);
   }
   // The local header repeats the name and extra fields, and its extra field
-  // length routinely DIFFERS from the central directory's — so the body offset
+  // length routinely DIFFERS from the central directory's, so the body offset
   // has to be computed from the local header, never from the central one.
   const nameLen = view.getUint16(local + 26, true);
   const extraLen = view.getUint16(local + 28, true);
@@ -132,7 +132,7 @@ async function readEntryText(
 }
 
 /* =============================================================================
-   SHEET XML — READING
+   SHEET XML: READING
 ============================================================================= */
 
 /** "A" -> 0, "Z" -> 25, "AA" -> 26. Cell references carry their column letters,
@@ -157,7 +157,7 @@ function parseSharedStrings(xml: string | null): string[] {
   if (!xml) return [];
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   // Concatenating every <t> handles rich text, where one string is split into
-  // several runs — taking only the first would silently truncate it.
+  // several runs, taking only the first would silently truncate it.
   return Array.from(doc.getElementsByTagName("si")).map((si) =>
     Array.from(si.getElementsByTagName("t"))
       .map((t) => t.textContent ?? "")
@@ -183,7 +183,7 @@ function parseSheet(xml: string, sharedStrings: string[]): string[][] {
           .join("");
       } else {
         // <v> holds the literal value for numbers and, for a formula cell, the
-        // result Excel cached the last time it recalculated — which is exactly
+        // result Excel cached the last time it recalculated, which is exactly
         // what's wanted, since nothing here evaluates formulas.
         const v = cell.getElementsByTagName("v")[0];
         const raw = v?.textContent ?? "";
@@ -208,7 +208,7 @@ function parseSheet(xml: string, sharedStrings: string[]): string[][] {
  *
  * Sheet order and names come from workbook.xml; the file each sheet actually
  * lives in comes from the workbook's relationship part, because sheet1.xml is
- * NOT reliably the first sheet — Excel reuses part numbers freely as sheets are
+ * NOT reliably the first sheet. Excel reuses part numbers freely as sheets are
  * added, deleted and reordered.
  */
 export async function readWorkbook(bytes: Uint8Array): Promise<SheetData[]> {
@@ -216,7 +216,7 @@ export async function readWorkbook(bytes: Uint8Array): Promise<SheetData[]> {
 
   const workbookXml = await readEntryText(bytes, entries, "xl/workbook.xml");
   if (!workbookXml) {
-    throw new WorkbookError("That file isn't an Excel workbook (.xlsx) — no workbook part was found.");
+    throw new WorkbookError("That file isn't an Excel workbook (.xlsx). No workbook part was found.");
   }
   const relsXml = await readEntryText(bytes, entries, "xl/_rels/workbook.xml.rels");
   if (!relsXml) {
@@ -256,7 +256,7 @@ export async function readWorkbook(bytes: Uint8Array): Promise<SheetData[]> {
 }
 
 /* =============================================================================
-   ZIP — WRITING (stored, no compression)
+   ZIP: WRITING (stored, no compression)
 ============================================================================= */
 
 let crcTable: Uint32Array | null = null;
@@ -278,7 +278,7 @@ function crc32(data: Uint8Array): number {
 type PendingFile = { name: string; data: Uint8Array; crc: number };
 
 /** Builds a ZIP with every entry stored uncompressed. Excel accepts this
- *  happily, and it keeps the writer to arithmetic — no DEFLATE encoder. */
+ *  happily, and it keeps the writer to arithmetic. No DEFLATE encoder. */
 function buildZip(files: { name: string; content: string }[]): Uint8Array {
   const encoder = new TextEncoder();
   const prepared: PendingFile[] = files.map((f) => {
@@ -302,7 +302,7 @@ function buildZip(files: { name: string; content: string }[]): Uint8Array {
     view.setUint16(p + 6, 0, true); // flags
     view.setUint16(p + 8, 0, true); // method: stored
     view.setUint16(p + 10, 0, true); // mod time
-    view.setUint16(p + 12, 0x21, true); // mod date — 1980-01-01, a fixed epoch
+    view.setUint16(p + 12, 0x21, true); // mod date, 1980-01-01, a fixed epoch
     view.setUint32(p + 14, file.crc, true);
     view.setUint32(p + 18, file.data.length, true);
     view.setUint32(p + 22, file.data.length, true);
@@ -352,7 +352,7 @@ function buildZip(files: { name: string; content: string }[]): Uint8Array {
 }
 
 /* =============================================================================
-   SHEET XML — WRITING
+   SHEET XML: WRITING
 ============================================================================= */
 
 function xmlEscape(text: string): string {
@@ -376,7 +376,7 @@ function columnLetter(index: number): string {
 
 /** Every cell is written as an inline string, which sidesteps the shared
  *  string table entirely. Excel reads inline strings natively, and a template
- *  is a handful of cells — the table would be pure ceremony. */
+ *  is a handful of cells. The table would be pure ceremony. */
 function sheetXml(rows: string[][]): string {
   const body = rows
     .map((cells, r) => {

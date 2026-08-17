@@ -23,7 +23,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { flash, devError } from "../shell";
+import { flash, devError, shortPath } from "../shell";
 import { Modal } from "../modal";
 
 /* =============================================================================
@@ -33,15 +33,15 @@ import { Modal } from "../modal";
 type Entry = {
   date: string;     // start date, YYYY-MM-DD
   start: string;    // start time, real HH:MM:SS (00:00:00-23:59:59)
-  endDate: string;  // end date, YYYY-MM-DD — always >= date
+  endDate: string;  // end date, YYYY-MM-DD, always >= date
   end: string;      // end time, real HH:MM:SS (00:00:00-23:59:59)
   activity: string;
-  project: string;  // free-text project name, "" if unset — optional grouping
+  project: string;  // free-text project name, "" if unset, optional grouping
   notes: string;
 };
 
-// A separate {id, name, status} list — same shape/spirit as Budget's
-// SimpleEntity — powering the Activity field's autocomplete (Phase 3) and the
+// A separate {id, name, status} list (same shape/spirit as Budget's
+// SimpleEntity) powering the Activity field's autocomplete (Phase 3) and the
 // Setup modal's Activities tab. Entries above keep storing `activity` as free
 // text; this list never rewrites history, it just remembers names that have
 // been used so they can be suggested/managed.
@@ -53,7 +53,7 @@ type Activity = { id: string; name: string; status: ActivityStatus };
 // Entries store `project` as free text (like `activity`), not this id.
 type Project = { id: string; projectNumber: number; name: string; status: ActivityStatus };
 
-// TT-specific settings — shell owns fontScale, theme, hour12 at the app level,
+// TT-specific settings, shell owns fontScale, theme, hour12 at the app level,
 // but TT reads them back from disk so its render/format functions still work.
 type TTSettings = {
   fontScale: number;
@@ -86,7 +86,7 @@ let projects: Project[] = [];
 let lastActivity = "";
 let selectedDate: string = today();
 // True once the user has directly touched the End Date field on the entry
-// form — after that, End Date no longer auto-follows Start Date, and the
+// form, after that, End Date no longer auto-follows Start Date, and the
 // overnight-rollover convenience (see addEntry) stops applying.
 let endDateManuallySet = false;
 let viewStart: string = today();
@@ -252,7 +252,7 @@ function parseTime(t: string): number {
   return (h ?? 0) * 3600 + (m ?? 0) * 60 + (s ?? 0);
 }
 
-/** Formats a duration in total seconds as "Xh Ym Zs" — minutes and seconds
+/** Formats a duration in total seconds as "Xh Ym Zs", minutes and seconds
  *  are always shown, even at :00, the same way a time typed as just an hour
  *  still normalizes (and displays) with ":00" minutes. */
 function formatDuration(totalSeconds: number): string {
@@ -270,7 +270,7 @@ function formatDuration(totalSeconds: number): string {
  *    4 digits   -> HH MM
  *    5 digits   -> H MM SS   (single-digit hour + minutes + seconds)
  *    6 digits   -> HH MM SS
- *  Returns null for any other length (including 0) — never silently
+ *  Returns null for any other length (including 0), never silently
  *  truncates or guesses at a reading. */
 function splitDigitsToClock(digits: string): { h: number; m: number; s: number } | null {
   switch (digits.length) {
@@ -300,13 +300,13 @@ function splitDigitsToClock(digits: string): { h: number; m: number; s: number }
 
 /** Whether h/m/s fall in valid clock ranges. minHour/maxHour let callers
  *  distinguish a 24h reading (0-23) from a still-unshifted 12h reading
- *  (1-12 — a 12-hour clock never reads 0, and never exceeds 12). */
+ *  (1-12, a 12-hour clock never reads 0, and never exceeds 12). */
 function isValidClock(h: number, m: number, s: number, minHour: number, maxHour: number): boolean {
   return h >= minHour && h <= maxHour && m >= 0 && m <= 59 && s >= 0 && s <= 59;
 }
 
 /** Normalizes a user-typed time (12h or 24h, with or without seconds) into a
- *  canonical "HH:MM:SS" string, or "" if unparseable OR out of range — every
+ *  canonical "HH:MM:SS" string, or "" if unparseable OR out of range. Every
  *  branch below validates before returning, so a caller can trust that a
  *  non-empty result is always a real, in-range time. There is no "hour ≥24
  *  rolls to the next day" reading anywhere here: with Start/End Date now
@@ -315,7 +315,7 @@ function isValidClock(h: number, m: number, s: number, minHour: number, maxHour:
 function normalizeTime(input: string): string {
   const trimmed = input.trim().toLowerCase();
 
-  // Explicit colon-delimited 24h time, with optional seconds — matched
+  // Explicit colon-delimited 24h time, with optional seconds, matched
   // verbatim (and validated) before the digit-only heuristics below, which
   // would otherwise strip the colons and misread a 5-6 digit HH:MM:SS as a
   // bare HHMMSS value.
@@ -328,7 +328,7 @@ function normalizeTime(input: string): string {
     return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
   }
 
-  // Colon-delimited 12h time with an am/pm suffix — "9:30pm", "9:30:15pm".
+  // Colon-delimited 12h time with an am/pm suffix, "9:30pm", "9:30:15pm".
   const colonSuffixMatch = trimmed.match(
     /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap]\.?m?\.?)$/,
   );
@@ -343,8 +343,8 @@ function normalizeTime(input: string): string {
     return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
   }
 
-  // Bare digit run with an am/pm suffix and no separators — "930pm",
-  // "0930pm", "93045pm" — split by the digit-length convention above rather
+  // Bare digit run with an am/pm suffix and no separators ("930pm",
+  // "0930pm", "93045pm") split by the digit-length convention above rather
   // than misreading the whole run as an hour (e.g. "930pm" used to parse as
   // hour 930, which "+12"'d into a nonsense value like "942:00:00").
   const bareSuffixMatch = trimmed.match(/^(\d{1,6})\s*([ap]\.?m?\.?)$/);
@@ -358,7 +358,7 @@ function normalizeTime(input: string): string {
     return `${pad2(hours)}:${pad2(parts.m)}:${pad2(parts.s)}`;
   }
 
-  // Bare digit run, no suffix at all — 24h reading via the same split.
+  // Bare digit run, no suffix at all, 24h reading via the same split.
   const cleaned = trimmed.replace(/[^0-9]/g, "");
   if (!cleaned) return "";
   const parts = splitDigitsToClock(cleaned);
@@ -366,14 +366,14 @@ function normalizeTime(input: string): string {
   return `${pad2(parts.h)}:${pad2(parts.m)}:${pad2(parts.s)}`;
 }
 
-// Every character normalizeTime() can ever make sense of — digits, the
+// Every character normalizeTime() can ever make sense of, digits, the
 // separators, and am/pm (with or without periods), either case.
 const TIME_INPUT_CHARS = /[^0-9:. apmAPM]/g;
 
 /** Live keystroke guard for a Start/End time field: strips any character
  *  that couldn't possibly be part of a valid time as the user types, so
- *  garbage letters/symbols can't even be entered. This is a UX filter only —
- *  it doesn't validate the VALUE (e.g. "99:99" still passes it fine); that's
+ *  garbage letters/symbols can't even be entered. This is a UX filter only.
+ *  It doesn't validate the VALUE (e.g. "99:99" still passes it fine); that's
  *  normalizeTime()'s job at commit time. Preserves caret position so typing
  *  mid-string doesn't jump the cursor around. */
 function restrictToTimeChars(input: HTMLInputElement): void {
@@ -389,7 +389,7 @@ function restrictToTimeChars(input: HTMLInputElement): void {
 }
 
 /** The current wall-clock time as "HH:MM" or "HH:MM:SS", per the "Round Now
- *  to Whole Minute" preference — used by the Start/End "Now" buttons. */
+ *  to Whole Minute" preference, used by the Start/End "Now" buttons. */
 function nowTimeString(): string {
   const raw = new Date().toTimeString(); // "HH:MM:SS GMT+..."
   return settings.roundNowToMinute ? raw.slice(0, 5) : raw.slice(0, 8);
@@ -405,7 +405,7 @@ function secondsToTimeString(totalSeconds: number): string {
 
 /** Duration in seconds between an entry's start (date+start) and end
  *  (endDate+end), correctly spanning midnight or multiple days. Negative if
- *  end is before start — callers must reject that rather than display it. */
+ *  end is before start, callers must reject that rather than display it. */
 function entryDurationSeconds(e: Pick<Entry, "date" | "start" | "endDate" | "end">): number {
   const startTotal = dateToDayIndex(e.date) * 86400 + parseTime(e.start);
   const endTotal = dateToDayIndex(e.endDate) * 86400 + parseTime(e.end);
@@ -464,15 +464,15 @@ function formatImportTimestamp(iso: string): string {
 ============================================================================= */
 
 function validateEntry({ date, start, end, activity }: Pick<Entry, "date" | "start" | "end" | "activity">): boolean {
-  if (!activity) { flash("Activity is required.", "error"); return false; }
-  if (!start)    { flash("Start time is missing or invalid.", "error"); return false; }
-  if (!end)      { flash("End time is missing or invalid.", "error"); return false; }
-  if (!date)     { flash("Start date is required.", "error"); return false; }
+  if (!activity) { flash("Activity is required", "error"); return false; }
+  if (!start)    { flash("Start time is missing or invalid", "error"); return false; }
+  if (!end)      { flash("End time is missing or invalid", "error"); return false; }
+  if (!date)     { flash("Start date is required", "error"); return false; }
   return true;
 }
 
 /* =============================================================================
-   SETTINGS — TT-SPECIFIC
+   SETTINGS: TT-SPECIFIC
    Shell owns fontScale, theme, hour12 at the app level. TT reads them back
    from shared settings.json so its render/format logic (formatDate, formatTime)
    stays in sync without needing to call back into shell.ts.
@@ -490,7 +490,7 @@ function applyPayPeriodButtons(): void {
 
 /**
  * Applies TT-specific settings to the DOM.
- * Shell handles fontScale, theme, and clock format — this only touches
+ * Shell handles fontScale, theme, and clock format. This only touches
  * the fields TT owns: date format, quick delete, pay period.
  */
 function applyTTSettings(): void {
@@ -524,11 +524,11 @@ function applyTTSettings(): void {
 function saveSettings(): void {
   if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
   settingsSaveTimer = window.setTimeout(async () => {
-    // TT's settings live in TT's OWN file (time-tracker-settings.json) —
+    // TT's settings live in TT's OWN file (time-tracker-settings.json),
     // settings.json belongs to the shell alone. Only the keys this tool
     // owns are written; shell-owned display prefs (fontScale, theme,
     // hour12, americanDates) are read-only here. Activities ride along in
-    // this same file — they're TT-owned user data, and keeping them out of
+    // this same file, they're TT-owned user data, and keeping them out of
     // the entries data file (save_data) avoids reshaping that atomic blob.
     const own = {
       quickDelete: settings.quickDelete,
@@ -544,7 +544,7 @@ function saveSettings(): void {
         data: JSON.stringify(own),
       });
     } catch (e) {
-      // This fires from a timer — without a catch, a failed save would
+      // This fires from a timer. Without a catch, a failed save would
       // vanish as an unhandled rejection while the user believes the
       // toggle stuck.
       flash(`Failed to save Time Tracker settings: ${e}`, "error", 8000);
@@ -563,7 +563,7 @@ async function loadSettings(): Promise<void> {
 
     // TT's own settings file is authoritative for TT keys. If it doesn't
     // exist yet (first run after the split), the legacy values merged above
-    // stand — and get persisted to the new home so the migration happens
+    // stand, and get persisted to the new home so the migration happens
     // exactly once.
     const ownRaw = await invoke<string>("load_tool_settings", { toolId: "time-tracker" });
     const own = JSON.parse(ownRaw || "{}");
@@ -619,7 +619,7 @@ function isValidProject(p: unknown): p is Project {
 }
 
 /* =============================================================================
-   PERSISTENCE — ENTRIES
+   PERSISTENCE: ENTRIES
 ============================================================================= */
 
 async function saveToDisk(): Promise<void> {
@@ -634,7 +634,7 @@ async function loadFromDisk(): Promise<void> {
       entries = [];
       return;
     }
-    // Validate each entry — drop any records with missing or wrong-typed required
+    // Validate each entry, drop any records with missing or wrong-typed required
     // fields so downstream render/sort logic never hits unexpected values.
     entries = parsed
       .filter((e): e is Entry & { endDate?: unknown } =>
@@ -645,11 +645,11 @@ async function loadFromDisk(): Promise<void> {
         typeof e.end      === "string" &&
         typeof e.activity === "string"
       )
-      // notes is a later addition — older saved entries won't have it, so
+      // notes is a later addition, older saved entries won't have it, so
       // default to "" rather than dropping them.
       // endDate is a later addition too. Pre-migration entries encoded an
       // overnight span by inflating `end` past 24:00 (e.g. "26:00" for
-      // 2am next day) — split that back into a real time-of-day plus a
+      // 2am next day), split that back into a real time-of-day plus a
       // rolled-forward endDate so old data reads correctly under the new
       // explicit-date model.
       // start/end are reformatted through parseTime+secondsToTimeString
@@ -658,7 +658,7 @@ async function loadFromDisk(): Promise<void> {
       // the current HH:MM:SS storage format.
       .map((e) => {
         const notes = typeof e.notes === "string" ? e.notes : "";
-        // project is a later addition — older saved entries won't have it.
+        // project is a later addition, older saved entries won't have it.
         const project = typeof e.project === "string" ? e.project : "";
         if (typeof e.endDate === "string" && e.endDate) {
           return {
@@ -684,7 +684,7 @@ async function loadFromDisk(): Promise<void> {
 }
 
 /* =============================================================================
-   PERSISTENCE — DRAFT
+   PERSISTENCE: DRAFT
 ============================================================================= */
 
 function saveDraft(
@@ -824,7 +824,7 @@ function updateDurationPreview(
     durationPreview.textContent = "";
     durationPreview.classList.remove("visible");
     // A live "ticking" preview may be running from a previously-valid start
-    // value — without this, its interval keeps firing every second against
+    // value. Without this, its interval keeps firing every second against
     // the stale closure until the field becomes valid or empty again.
     if (durationPreviewTimer) {
       clearInterval(durationPreviewTimer);
@@ -877,11 +877,11 @@ function updateDurationPreview(
  * Wraps a value as a quoted CSV field. Two things happen here that naive
  * `"${value}"` interpolation gets wrong:
  *
- * 1. Embedded double quotes are doubled ("" ) per RFC 4180 — an activity
+ * 1. Embedded double quotes are doubled ("" ) per RFC 4180, an activity
  *    named `Say "hi"` would otherwise produce a malformed row that shifts
  *    every column after it.
  * 2. Values starting with = + - @ or a tab get a leading apostrophe. Excel
- *    treats such cells as FORMULAS on open — an activity named
+ *    treats such cells as FORMULAS on open, an activity named
  *    `=HYPERLINK(...)` would execute rather than display. The apostrophe is
  *    Excel's own "treat as text" marker and is invisible in the cell.
  *
@@ -893,7 +893,7 @@ function updateDurationPreview(
    -----------------------------------------------------------------------------
    Shared by the Stats pane (renderStats) and the CSV export so the two can
    never disagree. Operates on whatever slice of entries the caller passes in
-   — always the currently-visible (view-filtered) set — so the numbers track
+:   always the currently-visible (view-filtered) set, so the numbers track
    the active view mode exactly like the Totals pane does.
 ============================================================================= */
 
@@ -950,7 +950,7 @@ function computeStats(visible: Entry[]): Stat[] {
     if (e2 > latestSecs) { latestEntry = e; latestSecs = e2; }
   });
 
-  // Per-date grouping — "craziest" (most entries) and "busiest" (most time).
+  // Per-date grouping, "craziest" (most entries) and "busiest" (most time).
   // Grouped by start date, same as the ledger's per-day subheaders.
   const byDate = new Map<string, { count: number; secs: number }>();
   visible.forEach((e) => {
@@ -1117,11 +1117,11 @@ async function exportCSV(): Promise<void> {
     });
 
   try {
-    await invoke("export_csv", { filename, data: lines.join("\r\n") });
-    flash("Report exported to Downloads!", "success");
+    const savedTo = await invoke<string>("export_csv", { filename, data: lines.join("\r\n") });
+    flash(`Report exported to ${shortPath(savedTo)}`, "success");
   } catch (err) {
     devError("Export failed:", err);
-    flash("Export failed.", "error");
+    flash("Export failed", "error");
   }
 }
 
@@ -1129,7 +1129,7 @@ async function exportCSV(): Promise<void> {
    CSV IMPORT
    -----------------------------------------------------------------------------
    Adds new entries from a user-provided CSV; never edits existing ones. All
-   rows are validated before anything is added — if any row is missing a
+   rows are validated before anything is added, if any row is missing a
    required field, the whole import is rejected and nothing changes.
 ============================================================================= */
 
@@ -1158,7 +1158,7 @@ function parseCsvText(text: string): string[][] {
 
     if (ch === '"') { inQuotes = true; }
     else if (ch === ",") { row.push(field); field = ""; }
-    else if (ch === "\r") { /* skip — \n (below) closes the row */ }
+    else if (ch === "\r") { /* skip, \n (below) closes the row */ }
     else if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
     else { field += ch; }
   }
@@ -1193,7 +1193,7 @@ function monthNameToNumber(raw: string): number {
 }
 
 /** Builds a canonical "YYYY-MM-DD" string, rejecting anything that isn't a
- *  real calendar date (e.g. month 13, or day 30 in February) — JS's Date
+ *  real calendar date (e.g. month 13, or day 30 in February). JS's Date
  *  constructor silently rolls those over rather than erroring, so the
  *  round-trip through getFullYear/getMonth/getDate is what actually catches
  *  them. */
@@ -1222,10 +1222,10 @@ function resolveMonthDay(a: number, b: number): [month: number, day: number] | n
   return null;
 }
 
-/** Parses a CSV date cell in any commonly-seen format — ISO ("2024-03-05"),
+/** Parses a CSV date cell in any commonly-seen format (ISO ("2024-03-05"),
  *  numeric with slashes/dashes/dots in either month-first or day-first order
  *  ("3/5/2024", "05.03.2024"), or a month name ("March 5, 2024", "5 Mar
- *  2024") — into a canonical "YYYY-MM-DD" string. Returns "" if the text
+ *  2024")) into a canonical "YYYY-MM-DD" string. Returns "" if the text
  *  isn't a discernible date. Ambiguous numeric dates (both parts ≤12) follow
  *  the Date Format setting's month/day order. */
 function normalizeCsvDate(input: string): string {
@@ -1258,7 +1258,7 @@ function normalizeCsvDate(input: string): string {
     if (month) return buildDateString(Number(dayFirstMatch[3]), month, Number(dayFirstMatch[1]));
   }
 
-  // Last resort — hand anything else recognizable (e.g. "2024-03-05T10:00:00")
+  // Last resort, hand anything else recognizable (e.g. "2024-03-05T10:00:00")
   // to the native parser rather than rejecting it outright.
   const fallback = new Date(trimmed);
   if (!isNaN(fallback.getTime())) {
@@ -1326,7 +1326,7 @@ function parseCsvImport(raw: string): CsvImportResult {
     if (!start) { errors.push(`Line ${lineNum}: Start Time "${startRaw}" isn't a recognizable time.`); return; }
     if (!end)   { errors.push(`Line ${lineNum}: End Time "${endRaw}" isn't a recognizable time.`); return; }
 
-    // End Date is optional — when absent, mirror the manual-entry convenience:
+    // End Date is optional, when absent, mirror the manual-entry convenience:
     // same day unless the end time is at/before the start time, in which case
     // it rolls forward one day.
     let endDate: string;
@@ -1364,7 +1364,7 @@ function parseCsvImport(raw: string): CsvImportResult {
   if (errors.length > 0) {
     return {
       ok: false,
-      message: `Import cancelled — ${errors.length} row${errors.length > 1 ? "s" : ""} failed validation:\n${errors.join("\n")}`,
+      message: `Import cancelled: ${errors.length} row${errors.length > 1 ? "s" : ""} failed validation:\n${errors.join("\n")}`,
     };
   }
   if (parsed.length === 0) {
@@ -1385,14 +1385,14 @@ async function downloadCsvTemplate(): Promise<void> {
       String(now.getMinutes()).padStart(2, "0"),
       String(now.getSeconds()).padStart(2, "0"),
     ].join("-");
-    await invoke("export_csv", {
+    const savedTo = await invoke<string>("export_csv", {
       filename: `time-tracker-import-template-${timestamp}.csv`,
       data: "Start Date,Start Time,End Date,End Time,Project,Activity,Notes",
     });
-    flash("Template downloaded to Downloads!", "success");
+    flash(`Template saved to ${shortPath(savedTo)}`, "success");
   } catch (err) {
     devError("Template download failed:", err);
-    flash("Template download failed.", "error");
+    flash("Template download failed", "error");
   }
 }
 
@@ -1448,7 +1448,7 @@ function render(
 
     const subheader = document.createElement("div");
     subheader.className = "entry-date-subheader";
-    subheader.textContent = `${formatDate(date)} — ${formatDuration(daySecs)}`;
+    subheader.textContent = `${formatDate(date)}: ${formatDuration(daySecs)}`;
     entriesDiv.appendChild(subheader);
 
     dateEntries.forEach((entry) => {
@@ -1492,7 +1492,7 @@ function render(
         : "entry-field entry-col-time";
       endSpan.textContent = dayDiff > 0 ? `${formatTime(entry.end)} (+${dayDiff}d)` : formatTime(entry.end);
       endSpan.title = dayDiff > 0
-        ? `Ends ${formatDate(entry.endDate)} — double-click to edit the time, use the calendar icon to edit dates`
+        ? `Ends ${formatDate(entry.endDate)}, double-click to edit the time, use the calendar icon to edit dates`
         : "Double-click to edit";
       endSpan.addEventListener("dblclick", () =>
         makeEditable(endSpan, entry, "end", entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv),
@@ -1595,7 +1595,7 @@ function makeEditable(
   statsDiv: HTMLElement,
 ): void {
   // For start/end, edit the raw formatted time rather than the row's display
-  // text — the end column may carry a "(+1d)" suffix that normalizeTime
+  // text. The end column may carry a "(+1d)" suffix that normalizeTime
   // can't parse.
   const original =
     field === "start" || field === "end" ? formatTime(entry[field]) : (span.textContent || "");
@@ -1613,7 +1613,7 @@ function makeEditable(
 
   function commit() {
     const raw = input.value.trim();
-    // Project is optional — clearing it to empty is a valid edit (removes
+    // Project is optional, clearing it to empty is a valid edit (removes
     // the entry from any project), unlike the other inline-editable fields
     // where empty means "discard this edit".
     if (!raw && field !== "project") { cancel(); return; }
@@ -1624,7 +1624,7 @@ function makeEditable(
       const prevValue = entry[field];
       entry[field] = normalized;
 
-      // No auto-roll here, unlike Add Entry — this is editing an EXISTING
+      // No auto-roll here, unlike Add Entry. This is editing an EXISTING
       // entry's dates are already fixed, so a start/end time edit that would
       // make the span negative is simply rejected. If the entry is already
       // multi-day (date !== endDate), entryDurationSeconds() correctly
@@ -1632,7 +1632,7 @@ function makeEditable(
       // comparison that's actually fine across the date boundary.
       if (entryDurationSeconds(entry) < 0) {
         entry[field] = prevValue;
-        flash("End time can't be before start time — use the calendar icon to edit dates if this should span multiple days.", "error");
+        flash("End time can't be before start time. Use the calendar icon to edit dates if this should span multiple days.", "error");
         render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
         return;
       }
@@ -1674,7 +1674,7 @@ function makeEditable(
 }
 
 /* =============================================================================
-   ENTRIES — CORE OPERATIONS
+   ENTRIES: CORE OPERATIONS
 ============================================================================= */
 
 async function addEntry(
@@ -1709,11 +1709,11 @@ async function addEntry(
   }
 
   if (endDate < startDate) {
-    flash("End date cannot be before Start date.", "error");
+    flash("End date cannot be before Start date", "error");
     return false;
   }
   if (entryDurationSeconds({ date: startDate, start, endDate, end }) < 0) {
-    flash("End time must be after Start time — check the dates.", "error");
+    flash("End time must be after Start time. Check the dates.", "error");
     return false;
   }
 
@@ -1721,7 +1721,7 @@ async function addEntry(
 
   sortEntries();
   lastActivity = activity;
-  // Remember this activity/project name for autocomplete — silent quick-add,
+  // Remember this activity/project name for autocomplete, silent quick-add,
   // mirrors Budget calling findOrCreateExpenseSource on entry commit. Project
   // is optional, so an empty value is skipped rather than creating a
   // nameless project.
@@ -1744,6 +1744,59 @@ async function addEntry(
   return true;
 }
 
+/* =============================================================================
+   EXTERNAL ENTRY API
+   -----------------------------------------------------------------------------
+   Other tools that produce a real span of worked time (currently the Countdown Timer
+   timer's "Log to Time Tracker") add it through here rather than writing
+   time-tracker.json themselves. That matters because `entries` is live module
+   state: a second writer touching the file directly would be silently
+   overwritten the next time this tool saved. Going through one function also
+   means an externally-added entry gets the same treatment as a hand-typed one
+:   sorted into place, its activity/project remembered for autocomplete, and
+   the visible list refreshed.
+============================================================================= */
+
+/** Appends an entry on behalf of another tool. Times are the same formats the
+ *  Entry type documents: dates YYYY-MM-DD, times HH:MM:SS, both local. */
+export async function addTimeTrackerEntry(input: {
+  date: string;
+  start: string;
+  endDate: string;
+  end: string;
+  activity: string;
+  project?: string;
+  notes?: string;
+}): Promise<void> {
+  entries.push({
+    date: input.date,
+    start: input.start,
+    endDate: input.endDate,
+    end: input.end,
+    activity: input.activity,
+    project: input.project ?? "",
+    notes: input.notes ?? "",
+  });
+
+  sortEntries();
+  findOrCreateActivity(input.activity);
+  if (input.project) findOrCreateProject(input.project);
+  await saveToDisk();
+  rerenderEntryViews();
+}
+
+/** Re-renders the entries list from the DOM ids, for callers outside
+ *  initTimeTracker's closure (which is where render's element refs live).
+ *  No-ops before init has run. Nothing is on screen to refresh yet. */
+function rerenderEntryViews(): void {
+  const entriesDiv = document.getElementById("entries");
+  const dayTotalDiv = document.getElementById("dayTotal");
+  const groupTotalsDiv = document.getElementById("groupTotals");
+  const statsDiv = document.getElementById("statsPanel");
+  if (!entriesDiv || !dayTotalDiv || !groupTotalsDiv || !statsDiv) return;
+  render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
+}
+
 async function deleteEntry(
   index: number,
   entriesDiv: HTMLElement,
@@ -1762,7 +1815,7 @@ async function deleteEntry(
 }
 
 /* =============================================================================
-   ACTIVITIES — SETUP LIST + AUTOCOMPLETE SOURCE
+   ACTIVITIES: SETUP LIST + AUTOCOMPLETE SOURCE
    -----------------------------------------------------------------------------
    Mirrors Budget's Expense Sources: a {id,name,status} list managed in the
    Setup modal, used to populate the Activity field's datalist (Phase 3).
@@ -1772,7 +1825,7 @@ async function deleteEntry(
  * Silent quick-add used from the main entry form (typed Activity text, or an
  * inline activity edit). Matches an existing ACTIVE activity case-insensitively
  * and does nothing if found; otherwise creates a new active one. No toast, no
- * reactivation of retired items — mirrors Budget's findOrCreate (active-only)
+ * reactivation of retired items, mirrors Budget's findOrCreate (active-only)
  * as opposed to the explicit addOrReactivate path used by the Setup button.
  */
 function findOrCreateActivity(name: string): void {
@@ -1822,7 +1875,7 @@ function addOrReactivateActivity(name: string): boolean {
 
 /**
  * Repopulates the Activity field's <datalist> from active activities.
- * No-op until Phase 3 adds the datalist element — safe to call now.
+ * No-op until Phase 3 adds the datalist element, safe to call now.
  */
 function refreshActivityDatalist(): void {
   const datalist = document.getElementById("ttActivityList") as HTMLDataListElement | null;
@@ -1840,7 +1893,7 @@ function refreshActivityDatalist(): void {
 }
 
 /** Number of entries currently using a given activity/project name
- *  (case-insensitive) — the "N entries" count shown in Setup list rows, the
+ *  (case-insensitive). The "N entries" count shown in Setup list rows, the
  *  Edit modal's context line, and the delete/merge confirmations. */
 function entryCountFor(kind: "activity" | "project", name: string): number {
   return kind === "activity"
@@ -1892,7 +1945,7 @@ function renderActivitiesList(): void {
   if (activities.length === 0) {
     const p = document.createElement("p");
     p.className = "placeholder-text";
-    p.textContent = "No activities yet — add one above.";
+    p.textContent = "No activities yet. Add one above.";
     container.appendChild(p);
     return;
   }
@@ -1906,7 +1959,7 @@ function renderActivitiesList(): void {
 }
 
 /* =============================================================================
-   PROJECTS — SETUP LIST + AUTOCOMPLETE SOURCE
+   PROJECTS: SETUP LIST + AUTOCOMPLETE SOURCE
    -----------------------------------------------------------------------------
    Mirrors the Activities list above, plus a user-assigned integer ID
    (projectNumber) that must stay unique across all projects. Entries keep
@@ -1915,8 +1968,8 @@ function renderActivitiesList(): void {
 ============================================================================= */
 
 /** Smallest integer not currently in use as a projectNumber. Used only for
- *  the quick-add path (typing a new name directly in the Input panel) —
- *  the Setup "+ New Project" form lets the user pick the number explicitly. */
+ *  the quick-add path (typing a new name directly in the Input panel).
+ *  The Setup "+ New Project" form lets the user pick the number explicitly. */
 function nextProjectNumber(): number {
   return projects.reduce((max, p) => Math.max(max, p.projectNumber), 0) + 1;
 }
@@ -1925,7 +1978,7 @@ function nextProjectNumber(): number {
  * Silent quick-add used from the main entry form (typed Project text).
  * Matches an existing ACTIVE project case-insensitively and does nothing if
  * found; otherwise creates a new active one with the next free ID number.
- * Mirrors findOrCreateActivity — no toast, no reactivation of retired items.
+ * Mirrors findOrCreateActivity. No toast, no reactivation of retired items.
  */
 function findOrCreateProject(name: string): void {
   const trimmed = name.trim();
@@ -1967,9 +2020,9 @@ function addOrReactivateProject(name: string, projectNumber: number): boolean {
     return true;
   }
 
-  if (!Number.isInteger(projectNumber)) { flash("ID Number must be a whole number.", "error"); return false; }
+  if (!Number.isInteger(projectNumber)) { flash("ID Number must be a whole number", "error"); return false; }
   if (projects.some((p) => p.projectNumber === projectNumber)) {
-    flash(`ID Number ${projectNumber} is already in use.`, "error");
+    flash(`ID Number ${projectNumber} is already in use`, "error");
     return false;
   }
 
@@ -1982,17 +2035,17 @@ function addOrReactivateProject(name: string, projectNumber: number): boolean {
 }
 
 /**
- * Save handler for the Edit Project modal: renames, renumbers, and — like
- * activity rename — rewrites every matching entry's `project` text so
+ * Save handler for the Edit Project modal: renames, renumbers, and (like
+ * activity rename) rewrites every matching entry's `project` text so
  * history stays in sync. Returns false (and flashes the reason) on
  * validation failure, so the modal can stay open.
  */
 function saveProjectEdit(item: Project, name: string, projectNumber: number): boolean {
   const trimmed = name.trim();
   if (!trimmed) { flash("Name cannot be empty", "error"); return false; }
-  if (!Number.isInteger(projectNumber)) { flash("ID Number must be a whole number.", "error"); return false; }
+  if (!Number.isInteger(projectNumber)) { flash("ID Number must be a whole number", "error"); return false; }
   if (projects.some((p) => p.id !== item.id && p.projectNumber === projectNumber)) {
-    flash(`ID Number ${projectNumber} is already in use.`, "error");
+    flash(`ID Number ${projectNumber} is already in use`, "error");
     return false;
   }
 
@@ -2038,7 +2091,7 @@ function buildProjectRow(item: Project): HTMLElement {
 
   const nameSpan = document.createElement("span");
   nameSpan.className = "setup-item-name";
-  nameSpan.textContent = `#${item.projectNumber} — ${item.name}`;
+  nameSpan.textContent = `#${item.projectNumber}: ${item.name}`;
   if (item.status === "retired") {
     const retiredBadge = document.createElement("span");
     retiredBadge.className = "setup-item-retired-badge";
@@ -2071,7 +2124,7 @@ function renderProjectsList(): void {
   if (projects.length === 0) {
     const p = document.createElement("p");
     p.className = "placeholder-text";
-    p.textContent = "No projects yet — add one above.";
+    p.textContent = "No projects yet. Add one above.";
     container.appendChild(p);
     return;
   }
@@ -2085,7 +2138,7 @@ function renderProjectsList(): void {
 }
 
 /* =============================================================================
-   MODAL — TT SETUP (Projects / Activities / Preferences tabs)
+   MODAL: TT SETUP (Projects / Activities / Preferences tabs)
    -----------------------------------------------------------------------------
    Module-level (like Budget's getSetupModal) so the Activity Add/Edit/Delete
    modals can reopen Setup on the Activities tab after their actions.
@@ -2161,7 +2214,7 @@ function getTTSetupModal(): Modal {
 }
 
 /* =============================================================================
-   MODAL — ACTIVITY ADD / EDIT (fully independent, mirrors Budget's simple
+   MODAL: ACTIVITY ADD / EDIT (fully independent, mirrors Budget's simple
    source/category modals)
 ============================================================================= */
 
@@ -2223,7 +2276,7 @@ function getActivityEditModal(): Modal {
       const oldName = item.name;
 
       // Renaming onto another activity's name would leave two activities
-      // sharing one name — offer a merge instead of allowing the collision.
+      // sharing one name, offer a merge instead of allowing the collision.
       if (name.toLowerCase() !== oldName.toLowerCase()) {
         const collision = activities.find(
           (a) => a.id !== item.id && a.name.toLowerCase() === name.toLowerCase(),
@@ -2297,7 +2350,7 @@ function openActivityEdit(item: Activity): void {
 }
 
 /* =============================================================================
-   MODAL — PROJECT ADD / EDIT (mirrors the Activity Add/Edit modals, plus a
+   MODAL: PROJECT ADD / EDIT (mirrors the Activity Add/Edit modals, plus a
    required, unique integer ID Number field)
 ============================================================================= */
 
@@ -2363,7 +2416,7 @@ function getProjectEditModal(): Modal {
       if (!name) { flash("Name cannot be empty", "error"); return; }
 
       // Renaming onto another project's name would leave two projects sharing
-      // one name — offer a merge instead of allowing the collision.
+      // one name, offer a merge instead of allowing the collision.
       if (name.toLowerCase() !== item.name.toLowerCase()) {
         const collision = projects.find(
           (p) => p.id !== item.id && p.name.toLowerCase() === name.toLowerCase(),
@@ -2424,9 +2477,9 @@ function openProjectEdit(item: Project): void {
 }
 
 /* =============================================================================
-   MODAL — TT SETUP DELETE CONFIRM
-   Shared by Activities and Projects — only reachable for an already-retired
-   item (Delete is hidden until an item is retired — mirrors Budget's setup
+   MODAL: TT SETUP DELETE CONFIRM
+   Shared by Activities and Projects (only reachable for an already-retired
+   item (Delete is hidden until an item is retired) mirrors Budget's setup
    delete flow).
 ============================================================================= */
 
@@ -2444,7 +2497,7 @@ function getTTSetupDeleteModal(): Modal {
     document.getElementById("ttSetupDeleteConfirmBtn")!.addEventListener("click", () => {
       if (!pendingSetupDelete) return;
       const { kind, id, name } = pendingSetupDelete;
-      // Entries store the name, not an id — so orphaned entries would keep a
+      // Entries store the name, not an id, so orphaned entries would keep a
       // name that no longer exists in the list. Reassign them to "Unknown"
       // (the delete confirm already warned how many are affected). This is
       // why Retire exists: it preserves the name on history without deletion.
@@ -2491,9 +2544,9 @@ function openTTSetupDelete(kind: TTDeleteKind, id: string, name: string): void {
 }
 
 /* =============================================================================
-   MODAL — TT SETUP MERGE CONFIRM (shared by Activities and Projects)
+   MODAL: TT SETUP MERGE CONFIRM (shared by Activities and Projects)
    Reached when an Edit rename collides with another activity/project's name
-   (case-insensitively) — since two active entities can't share a name, the
+   (case-insensitively), since two active entities can't share a name, the
    only way forward is to merge the one being edited (`source`) into the
    existing one (`target`): source's entries are reassigned to target's name
    and source itself is deleted. target keeps its own name/casing and (for
@@ -2572,9 +2625,9 @@ function openTTMergeConfirm(kind: TTMergeKind, source: Activity | Project, targe
 }
 
 /* =============================================================================
-   MODAL — CSV IMPORT
+   MODAL: CSV IMPORT
    Mirrors the Activity Add/Edit modals' "leaves Setup, returns to Setup on
-   close" pattern — Back, the header X, and Cancel all return to the
+   close" pattern. Back, the header X, and Cancel all return to the
    Preferences tab rather than closing to the underlying tool view.
 ============================================================================= */
 
@@ -2697,12 +2750,12 @@ function openCsvImportModal(): void {
 }
 
 /* =============================================================================
-   MODAL HELPERS — TT-OWNED (delete confirm only)
+   MODAL HELPERS: TT-OWNED (delete confirm only)
    Shell owns: settings, about, exit, changelog.
 ============================================================================= */
 
 /* =============================================================================
-   MODAL — DELETE CONFIRM
+   MODAL: DELETE CONFIRM
    Owned by time-tracker; uses the shared Modal primitive.
 ============================================================================= */
 
@@ -2730,9 +2783,9 @@ function closeDeleteModal(): void {
 }
 
 /* =============================================================================
-   MODAL — EDIT NOTES
+   MODAL: EDIT NOTES
    Notes get a dedicated modal (a plain multi-line textarea) rather than the
-   inline entry-edit-input used by the other columns — multi-line text
+   inline entry-edit-input used by the other columns, multi-line text
    doesn't fit a single-line inline editor.
 ============================================================================= */
 
@@ -2766,7 +2819,7 @@ function getNotesEditModal(): Modal {
   return notesEditModal;
 }
 
-/** Fills a modal's context block with one line per string — built via
+/** Fills a modal's context block with one line per string, built via
  *  createElement/textContent (not innerHTML) since these lines carry
  *  free-text user data (project/activity names) that must never be parsed
  *  as HTML. */
@@ -2792,9 +2845,9 @@ function openNotesEditModal(entry: Entry, rerender: () => void): void {
 }
 
 /* =============================================================================
-   MODAL — EDIT DATES
+   MODAL: EDIT DATES
    Launched from each row's calendar icon. Lets Start Date and End Date be
-   edited independently — End Date must be on or after Start Date, and the
+   edited independently. End Date must be on or after Start Date, and the
    resulting span must still be a positive duration given the entry's times.
 ============================================================================= */
 
@@ -2802,20 +2855,20 @@ let dateEditModal: Modal | null = null;
 let dateEditEntry: Entry | null = null;
 let dateEditRerender: () => void = () => {};
 // Staged Start/End Time, initialized from the entry when the modal opens and
-// only written back to the entry on Update — see makeDateEditTimeEditable's
+// only written back to the entry on Update, see makeDateEditTimeEditable's
 // doc comment for why these can't just write straight to dateEditEntry.
 let dateEditStagedStart = "";
 let dateEditStagedEnd = "";
 
 /** Double-click-to-edit for the Start/End Time values shown (read-only,
  *  until now) in the Edit Dates modal. It's a bit silly to show them next to
- *  editable dates and not let you fix them too — especially since a date
+ *  editable dates and not let you fix them too, especially since a date
  *  change can put them in conflict. Mirrors the Entries panel's inline time
  *  edit's normalizeTime() parsing, but does NOT validate or save immediately
  *  the way that inline edit does: this modal's date fields are themselves
  *  only staged until Update, so checking the edited time against the
  *  entry's still-unstaged dates would reject perfectly valid combinations
- *  (e.g. changing 8am-12pm on 8/6 to 8am-7am spanning 8/6-8/7 — typing the
+ *  (e.g. changing 8am-12pm on 8/6 to 8am-7am spanning 8/6-8/7, typing the
  *  new 7am end time fails immediately against the old same-day End Date,
  *  even though the pending End Date edit would make it valid). So a typed
  *  time is only parsed here and held in dateEditStaged{Start,End}; the real
@@ -2903,10 +2956,10 @@ function getDateEditModal(): Modal {
       if (!dateEditEntry) return;
       const newStart = startInput.value;
       const newEnd = endInput.value;
-      if (!newStart || !newEnd) { flash("Both dates are required.", "error"); return; }
-      if (newEnd < newStart) { flash("End date cannot be before Start date.", "error"); return; }
+      if (!newStart || !newEnd) { flash("Both dates are required", "error"); return; }
+      if (newEnd < newStart) { flash("End date cannot be before Start date", "error"); return; }
       if (entryDurationSeconds({ date: newStart, start: dateEditStagedStart, endDate: newEnd, end: dateEditStagedEnd }) < 0) {
-        flash("End time must be after Start time — check the dates.", "error");
+        flash("End time must be after Start time. Check the dates.", "error");
         return;
       }
       dateEditEntry.date = newStart;
@@ -2946,7 +2999,7 @@ function openDateEditModal(entry: Entry, rerender: () => void): void {
 }
 
 /* =============================================================================
-   VIEW — PRESET / DATE RANGE HELPERS
+   VIEW: PRESET / DATE RANGE HELPERS
 ============================================================================= */
 
 function applyPreset(
@@ -2998,7 +3051,7 @@ function shiftDate(dateStr: string, delta: string): string {
 }
 
 /* =============================================================================
-   INIT — EXPORTED ENTRY POINT
+   INIT: EXPORTED ENTRY POINT
 ============================================================================= */
 
 export function initTimeTracker(): void {
@@ -3019,7 +3072,7 @@ export function initTimeTracker(): void {
   const statsDiv        = document.getElementById("statsPanel")!;
   const durationPreview = document.getElementById("durationPreview")!;
 
-  // Block keystrokes that could never be part of a valid time — letters
+  // Block keystrokes that could never be part of a valid time, letters
   // other than a/p/m, symbols, etc. Doesn't validate the VALUE typed, just
   // the characters (see normalizeTime() for the actual range validation).
   restrictToTimeChars(startInput);
@@ -3043,7 +3096,7 @@ export function initTimeTracker(): void {
   // the form shows the date the entry will actually get before you submit.
   // No-ops once End Date has been touched directly. Called whenever Start
   // Date changes and whenever the user leaves a time field (see the blur
-  // listeners below) — the same moments the draft gets saved.
+  // listeners below). The same moments the draft gets saved.
   function syncEndDateFromTimes() {
     if (endDateManuallySet) return;
     const startDate = datePicker.value || today();
@@ -3055,7 +3108,7 @@ export function initTimeTracker(): void {
     if (endDatePicker.value !== newEndDate) endDatePicker.value = newEndDate;
   }
   // Shared by the Start Date picker's own change event and the Start-time
-  // "Now" button (which also sets Start Date to today) — keeps both paths
+  // "Now" button (which also sets Start Date to today), keeps both paths
   // in sync with End Date/selectedDate/the ledger the same way.
   function applyStartDateChange() {
     selectedDate = datePicker.value;
@@ -3072,7 +3125,7 @@ export function initTimeTracker(): void {
   renderCurrentView = doRender;
 
   /* -------------------------------------------------------------------------
-     EVENT LISTENERS — INPUT PANEL
+     EVENT LISTENERS: INPUT PANEL
   -------------------------------------------------------------------------- */
 
   document.getElementById("addBtn")!.addEventListener("click", async (e) => {
@@ -3115,7 +3168,7 @@ export function initTimeTracker(): void {
   document.getElementById("stopBtn")!.addEventListener("click", (e) => {
     e.preventDefault();
     endInput.value = nowTimeString();
-    // "Now" is an explicit, real end date — treat it like the user picked
+    // "Now" is an explicit, real end date, treat it like the user picked
     // End Date directly rather than letting a later Start Date change (or
     // the overnight auto-roll) silently move it.
     endDatePicker.value = today();
@@ -3150,7 +3203,7 @@ export function initTimeTracker(): void {
   });
 
   /* -------------------------------------------------------------------------
-     EVENT LISTENERS — CONTROLS PANEL
+     EVENT LISTENERS: CONTROLS PANEL
   -------------------------------------------------------------------------- */
 
   document.querySelectorAll("#utility-tool-time-tracker .preset-btn").forEach((btn) => {
@@ -3208,7 +3261,7 @@ export function initTimeTracker(): void {
   document.getElementById("exportBtn")!.addEventListener("click", exportCSV);
 
   /* -------------------------------------------------------------------------
-     EVENT LISTENERS — TT SETTINGS ROWS (in shell settings modal)
+     EVENT LISTENERS: TT SETTINGS ROWS (in shell settings modal)
   -------------------------------------------------------------------------- */
 
   // Note: shell.ts owns the dateFormatToggle label and saves the setting.
@@ -3218,7 +3271,7 @@ export function initTimeTracker(): void {
     doRender();
   });
 
-  // Same story for Time Format (12h/24h) — shell.ts owns the toggle/label and
+  // Same story for Time Format (12h/24h), shell.ts owns the toggle/label and
   // saves the setting; TT just needs to know so formatTime() stops using a
   // stale value and the Entries panel re-renders without a relaunch.
   document.getElementById("timeFormatToggle")!.addEventListener("change", (e) => {
@@ -3266,7 +3319,7 @@ export function initTimeTracker(): void {
   });
 
   /* -------------------------------------------------------------------------
-     EVENT LISTENERS — TT SETUP MODAL
+     EVENT LISTENERS: TT SETUP MODAL
      Modal instantiation/tabs/Reset live at module level (getTTSetupModal) so
      the Activity Add/Edit modals can reopen Setup on the Activities tab.
   -------------------------------------------------------------------------- */
@@ -3277,7 +3330,7 @@ export function initTimeTracker(): void {
   document.getElementById("ttCsvImportBtn")!.addEventListener("click", openCsvImportModal);
 
   /* -------------------------------------------------------------------------
-     EVENT LISTENERS — TT-OWNED MODALS (delete confirm only)
+     EVENT LISTENERS: TT-OWNED MODALS (delete confirm only)
   -------------------------------------------------------------------------- */
 
   document.getElementById("deleteConfirmBtn")!.addEventListener("click", async () => {

@@ -101,7 +101,7 @@ let addEntryBtn:      HTMLButtonElement;
 let resultsList:      HTMLElement;
 let organizeSublabel: HTMLElement;
 
-// Ext-picker modal — Modal instance created in bindExtModal once DOM is ready
+// Ext-picker modal. Modal instance created in bindExtModal once DOM is ready
 let extModal: Modal;
 
 /* =============================================================================
@@ -187,7 +187,7 @@ function appendResult(state: "success" | "error", title: string, detail: string,
   `;
   card.querySelector(".dfg-status-clear-btn")!.addEventListener("click", () => {
     card.remove();
-    flash("Result cleared.", "success");
+    flash("Result cleared", "success");
   });
   resultsList.insertBefore(card, resultsList.firstChild);
 }
@@ -385,7 +385,7 @@ function handleReset(): void {
   });
   if (organizeSublabel) organizeSublabel.textContent = ORGANIZE_LABELS.flat;
   clearAllResults();
-  flash("Tool reset.", "success");
+  flash("Tool reset", "success");
 }
 
 /* =============================================================================

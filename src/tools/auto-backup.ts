@@ -1,5 +1,5 @@
 /* =============================================================================
-   AUTO-BACKUP  — Robocopy-based folder mirroring
+   AUTO-BACKUP: Robocopy-based folder mirroring
    -----------------------------------------------------------------------------
    Frontend logic for the Auto-Backup tool. All filesystem operations and the
    Robocopy subprocess run in Rust; this file owns UI state, progress display,
@@ -10,7 +10,7 @@
        never blocked. Progress arrives as Tauri events (backup-plan-progress,
        backup-plan-done, backup-folder-start, backup-file-progress,
        backup-folder-done, backup-complete). The overall bar is byte-weighted
-       against a preflight plan and animated via requestAnimationFrame — see
+       against a preflight plan and animated via requestAnimationFrame, see
        the SMOOTH PROGRESS BAR ENGINE section.
      • Listeners are attached once at init and remain alive for the session.
        unlisteners[] holds their handles and attachBackupListeners() drains it
@@ -29,7 +29,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { flash, devError, devWarn } from "../shell";
+import { flash, devError, devWarn, setToolAttention } from "../shell";
+import {
+  DAY_MS,
+  isReminderDue,
+  normalizeMonthDays,
+  parseMonthDaysInput,
+} from "../reminder-schedule";
 import { Modal } from "../modal";
 
 /* =============================================================================
@@ -41,23 +47,31 @@ interface BackupConfig {
   destinations: string[];
   copySpeed: number; // bytes/sec
   /** True once the user checks "Never show this warning again" on the
-   *  entry disclaimer — suppresses the disclaimer face on future entries. */
+   *  entry disclaimer, suppresses the disclaimer face on future entries. */
   skipDisclaimer: boolean;
   /** When true (default), show live per-file progress during a backup. This
    *  is slower because parsing robocopy's per-file output live can throttle
    *  robocopy on trees full of small files. When false, robocopy runs
-   *  unmonitored and the bar/stats update per-folder instead — much faster. */
+   *  unmonitored and the bar/stats update per-folder instead, much faster. */
   showDetails: boolean;
   /** Master switch for the "it's been a while" backup nudge, set up in the
    *  Setup modal. */
   reminderEnabled: boolean;
+  /** Which schedule the reminder runs on. "interval" counts days since the
+   *  last completed backup; "monthly" fires on fixed days of the month.
+   *  Shared shape with Budget's reminder, see reminder-schedule.ts. */
+  reminderMode: "interval" | "monthly";
   /** How many days may pass after the last completed backup before the
-   *  reminder is due. Integer, 1–366. */
+   *  reminder is due, in interval mode. Integer, 1–366. */
   reminderDays: number;
+  /** Days of the month that trigger the reminder in monthly mode. Integers
+   *  1–31, sorted and de-duplicated; a day past the end of a short month folds
+   *  to that month's last day. */
+  reminderMonthDays: number[];
   /** true = Aggressive (a modal on next launch), false = Gentle (a toast). */
   reminderAggressive: boolean;
   /** ISO timestamp of the last backup run that completed (success === true,
-   *  regardless of skipped files) — null if none has ever completed. Reset
+   *  regardless of skipped files), null if none has ever completed. Reset
    *  by every completed run, whichever sources/destinations/preset it used;
    *  there's no per-schedule tracking yet, so this is a single shared clock. */
   lastBackupCompletedAt: string | null;
@@ -79,7 +93,7 @@ interface BackupFolderDoneEvent {
   dirs_copied: number;
   bytes_copied: number;
   elapsed_secs: number;
-  /** Which destination (by index) this folder pair belongs to — destinations
+  /** Which destination (by index) this folder pair belongs to, destinations
    *  now mirror concurrently, so folder-done events interleave across them. */
   dest_index: number;
   folders_done: number;
@@ -87,7 +101,7 @@ interface BackupFolderDoneEvent {
 }
 
 /** One file that couldn't be copied (locked/access error, not a "no
- *  difference" skip — see run_destination's doc comment in Rust for why
+ *  difference" skip, see run_destination's doc comment in Rust for why
  *  those two can't be confused here). */
 interface SkippedFileEntry {
   source: string;
@@ -104,7 +118,7 @@ interface BackupCompleteEvent {
   total_extras: number;
   total_secs: number;
   aborted_file: string | null;
-  /** Capped by the backend's retention limit — use skipped_total for the
+  /** Capped by the backend's retention limit, use skipped_total for the
    *  real count and the log files for the complete record. */
   skipped_files: SkippedFileEntry[];
   /** Exact number of skipped files, even when skipped_files was truncated. */
@@ -114,7 +128,7 @@ interface BackupCompleteEvent {
 
 interface BackupFileProgressEvent {
   /** Bytes of COMPLETED files (excludes the file currently copying). RUN-WIDE
-   *  — sums every destination's progress, since destinations now mirror
+   *:  sums every destination's progress, since destinations now mirror
    *  concurrently rather than one after another. */
   bytes_done: number;
   files_done: number;
@@ -126,7 +140,7 @@ interface BackupFileProgressEvent {
   /** Which destination (by index) this file belongs to. */
   dest_index: number;
   /** This destination's OWN completed-bytes total (excludes the in-flight
-   *  file) — the numerator for that destination's own progress bar. */
+   *  file). The numerator for that destination's own progress bar. */
   dest_bytes_done: number;
 }
 
@@ -147,7 +161,7 @@ interface BackupPlanDoneEvent {
   bytes_to_copy: number;
   files_to_copy: number;
   extras_to_delete: number;
-  /** Per-pair breakdown in run order — feeds the work-weighted bar. */
+  /** Per-pair breakdown in run order, feeds the work-weighted bar. */
   per_pair: PlanPair[];
 }
 
@@ -197,7 +211,9 @@ let config: BackupConfig = {
   skipDisclaimer: false,
   showDetails: true, // on by default; users opt into fast mode
   reminderEnabled: false,
+  reminderMode: "interval",
   reminderDays: 7,
+  reminderMonthDays: [1],
   reminderAggressive: false, // Gentle by default
   lastBackupCompletedAt: null,
 };
@@ -218,7 +234,7 @@ let runTotalDirs = 0;
 let runTotalBytes = 0;
 let hasRunOnce = false; // tracks whether a backup has run this session
 
-/** Files the last run couldn't copy (locked/access error) — populated by
+/** Files the last run couldn't copy (locked/access error), populated by
  *  backup-complete, read by the "View Skipped Files" modal. */
 let lastSkippedFiles: SkippedFileEntry[] = [];
 /** Exact skip count for the last run. Can exceed lastSkippedFiles.length: the
@@ -231,7 +247,7 @@ let lastSkippedTotal = 0;
    The bar is driven by a requestAnimationFrame loop, not directly by events.
    Events update a TARGET; the loop eases the DISPLAYED value toward it every
    frame and interpolates through the in-flight file at the measured copy
-   speed — that combination is what makes the bar glide instead of chunking,
+   speed. That combination is what makes the bar glide instead of chunking,
    even though robocopy's piped output arrives in buffered bursts. */
 /** Exact bytes this run will copy, from the preflight pass (the denominator). */
 let planBytes = 0;
@@ -272,8 +288,8 @@ let scanRateLearned = false;
 let barRaf: number | null = null;
 let barLastTick = 0;
 let displayedPct = 0;
-let barFinished = false; // completion event arrived — sprint to 100 and stop
-/** Sum of authoritative per-folder byte totals (from folder-done events) —
+let barFinished = false; // completion event arrived, sprint to 100 and stop
+/** Sum of authoritative per-folder byte totals (from folder-done events),
  *  reconciles the last in-flight file of each folder, whose bytes complete
  *  after that folder's final progress emit. */
 let folderBytesAccum = 0;
@@ -281,7 +297,7 @@ let folderBytesAccum = 0;
 /* ── Live backup estimate (Summary panel's "Next Backup" stats) ───────────
    Whenever the source/destination sets change, a debounced robocopy /L scan
    (the same preflight the real run uses) computes the EXACT workload a
-   backup would perform right now — files to copy, bytes to copy, stale items
+   backup would perform right now, files to copy, bytes to copy, stale items
    to delete. A fingerprint of the path sets makes repeat triggers free, and
    a sequence counter discards stale responses from superseded scans. */
 let estimate: BackupEstimate | null = null;
@@ -291,7 +307,7 @@ let _estimateTimer: number | null = null;
 let _estimateSeq = 0;
 let _lastEstimateFp = "";
 let _estimateForce = false;
-/** True when the current estimate was started by the Run Estimate button —
+/** True when the current estimate was started by the Run Estimate button,
  *  errors then flash a toast; automatic (config-change / post-backup)
  *  estimates surface errors only via the ⚠ cells to avoid toast spam. */
 let _estimateManual = false;
@@ -367,6 +383,10 @@ let setupReminderToggle: HTMLInputElement;
 let setupReminderLabel: HTMLElement;
 let setupReminderSubsettings: HTMLElement;
 let setupReminderDaysInput: HTMLInputElement;
+let setupReminderScheduleSelect: HTMLSelectElement;
+let setupReminderDaysRow: HTMLElement;
+let setupReminderMonthDaysRow: HTMLElement;
+let setupReminderMonthDaysInput: HTMLInputElement;
 let setupReminderModeToggle: HTMLInputElement;
 let setupReminderModeLabel: HTMLElement;
 
@@ -374,7 +394,7 @@ let setupReminderModeLabel: HTMLElement;
 let faceDisclaimer: HTMLElement;
 let faceTool: HTMLElement;
 let disclaimerSkipCheck: HTMLInputElement;
-/** Presets/Setup nav — hidden while the warning face is showing, since
+/** Presets/Setup nav, hidden while the warning face is showing, since
  *  neither is meaningful until the user has actually entered the tool. */
 let headerNav: HTMLElement;
 
@@ -393,7 +413,7 @@ let skippedFilesListEl: HTMLElement;
 
 /** Set once initAutoBackup completes. Entry-hook calls that arrive before
  *  then (the startup-restore path navigates before tools initialise) are
- *  deferred — init applies the disclaimer state itself when it finishes. */
+ *  deferred, init applies the disclaimer state itself when it finishes. */
 let _abInitialized = false;
 
 /* =============================================================================
@@ -438,7 +458,7 @@ async function loadConfig(): Promise<void> {
     config.destinations   = destinations;
     config.copySpeed      = copySpeed;
     config.skipDisclaimer = parsed?.skipDisclaimer === true;
-    // Default ON when the key is missing (older configs) or malformed — only
+    // Default ON when the key is missing (older configs) or malformed, only
     // an explicit stored `false` turns details off.
     config.showDetails    = parsed?.showDetails !== false;
 
@@ -449,6 +469,14 @@ async function loadConfig(): Promise<void> {
       parsed.reminderDays >= 1 && parsed.reminderDays <= 366
         ? parsed.reminderDays
         : 7;
+    config.reminderMode =
+      parsed?.reminderMode === "monthly" ? "monthly" : "interval";
+    config.reminderMonthDays = Array.isArray(parsed?.reminderMonthDays)
+      ? normalizeMonthDays(parsed.reminderMonthDays)
+      : [1];
+    // An empty list would be a monthly schedule that can never fire, a state
+    // the UI has no way to produce, so treat it as unset.
+    if (config.reminderMonthDays.length === 0) config.reminderMonthDays = [1];
     config.reminderAggressive = parsed?.reminderAggressive === true;
     config.lastBackupCompletedAt =
       typeof parsed?.lastBackupCompletedAt === "string"
@@ -462,7 +490,7 @@ async function loadConfig(): Promise<void> {
 const PRESETS_LS_KEY = "ab-presets-fallback";
 
 async function savePresets(): Promise<void> {
-  // Write to localStorage first — zero-latency, zero-failure insurance so
+  // Write to localStorage first, zero-latency, zero-failure insurance so
   // presets survive reloads even in the unlikely event the Rust write fails.
   try {
     localStorage.setItem(PRESETS_LS_KEY, JSON.stringify(presets));
@@ -507,7 +535,7 @@ async function loadPresets(): Promise<void> {
       return;
     }
   } catch {
-    // Rust read failed — fall through to localStorage.
+    // Rust read failed, fall through to localStorage.
   }
   // Fall back to localStorage (e.g. first run before any Rust write has occurred).
   try {
@@ -622,7 +650,7 @@ function refreshSummary(): void {
     totalFilesEl.textContent = files.toLocaleString();
     totalDirsEl.textContent  = dirs.toLocaleString();
   }
-  // The "Next Backup" cells are owned by the estimate engine — one renderer,
+  // The "Next Backup" cells are owned by the estimate engine. One renderer,
   // one source of truth, regardless of which code path repainted the summary.
   renderEstimateCells();
 }
@@ -641,10 +669,10 @@ function setMultilineContent(el: HTMLElement, lines: string[]): void {
 }
 
 /* =============================================================================
-   LIVE BACKUP ESTIMATE  ("Next Backup — If Run Now")
+   LIVE BACKUP ESTIMATE  ("Next Backup. If Run Now")
 ============================================================================= */
 
-/** Identity of the path sets — if this hasn't changed, neither has the scan's
+/** Identity of the path sets, if this hasn't changed, neither has the scan's
  *  input, so a re-trigger (e.g. a copy-speed save) costs nothing. */
 function estimateFingerprint(): string {
   return JSON.stringify([config.sources, config.destinations]);
@@ -652,7 +680,7 @@ function estimateFingerprint(): string {
 
 /**
  * Schedules a (debounced) estimate rescan. `force` bypasses the fingerprint
- * check — used after a backup completes, when the paths are unchanged but
+ * check, used after a backup completes, when the paths are unchanged but
  * the DISK state isn't.
  */
 function queueEstimateRefresh(force = false): void {
@@ -706,7 +734,7 @@ async function runEstimate(): Promise<void> {
   syncEstimateButton();
   renderEstimateCells();
 
-  // Re-check free space too — a drive that was "unavailable" (not plugged in
+  // Re-check free space too, a drive that was "unavailable" (not plugged in
   // when the app opened) may be connected now. Fire-and-forget: this just
   // refreshes a display value and shouldn't hold up the estimate itself.
   void refreshFreeSpace();
@@ -724,13 +752,13 @@ async function runEstimate(): Promise<void> {
     if (seq !== _estimateSeq) return;
     if (String(e).includes("__ESTIMATE_SUPERSEDED__")) {
       // The backend killed this scan because a newer one (or a config
-      // change, or a backup launch) replaced it. Routine, not an error —
+      // change, or a backup launch) replaced it. Routine, not an error,
       // stay silent and leave the scanning state for the successor, whose
       // own run is already queued.
       superseded = true;
       return;
     }
-    // Includes unsafe-path validation errors — surfacing them here means a
+    // Includes unsafe-path validation errors, surfacing them here means a
     // bad configuration is visible in the Summary the moment the scan runs,
     // not first discovered on Run.
     estimate = null;
@@ -786,16 +814,16 @@ function renderEstimateCells(): void {
   }
 
   // From here on estimate is non-null (a stale one may show briefly while a
-  // rescan runs — the "scanning…" chip signals that).
+  // rescan runs. The "scanning…" chip signals that).
   const est = estimate!;
   estFilesEl.textContent = est.files_to_copy.toLocaleString();
   estDeletesEl.textContent = est.extras_to_delete.toLocaleString();
 
   // Dirs to Copy can legitimately exceed Total Source Dirs: robocopy also
-  // creates each source folder's ROOT at <destination>\<name> — one extra
-  // dir per source×destination pair — and Total Source Dirs (correctly)
+  // creates each source folder's ROOT at <destination>\<name> (one extra
+  // dir per source×destination pair) and Total Source Dirs (correctly)
   // describes only what's INSIDE the sources. When that happens, reveal the
-  // ℹ button beside the value (it opens an explanatory modal — same pattern
+  // ℹ button beside the value (it opens an explanatory modal. Same pattern
   // as Copy Speed's), rather than inflating the source stats to hide it.
   estDirsEl.textContent = est.dirs_to_copy.toLocaleString();
   dirsInfoBtn.style.display = est.dirs_to_copy > totalSourceDirs ? "" : "none";
@@ -822,7 +850,7 @@ function renderEstimateCells(): void {
     : "—";
 }
 
-/** Back-compat shims — many call sites refresh these cells individually; both
+/** Back-compat shims, many call sites refresh these cells individually; both
  *  now render from the single estimate state. */
 function refreshEstTime(): void {
   renderEstimateCells();
@@ -832,10 +860,10 @@ function refreshEstSize(): void {
   renderEstimateCells();
 }
 
-/** Per-drive-letter free space in bytes, from the last successful check —
+/** Per-drive-letter free space in bytes, from the last successful check,
  *  read by the confirmation modal to warn about destinations that don't have
  *  room for what's about to be copied. A letter with no entry here means the
- *  last check failed (unplugged drive, etc.) — treated as "unknown", not
+ *  last check failed (unplugged drive, etc.), treated as "unknown", not
  *  "definitely enough room", so no warning fires for it either way. */
 const freeSpaceByLetter = new Map<string, number>();
 
@@ -926,7 +954,7 @@ function renderSourceList(): void {
       const picked = await pickFolder();
       if (!picked) return;
       if (config.sources.some((p, j) => j !== i && p === picked)) {
-        flash("Source folder already in list.", "error");
+        flash("Source folder already in list", "error");
         return;
       }
       const old = config.sources[i];
@@ -935,7 +963,7 @@ function renderSourceList(): void {
       renderSourceList();
       saveConfig();
       fetchAndCacheSize(picked);
-      flash("Source folder updated.", "success");
+      flash("Source folder updated", "success");
     });
     row.appendChild(browseBtn);
 
@@ -952,7 +980,7 @@ function renderSourceList(): void {
       refreshSummary();
       refreshEstTime();
       saveConfig();
-      flash("Source folder removed.", "success");
+      flash("Source folder removed", "success");
     });
     row.appendChild(removeBtn);
 
@@ -992,7 +1020,7 @@ function renderDestList(): void {
       const picked = await pickFolder();
       if (!picked) return;
       if (config.destinations.some((p, j) => j !== i && p === picked)) {
-        flash("Destination already in list.", "error");
+        flash("Destination already in list", "error");
         return;
       }
       config.destinations[i] = picked;
@@ -1001,7 +1029,7 @@ function renderDestList(): void {
       refreshEstSize();
       refreshFreeSpace();
       saveConfig();
-      flash("Destination updated.", "success");
+      flash("Destination updated", "success");
     });
     row.appendChild(browseBtn);
 
@@ -1018,7 +1046,7 @@ function renderDestList(): void {
       refreshEstSize();
       refreshFreeSpace();
       saveConfig();
-      flash("Destination removed.", "success");
+      flash("Destination removed", "success");
     });
     row.appendChild(removeBtn);
 
@@ -1054,7 +1082,7 @@ function makePathEditable(
 
     const isDupe = config[listKey].some((p, i) => i !== index && p.toLowerCase() === raw.toLowerCase());
     if (isDupe) {
-      flash("That path is already in the list.", "error");
+      flash("That path is already in the list", "error");
       cancel();
       return;
     }
@@ -1065,7 +1093,7 @@ function makePathEditable(
       renderSourceList();
       saveConfig();
       fetchAndCacheSize(raw);
-      flash("Source folder updated.", "success");
+      flash("Source folder updated", "success");
     } else {
       config.destinations[index] = raw;
       renderDestList();
@@ -1073,7 +1101,7 @@ function makePathEditable(
       refreshEstSize();
       refreshFreeSpace();
       saveConfig();
-      flash("Destination updated.", "success");
+      flash("Destination updated", "success");
     }
   }
 
@@ -1105,9 +1133,9 @@ function makePathEditable(
 
 function addSource(raw: string): void {
   const path = raw.trim();
-  if (!path) { flash("Enter a folder path first.", "error"); return; }
+  if (!path) { flash("Enter a folder path first", "error"); return; }
   if (config.sources.includes(path)) {
-    flash("Source folder already in list.", "error");
+    flash("Source folder already in list", "error");
     return;
   }
   config.sources.push(path);
@@ -1115,14 +1143,14 @@ function addSource(raw: string): void {
   renderSourceList();
   saveConfig();
   fetchAndCacheSize(path);
-  flash("Source folder added.", "success");
+  flash("Source folder added", "success");
 }
 
 function addDest(raw: string): void {
   const path = raw.trim();
-  if (!path) { flash("Enter a folder path first.", "error"); return; }
+  if (!path) { flash("Enter a folder path first", "error"); return; }
   if (config.destinations.includes(path)) {
-    flash("Destination already in list.", "error");
+    flash("Destination already in list", "error");
     return;
   }
   config.destinations.push(path);
@@ -1132,7 +1160,7 @@ function addDest(raw: string): void {
   refreshEstSize();
   refreshFreeSpace();
   saveConfig();
-  flash("Destination added.", "success");
+  flash("Destination added", "success");
 }
 
 /* =============================================================================
@@ -1175,7 +1203,7 @@ function startElapsedTimer(): void {
     progressElapsedEl.textContent = formatSeconds(elapsed);
 
     // ETA. With a preflight plan the remaining work is EXACT (plan minus
-    // completed bytes) and the rate is the measured throughput — far better
+    // completed bytes) and the rate is the measured throughput, far better
     // than the old source-size guess, which overestimated incremental runs
     // by however much hadn't changed. Pre-plan (or zero-copy runs): "…".
     const workRemaining = workRemainingSeconds(performance.now());
@@ -1192,8 +1220,8 @@ function startElapsedTimer(): void {
       progressEtaEl.textContent = "…";
     }
 
-    // Live measured copy speed (EMA over actual file completions — pure copy
-    // throughput, uncontaminated by preflight/scan time). "—" until the first
+    // Live measured copy speed (EMA over actual file completions, pure copy
+    // throughput, uncontaminated by preflight/scan time). ", " until the first
     // real bytes land.
     progressSpeedEl.textContent = measuredBps > 0
       ? `${formatBytes(measuredBps)}/s`
@@ -1224,7 +1252,7 @@ function setBackupRunning(running: boolean): void {
   runSpinner.style.display = running ? "" : "none";
   runBtnLabel.textContent  = running ? "Backing up…" : "Run Backup";
   // Estimates can't run during a backup (the backend refuses; the disk is
-  // busy) — reflect that on the button rather than letting clicks no-op.
+  // busy), reflect that on the button rather than letting clicks no-op.
   estimateBtn.disabled     = running;
   // Lock all interactive source/dest controls
   addSourceBtn.disabled    = running;
@@ -1263,7 +1291,7 @@ function setBackupRunning(running: boolean): void {
 
   // Suppress / restore tooltip and dblclick hint text on all path-label spans
   // and browse/remove buttons inside the locked lists. Also clear the title on
-  // the row itself — otherwise it bleeds through when hovering child buttons
+  // the row itself, otherwise it bleeds through when hovering child buttons
   // (since the row's title is inherited by pointer events on children).
   const suppressInList = (list: HTMLElement) => {
     list.querySelectorAll<HTMLElement>(".ab-list-row").forEach(el => {
@@ -1298,7 +1326,7 @@ function effectiveBps(): number {
 }
 
 /** Source file count for a pair's scan weight. Prefers the folder-stats
- *  cache; falls back to the pair's plan files (a hard floor — you can't copy
+ *  cache; falls back to the pair's plan files (a hard floor. You can't copy
  *  more files than you compare). */
 function pairSourceFiles(pair: PlanPair): number {
   const stats = statsCache.get(pair.source);
@@ -1358,7 +1386,7 @@ function barTarget(now: number): number {
     pct = foldersTotalN > 0 ? (foldersDoneN / foldersTotalN) * 100 : 0;
   }
 
-  // Never let estimation complete the bar — 100% is reserved for the
+  // Never let estimation complete the bar, 100% is reserved for the
   // completion event. (Windows holds just short of full for the same reason.)
   return Math.min(pct, 99);
 }
@@ -1380,13 +1408,13 @@ function barTick(now: number): void {
 
   const target = barTarget(now);
 
-  // Exponential approach with a per-16.7ms base rate — the same easing at any
+  // Exponential approach with a per-16.7ms base rate. The same easing at any
   // refresh rate. Finishing sprints harder so 100% lands promptly.
   const base = barFinished ? 0.28 : 0.10;
   const k = 1 - Math.pow(1 - base, dt / 16.7);
   // Monotonic: if the target momentarily dips below the displayed value
   // (e.g. the in-flight interpolation ran slightly ahead of a folder
-  // boundary reconciliation), the bar HOLDS rather than retreating —
+  // boundary reconciliation), the bar HOLDS rather than retreating,
   // progress bars that move backward read as broken.
   if (target > displayedPct) {
     displayedPct += (target - displayedPct) * k;
@@ -1425,7 +1453,7 @@ function startBarEngine(): void {
   activePairIdx = -1;
   pairStartedAt = 0;
   pairStartBytes = 0;
-  // scanFilesPerSec deliberately NOT reset — it's learned knowledge about
+  // scanFilesPerSec deliberately NOT reset, it's learned knowledge about
   // this machine, and it carries usefully from run to run within a session.
   progressBarFill.style.width = "0%";
   barRaf = requestAnimationFrame(barTick);
@@ -1440,7 +1468,7 @@ function stopBarEngine(): void {
 }
 
 /** Feeds a progress event into the throughput EMA. Bursty piped output makes
- *  instantaneous rates noisy — the EMA (and a minimum sample window) keeps the
+ *  instantaneous rates noisy. The EMA (and a minimum sample window) keeps the
  *  in-flight interpolation from twitching. */
 function updateThroughput(bytesDoneNow: number): void {
   const now = performance.now();
@@ -1460,7 +1488,7 @@ function updateThroughput(bytesDoneNow: number): void {
 
 async function attachBackupListeners(): Promise<void> {
   // Idempotent: drop any previously-attached set first. initAutoBackup() is
-  // the only caller today and runs once, so this is normally a no-op — but a
+  // the only caller today and runs once, so this is normally a no-op, but a
   // second call must not leave two of every handler live, each reacting to
   // the same event and double-counting progress.
   for (const off of unlisteners) off();
@@ -1469,7 +1497,7 @@ async function attachBackupListeners(): Promise<void> {
   const unlistenPlanProgress = await listen<BackupPlanProgressEvent>(
     "backup-plan-progress",
     ({ payload }) => {
-      // Preflight phase — mirror Windows' "Calculating…" stage.
+      // Preflight phase, mirror Windows' "Calculating…" stage.
       progressBarFill.classList.add("ab-bar-indeterminate");
       progressCurrentLabel.textContent =
         `Calculating backup size… (${payload.pair_index + 1}/${payload.pairs_total})`;
@@ -1489,7 +1517,7 @@ async function attachBackupListeners(): Promise<void> {
         : "";
       progressCurrentFileEl.textContent = payload.files_to_copy > 0
         ? `${payload.files_to_copy.toLocaleString()} file${payload.files_to_copy === 1 ? "" : "s"} to copy (${formatBytes(payload.bytes_to_copy)})${deletions}`
-        : `Everything up to date${deletions} — verifying…`;
+        : `Everything up to date${deletions}, verifying…`;
     }
   );
 
@@ -1498,7 +1526,7 @@ async function attachBackupListeners(): Promise<void> {
     ({ payload }) => {
       const { source, destination, source_index, source_total, dest_index, dest_total } = payload;
       // Destinations run one at a time, so a single label describing the
-      // current folder is accurate — nothing else is copying to fight over it.
+      // current folder is accurate. Nothing else is copying to fight over it.
       progressCurrentLabel.textContent =
         `[Dest ${dest_index + 1}/${dest_total}] ` +
         `[Folder ${source_index + 1}/${source_total}] ` +
@@ -1546,11 +1574,11 @@ async function attachBackupListeners(): Promise<void> {
     ({ payload }) => {
       // The bar itself is byte-driven via the animation engine; folder
       // completion only feeds the fallback fraction (used when the plan is
-      // zero — i.e. a fully up-to-date run that's just scanning).
+      // zero, i.e. a fully up-to-date run that's just scanning).
       foldersDoneN  = payload.folders_done;
       foldersTotalN = payload.folders_total;
       // The folder's last in-flight file is definitionally finished, and the
-      // folder's summary bytes are authoritative — including that last file,
+      // folder's summary bytes are authoritative, including that last file,
       // which completed after the folder's final progress emit.
       inFlightBytes = 0;
       folderBytesAccum += payload.bytes_copied;
@@ -1567,7 +1595,7 @@ async function attachBackupListeners(): Promise<void> {
         const scanSecs = payload.elapsed_secs - copySecs;
         if (scanSecs > 0.25) {
           const rate = srcFiles / scanSecs;
-          // First real measurement replaces the seed outright — a guess
+          // First real measurement replaces the seed outright, a guess
           // deserves no vote against data. After that, EMA.
           scanFilesPerSec = scanRateLearned
             ? scanFilesPerSec * 0.7 + rate * 0.3
@@ -1623,27 +1651,30 @@ async function attachBackupListeners(): Promise<void> {
       syncSkippedFilesButton();
 
       if (payload.success) {
-        // Any completed run — regardless of which sources/destinations or
-        // preset it used — resets the "time since last backup" clock that
+        // Any completed run (regardless of which sources/destinations or
+        // preset it used) resets the "time since last backup" clock that
         // the reminder feature watches.
         config.lastBackupCompletedAt = new Date().toISOString();
         saveConfig();
+        // Clears the sidebar pulse + header notice the moment the backup they
+        // were nagging about lands.
+        refreshBackupDueUI();
 
         const skipCount = lastSkippedTotal;
         if (skipCount > 0) {
-          // Succeeded, but some files couldn't be copied — flag it with the
+          // Succeeded, but some files couldn't be copied, flag it with the
           // same ⚠ used in the Estimate Summary rather than a clean ✓.
           progressCurrentLabel.textContent =
-            `⚠ Complete — ${skipCount} file${skipCount === 1 ? "" : "s"} skipped`;
+            `⚠ Complete: ${skipCount} file${skipCount === 1 ? "" : "s"} skipped`;
           flash(
-            `Backup complete, but ${skipCount} file${skipCount === 1 ? "" : "s"} couldn't be copied — see Skipped Files.`,
+            `Backup complete, but ${skipCount} file${skipCount === 1 ? "" : "s"} couldn't be copied. See Skipped Files.`,
             "error",
             7000
           );
         } else {
           progressCurrentLabel.textContent = "Complete ✓";
           flash(
-            `Backup complete — ${payload.total_files.toLocaleString()} files, ${formatBytes(payload.total_bytes)}`,
+            `Backup complete: ${payload.total_files.toLocaleString()} files, ${formatBytes(payload.total_bytes)}`,
             "success",
             6000
           );
@@ -1686,7 +1717,7 @@ async function attachBackupListeners(): Promise<void> {
       }
 
       // The run changed the disk state (even a failed run may have got
-      // part-way), so the "Next Backup" numbers are stale — force a rescan.
+      // part-way), so the "Next Backup" numbers are stale, force a rescan.
       // After a successful run this snaps the panel to the satisfying
       // "0 files to copy" state.
       queueEstimateRefresh(true);
@@ -1704,18 +1735,18 @@ async function startBackup(): Promise<void> {
   if (backupRunning) return;
 
   if (config.sources.length === 0) {
-    flash("Add at least one source folder.", "error");
+    flash("Add at least one source folder", "error");
     return;
   }
   if (config.destinations.length === 0) {
-    flash("Add at least one destination folder.", "error");
+    flash("Add at least one destination folder", "error");
     return;
   }
 
   // Run the FULL path-safety validation (same checks the backend enforces:
   // same-path, nesting, duplicate leaf names) BEFORE showing the
   // confirmation modal. Confirming a backup that was always going to be
-  // refused is a broken promise — the error belongs on this click, not
+  // refused is a broken promise. The error belongs on this click, not
   // after "Proceed".
   try {
     await invoke("validate_backup_config", {
@@ -1727,7 +1758,7 @@ async function startBackup(): Promise<void> {
     return;
   }
 
-  // Everything below is gated behind an explicit confirmation — /MIR can
+  // Everything below is gated behind an explicit confirmation, /MIR can
   // delete files in the destinations, so a stray click on Run must never
   // start a backup by itself.
   await openRunConfirmModal();
@@ -1735,7 +1766,7 @@ async function startBackup(): Promise<void> {
 
 /** Fills the confirmation modal's dynamic text and opens it. */
 async function openRunConfirmModal(): Promise<void> {
-  // Prefer the live estimate — it's the EXACT workload of this run (the /L
+  // Prefer the live estimate, it's the EXACT workload of this run (the /L
   // delta), which is what the person is actually consenting to. "Fresh"
   // means: a scan has completed, none is in flight, and the path sets
   // haven't changed since it ran.
@@ -1750,7 +1781,7 @@ async function openRunConfirmModal(): Promise<void> {
     confirmSizeEl.textContent = formatBytes(estimate!.bytes_to_copy);
   } else {
     // No trustworthy estimate yet (still scanning, or config just changed):
-    // fall back to the source totals as an explicit UPPER BOUND — a mirror
+    // fall back to the source totals as an explicit UPPER BOUND, a mirror
     // run never copies more than the sources contain.
     const scanning = config.sources.some((s) => sizeCache.get(s) == null);
     const n = totalSourceFiles;
@@ -1764,7 +1795,7 @@ async function openRunConfirmModal(): Promise<void> {
   confirmDrivesEl.textContent = formatDriveList(config.destinations);
 
   // Open right away with whatever we've got, then refresh free space and
-  // fill in the warnings once that resolves — a drive plugged in seconds ago
+  // fill in the warnings once that resolves, a drive plugged in seconds ago
   // shouldn't still show as unavailable at exactly this moment. The modal
   // isn't gated behind this network round-trip; the warnings just appear a
   // beat after the rest of the text if the check takes a moment.
@@ -1781,7 +1812,7 @@ async function openRunConfirmModal(): Promise<void> {
  * is the full size of every changed file, not the actual new bytes an
  * overwrite adds (robocopy replaces a changed file wholesale rather than
  * patching it, so the real new disk usage for a changed file is only the
- * size difference — usually smaller, sometimes nothing). Only shown when a
+ * size difference, usually smaller, sometimes nothing). Only shown when a
  * fresh estimate gives real per-destination numbers to compare against.
  */
 function renderSpaceWarnings(estFresh: boolean): void {
@@ -1802,7 +1833,7 @@ function renderSpaceWarnings(estFresh: boolean): void {
     const letter = isDriveLetter ? first.toUpperCase() : null;
     const freeBytes = letter ? freeSpaceByLetter.get(letter) : undefined;
     // No reading for this drive (unplugged, or a UNC path free-space can't
-    // check) means "unknown", not "definitely fine" — stay silent rather
+    // check) means "unknown", not "definitely fine", stay silent rather
     // than guess either way.
     if (freeBytes === undefined || freeBytes >= plannedBytes) continue;
 
@@ -1812,7 +1843,7 @@ function renderSpaceWarnings(estFresh: boolean): void {
       `⚠ ${destination} has ${formatBytes(freeBytes)} free, but this run plans to copy ` +
       `${formatBytes(plannedBytes)} to it. That number counts the full size of every ` +
       `changed file, not just the new bytes an overwrite actually adds, so this may still ` +
-      `fit — but it's close enough to be worth checking first.`;
+      `fit, but it's close enough to be worth checking first.`;
     confirmSpaceWarningsEl.appendChild(p);
   }
 }
@@ -1839,12 +1870,12 @@ function formatDriveList(destinations: string[]): string {
   return `${word} ${joined}`;
 }
 
-/** Actually starts the backup — only ever reached via the confirmation
+/** Actually starts the backup, only ever reached via the confirmation
  *  modal's "Proceed with Backup" button. */
 async function launchBackup(): Promise<void> {
   if (backupRunning) return;
 
-  // A live estimate is now pointless — the run's own preflight measures the
+  // A live estimate is now pointless. The run's own preflight measures the
   // same thing, and the post-run refresh re-estimates anyway. Kill it at the
   // backend and orphan its promise (the seq bump makes every branch of the
   // in-flight call early-return), then reset the button/cells it owned.
@@ -1856,7 +1887,7 @@ async function launchBackup(): Promise<void> {
 
   resetProgress();
   showProgressContent(true);
-  // Fast mode has no live per-file text — hide that line for this run so it
+  // Fast mode has no live per-file text, hide that line for this run so it
   // doesn't sit frozen on a stale filename. Details mode shows it as usual.
   progressCurrentFileEl.style.display = config.showDetails ? "" : "none";
   hasRunOnce = true;
@@ -1865,7 +1896,7 @@ async function launchBackup(): Promise<void> {
   startBarEngine();
   startElapsedTimer();
   progressCurrentLabel.textContent = "Calculating backup size…";
-  flash("Backup started.", "success", 3000);
+  flash("Backup started", "success", 3000);
   // Same reasoning as runEstimate: a drive connected after the app opened
   // (or since the last check) should stop showing "unavailable".
   void refreshFreeSpace();
@@ -1886,7 +1917,7 @@ async function launchBackup(): Promise<void> {
 }
 
 /* =============================================================================
-   ENTRY DISCLAIMER  — first-thing warning face
+   ENTRY DISCLAIMER: first-thing warning face
    -----------------------------------------------------------------------------
    Shown on every entry to the tool (via onAutoBackupToolEntry, called from
    shell.ts) until the user checks "Never show this warning again", which is
@@ -1923,7 +1954,7 @@ function applyDisclaimerEntryState(): void {
 /**
  * Called by shell.ts every time the user navigates to the Auto-Backup tool.
  * Calls that arrive before init completes (the startup-restore path) are
- * ignored — initAutoBackup applies the entry state itself once ready.
+ * ignored, initAutoBackup applies the entry state itself once ready.
  */
 export function onAutoBackupToolEntry(): void {
   if (!_abInitialized) return;
@@ -1932,7 +1963,7 @@ export function onAutoBackupToolEntry(): void {
 
 /** Cross-fades disclaimer → tool (mirrors Budget's toggleAnnualStats). */
 function fadeToToolFace(): void {
-  const HALF = 400; // ms — matches the CSS animation duration
+  const HALF = 400; // ms, matches the CSS animation duration
 
   if (_faceSwitching) return;
   _faceSwitching = true;
@@ -1952,7 +1983,7 @@ function fadeToToolFace(): void {
 
     faceTool.addEventListener("animationend", function done(e: AnimationEvent) {
       // Children animate too as they enter the DOM flow (e.g. the list rows'
-      // abRowIn) and those animationend events BUBBLE up to the face —
+      // abRowIn) and those animationend events BUBBLE up to the face,
       // filter to our own fade so a 0.15s row animation can't cut the 0.4s
       // face fade short.
       if (e.animationName !== "ab-face-in") return;
@@ -1996,7 +2027,7 @@ function initDisclaimer(): void {
    showing on tool entry.
 
    "Enable Backup Reminders" nudges the user on app startup if it's been a
-   while since the last completed backup — see getDueBackupReminder(), called
+   while since the last completed backup, see getDueBackupReminder(), called
    from shell.ts's startup sequence.
 ============================================================================= */
 
@@ -2012,7 +2043,21 @@ function renderSetupWarningToggle(): void {
 function renderSetupReminderToggle(): void {
   setupReminderToggle.checked = config.reminderEnabled;
   setupReminderLabel.textContent = config.reminderEnabled ? "On" : "Off";
-  setupReminderSubsettings.style.maxHeight = config.reminderEnabled ? "160px" : "0";
+  // Room for the schedule select, whichever schedule row is showing, and the
+  // Gentle/Aggressive row.
+  setupReminderSubsettings.style.maxHeight = config.reminderEnabled ? "240px" : "0";
+}
+
+/** Syncs the schedule select and swaps which schedule row is visible, then
+ *  rewrites both fields from config, which is also how a clamped or cleaned
+ *  value gets reflected back into the input the user just typed in. */
+function renderSetupReminderSchedule(): void {
+  const monthly = config.reminderMode === "monthly";
+  setupReminderScheduleSelect.value = config.reminderMode;
+  setupReminderDaysRow.style.display = monthly ? "none" : "";
+  setupReminderMonthDaysRow.style.display = monthly ? "" : "none";
+  setupReminderDaysInput.value = String(config.reminderDays);
+  setupReminderMonthDaysInput.value = config.reminderMonthDays.join(", ");
 }
 
 /** Syncs the Aggressive/Gentle mode toggle + label to config.reminderAggressive. */
@@ -2022,7 +2067,7 @@ function renderSetupReminderMode(): void {
 }
 
 /* ── Info tooltips ─────────────────────────────────────────────────────────
-   Small click-to-toggle popovers for the (i) buttons in this modal — not
+   Small click-to-toggle popovers for the (i) buttons in this modal, not
    full modals, just a floating explanation anchored under whichever icon
    was clicked. Single shared bubble element, repositioned per click. */
 let infoTooltipEl: HTMLDivElement | null = null;
@@ -2046,7 +2091,7 @@ function toggleInfoTooltip(btn: HTMLButtonElement, text: string): void {
   infoTooltipEl.textContent = text;
   infoTooltipEl.classList.add("visible");
   // Position after adding to the DOM (and after the text is set) so its
-  // rendered width is known — anchored just below the icon, clamped so it
+  // rendered width is known, anchored just below the icon, clamped so it
   // can't run off the right edge of the window.
   const rect = btn.getBoundingClientRect();
   const bubbleWidth = infoTooltipEl.offsetWidth;
@@ -2081,6 +2126,10 @@ function initSetupModal(): void {
   setupReminderLabel       = document.getElementById("ab-setup-reminder-label")!;
   setupReminderSubsettings = document.getElementById("ab-setup-reminder-subsettings")!;
   setupReminderDaysInput   = document.getElementById("ab-setup-reminder-days") as HTMLInputElement;
+  setupReminderScheduleSelect  = document.getElementById("ab-setup-reminder-schedule") as HTMLSelectElement;
+  setupReminderDaysRow         = document.getElementById("ab-setup-reminder-days-row")!;
+  setupReminderMonthDaysRow    = document.getElementById("ab-setup-reminder-monthdays-row")!;
+  setupReminderMonthDaysInput  = document.getElementById("ab-setup-reminder-monthdays") as HTMLInputElement;
   setupReminderModeToggle  = document.getElementById("ab-setup-reminder-mode-toggle") as HTMLInputElement;
   setupReminderModeLabel   = document.getElementById("ab-setup-reminder-mode-label")!;
 
@@ -2091,7 +2140,7 @@ function initSetupModal(): void {
       renderSetupWarningToggle();
       renderSetupReminderToggle();
       renderSetupReminderMode();
-      setupReminderDaysInput.value = String(config.reminderDays);
+      renderSetupReminderSchedule();
     },
     onClosed: () => closeInfoTooltip(),
   });
@@ -2109,14 +2158,35 @@ function initSetupModal(): void {
     config.reminderEnabled = setupReminderToggle.checked;
     saveConfig();
     renderSetupReminderToggle();
+    // Turning reminders off has to drop the pulse/notice with them, and turning
+    // them on when a backup is already overdue should light them immediately.
+    refreshBackupDueUI();
+  });
+
+  setupReminderScheduleSelect.addEventListener("change", () => {
+    config.reminderMode =
+      setupReminderScheduleSelect.value === "monthly" ? "monthly" : "interval";
+    saveConfig();
+    renderSetupReminderSchedule();
+    refreshBackupDueUI();
   });
 
   setupReminderDaysInput.addEventListener("change", () => {
     const n = Math.round(parseFloat(setupReminderDaysInput.value));
-    const clamped = Number.isFinite(n) ? Math.min(366, Math.max(1, n)) : 7;
-    config.reminderDays = clamped;
-    setupReminderDaysInput.value = String(clamped); // reflect any clamping back into the field
+    config.reminderDays = Number.isFinite(n) ? Math.min(366, Math.max(1, n)) : 7;
     saveConfig();
+    renderSetupReminderSchedule(); // reflects any clamping back into the field
+    refreshBackupDueUI();
+  });
+
+  setupReminderMonthDaysInput.addEventListener("change", () => {
+    // An entry that yields nothing usable falls back to the 1st rather than
+    // leaving a schedule that can't fire.
+    const parsed = parseMonthDaysInput(setupReminderMonthDaysInput.value);
+    config.reminderMonthDays = parsed.length > 0 ? parsed : [1];
+    saveConfig();
+    renderSetupReminderSchedule(); // rewrites the field in its cleaned form
+    refreshBackupDueUI();
   });
 
   setupReminderModeToggle.addEventListener("change", () => {
@@ -2128,7 +2198,7 @@ function initSetupModal(): void {
   initInfoTooltips(setupModalEl);
 }
 
-/** Reminder status returned when a nudge is due — null otherwise (reminders
+/** Reminder status returned when a nudge is due, null otherwise (reminders
  *  off, no backup has ever completed, or it's simply not time yet). Read by
  *  shell.ts's startup sequence, once, ~2s after the app is ready. */
 export interface BackupReminderStatus {
@@ -2141,9 +2211,48 @@ export function getDueBackupReminder(): BackupReminderStatus | null {
   if (!config.lastBackupCompletedAt) return null; // no baseline to measure from yet
   const lastMs = new Date(config.lastBackupCompletedAt).getTime();
   if (Number.isNaN(lastMs)) return null;
-  const elapsedDays = Math.floor((Date.now() - lastMs) / (24 * 60 * 60 * 1000));
-  if (elapsedDays < config.reminderDays) return null;
-  return { aggressive: config.reminderAggressive, elapsedDays };
+
+  const now = Date.now();
+  const due = isReminderDue(
+    lastMs,
+    config.reminderMode,
+    config.reminderDays,
+    config.reminderMonthDays,
+    now,
+  );
+  if (!due) return null;
+
+  return {
+    aggressive: config.reminderAggressive,
+    elapsedDays: Math.floor((now - lastMs) / DAY_MS),
+  };
+}
+
+/* -----------------------------------------------------------------------------
+   Persistent due signals, modelled on the new-version notifier, which pulses
+   the About row in the sidebar and writes a line into the Home header for as
+   long as the update exists. The startup reminder is a single moment that's
+   easy to click past; these stay up until a backup actually completes.
+
+   Both are driven from getDueBackupReminder(), so they respect the same
+   enable toggle and day threshold, and "not due" clears them.
+----------------------------------------------------------------------------- */
+
+function refreshBackupDueUI(): void {
+  const status = getDueBackupReminder();
+  const due = status !== null;
+
+  setToolAttention("files", "auto-backup", due);
+
+  // Queried per call rather than cached at init: this runs from the backup
+  // completion handler and from Setup changes, both of which can happen before
+  // any init that would have captured them.
+  const notice = document.getElementById("ab-due-notice");
+  const daysEl = document.getElementById("ab-due-days");
+  if (notice && daysEl) {
+    if (due) daysEl.textContent = String(status.elapsedDays);
+    notice.style.display = due ? "" : "none";
+  }
 }
 
 /* =============================================================================
@@ -2178,7 +2287,7 @@ function initRunConfirmModal(): void {
   confirmDrivesEl = document.getElementById("ab-confirm-drives")!;
   confirmSpaceWarningsEl = document.getElementById("ab-confirm-space-warnings")!;
 
-  // X and the abort button both simply close — closing IS the abort, since
+  // X and the abort button both simply close, closing IS the abort, since
   // nothing has been started yet. Escape and header-drag come free from the
   // Modal primitive.
   document.getElementById("abRunConfirmClose")!
@@ -2195,7 +2304,7 @@ function initRunConfirmModal(): void {
 /* =============================================================================
    SKIPPED FILES MODAL
    -----------------------------------------------------------------------------
-   Files robocopy attempted to copy but couldn't (locked/access error) — the
+   Files robocopy attempted to copy but couldn't (locked/access error). The
    destination still completed; these were skipped, not the reason for a
    failure. Populated once per run by the backup-complete handler.
 ============================================================================= */
@@ -2215,8 +2324,8 @@ function initSkippedFilesModal(): void {
 
   document.getElementById("ab-skipped-files-explorer-btn")!.addEventListener("click", async () => {
     if (lastSkippedFiles.length === 0) return;
-    // Open to the FIRST skipped file's SOURCE path, not its destination —
-    // the destination copy was never successfully written (that's the whole
+    // Open to the FIRST skipped file's SOURCE path, not its destination.
+    // The destination copy was never successfully written (that's the whole
     // reason it's in this list), so explorer would have nothing to select
     // there. The source file always exists; robocopy failed to read/write
     // it, but never touched the original.
@@ -2263,7 +2372,7 @@ function renderSkippedFilesList(): void {
 
   // The backend caps how many entries it ships so a catastrophic run can't
   // build a hundred thousand DOM rows. Say so explicitly rather than letting
-  // the list silently disagree with the count above it — the per-destination
+  // the list silently disagree with the count above it. The per-destination
   // SKIPPED_FILES log holds every one.
   const hidden = n - lastSkippedFiles.length;
   if (hidden > 0) {
@@ -2316,11 +2425,11 @@ function initPresetsModal(): void {
     }, 50);
   });
 
-  // From current — snapshots whatever Sources / Destinations are set in the
+  // From current, snapshots whatever Sources / Destinations are set in the
   // main tool right now into a new preset.
   document.getElementById("ab-preset-from-current-btn")!.addEventListener("click", () => {
     if (config.sources.length === 0 && config.destinations.length === 0) {
-      flash("Nothing set in Sources / Destinations to snapshot yet.", "error");
+      flash("Nothing set in Sources / Destinations to snapshot yet", "error");
       return;
     }
     const preset: BackupPreset = {
@@ -2341,7 +2450,7 @@ function initPresetsModal(): void {
     }, 50);
   });
 
-  // Name input auto-save — empty and duplicate names are rejected rather
+  // Name input auto-save, empty and duplicate names are rejected rather
   // than saved, since presets are told apart by name everywhere in the UI.
   const presetNameInput = document.getElementById("ab-preset-name-input") as HTMLInputElement;
   // Snapshot of the name when the field was focused, so blur can tell
@@ -2371,15 +2480,15 @@ function initPresetsModal(): void {
     if (!preset) return;
     const candidate = presetNameInput.value.trim();
     if (!candidate) {
-      flash("Preset name can't be empty — reverted to the previous name.", "error");
+      flash("Preset name can't be empty, so it was reverted to the previous name.", "error");
       presetNameInput.value = preset.name; // last saved, valid name
       presetNameInput.classList.remove("input-error");
     } else if (isPresetNameTaken(candidate, preset.id)) {
-      flash("A preset with that name already exists — choose a different name.", "error");
+      flash("A preset with that name already exists. Choose a different name.", "error");
       presetNameInput.value = preset.name; // revert to the last saved, unique name
       presetNameInput.classList.remove("input-error");
     } else if (presetNameAtFocus !== null && candidate !== presetNameAtFocus.trim()) {
-      // A genuine, valid rename went through — the "input" handler above
+      // A genuine, valid rename went through. The "input" handler above
       // already persisted it. Toast once, here, rather than per keystroke.
       flash(`Preset renamed to "${candidate}".`, "success");
     }
@@ -2418,7 +2527,7 @@ function initPresetsModal(): void {
   document.getElementById("ab-preset-load-btn")!.addEventListener("click", () => {
     const preset = presets.find(p => p.id === activePresetId);
     if (!preset) return;
-    if (backupRunning) { flash("Cannot load a preset while a backup is running.", "error"); return; }
+    if (backupRunning) { flash("Cannot load a preset while a backup is running", "error"); return; }
 
     // Clear size cache for old sources
     for (const src of config.sources) sizeCache.delete(src);
@@ -2449,7 +2558,7 @@ function initPresetsModal(): void {
     const name = presets[idx]!.name;
     presets.splice(idx, 1);
     // After removal, whatever now sits at `idx` is the preset that was
-    // directly below the one just deleted — select that. If the deleted
+    // directly below the one just deleted, select that. If the deleted
     // preset was last in the list, fall back to the new last preset.
     const next = presets[idx] ?? presets[presets.length - 1];
     activePresetId = next ? next.id : null;
@@ -2474,7 +2583,7 @@ function isPresetNameTaken(name: string, excludeId: string | null): boolean {
   );
 }
 
-/** Returns `base` if it's free, otherwise `base 2`, `base 3`, … — the first
+/** Returns `base` if it's free, otherwise `base 2`, `base 3`, …. The first
  *  unused suffix. Used to seed new presets with a unique starting name. */
 function generateUniquePresetName(base: string): string {
   if (!isPresetNameTaken(base, null)) return base;
@@ -2565,7 +2674,7 @@ function renderPresetPathList(which: "sources" | "destinations", preset: BackupP
       preset[which].splice(i, 1);
       savePresets();
       renderPresetPathList(which, preset);
-      flash("Path removed from preset.", "success");
+      flash("Path removed from preset", "success");
     });
     row.appendChild(removeBtn);
 
@@ -2577,17 +2686,17 @@ function addPathToPreset(which: "sources" | "destinations", raw: string): void {
   const preset = presets.find(p => p.id === activePresetId);
   if (!preset) return;
   const path = raw.trim();
-  if (!path) { flash("Enter a folder path first.", "error"); return; }
-  if (preset[which].includes(path)) { flash("That path is already in this preset.", "error"); return; }
+  if (!path) { flash("Enter a folder path first", "error"); return; }
+  if (preset[which].includes(path)) { flash("That path is already in this preset", "error"); return; }
   preset[which].push(path);
   savePresets();
   renderPresetPathList(which, preset);
-  flash("Path added to preset.", "success");
+  flash("Path added to preset", "success");
 }
 
 
 /* =============================================================================
-   EXPORT — INIT
+   EXPORT: INIT
 ============================================================================= */
 
 export async function initAutoBackup(): Promise<void> {
@@ -2662,7 +2771,7 @@ export async function initAutoBackup(): Promise<void> {
     if (!sizeCache.has(src)) fetchAndCacheSize(src);
   }
 
-  // Deliberately NO estimate on app load — opening the app shouldn't spin
+  // Deliberately NO estimate on app load, opening the app shouldn't spin
   // the disks through a full /L walk. The first estimate runs when the user
   // clicks Run Estimate, changes the configuration, or completes a backup.
 
@@ -2711,7 +2820,7 @@ export async function initAutoBackup(): Promise<void> {
   cancelBtn.addEventListener("click", async () => {
     try {
       await invoke("cancel_backup");
-      flash("Cancelling — stopping the current copy…", "error", 4000);
+      flash("Cancelling, stopping the current copy…", "error", 4000);
     } catch (e) {
       devError("Cancel failed:", e);
     }
@@ -2722,7 +2831,7 @@ export async function initAutoBackup(): Promise<void> {
     resetProgress();
     showProgressContent(false);
     clearBtn.disabled = true;
-    flash("Last run results cleared.", "success");
+    flash("Last run results cleared", "success");
   });
 
   clearSourceBtn.addEventListener("click", () => {
@@ -2734,7 +2843,7 @@ export async function initAutoBackup(): Promise<void> {
     refreshSummary();
     refreshEstTime();
     refreshEstSize();
-    flash("Source folders cleared.", "success");
+    flash("Source folders cleared", "success");
   });
 
   clearDestBtn.addEventListener("click", () => {
@@ -2745,7 +2854,7 @@ export async function initAutoBackup(): Promise<void> {
     refreshEstTime();
     refreshEstSize();
     refreshFreeSpace();
-    flash("Destination folders cleared.", "success");
+    flash("Destination folders cleared", "success");
   });
 
   initPresetsModal();
@@ -2760,9 +2869,14 @@ export async function initAutoBackup(): Promise<void> {
 
   _abInitialized = true;
 
+  // Config is loaded by this point, so the due signals can be lit before the
+  // window is shown. No flash of an un-pulsed sidebar on a launch where a
+  // backup is already overdue.
+  refreshBackupDueUI();
+
   // The startup-restore path can navigate to this tool BEFORE this init ran
   // (loadShellState resolves earlier in shell.ts's boot sequence), in which
-  // case the entry hook above was a deferred no-op — apply the disclaimer
+  // case the entry hook above was a deferred no-op, apply the disclaimer
   // decision now that config and refs exist. The window isn't shown until
   // after all tool inits complete, so there's no visible face flash.
   const view = document.getElementById("files-tool-auto-backup")!;

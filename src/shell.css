@@ -1,24 +1,24 @@
 /* =============================================================================
    BASE
    Inherits CSS custom properties from the active theme file (themes/*.css).
-   All color references use var(--color-*) — never hardcoded values.
+   All color references use var(--color-*), never hardcoded values.
 ============================================================================= */
 
 :root {
   --font-scale: 0;
   font-size: calc(20px + var(--font-scale) * 1px);
 
-  /* Sidebar dimensions — change these two values to resize the sidebar.
+  /* Sidebar dimensions, change these two values to resize the sidebar.
      Expanded width sized to fit the longest nav label (currently
      "Dummy File Generator") at the base font scale without clipping. */
   --sidebar-collapsed-width: 52px;
   --sidebar-expanded-width: 240px;
   --sidebar-transition: 200ms ease;
 
-  /* Title bar height — referenced by both titleBar and appBody */
+  /* Title bar height, referenced by both titleBar and appBody */
   --titlebar-height: 36px;
 
-  /* Universal hover transition — applies to all buttons, links, and
+  /* Universal hover transition, applies to all buttons, links, and
      interactive elements. Set once here; never override in themes. */
   --hover-transition: 0.5s ease;
 }
@@ -169,7 +169,7 @@ body {
   /* Take all the space between the top of the sidebar and the pinned
      navBottom, and scroll internally when the tool list is taller than that
      space (short screens). min-height: 0 lets a flex child actually shrink
-     below its content height so the overflow scroll can engage — without it
+     below its content height so the overflow scroll can engage. Without it
      the list would push navBottom off-screen instead of scrolling.
      #appBody gives the sidebar a definite height, so no explicit height is
      needed here. Applies in both collapsed and expanded widths. */
@@ -202,7 +202,7 @@ body {
   flex-direction: column;
   gap: 2px;
   border-top: 1px solid var(--color-border);
-  /* Never shrink or scroll away — About + Settings stay visible at the bottom
+  /* Never shrink or scroll away. About + Settings stay visible at the bottom
      edge while #navList scrolls under them. */
   flex-shrink: 0;
 }
@@ -259,7 +259,7 @@ body {
   opacity: 0;
   transition: opacity var(--sidebar-transition);
   pointer-events: none;
-  /* Safety net for larger font-scale settings — truncates gracefully
+  /* Safety net for larger font-scale settings, truncates gracefully
      instead of clipping mid-character against the sidebar's edge. */
   flex: 1;
   min-width: 0;
@@ -269,18 +269,30 @@ body {
 }
 
 /* =============================================================================
-   ABOUT-ICON UPDATE PULSE
+   SIDEBAR ATTENTION PULSE
    -----------------------------------------------------------------------------
    Added to #aboutBtn (via the .update-available class from refreshUpdateUI)
    while a newer release than the running version is available and un-ignored.
    The row pops to the theme's inverted button colours (accent fill, contrasting
    icon), holds briefly so the pop registers, then eases the whole row back to
    the resting muted-icon/transparent look. Looping means it snaps back to the
-   inverted state at the loop boundary — the "pop" — every 2s.
+   inverted state at the loop boundary (the "pop") every 2s.
 
-   Colours come entirely from theme vars (--color-btn / --color-btn-text — the
+   Colours come entirely from theme vars (--color-btn / --color-btn-text. The
    same fg/bg pair the primary button uses, so contrast is guaranteed in every
    theme). No theme styles .nav-item directly, so there's no !important to fight.
+
+   .attention-pulse is the same effect on an ordinary tool row, for reminders
+   that a tool needs attention: Auto-Backup when a backup is overdue, Budget
+   when the budget hasn't been updated in a while. Same animation on purpose,
+   "the sidebar is pulsing at me" should mean one thing across the whole app.
+   Distinct from the small corner dot (.tts-speaking / .cd-running), which means
+   "this tool is busy right now" rather than "this tool wants something".
+
+   Raised via setToolAttention() (shell.ts), which lights this row and the
+   tool's dashboard cards together. The cards use a gentler variant of the same
+   idea, see .tool-card.attention-pulse in landing.css for why they don't just
+   reuse these keyframes.
 ============================================================================= */
 
 @keyframes about-update-pulse {
@@ -289,14 +301,16 @@ body {
   100% { background-color: transparent;      color: var(--color-text-muted); }
 }
 
-#aboutBtn.update-available {
+#aboutBtn.update-available,
+.nav-item.attention-pulse {
   animation: about-update-pulse 2s ease-out infinite;
 }
 
 /* Respect reduced-motion: no pulsing, but keep a steady inverted state so the
-   "update available" signal isn't lost entirely for those users. */
+   signal isn't lost entirely for those users. */
 @media (prefers-reduced-motion: reduce) {
-  #aboutBtn.update-available {
+  #aboutBtn.update-available,
+  .nav-item.attention-pulse {
     animation: none;
     background-color: var(--color-btn);
     color: var(--color-btn-text);
@@ -355,6 +369,11 @@ body {
   /* Positioning context for the Home-only #homeUpdateNotice, centred across
      the full bar independent of the left-aligned title. */
   position: relative;
+  /* Cross-fades the palette on a theme change rather than cutting to it, see
+     the note on .panel. */
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition);
 }
 
 .section-title {
@@ -370,7 +389,7 @@ body {
 
 /* =============================================================================
    PANELS
-   Same visual treatment as the time tracker — accent border left, themed bg.
+   Same visual treatment as the time tracker, accent border left, themed bg.
 ============================================================================= */
 
 .panel {
@@ -378,6 +397,20 @@ body {
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 12px;
+  /* Not a hover effect. This is what makes a theme change CROSS-FADE here
+     instead of snapping. Swapping themes just reassigns the CSS vars, so any
+     element carrying a transition on the properties that read them eases into
+     the new palette, and any element without one cuts instantly.
+
+     Home looked smooth purely by accident: .tool-card carries this pair for
+     its hover, and the card grid is most of what you see there. Tool views are
+     built from panels and headers, which had no transition at all, hence the
+     hard cut. Same declaration on the same two properties, so tool views now
+     fade exactly like the dashboard. See also .section-header and
+     .tool-view-header (landing.css), which needed it for the same reason. */
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition);
 }
 
 /* Each section can assign its own accent colour to child panels via a
@@ -440,7 +473,7 @@ input:-webkit-autofill {
   caret-color: var(--color-text);
 }
 
-/* Hide number input spinners everywhere — they clutter narrow amount/interval
+/* Hide number input spinners everywhere. They clutter narrow amount/interval
    fields and aren't needed since all of these are typed or stepped via other
    controls. */
 input[type="number"]::-webkit-outer-spin-button,
@@ -571,7 +604,7 @@ button:hover {
 }
 
 /* =============================================================================
-   MODAL BACKDROP — stacking context fix
+   MODAL BACKDROP: stacking context fix
    -----------------------------------------------------------------------------
    modal.css puts backdrop-filter: blur(4px) directly on .modal-backdrop, which
    forces a new compositing layer. That layer can paint over siblings with a
@@ -598,10 +631,10 @@ button:hover {
 }
 
 /* =============================================================================
-   MODALS — SETTINGS
+   MODALS: SETTINGS
 ============================================================================= */
 
-/* Settings modal — scrollable body when window is short */
+/* Settings modal, scrollable body when window is short */
 #settingsModal {
   max-height: 85vh;
   display: flex;
@@ -617,7 +650,7 @@ button:hover {
   padding-right: 2px;
 }
 
-/* Time Tracker Settings modal — same sizing/scroll as the General Settings modal */
+/* Time Tracker Settings modal. Same sizing/scroll as the General Settings modal */
 #ttSettingsModal {
   max-height: 85vh;
   display: flex;
@@ -638,7 +671,7 @@ button:hover {
   gap: 10px;
 }
 
-/* Label + status badge pair within a settings row — same look as Time
+/* Label + status badge pair within a settings row. Same look as Time
    Tracker's CSV import status (.tt-settings-label-col/-status-badge in
    time-tracker.css), duplicated here rather than shared across owning
    files, matching this codebase's convention for small per-file UI bits. */
@@ -660,7 +693,7 @@ button:hover {
 }
 
 /* Collapsible sub-block that expands/collapses beneath a settings row (its
-   max-height is toggled from JS). Shared app-wide — not tool-specific: the
+   max-height is toggled from JS). Shared app-wide, not tool-specific: the
    General Settings modal (App Lock / Random / Custom-theme sub-options), the
    Time Tracker settings (pay-period options), and the Budget setup modals
    (expectation / threshold fields) all use it. Lives here next to the other
@@ -682,6 +715,19 @@ button:hover {
   border-left: 2px solid var(--color-border);
   margin-left: 4px;
   flex-shrink: 0;
+}
+
+/* Quiet explanatory line under whatever it follows. The in-place equivalent of
+   the (i) tooltips tool Setup modals use, for cases where a choice needs a
+   sentence and there's room to just say it. Used under subsettings (General
+   Settings' notification mode, Budget's reminder schedule) and under the
+   question in a confirm modal, where it says what the action will actually do.
+   Deliberately not named for either context, it's a text style, not a place. */
+.subhint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  opacity: 0.55;
 }
 
 #settingsReset {
@@ -820,12 +866,12 @@ button:hover {
    font-size vary slightly by call site and stay as tool-specific overrides.
 
    NOT folded in here: file-gen.css's .dfg-naming-btn/.dfg-organize-btn
-   (segmented button group — merged borders, per-position corner rounding,
+   (segmented button group, merged borders, per-position corner rounding,
    z-index layering, opaque --color-input-bg base) and .dfg-ext-pill (inline
    pill, also an opaque base, extra hover border-color change). Both share
    this idiom's .active treatment conceptually, but their base states differ
    enough (opaque background vs transparent, structural border-merging) that
-   forcing them onto this base would mean overriding most of it right back —
+   forcing them onto this base would mean overriding most of it right back,
    not a real reduction in duplication, just indirection. Left as their own
    components in file-gen.css.
 ============================================================================= */
@@ -854,7 +900,7 @@ button:hover {
    INFO PANEL  (small "ℹ" disclaimer/explainer modal content)
    -----------------------------------------------------------------------------
    Tier 2 promotion: previously duplicated wholesale as .ab-info-* in
-   auto-backup.css and .resize-info-* in image-ccr.css — byte-identical
+   auto-backup.css and .resize-info-* in image-ccr.css, byte-identical
    properties under a different prefix. .info-trigger-btn is the shared
    button look; each tool keeps its own .ab-info-btn/.resize-info-btn class
    in markup (trimmed to just a padding/font-size delta) alongside this one,
@@ -1046,9 +1092,9 @@ button:hover {
 }
 
 /* =============================================================================
-   BACKUP REMINDER MODAL  (universal — owned by shell; Aggressive mode)
+   BACKUP REMINDER MODAL  (universal, owned by shell; Aggressive mode)
    Reuses .exit-modal-body / .exit-modal-actions for the two-button layout,
-   same as the Exit modal — only the width is bespoke.
+   same as the Exit modal, only the width is bespoke.
 ============================================================================= */
 
 .backup-reminder-modal {
@@ -1056,16 +1102,16 @@ button:hover {
 }
 
 /* =============================================================================
-   SETUP MODAL — shared tabbed list-editor chrome
+   SETUP MODAL: shared tabbed list-editor chrome
    -----------------------------------------------------------------------------
    Promoted out of budget.css so Budget, Time Tracker, and the Theme Editor can
    all share one definition rather than forking three copies. Every rule body
-   here is the exact look Budget shipped — moving it verbatim keeps the modals
+   here is the exact look Budget shipped, moving it verbatim keeps the modals
    pixel-identical. Tools scope their tab-switching querySelectorAll to their
    own modal id (e.g. "#budgetSetupModal .setup-tab") so the shared class name
    never cross-wires one modal's tabs to another's.
 
-   Budget keeps its own .budget-summary-tab (a different UI region — the
+   Budget keeps its own .budget-summary-tab (a different UI region. The
    summary panel's tab strip) and .budget-setup-item-budget-badge
    (Expectation/Threshold text, a budget-only concept) locally.
 ============================================================================= */
@@ -1081,7 +1127,7 @@ button:hover {
 /* .modal-body qualifier (rather than .setup-body alone) is deliberate: both
    classes always appear together on this element, and modal.css's later-
    loaded .modal-body { text-align: center } has equal specificity to a bare
-   .setup-body rule, so which one wins depends on file load order — it was
+   .setup-body rule, so which one wins depends on file load order. It was
    losing here. Pairing the selectors makes this one unconditionally win. */
 .modal-body.setup-body {
   display: flex;
@@ -1120,7 +1166,7 @@ button:hover {
   /* Grow to share the tab bar evenly so any tab count fills the modal width
      (3 tabs in Time Tracker, 5 in Budget) rather than bunching to the left.
      nowrap keeps long uppercase labels (e.g. "EXPENSE CATEGORIES") on one
-     line — without it, flex shrink lets them wrap and push the bar taller. */
+     line. Without it, flex shrink lets them wrap and push the bar taller. */
   flex: 1 1 0;
   min-width: 0;
   text-align: center;
@@ -1256,12 +1302,49 @@ button:hover {
 /* Bottom-left footer row, separate from the header's back arrow so the two
    don't compete for the same corner. Reset itself uses the default <button>
    look (no extra class), same as General Settings' own Reset button. */
+/* Wider than the default modal so the five sort buttons sit on one line with
+   room to breathe rather than being crushed or wrapped. */
+.sidebar-edit-modal {
+  width: min(660px, 94vw);
+}
+
 .sidebar-edit-footer {
   display: flex;
   justify-content: flex-start;
+  gap: 6px;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
+}
+
+/* Equal shares of the row, so the set always fits and stays balanced whatever
+   the longest label is. nowrap keeps "Most Recent" on one line. */
+.sidebar-sort-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.sidebar-sort-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* No button is marked while the order is a custom, hand-dragged one, none of
+   them describes it. */
+.sidebar-sort-btn.active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
 }
 
 .sidebar-edit-hint {
@@ -1375,13 +1458,43 @@ button:hover {
 }
 
 .sidebar-edit-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  opacity: 0.6;
   margin: 14px 0 6px;
   text-align: left;
+}
+
+/* Opacity moved off the row and onto the label alone, as a row property it
+   would dim the button sitting next to it too. */
+.sidebar-edit-section-divider > span {
+  opacity: 0.6;
+}
+
+.sidebar-unhide-all-btn {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.sidebar-unhide-all-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-btn);
 }
 
 /* =============================================================================
@@ -1389,7 +1502,7 @@ button:hover {
 ============================================================================= */
 
 /* Combined-class selector (not just .theme-picker-modal) so this reliably
-   beats .modal's own width:500px regardless of stylesheet load order —
+   beats .modal's own width:500px regardless of stylesheet load order,
    modal.css loads after shell.css, so a same-specificity single-class rule
    here would otherwise lose the cascade and silently render at 500px. */
 .modal.theme-picker-modal {
@@ -1436,7 +1549,7 @@ button:hover {
   gap: 16px;
   /* Real cap is set inline by syncThemeGridHeight() in shell.ts, sized to
      the actual rendered row height (which depends on how many columns the
-     auto-fill grid lands on) rather than a guessed viewport fraction — one
+     auto-fill grid lands on) rather than a guessed viewport fraction. One
      or two rows grow freely with no scrolling, three+ caps at two full
      rows. This 58vh is just the pre-JS/no-JS fallback. */
   max-height: 58vh;
@@ -1499,7 +1612,7 @@ button:hover {
   border-radius: 3px;
 }
 
-/* The 8-color chart palette — the richest, most theme-distinctive set of
+/* The 8-color chart palette. The richest, most theme-distinctive set of
    colors available, so it's the main "show off the theme" element. */
 .theme-tile-preview-chips {
   flex-shrink: 0;
@@ -1535,7 +1648,7 @@ button:hover {
 .theme-tile-preview-lines span:first-child { width: 70%; }
 .theme-tile-preview-lines span:last-child  { width: 45%; }
 
-/* Random / Custom-add tiles have no fixed palette to preview — an icon
+/* Random / Custom-add tiles have no fixed palette to preview, an icon
    centered on a neutral panel stands in for the swatch preview. */
 .theme-tile-preview-icon {
   width: 100%;
@@ -1564,7 +1677,7 @@ button:hover {
   min-width: 0;
 }
 
-/* Explicitly set rather than left to inherit — the tile sits on a
+/* Explicitly set rather than left to inherit. The tile sits on a
    transparent/panel background whose readable foreground is --color-text,
    not whatever button/accent color happens to cascade in. Needed so the
    name stays legible across every theme (e.g. Light, Patriot). */
@@ -1580,13 +1693,13 @@ button:hover {
 }
 
 /* Scoped through .theme-tile-footer so this only affects custom theme
-   tiles (the only ones with edit/delete icons to make room for) — plain
+   tiles (the only ones with edit/delete icons to make room for), plain
    theme tiles' names live outside a footer and stay put on hover. */
 .theme-tile:hover .theme-tile-footer .theme-tile-name {
   transform: translateX(-16px);
 }
 
-/* Edit/delete icons on a custom theme tile — absolutely positioned over the
+/* Edit/delete icons on a custom theme tile, absolutely positioned over the
    right edge and hidden until the tile (or an icon itself, for keyboard/
    touch) is focused/hovered, so the tile reads as a clean, centered preview
    the rest of the time and the name doesn't have to share space with them. */
@@ -1646,7 +1759,7 @@ button:hover {
   padding: 20px 0;
 }
 
-/* Random tab: the tile on the left, its settings to the right — not a grid,
+/* Random tab: the tile on the left, its settings to the right, not a grid,
    just the one tile plus a settings panel sized to fill the rest of the row. */
 .theme-picker-random-pane {
   display: flex;
@@ -1660,10 +1773,10 @@ button:hover {
   width: 200px;
 }
 
-/* Capped and independently scrollable — same reasoning as .theme-picker-grid:
+/* Capped and independently scrollable. Same reasoning as .theme-picker-grid:
    without this, a tall settings column (Cycle's, especially with Holiday
    Override's sub-rows expanded) has nowhere to shrink, so the ancestor
-   .theme-picker-body scrolls instead — dragging the tabs row and the tile
+   .theme-picker-body scrolls instead, dragging the tabs row and the tile
    on this pane's left (.theme-picker-random-tile-wrap) out of view with it.
    Capping the settings column here keeps the tabs and the tile fixed while
    only the settings scroll, matching how the grid tabs never need the body
@@ -1687,7 +1800,7 @@ button:hover {
   pointer-events: none;
 }
 
-/* Preferences pane — a single settings column with no tile beside it, so it
+/* Preferences pane, a single settings column with no tile beside it, so it
    spans the full body rather than using .theme-picker-random-pane's two-column
    split. Capped and scrollable for the same reason the settings column above
    is: with eight per-theme rows expanded, the pane has to absorb its own
@@ -1734,7 +1847,7 @@ button:hover {
   display: block;
 }
 
-/* Cycle pane's "a Holiday Override is forcing the theme right now" note —
+/* Cycle pane's "a Holiday Override is forcing the theme right now" note,
    shown/hidden directly via JS (refreshCycleHolidayNote() in shell.ts),
    independent of the .inactive-driven hint above. Accent-colored so it reads
    as a live status rather than the muted italic hint text. */
@@ -1749,7 +1862,7 @@ button:hover {
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
-/* Cycle tab's holiday-subsettings (i) buttons — same click-to-toggle
+/* Cycle tab's holiday-subsettings (i) buttons. Same click-to-toggle
    popover styling as the Auto-Backup Setup modal's "Show Tool Warning Page"
    info button (see .ab-info-btn/.ab-info-tooltip in auto-backup.css); the
    JS-side toggle logic is reimplemented here rather than shared, matching
@@ -1812,18 +1925,103 @@ button:hover {
 /* =============================================================================
    CHOOSE SOUND PACK MODAL
    -----------------------------------------------------------------------------
-   Tile cards styled like the Theme picker's, but plainer — a sound pack has
+   Tile cards styled like the Theme picker's, but plainer, a sound pack has
    no palette to preview, so each card just uses the ambient (currently
    active) theme's own colors rather than fetching/rendering another one's.
 ============================================================================= */
 
-/* Combined-class selector — same reasoning as .modal.theme-picker-modal
+/* Combined-class selector. Same reasoning as .modal.theme-picker-modal
    above: modal.css loads after shell.css, so a same-specificity single-class
    rule here would otherwise lose the cascade and silently render at the
    base .modal width of 500px. */
 .modal.sound-pack-picker-modal {
   width: 680px;
   max-width: 94vw;
+}
+
+/* =============================================================================
+   NOTIFICATION VOLUME  (sound pack modal)
+   -----------------------------------------------------------------------------
+   Sits under the pack grid, separated by a rule, because it's a different kind
+   of choice from "which pack": it applies to whichever pack is selected.
+============================================================================= */
+
+.sound-volume-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sound-volume-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sound-volume-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-btn);
+  font-variant-numeric: tabular-nums;
+  cursor: text; /* double-click types an exact value */
+  min-width: 60px;
+  text-align: right;
+}
+
+/* Muted is an off state, not a quiet one, so it drops the accent colour that
+   says "this is doing something". */
+.sound-volume-value.is-muted {
+  color: var(--color-text-muted);
+  opacity: 0.75;
+}
+
+/* Inline editor swapped in on double-click, sized to sit in the read-out's
+   place without shifting the row. */
+.sound-volume-edit {
+  width: 72px;
+  margin: 0;
+  padding: 1px 5px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.sound-volume-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* accent-color themes the native track/thumb in one line and follows the
+   active theme automatically, same as the TTS Repeater's sliders. */
+.sound-volume-slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--color-btn);
+  cursor: pointer;
+}
+
+.sound-volume-end {
+  font-size: 0.7rem;
+  opacity: 0.5;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sound-volume-reset {
+  align-self: flex-start;
+  font-size: 0.72rem;
+  padding: 3px 10px;
+}
+
+.sound-volume-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .sound-pack-grid {

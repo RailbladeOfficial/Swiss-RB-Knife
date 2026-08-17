@@ -1,13 +1,13 @@
 /* =============================================================================
-   TIME TRACKER  — persistence commands
+   TIME TRACKER: persistence commands
    -----------------------------------------------------------------------------
    Tauri commands for loading/saving Time Tracker entries, the input draft,
    and exporting CSV reports. All file I/O uses crate::get_data_path() from
    lib.rs so the dev/release directory logic lives in exactly one place.
 
    Data files:
-     time-tracker.json  — entry array (written on every add/delete/edit)
-     draft.json         — current input field state (debounced auto-save)
+     time-tracker.json:  entry array (written on every add/delete/edit)
+     draft.json:         current input field state (debounced auto-save)
 
    Rust commands exposed:
      save_data, load_data, save_draft, load_draft, export_csv
@@ -64,14 +64,14 @@ pub fn load_draft(app: tauri::AppHandle) -> Result<String, String> {
 ============================================================================= */
 
 /// Largest CSV this will read. Time Tracker exports are measured in kilobytes,
-/// so this is enormously generous for any legitimate import — it exists to
+/// so this is enormously generous for any legitimate import. It exists to
 /// bound the accidental case (picking a multi-gigabyte file by mistake), not
 /// to constrain real use.
 const MAX_IMPORT_CSV_BYTES: u64 = 50 * 1024 * 1024;
 
 /// Reads the contents of a user-selected CSV file. The path comes from the
 /// OS-native file picker (plugin-dialog on the frontend), so no path
-/// validation is needed here — same trust boundary as the path-taking commands
+/// validation is needed here. Same trust boundary as the path-taking commands
 /// in the other tools.
 ///
 /// The SIZE is checked, though, because reading is only the first of several
@@ -88,7 +88,7 @@ pub fn import_csv(path: String) -> Result<String, String> {
         .len();
     if size > MAX_IMPORT_CSV_BYTES {
         return Err(format!(
-            "That file is {:.1} MB. The import limit is {} MB — check you picked the right file.",
+            "That file is {:.1} MB. The import limit is {} MB. Check you picked the right file.",
             size as f64 / (1024.0 * 1024.0),
             MAX_IMPORT_CSV_BYTES / (1024 * 1024)
         ));
@@ -106,7 +106,7 @@ pub fn import_csv(path: String) -> Result<String, String> {
 /// The filename is sanitized at this boundary rather than trusted: the join
 /// below would otherwise honor path separators and "..", letting a filename
 /// escape the Downloads folder entirely. The frontend only ever sends safe
-/// generated names today — this guard exists so that never has to stay true.
+/// generated names today. This guard exists so that never has to stay true.
 #[tauri::command]
 pub fn export_csv(app: tauri::AppHandle, filename: String, data: String) -> Result<String, String> {
     let safe_name = crate::sanitize_filename(&filename)?;
@@ -121,5 +121,5 @@ pub fn export_csv(app: tauri::AppHandle, filename: String, data: String) -> Resu
     Ok(path.to_string_lossy().to_string())
 }
 
-// Filename sanitising lives in lib.rs (crate::sanitize_filename) — shared with
+// Filename sanitising lives in lib.rs (crate::sanitize_filename), shared with
 // Game Stats' template download, which needs the identical guard.

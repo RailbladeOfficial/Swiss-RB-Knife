@@ -1,11 +1,11 @@
 /* =============================================================================
-   RANDOM THEME  — palette generation + live "Regenerative" reactivity
+   RANDOM THEME: palette generation + live "Regenerative" reactivity
    -----------------------------------------------------------------------------
    Owns the Random theme's two palette generators (Harmonized/Chaotic), the
    :root CSS-var application + injected modal-override stylesheet, and the
    app-wide click/keydown/change listeners that drive Regenerative re-rolls.
 
-   Split out of shell.ts (Tier 6). Pure and mostly self-contained — its only
+   Split out of shell.ts (Tier 6). Pure and mostly self-contained. Its only
    external dependency is `settings` from shell.ts (to check the active theme
    mode). theme-core.ts and theme-editor.ts both import from this file; this
    file does not import from either of them.
@@ -45,7 +45,7 @@ export const RANDOM_VARS = [
   "--color-toast-error-bg",
   "--color-toast-error-border",
   "--color-toast-error-text",
-  // Budget chart palette — 8 distinct colors for pie/bar segments
+  // Budget chart palette, 8 distinct colors for pie/bar segments
   "--color-chart-1",
   "--color-chart-2",
   "--color-chart-3",
@@ -105,8 +105,8 @@ export function generateRandomPalette(): Record<string, string> {
   const btn = hslToHex(accentHue, rInt(65, 100), rInt(40, 60));
   const btnHover = hslToHex(accentHue, rInt(65, 100), rInt(30, 48));
   // The bright highlight accent (active tabs, section titles, slider values):
-  // a same-hue shade of the button colour — lighter on dark themes, darker on
-  // light themes — mirroring how the static themes relate --color-accent to
+  // a same-hue shade of the button colour (lighter on dark themes, darker on
+  // light themes) mirroring how the static themes relate --color-accent to
   // --color-btn (e.g. default #60a5fa vs #2563eb; light #1e40af vs #3b82f6).
   const accent = isDark
     ? hslToHex(accentHue, rInt(70, 95), rInt(62, 74))
@@ -264,7 +264,7 @@ export function applyPalette(palette: Record<string, string>): void {
 
 /** Legacy hook. The random/custom palette now flows entirely through CSS
  *  variables: applyPalette() sets every var on :root (including --color-accent),
- *  and default.css — loaded as the base for random/custom themes — reads those
+ *  and default.css (loaded as the base for random/custom themes) reads those
  *  vars directly (no hardcoded colours, no !important). So there is nothing left
  *  to inject. This stub only clears any stale override tag left by an older
  *  build/session, then no-ops. Kept (rather than deleted) so existing call sites
@@ -291,7 +291,7 @@ export function clearRandomPalette(): void {
 // separate interactions are always further apart than this.
 let _lastRegen = 0;
 
-/** Regenerates the palette when — and only when — Regenerative random is active.
+/** Regenerates the palette when (and only when) Regenerative random is active.
  *  The single choke point for every re-roll trigger (modal opens, view changes,
  *  button presses, input commits), so it stays a no-op in every other mode. */
 export function maybeRegenerateRandom(): void {
@@ -309,7 +309,7 @@ export function maybeRegenerateRandom(): void {
 /* -----------------------------------------------------------------------------
    Regenerative-random reactivity
    -----------------------------------------------------------------------------
-   In Regenerative mode the palette should feel alive — re-rolling not just on
+   In Regenerative mode the palette should feel alive, re-rolling not just on
    modal opens and view changes (wired elsewhere) but on the interactions that
    make up actually USING the app: pressing a tool/modal button, switching a tab,
    collapsing a changelog entry, or committing/discarding a field with
@@ -343,7 +343,7 @@ document.addEventListener(
   (e) => {
     if (e.key !== "Enter" && e.key !== "Escape") return;
     const target = e.target as HTMLElement | null;
-    // Only a commit/discard inside a field — never a modal-closing Escape.
+    // Only a commit/discard inside a field, never a modal-closing Escape.
     if (!target || !target.matches("input, textarea, select")) return;
     maybeRegenerateRandom();
   },

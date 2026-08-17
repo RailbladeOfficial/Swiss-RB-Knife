@@ -17,6 +17,9 @@
   <link rel="stylesheet" href="src/tools/auto-backup.css" />
   <link rel="stylesheet" href="src/tools/budget.css" />
   <link rel="stylesheet" href="src/tools/game-stats.css" />
+  <link rel="stylesheet" href="src/tools/tts-repeater.css" />
+  <link rel="stylesheet" href="src/tools/days-between.css" />
+  <link rel="stylesheet" href="src/tools/countdown.css" />
   <link id="themeLink" rel="stylesheet" href="/themes/default.css" />
   <script type="module" src="src/shell.ts"></script>
 </head>
@@ -31,7 +34,7 @@
 
   <!-- =====================================================================
        APP LOCK SCREEN
-       Full-window overlay — shown before app content if lock is enabled.
+       Full-window overlay, shown before app content if lock is enabled.
        Removed by shell.ts on correct credential entry.
   ====================================================================== -->
   <div id="lockScreen" style="display:none;">
@@ -210,10 +213,53 @@
           <span class="nav-label">Game Stats</span>
         </li>
 
+        <li class="nav-item" data-section="utility" data-tool="tts-repeater" title="TTS Repeater">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a7 7 0 0 1 0 14.14" />
+            </svg>
+          </span>
+          <span class="nav-label">TTS Repeater</span>
+        </li>
+
+        <li class="nav-item" data-section="utility" data-tool="countdown" title="Countdown Timer">
+          <span class="nav-icon">
+            <!-- Hourglass, mostly unspent: the top bulb is still well filled and
+                 only a small mound has gathered in the bottom one. -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <line x1="6" y1="3" x2="18" y2="3" />
+              <line x1="6" y1="21" x2="18" y2="21" />
+              <path d="M7 3 L12 12 L7 21" />
+              <path d="M17 3 L12 12 L17 21" />
+              <path d="M8.1 5 L15.9 5 L12 12 Z" fill="currentColor" stroke="none" />
+              <path d="M7.8 20.5 L16.2 20.5 L12 17.2 Z" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <span class="nav-label">Countdown Timer</span>
+        </li>
+
+        <li class="nav-item" data-section="utility" data-tool="days-between" title="Days Between Dates">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+              <line x1="8" y1="15" x2="16" y2="15" />
+            </svg>
+          </span>
+          <span class="nav-label">Days Between Dates</span>
+        </li>
+
         <!-- =================================================================
-             ARCHIVED — category-based sidebar nav, retired in favor of the
+             ARCHIVED: category-based sidebar nav, retired in favor of the
              flat tool list above. Kept for reference / possible future
-             reintroduction of categories. Not live markup — do not uncomment
+             reintroduction of categories. Not live markup, do not uncomment
              without also restoring the matching Home dashboard cards and
              per-section landing pages (see other ARCHIVED blocks below).
 
@@ -284,7 +330,7 @@
 
       </ul>
 
-      <!-- BOTTOM NAV — about and settings (About first so it sits above
+      <!-- BOTTOM NAV, about and settings (About first so it sits above
            Settings; Settings anchors the very bottom edge). Both stay pinned
            and visible even when #navList scrolls on short screens. -->
       <ul id="navBottom">
@@ -317,7 +363,7 @@
     <main id="mainContent">
 
       <!-- =================================================================
-           HOME — DASHBOARD
+           HOME: DASHBOARD
       ================================================================== -->
       <section id="section-home" class="content-section active">
         <div class="section-header">
@@ -407,14 +453,63 @@
               </svg>
             </div>
             <div class="tool-card-name">Game Stats</div>
-            <div class="tool-card-desc">Log card and board game results and get fully automatic stats — starting
+            <div class="tool-card-desc">Log card and board game results and get fully automatic stats, starting
               with Five Crowns.</div>
+          </div>
+
+          <div class="tool-card" data-section="utility" data-tool="tts-repeater">
+            <div class="tool-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a7 7 0 0 1 0 14.14" />
+              </svg>
+            </div>
+            <div class="tool-card-name">TTS Repeater</div>
+            <div class="tool-card-desc">Speak a message out loud on a repeating interval. It keeps going while you
+              work in other apps.</div>
+          </div>
+
+          <div class="tool-card" data-section="utility" data-tool="countdown">
+            <div class="tool-card-icon">
+              <!-- Hourglass, mostly unspent: the top bulb is still well filled and
+                   only a small mound has gathered in the bottom one. -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <line x1="6" y1="3" x2="18" y2="3" />
+                <line x1="6" y1="21" x2="18" y2="21" />
+                <path d="M7 3 L12 12 L7 21" />
+                <path d="M17 3 L12 12 L17 21" />
+                <path d="M8.1 5 L15.9 5 L12 12 Z" fill="currentColor" stroke="none" />
+                <path d="M7.8 20.5 L16.2 20.5 L12 17.2 Z" fill="currentColor" stroke="none" />
+              </svg>
+            </div>
+            <div class="tool-card-name">Countdown Timer</div>
+            <div class="tool-card-desc">A big, screen-shareable countdown that keeps ticking while the window is
+              unfocused, with memos and a loggable history.</div>
+          </div>
+
+          <div class="tool-card" data-section="utility" data-tool="days-between">
+            <div class="tool-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+                <line x1="8" y1="15" x2="16" y2="15" />
+              </svg>
+            </div>
+            <div class="tool-card-name">Days Between Dates</div>
+            <div class="tool-card-desc">Pick two dates and get the elapsed days broken down by calendar, weeks,
+              weekdays and more.</div>
           </div>
 
         </div>
 
         <!-- =================================================================
-             ARCHIVED — category-based Home dashboard, retired in favor of the
+             ARCHIVED: category-based Home dashboard, retired in favor of the
              flat tool-card-grid above. Kept for reference / possible future
              reintroduction of categories. Not live markup.
 
@@ -521,11 +616,11 @@
       </section>
 
       <!-- =================================================================
-           UTILITY — LANDING + TOOL VIEWS
+           UTILITY: LANDING + TOOL VIEWS
       ================================================================== -->
       <section id="section-utility" class="content-section">
         <!-- =================================================================
-             ARCHIVED — category section header + landing page, retired in
+             ARCHIVED: category section header + landing page, retired in
              favor of flat tool navigation (the tool view below is still
              live). Kept for reference / possible future reintroduction.
 
@@ -693,14 +788,398 @@
           </div>
 
         </div><!-- /utility-tool-time-tracker -->
+
+        <!-- =================================================================
+             TTS REPEATER
+             The repeat schedule itself lives in Rust (see
+             src-tauri/src/tools/tts_repeater.rs) so it survives the window
+             being minimized; this view is only the controls and status. The
+             .tts-locked-panel class marks the panels that dim while a run is
+             in progress, see tts-repeater.css.
+        ================================================================== -->
+        <div id="utility-tool-tts-repeater" class="tool-view" style="display:none;">
+          <div class="tool-view-header">
+            <button class="tool-back-btn" data-section="home" title="Back to Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span class="tool-view-title">TTS Repeater</span>
+            <nav class="tool-view-header-actions">
+              <button id="tts-presets-btn" title="Saved message presets">Presets</button>
+              <button id="tts-setup-btn" title="Display View appearance">Setup</button>
+            </nav>
+          </div>
+
+          <div id="tts-repeater-body" class="tts-body">
+
+            <!-- Message -->
+            <div class="panel tts-locked-panel">
+              <div class="tts-field">
+                <div class="tts-label-row">
+                  <label class="tts-label" for="tts-message">Message</label>
+                  <span id="tts-message-count" class="tts-message-count">0 / 1000</span>
+                </div>
+                <textarea id="tts-message" placeholder="What should I say?" spellcheck="true"></textarea>
+              </div>
+            </div>
+
+            <!-- Interval + repeat -->
+            <div class="panel tts-locked-panel">
+              <div class="tts-timing-row">
+
+                <div class="tts-field">
+                  <span class="tts-label">Interval</span>
+                  <div class="tts-inline-row">
+                    <input id="tts-interval-amount" class="tts-number-input" type="number" min="1" max="86400"
+                      step="1" value="30" autocomplete="off" />
+                    <div id="tts-interval-unit" class="tts-seg-group">
+                      <button class="toggle-btn active" data-value="seconds">Seconds</button>
+                      <button class="toggle-btn" data-value="minutes">Minutes</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="tts-field">
+                  <span class="tts-label">Repeat</span>
+                  <div class="tts-inline-row">
+                    <div id="tts-repeat-mode" class="tts-seg-group">
+                      <button class="toggle-btn active" data-value="forever">Forever</button>
+                      <button class="toggle-btn" data-value="count">Set number</button>
+                    </div>
+                    <!-- Shown only in "Set number" mode; see syncDerivedUI(). -->
+                    <div id="tts-repeat-count-field" class="tts-inline-row" style="display:none;">
+                      <input id="tts-repeat-count" class="tts-number-input" type="number" min="1" max="9999" step="1"
+                        value="10" autocomplete="off" />
+                      <span class="tts-slider-label">times</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="tts-field">
+                  <span class="tts-label">Count Interval From</span>
+                  <div id="tts-timer-basis" class="tts-seg-group">
+                    <button class="toggle-btn active" data-value="start"
+                      title="Fixed schedule: a message still being read when its interval is up gets cut off">Message
+                      start</button>
+                    <button class="toggle-btn" data-value="end"
+                      title="Interval is silence between readings, so nothing is ever cut off">Message end</button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Voice -->
+            <div class="panel tts-locked-panel">
+              <div class="tts-voice-row">
+
+                <div class="tts-voice-col">
+                  <div class="tts-field">
+                    <label class="tts-label" for="tts-voice">Voice</label>
+                    <!-- Populated from speechSynthesis.getVoices() at init and on
+                         every voiceschanged event. -->
+                    <select id="tts-voice">
+                      <option value="">System default</option>
+                    </select>
+                  </div>
+                  <button id="tts-test-btn" class="modal-cancel-btn" title="Speak the message once">Test Voice</button>
+                </div>
+
+                <!-- Pitch and volume span the Web Speech API's full ranges
+                     (0–2 and 0–1); rate stops at 2 rather than the API's 10
+                     because the Windows voices stop being intelligible well
+                     before that, so the rest would be dead travel. Every
+                     read-out is double-click to type an exact value, see
+                     bindSliderEntry(). -->
+                <div class="tts-voice-col">
+                  <div class="tts-slider-grid">
+                    <span class="tts-slider-label">Rate</span>
+                    <input id="tts-rate" type="range" min="0.1" max="2" step="0.05" value="1" />
+                    <span class="tts-slider-readout">
+                      <span id="tts-rate-value" class="tts-slider-value"
+                        title="Double-click to type an exact value">1.00×</span>
+                      <input id="tts-rate-entry" class="tts-slider-entry" type="number" min="0.1" max="2" step="0.05"
+                        hidden />
+                    </span>
+
+                    <span class="tts-slider-label">Pitch</span>
+                    <input id="tts-pitch" type="range" min="0" max="2" step="0.05" value="1" />
+                    <span class="tts-slider-readout">
+                      <span id="tts-pitch-value" class="tts-slider-value"
+                        title="Double-click to type an exact value">1.00</span>
+                      <input id="tts-pitch-entry" class="tts-slider-entry" type="number" min="0" max="2" step="0.05"
+                        hidden />
+                    </span>
+
+                    <span class="tts-slider-label">Volume</span>
+                    <input id="tts-volume" type="range" min="0" max="1" step="0.05" value="1" />
+                    <span class="tts-slider-readout">
+                      <span id="tts-volume-value" class="tts-slider-value"
+                        title="Double-click to type an exact value">100%</span>
+                      <input id="tts-volume-entry" class="tts-slider-entry" type="number" min="0" max="1" step="0.05"
+                        hidden />
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Start / stop + live status. Reset lives here (pushed to the far
+                 right, away from Start) now that the header slot it used to
+                 occupy belongs to Setup. -->
+            <div class="panel">
+              <div class="tts-actions">
+                <button id="tts-start-btn">Start</button>
+                <button id="tts-display-btn" style="display:none;"
+                  title="Show just the message, full screen">Display View</button>
+                <span id="tts-status" class="tts-status">Not running.</span>
+                <button id="tts-reset-btn" class="modal-cancel-btn tts-reset-btn"
+                  title="Reset all fields">Reset</button>
+              </div>
+            </div>
+
+          </div>
+        </div><!-- /utility-tool-tts-repeater -->
+
+        <!-- =================================================================
+             COUNTDOWN
+             The clock is read from an absolute end timestamp and repainted
+             from a Rust-side ticker (src-tauri/src/tools/countdown.rs), so it
+             stays accurate AND stays moving while this window is unfocused or
+             occluded, which is the whole point, since it's meant to be
+             screen-shared while the user is off doing something else.
+        ================================================================== -->
+        <div id="utility-tool-countdown" class="tool-view" style="display:none;">
+          <div class="tool-view-header">
+            <button class="tool-back-btn" data-section="home" title="Back to Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span class="tool-view-title">Countdown Timer</span>
+            <nav class="tool-view-header-actions">
+              <button id="cd-presets-btn" title="Manage duration presets">Presets</button>
+              <button id="cd-setup-btn" title="Countdown Timer appearance and alarm">Setup</button>
+            </nav>
+          </div>
+
+          <div class="cd-body">
+
+            <!-- The clock, always visible: previews the pending duration while
+                 idle, counts down while running. Double-click it to type a
+                 duration. There are no separate h/m/s fields. -->
+            <div class="panel cd-clock-panel">
+              <div class="cd-clock-row">
+
+                <!-- Hourglass progress figure, sits beside the clock. Sand
+                     drains from the top bulb into the bottom one. -->
+                <svg id="cd-hourglass" class="cd-hourglass" viewBox="0 0 40 80" aria-hidden="true"
+                  style="display:none;">
+                  <defs>
+                    <clipPath id="cd-hg-top-clip">
+                      <polygon points="6,7 34,7 20,38" />
+                    </clipPath>
+                    <clipPath id="cd-hg-bottom-clip">
+                      <polygon points="20,42 34,73 6,73" />
+                    </clipPath>
+                  </defs>
+                  <rect id="cd-hg-top-sand" class="cd-hg-sand" x="0" width="40" y="7" height="31"
+                    clip-path="url(#cd-hg-top-clip)" />
+                  <rect id="cd-hg-bottom-sand" class="cd-hg-sand" x="0" width="40" y="73" height="0"
+                    clip-path="url(#cd-hg-bottom-clip)" />
+                  <polygon class="cd-hg-frame" points="6,7 34,7 20,38" />
+                  <polygon class="cd-hg-frame" points="20,42 34,73 6,73" />
+                  <line class="cd-hg-frame" x1="4" y1="6" x2="36" y2="6" />
+                  <line class="cd-hg-frame" x1="4" y1="74" x2="36" y2="74" />
+                </svg>
+
+                <div id="cd-clock-wrap" class="cd-clock-wrap">
+                  <!-- Ring progress, a rounded rect traced around the clock.
+                       Its geometry is sized in JS from this wrapper's real
+                       pixel box (see layoutRing) so the stroke stays even
+                       instead of being distorted by a scaled viewBox. -->
+                  <svg id="cd-ring" class="cd-ring" aria-hidden="true" style="display:none;">
+                    <rect id="cd-ring-track" class="cd-ring-track" />
+                    <rect id="cd-ring-progress" class="cd-ring-progress" />
+                  </svg>
+                  <div id="cd-clock" class="cd-clock" title="Double-click to set the duration">10:00</div>
+                  <input id="cd-clock-edit" class="cd-clock-edit" type="text" spellcheck="false" autocomplete="off"
+                    style="display:none;" />
+                </div>
+              </div>
+
+              <span id="cd-clock-hint" class="cd-clock-hint" style="display:none;">Enter, or Esc to cancel. A bare
+                number means minutes.</span>
+              <span id="cd-clock-memo" class="cd-clock-memo" style="display:none;"></span>
+
+              <!-- Bar progress -->
+              <div id="cd-bar-wrap" class="cd-bar-wrap" style="display:none;">
+                <div id="cd-bar" class="cd-bar"></div>
+              </div>
+
+              <div id="cd-running-panel" style="display:none;">
+                <div class="cd-times-row">
+                  <div class="cd-time-block">
+                    <span class="cd-time-label">Started at</span>
+                    <span id="cd-started-at" class="cd-time-value">—</span>
+                  </div>
+                  <div class="cd-time-block">
+                    <span class="cd-time-label">Ending at</span>
+                    <span id="cd-ending-at" class="cd-time-value">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Start lives here with Pause/Stop rather than in a row of its
+                   own, so the controls are all under the thing they control. -->
+              <div class="cd-actions">
+                <button id="cd-start-btn">Start</button>
+                <button id="cd-pause-btn" class="modal-cancel-btn" style="display:none;">Pause</button>
+                <button id="cd-stop-btn" class="danger-btn" style="display:none;">Stop</button>
+              </div>
+
+              <div id="cd-extend-row" class="cd-extend-row" style="display:none;">
+                <span class="cd-unit">Add:</span>
+                <button class="cd-extend-btn modal-cancel-btn" data-seconds="60">+1 min</button>
+                <button class="cd-extend-btn modal-cancel-btn" data-seconds="300">+5 min</button>
+                <button class="cd-extend-btn modal-cancel-btn" data-seconds="600">+10 min</button>
+                <span class="cd-extend-sep"></span>
+                <!-- Titles are rewritten each paint with the time each button
+                     would actually land on, see render(). -->
+                <span class="cd-unit">Round to:</span>
+                <button class="cd-round-btn modal-cancel-btn" data-step="15">Next ¼ hr</button>
+                <button class="cd-round-btn modal-cancel-btn" data-step="30">Next ½ hr</button>
+              </div>
+            </div>
+
+            <!-- Setup, hidden while a countdown is live. -->
+            <div id="cd-setup-panel" class="panel">
+              <div class="cd-field cd-memo-field">
+                <label class="cd-label" for="cd-memo">Memo / Activity</label>
+                <input id="cd-memo" type="text" placeholder="What's this timer for?" autocomplete="off"
+                  maxlength="120" />
+              </div>
+              <!-- Rebuilt from the saved presets, see renderPresets(). -->
+              <div id="cd-presets" class="cd-presets"></div>
+            </div>
+
+            <!-- History -->
+            <div class="panel">
+              <div class="cd-log-header">
+                <span class="cd-label">History</span>
+                <button id="cd-clear-log-btn" class="modal-cancel-btn">Clear History</button>
+              </div>
+              <p id="cd-log-empty" class="placeholder-text">No sessions yet. Finished and stopped countdowns land
+                here, and each one can be logged to the Time Tracker.</p>
+              <div id="cd-log-list" class="cd-log-list"></div>
+            </div>
+
+          </div>
+        </div><!-- /utility-tool-countdown -->
+
+        <!-- =================================================================
+             DAYS BETWEEN DATES
+             Counts ELAPSED days. The start date isn't counted, so the same
+             date twice is 0 and Aug 1 → Aug 8 is 7. The inclusive count is
+             offered as a clearly labelled secondary row. See days-between.ts.
+        ================================================================== -->
+        <div id="utility-tool-days-between" class="tool-view" style="display:none;">
+          <div class="tool-view-header">
+            <button class="tool-back-btn" data-section="home" title="Back to Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span class="tool-view-title">Days Between Dates</span>
+            <button id="dbd-reset" class="tool-view-header-action" title="Reset both dates to today">Reset</button>
+          </div>
+
+          <div class="dbd-body">
+
+            <div class="panel">
+              <!-- Each date owns its own nudge row directly beneath it, so
+                   there's never a question of which field a button moves. The
+                   two rows are identical apart from data-target. -->
+              <div class="dbd-dates-row">
+                <div class="dbd-field">
+                  <label class="dbd-label" for="dbd-start">Start Date</label>
+                  <div class="dbd-input-row">
+                    <input id="dbd-start" type="date" />
+                    <button id="dbd-start-today" class="modal-cancel-btn" title="Set to today">Today</button>
+                  </div>
+                  <div class="dbd-shift-row" data-target="start">
+                    <span class="dbd-shift-caption">Nudge start</span>
+                    <button class="dbd-shift-btn toggle-btn" data-days="-365">−365d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="-30">−30d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="-7">−7d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="-1">−1d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="1">+1d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="7">+7d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="30">+30d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="365">+365d</button>
+                  </div>
+                </div>
+
+                <button id="dbd-swap" class="modal-cancel-btn" title="Swap the two dates">⇄</button>
+
+                <div class="dbd-field">
+                  <label class="dbd-label" for="dbd-end">End Date</label>
+                  <div class="dbd-input-row">
+                    <input id="dbd-end" type="date" />
+                    <button id="dbd-end-today" class="modal-cancel-btn" title="Set to today">Today</button>
+                  </div>
+                  <div class="dbd-shift-row" data-target="end">
+                    <span class="dbd-shift-caption">Nudge end</span>
+                    <button class="dbd-shift-btn toggle-btn" data-days="-365">−365d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="-30">−30d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="-7">−7d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="-1">−1d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="1">+1d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="7">+7d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="30">+30d</button>
+                    <button class="dbd-shift-btn toggle-btn" data-days="365">+365d</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Swaps which reading is the headline. The other one always
+                   remains as the last breakdown row, so both numbers are
+                   visible either way. This just decides which one leads. -->
+              <div class="dbd-mode-row">
+                <span class="dbd-label">Count</span>
+                <div id="dbd-count-mode" class="dbd-seg-group">
+                  <button class="toggle-btn active" data-value="elapsed"
+                    title="Days elapsed, not counting the start date">Days elapsed</button>
+                  <button class="toggle-btn" data-value="inclusive"
+                    title="Counts both the start and end dates">Including start date</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel dbd-headline-panel">
+              <div id="dbd-headline" class="dbd-headline">—</div>
+              <span id="dbd-headline-sub" class="dbd-headline-sub"></span>
+            </div>
+
+            <div class="panel">
+              <div id="dbd-breakdown" class="dbd-breakdown"></div>
+            </div>
+
+          </div>
+        </div><!-- /utility-tool-days-between -->
       </section>
 
       <!-- =================================================================
-           FILES — LANDING + TOOL VIEWS
+           FILES: LANDING + TOOL VIEWS
       ================================================================== -->
       <section id="section-files" class="content-section">
         <!-- =================================================================
-             ARCHIVED — category section header + landing page, retired in
+             ARCHIVED: category section header + landing page, retired in
              favor of flat tool navigation (the tool views below are still
              live). Kept for reference / possible future reintroduction.
 
@@ -767,7 +1246,7 @@
 
                 <div class="dfg-field dfg-field--output">
                   <label class="dfg-label" for="dfg-output-dir">Output Directory <span
-                      style="opacity:.45;font-weight:400">(optional — defaults to Downloads)</span></label>
+                      style="opacity:.45;font-weight:400">(optional, defaults to Downloads)</span></label>
                   <div class="dfg-input-row">
                     <input id="dfg-output-dir" type="text" placeholder="Leave blank for Downloads" autocomplete="off"
                       spellcheck="false" />
@@ -821,6 +1300,13 @@
               </svg>
             </button>
             <span class="tool-view-title">Auto-Backup</span>
+            <!-- Backup-due line. The tool-header counterpart to the Home
+                 header's "Update Available" notice, centred across the bar the
+                 same way. Shown/hidden by refreshBackupDueUI() alongside the
+                 sidebar pulse. -->
+            <div id="ab-due-notice" class="tool-header-notice-wrap" style="display: none;">
+              <span class="tool-header-notice">Backup Due: <span id="ab-due-days">—</span> days</span>
+            </div>
             <nav id="ab-header-nav" class="tool-view-header-actions">
               <button id="ab-presets-btn">Presets</button>
               <button id="ab-setup-btn">Setup</button>
@@ -845,7 +1331,7 @@
                   </p>
                   <p>
                     <strong>Mirror means mirror.</strong> To keep a destination identical to its
-                    source, this tool doesn't just add and update files — it also
+                    source, this tool doesn't just add and update files. It also
                     <strong>deletes</strong> anything inside the destination's copy that no longer
                     exists in the source. That's what makes it a true backup, and it's also what
                     makes it powerful: pointed at the wrong folder, it will faithfully reshape that
@@ -854,7 +1340,7 @@
                   <p>
                     The tool refuses obviously unsafe setups (overlapping paths, duplicate folder
                     names, mirroring a folder onto itself) and asks for confirmation before every
-                    run. Still — double-check your destinations. This tool does exactly what you
+                    run. Still, double-check your destinations. This tool does exactly what you
                     tell it to.
                   </p>
 
@@ -944,7 +1430,7 @@
 
             <!-- Next Backup: exact workload if a backup ran right now, from a
                  robocopy /L (list-only) scan of every source×destination pair -->
-            <span class="ab-summary-subtitle">Next Backup — If Run Now
+            <span class="ab-summary-subtitle">Next Backup: If Run Now
               <span id="ab-estimate-status" class="ab-summary-status"></span>
             </span>
             <div class="ab-summary-grid">
@@ -959,7 +1445,7 @@
                 <div class="ab-summary-value ab-value-row">
                   <span id="ab-est-dirs">—</span>
                   <!-- Shown by renderEstimateCells() only when Dirs to Copy
-                       exceeds Total Source Dirs — see the modal below. -->
+                       exceeds Total Source Dirs, see the modal below. -->
                   <button class="info-trigger-btn ab-info-btn" id="ab-dirs-info-btn" style="display:none;"
                     title="Why is this higher than Total Source Dirs?">ℹ</button>
                 </div>
@@ -1040,7 +1526,7 @@
               <p id="ab-progress-current-file" class="ab-progress-current-file"></p>
 
               <!-- Shown only when the last run had files it couldn't copy
-                   (locked/access error) — sits between the status text above
+                   (locked/access error), sits between the status text above
                    and the Backup Progress bar below, left-aligned. -->
               <button id="ab-skipped-files-btn" class="modal-cancel-btn ab-skipped-files-btn" style="display:none;">
                 View Skipped Files
@@ -1104,11 +1590,11 @@
       </section>
 
       <!-- =================================================================
-           MEDIA — IMAGE CC
+           MEDIA: IMAGE CC
       ================================================================== -->
       <section id="section-media" class="content-section">
         <!-- =================================================================
-             ARCHIVED — category section header + landing page, retired in
+             ARCHIVED: category section header + landing page, retired in
              favor of flat tool navigation (the tool view below is still
              live). Kept for reference / possible future reintroduction.
 
@@ -1284,7 +1770,7 @@
 
                 <!-- Transparency note (shown when a transparent fill is set but format is JPG) -->
                 <p class="transparent-hint" id="combine-transparent-hint" style="display:none">
-                  ⚠ Transparency needs PNG output — JPG will fill transparent areas with black.
+                  ⚠ Transparency needs PNG output. JPG will fill transparent areas with black.
                 </p>
 
                 <!-- Actions -->
@@ -1431,7 +1917,7 @@
                 </div>
                 <p class="option-hint">Pick a whole folder, or select one or more individual images.</p>
 
-                <!-- Scan progress — shown while the source is being analysed -->
+                <!-- Scan progress, shown while the source is being analysed -->
                 <div id="resize-scan-progress" class="resize-scan-progress" style="display:none">
                   <span class="scan-spinner"></span>
                   <div class="progress-bar-track">
@@ -1440,7 +1926,7 @@
                   <span class="resize-scan-label" id="resize-scan-label">Scanning…</span>
                 </div>
 
-                <!-- Folder stats — shown after the source is scanned -->
+                <!-- Folder stats, shown after the source is scanned -->
                 <div id="resize-folder-stats" class="resize-stats-row" style="display:none">
                   <div class="resize-stat resize-stat-count">
                     <span class="resize-stat-label">Images found</span>
@@ -1568,7 +2054,7 @@
 
                 <!-- Transparency note (shown when transparent background is set but format is JPG) -->
                 <p class="transparent-hint" id="resize-transparent-hint" style="display:none">
-                  ⚠ Transparency needs PNG output — JPG will fill transparent areas with black.
+                  ⚠ Transparency needs PNG output. JPG will fill transparent areas with black.
                 </p>
 
                 <!-- Actions row -->
@@ -1599,7 +2085,7 @@
       </section>
 
       <!-- =================================================================
-           ARCHIVED — MUSIC category section. Retired along with the rest of
+           ARCHIVED: MUSIC category section. Retired along with the rest of
            the category structure (it never held a real tool, only a
            "Coming Soon" placeholder). Kept for reference / possible future
            reintroduction. Not live markup.
@@ -1633,7 +2119,7 @@
       ================================================================== -->
 
       <!-- =================================================================
-           FINANCE — LANDING + TOOL VIEWS
+           FINANCE: LANDING + TOOL VIEWS
       ================================================================== -->
       <section id="section-finance" class="content-section">
         <div class="section-header">
@@ -1647,7 +2133,7 @@
         </div>
 
         <!-- =================================================================
-             ARCHIVED — category landing page, retired in favor of flat tool
+             ARCHIVED: category landing page, retired in favor of flat tool
              navigation (the tool view below is still live). Kept for
              reference / possible future reintroduction.
 
@@ -1673,7 +2159,7 @@
 
           <!-- =================================================================
                BUDGET AUTH GATE
-               A view within the Budget tool itself — exactly like Setup or any
+               A view within the Budget tool itself, exactly like Setup or any
                other internal panel. Lives and dies with #finance-tool-budget's
                own visibility; shell.ts needs no awareness of it at all.
                Shown when encryption is enabled and the user must authenticate.
@@ -1729,6 +2215,18 @@
               </svg>
             </button>
             <span class="tool-view-title">Budget Tracker</span>
+            <!-- Update-due line. The tool-header counterpart to the Home
+                 header's "Update Available" notice. Shown/hidden by
+                 refreshBudgetDueUI() alongside the sidebar pulse. -->
+            <div id="budgetDueNotice" class="tool-header-notice-wrap" style="display: none;">
+              <span class="tool-header-notice">Not Updated In <span id="budgetDueDays">—</span> Days</span>
+              <!-- The only way to clear this reminder short of entering data,
+                   see markBudgetReviewed(). Inside the wrapper so it stays with
+                   the text as one centred unit. -->
+              <button id="budgetDueClearBtn" class="tool-header-notice-btn"
+                title="Clear this reminder without entering anything, for when you've looked and there's nothing to add">Mark
+                Reviewed</button>
+            </div>
             <div class="tool-view-header-actions">
               <button id="budgetAnnualStatsBtn" title="View annual statistics for the currently browsed year">View Annual Stats</button>
               <button id="budgetSetupBtn" title="Manage income sources, recurring bills, expense categories, and expense sources">Setup</button>
@@ -1758,7 +2256,7 @@
             </div>
           </div>
 
-          <!-- Flip container — rotates 180° to reveal Annual Stats page -->
+          <!-- Flip container, rotates 180° to reveal Annual Stats page -->
           <div id="budgetFlipContainer">
             <div id="budgetFlipCard" class="budget-flip-card">
 
@@ -1873,7 +2371,7 @@
 
               <!-- Title -->
               <div class="panel budget-annual-stats-title-panel">
-                <span class="budget-annual-stats-title" id="budgetAnnualStatsTitle">Annual Stats — 2026</span>
+                <span class="budget-annual-stats-title" id="budgetAnnualStatsTitle">Annual Stats: 2026</span>
               </div>
 
               <!-- Year at a Glance -->
@@ -1922,7 +2420,7 @@
 
               <!-- Fluctuating Expenses by Category -->
               <div class="panel panel-accent-input">
-                <div class="budget-stats-section-heading">Fluctuating Expenses — by Category</div>
+                <div class="budget-stats-section-heading">Fluctuating Expenses by Category</div>
                 <div class="budget-stats-table-wrap">
                   <table id="budgetAnnualCategoryTable" class="budget-stats-table">
                     <thead>
@@ -1943,7 +2441,7 @@
 
               <!-- Fluctuating Expenses by Source -->
               <div class="panel panel-accent-entries">
-                <div class="budget-stats-section-heading">Fluctuating Expenses — by Source</div>
+                <div class="budget-stats-section-heading">Fluctuating Expenses by Source</div>
                 <div class="budget-stats-table-wrap">
                   <table id="budgetAnnualSourceTable" class="budget-stats-table">
                     <thead>
@@ -2000,7 +2498,7 @@
       </section>
 
       <!-- =================================================================
-           GAMES — TOOL VIEWS
+           GAMES: TOOL VIEWS
       ================================================================== -->
       <section id="section-games" class="content-section">
 
@@ -2102,7 +2600,7 @@
               <div class="gs-panel-header">
                 <div class="gs-panel-heading">
                   <div class="gs-panel-title">Set the Table</div>
-                  <div class="gs-panel-sub">Type a name to reuse a profile — anyone new is created automatically.</div>
+                  <div class="gs-panel-sub">Type a name to reuse a profile. Anyone new is created automatically.</div>
                 </div>
               </div>
 
@@ -2118,12 +2616,12 @@
                 <div class="gs-field">
                   <label for="gsFillFromTableSelect">Fill from an existing table</label>
                   <select id="gsFillFromTableSelect">
-                    <option value="">— None —</option>
+                    <option value="">(None)</option>
                   </select>
                 </div>
                 <!-- Shown before the game starts so it can be checked against
                      a paper scoresheet while the roster is still on screen.
-                     Locked by default — the auto value is right whenever games
+                     Locked by default. The auto value is right whenever games
                      are entered in order. -->
                 <div class="gs-field">
                   <label for="gsGameNumberInput">Game Number</label>
@@ -2212,7 +2710,7 @@
                 <div class="gs-panel-header">
                   <div class="gs-panel-heading">
                     <div class="gs-panel-title">Progress</div>
-                    <div class="gs-panel-sub">Running total after each round — lowest line is leading.</div>
+                    <div class="gs-panel-sub">Running total after each round. The lowest line is leading.</div>
                   </div>
                   <button id="gsProgressChartExpandBtn" class="gs-chart-expand-btn" type="button" title="Expand chart">⤢</button>
                 </div>
@@ -2317,7 +2815,7 @@
        SHARED MODAL OVERLAY
        Single dim + blur layer managed by modal.ts. Fades in when the first
        modal opens, fades out when the last closes. Individual modal-backdrops
-       are transparent containers — they never dim or blur on their own.
+       are transparent containers. They never dim or blur on their own.
   ====================================================================== -->
   <div id="modalOverlay"></div>
 
@@ -2382,11 +2880,11 @@
             <optgroup label="Main">
               <option value="lastView">Last View (default)</option>
               <option value="lastTool">Last Tool</option>
-              <!-- Hidden — categories retired, may come back later. -->
+              <!-- Hidden, categories retired, may come back later. -->
               <option value="lastCategory" style="display:none;">Last Category</option>
               <option value="home">Home</option>
             </optgroup>
-            <!-- Hidden — categories retired, may come back later. -->
+            <!-- Hidden, categories retired, may come back later. -->
             <optgroup label="Specific Category" style="display:none;">
               <option value="utility">Utility</option>
               <option value="files">Files</option>
@@ -2401,6 +2899,9 @@
               <option value="media:image-ccr">Image CCR</option>
               <option value="files:dummy-file-generator">Dummy File Generator</option>
               <option value="games:game-stats">Game Stats</option>
+              <option value="utility:tts-repeater">TTS Repeater</option>
+              <option value="utility:countdown">Countdown Timer</option>
+              <option value="utility:days-between">Days Between Dates</option>
             </optgroup>
           </select>
         </div>
@@ -2437,6 +2938,23 @@
           </div>
         </div>
 
+        <!-- Collapsed to zero height while version notifications are off. The
+             mode only means anything when there's something to announce. -->
+        <div id="newVersionSubsettings" class="subsettings" style="max-height: 0;">
+          <div class="settings-row">
+            <span>Mode:</span>
+            <div class="toggle-with-label">
+              <span id="newVersionModeLabel">Gentle</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="newVersionModeToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <p id="newVersionModeHint" class="subhint">Gentle announces a new version with a toast. Aggressive
+            opens a modal on startup with a shortcut to the release page.</p>
+        </div>
+
         <div class="settings-row">
           <div class="settings-label-col">
             <span>Sidebar:</span>
@@ -2453,7 +2971,7 @@
           <button id="themeEditBtn" class="settings-action-btn">Customize</button>
         </div>
 
-        <!-- Hidden data holder — kept as the single source of truth for the
+        <!-- Hidden data holder, kept as the single source of truth for the
              active theme id/optgroup grouping (theme-editor.ts still reads/
              writes it directly), it's just no longer rendered as a dropdown. -->
         <select id="themeSelect" style="display:none;">
@@ -2501,7 +3019,7 @@
        EDIT SIDEBAR
   ====================================================================== -->
   <div id="sidebarEditBackdrop" class="modal-backdrop" style="display: none;">
-    <div class="modal">
+    <div class="modal sidebar-edit-modal">
       <div class="modal-header">
         <button id="sidebarEditBack" class="nav-back-btn modal-header-left" title="Back to Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
@@ -2512,16 +3030,33 @@
         </button>
       </div>
       <div class="modal-body" style="text-align:left;">
-        <p class="sidebar-edit-hint">Drag to reorder. Click the eye to show or hide a tool on the sidebar and Home dashboard.</p>
+        <p class="sidebar-edit-hint">Drag to reorder, which switches you to a custom order. Click the eye to show or
+          hide a tool on the sidebar and Home dashboard.</p>
         <div id="sidebarEditShownList" class="sidebar-edit-list"></div>
 
         <div id="sidebarEditHiddenSection" style="display:none;">
-          <div class="sidebar-edit-section-divider">Hidden</div>
+          <!-- The whole section is only rendered when something IS hidden, so
+               the button needs no visibility logic of its own. -->
+          <div class="sidebar-edit-section-divider">
+            <span>Hidden</span>
+            <button id="sidebarUnhideAllBtn" class="sidebar-unhide-all-btn"
+              title="Show every hidden tool again">Unhide All</button>
+          </div>
           <div id="sidebarEditHiddenList" class="sidebar-edit-list"></div>
         </div>
       </div>
+      <!-- Sort modes. These are persistent modes, not one-off actions: the
+           usage-driven ones re-rank live as you open tools. Dragging a row
+           switches to a custom order and deselects all of them. -->
       <div class="sidebar-edit-footer">
-        <button id="sidebarEditResetBtn" title="Reset to default order, all tools shown">Reset</button>
+        <button class="sidebar-sort-btn" data-sort="classic"
+          title="The app's own default order">Classic</button>
+        <button class="sidebar-sort-btn" data-sort="az" title="Alphabetical, A to Z">Sort A-Z</button>
+        <button class="sidebar-sort-btn" data-sort="za" title="Alphabetical, Z to A">Sort Z-A</button>
+        <button class="sidebar-sort-btn" data-sort="recent"
+          title="Most recently opened first, updates as you use tools">Most Recent</button>
+        <button class="sidebar-sort-btn" data-sort="used"
+          title="Most often opened first, updates as you use tools">Most Used</button>
       </div>
     </div>
   </div>
@@ -2553,7 +3088,7 @@
         <div id="themePickerGrid" class="theme-picker-grid"></div>
 
         <!-- Random tab: the tile on the left, its settings to the right.
-             The settings panel is always visible here — greyed out and
+             The settings panel is always visible here, greyed out and
              inert (see .theme-picker-random-settings.inactive) until Random
              is actually the active theme, not just being previewed. -->
         <div id="themePickerRandomPane" class="theme-picker-random-pane" style="display:none;">
@@ -2640,7 +3175,7 @@
             <div class="settings-row">
               <span class="theme-picker-label-with-info">
                 Holiday Overrides:
-                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="When today's date matches a Holiday theme (Christmas, Halloween, etc.), Cycle force-switches to it, overriding whatever it would otherwise be showing, until the date passes. Independent of the setting below — combine both if you want a Holiday theme to appear ONLY by being force-switched to.">ℹ</button>
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="When today's date matches a Holiday theme (Christmas, Halloween, etc.), Cycle force-switches to it, overriding whatever it would otherwise be showing, until the date passes. Independent of the setting below. Combine both if you want a Holiday theme to appear ONLY by being force-switched to.">ℹ</button>
               </span>
               <div class="toggle-with-label">
                 <span id="cycleHolidayOverrideLabel">Off</span>
@@ -2653,7 +3188,7 @@
             <div class="settings-row">
               <span class="theme-picker-label-with-info">
                 Restrict to Holiday Season:
-                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Keeps Holiday themes out of the normal cycle rotation except during their own window (their exact date, or their full season if that's on below) — independent of Holiday Overrides above, so this works whether or not that's on.">ℹ</button>
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Keeps Holiday themes out of the normal cycle rotation except during their own window (their exact date, or their full season if that's on below). Independent of Holiday Overrides above, so this works whether or not that's on.">ℹ</button>
               </span>
               <div class="toggle-with-label">
                 <span id="cycleHolidaySeasonOnlyLabel">Off</span>
@@ -2666,7 +3201,7 @@
             <div id="cycleHolidayFullSeasonRow" class="settings-row" style="display:none;">
               <span class="theme-picker-label-with-info">
                 Full Holiday Season:
-                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Widens each Holiday theme's active date range to its traditional season (e.g. all of October for Halloween) instead of just its exact date — affects both settings above, wherever either is on.">ℹ</button>
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Widens each Holiday theme's active date range to its traditional season (e.g. all of October for Halloween) instead of just its exact date. Affects both settings above, wherever either is on.">ℹ</button>
               </span>
               <div class="toggle-with-label">
                 <span id="cycleHolidayFullSeasonLabel">Off</span>
@@ -2703,7 +3238,7 @@
             </div>
           </div>
 
-          <!-- Hidden wholesale while the master switch is off — with nothing
+          <!-- Hidden wholesale while the master switch is off, with nothing
                running, per-theme opt-outs would be controls with no effect. -->
           <div id="themeAnimationsPerTheme">
             <div class="theme-picker-section-divider">Per-Theme Animations</div>
@@ -2731,6 +3266,26 @@
       <div class="modal-body" style="text-align:left;">
         <p class="sidebar-edit-hint">Click a pack to select it. Use the speaker icons to preview its success/error sounds.</p>
         <div id="soundPackPickerGrid" class="sound-pack-grid"></div>
+
+        <!-- Toast volume. 0 dB is the volume the app has always played at, so
+             an untouched install sounds exactly as it did before this existed.
+             The slider runs to -26, one step past the quietest real level, and
+             that bottom notch is Muted rather than a level. Releasing the
+             slider plays a preview so it can be judged by ear; double-clicking
+             the read-out types an exact value. -->
+        <div class="sound-volume-row">
+          <div class="sound-volume-label">
+            <span>Notification Volume</span>
+            <span id="soundVolumeValue" class="sound-volume-value"
+              title="Double-click to type an exact value">Default</span>
+          </div>
+          <div class="sound-volume-slider-row">
+            <span class="sound-volume-end">Muted</span>
+            <input type="range" id="soundVolumeSlider" min="-26" max="5" step="1" value="0" />
+            <span class="sound-volume-end">+5 dB</span>
+          </div>
+          <button id="soundVolumeReset" class="sound-volume-reset">Reset to Default</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2750,8 +3305,8 @@
         </button>
       </div>
       <div class="modal-body">
-        <p><strong>Swiss RB Knife — <span id="appVersion"></span></strong> — <a id="changelogLink" href="#">What's
-            New</a></p>
+        <p><strong>Swiss RB Knife <span id="appVersion"></span></strong> (<a id="changelogLink" href="#">What's
+            New</a>)</p>
         <div id="updateNotice" class="update-notice" style="display: none;">
           <p class="update-notice-text">Yo! A new version is available. Check out <a id="updateNoticeLink"
               href="#"></a>!</p>
@@ -2768,7 +3323,7 @@
   </div>
 
   <!-- =====================================================================
-       IGNORE VERSION MODAL  (from About — confirms muting the current update)
+       IGNORE VERSION MODAL  (from About, confirms muting the current update)
   ====================================================================== -->
   <div id="ignoreVersionBackdrop" class="modal-backdrop" style="display: none;">
     <div id="ignoreVersionModal" class="modal">
@@ -2801,7 +3356,7 @@
   </div>
 
   <!-- =====================================================================
-       ENABLE VERSION NOTIFICATIONS MODAL  (from General Settings — confirms
+       ENABLE VERSION NOTIFICATIONS MODAL  (from General Settings, confirms
        the network implication before the toggle actually turns on)
   ====================================================================== -->
   <div id="updateEnableBackdrop" class="modal-backdrop" style="display: none;">
@@ -2835,8 +3390,28 @@
   </div>
 
   <!-- =====================================================================
-       BACKUP REMINDER MODAL  (universal — owned by shell; Aggressive mode)
+       BACKUP REMINDER MODAL  (universal, owned by shell; Aggressive mode)
   ====================================================================== -->
+  <!-- =====================================================================
+       NEW VERSION MODAL  (universal, owned by docs.ts; Aggressive mode)
+       Gentle mode announces with a toast instead and never opens this.
+  ====================================================================== -->
+  <div id="updateNotifyBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="updateNotifyModal" class="modal">
+      <div class="modal-header">
+        <span>New Version Available</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p>Version <strong id="updateNotifyVersion">—</strong> is out. You're running <strong
+            id="updateNotifyCurrent">—</strong>. Wanna go grab it?</p>
+        <div class="exit-modal-actions">
+          <button id="updateNotifyGoBtn">Sure, take me there</button>
+          <button id="updateNotifyLaterBtn" class="modal-cancel-btn">Nah, maybe later</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="backupReminderBackdrop" class="modal-backdrop" style="display: none;">
     <div id="backupReminderModal" class="modal backup-reminder-modal">
       <div class="modal-header">
@@ -2847,6 +3422,29 @@
         <div class="exit-modal-actions">
           <button id="backupReminderGoBtn">Sure, take me there</button>
           <button id="backupReminderCancelBtn" class="modal-cancel-btn">No, let's procrastinate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       BUDGET REMINDER MODAL  (universal, owned by shell; Aggressive mode)
+       Gentle mode announces with a toast instead and never opens this.
+  ====================================================================== -->
+  <div id="budgetReminderBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="budgetReminderModal" class="modal">
+      <div class="modal-header">
+        <span>Budget Reminder</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p>Your budget hasn't been touched in <strong id="budgetReminderDaysEl">—</strong> days. Wanna go put your
+          numbers in?</p>
+        <div class="exit-modal-actions stacked">
+          <button id="budgetReminderGoBtn">Sure, take me there</button>
+          <!-- Resets the clock without entering anything, so the nudge doesn't
+               come straight back when there was genuinely nothing to add. -->
+          <button id="budgetReminderReviewedBtn" class="modal-cancel-btn">Nothing to add, mark it reviewed</button>
+          <button id="budgetReminderCancelBtn" class="modal-cancel-btn">No, let's procrastinate</button>
         </div>
       </div>
     </div>
@@ -2871,7 +3469,7 @@
   </div>
 
   <!-- =====================================================================
-       LICENSING & ATTRIBUTIONS MODAL  (universal — owned by shell)
+       LICENSING & ATTRIBUTIONS MODAL  (universal, owned by shell)
   ====================================================================== -->
   <div id="licensingBackdrop" class="modal-backdrop" style="display: none;">
     <div id="licensingModal" class="modal licensing-modal">
@@ -2894,8 +3492,8 @@
            All 18 built-in themes (and any user-made Custom theme) style
            .budget-summary-tab unscoped with their own hover/active colours;
            .licensing-tab has no such theme coverage. Sharing the class is the
-           only way to get identical highlight behaviour under every theme —
-           including custom ones we can't edit — without restating the rule in
+           only way to get identical highlight behaviour under every theme (
+           including custom ones we can't edit) without restating the rule in
            each theme file. It also brings flex:1 + centred text, so the tabs
            fill and centre the strip the same way the Budget summary panel's
            do. .licensing-tab still supplies the JS hooks and is kept as a
@@ -2942,7 +3540,7 @@
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <span>GNU AGPL v3 — Full License Text</span>
+        <span>GNU AGPL v3: Full License Text</span>
         <button id="fullLicenseClose" class="modal-close-btn modal-header-right">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -2957,7 +3555,7 @@
   </div>
 
   <!-- =====================================================================
-       README MODAL  (universal — owned by shell)
+       README MODAL  (universal, owned by shell)
   ====================================================================== -->
   <div id="readmeBackdrop" class="modal-backdrop" style="display: none;">
     <div id="readmeModal" class="modal">
@@ -3035,7 +3633,7 @@
   </div>
 
   <!-- =====================================================================
-       README IMAGE LIGHTBOX  (universal — owned by shell)
+       README IMAGE LIGHTBOX  (universal, owned by shell)
        Full-size view of a README screenshot. Back arrow returns to the
        README modal scrolled to the image; X dismisses entirely.
   ====================================================================== -->
@@ -3063,7 +3661,7 @@
   </div>
 
   <!-- =====================================================================
-       CHANGELOG MODAL  (universal — owned by shell)
+       CHANGELOG MODAL  (universal, owned by shell)
   ====================================================================== -->
   <div id="changelogBackdrop" class="modal-backdrop" style="display: none;">
     <div id="changelogModal" class="modal">
@@ -3089,7 +3687,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — CONFIRM DELETE MODAL
+       TIME TRACKER: CONFIRM DELETE MODAL
   ====================================================================== -->
   <div id="deleteBackdrop" class="modal-backdrop" style="display: none;">
     <div id="deleteModal" class="modal">
@@ -3107,7 +3705,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — EDIT NOTES
+       TIME TRACKER: EDIT NOTES
   ====================================================================== -->
   <div id="ttNotesEditBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3133,7 +3731,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — EDIT DATES
+       TIME TRACKER: EDIT DATES
   ====================================================================== -->
   <div id="ttDateEditBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3178,7 +3776,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — IMPORT CSV DATA
+       TIME TRACKER: IMPORT CSV DATA
   ====================================================================== -->
   <div id="ttCsvImportBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal modal-scrollable">
@@ -3193,8 +3791,8 @@
       </div>
       <div class="modal-body" style="text-align:left;">
         <p>Import entries from a CSV file. The first row must be a header row with these columns: <strong>Start Date</strong>, <strong>Start Time</strong>, <strong>End Time</strong>, <strong>Activity</strong>, and optionally <strong>End Date</strong>, <strong>Project</strong>, and <strong>Notes</strong>.</p>
-        <p>Every row needs a Start Date, Start Time, End Time, and Activity — if any row is missing one, the whole import is cancelled and nothing is added. This can only add new entries; it can't edit existing ones.</p>
-        <p>Dates can be in any common format (e.g. <strong>2024-03-05</strong>, <strong>3/5/2024</strong>, or <strong>March 5, 2024</strong>) as long as they're unambiguous — numeric dates follow the Date Format setting's month/day order.</p>
+        <p>Every row needs a Start Date, Start Time, End Time, and Activity. If any row is missing one, the whole import is cancelled and nothing is added. This can only add new entries; it can't edit existing ones.</p>
+        <p>Dates can be in any common format (e.g. <strong>2024-03-05</strong>, <strong>3/5/2024</strong>, or <strong>March 5, 2024</strong>) as long as they're unambiguous. Numeric dates follow the Date Format setting's month/day order.</p>
         <p id="ttCsvImportLastRow" class="tt-csv-import-last">Never imported</p>
 
         <button id="ttCsvImportTemplateBtn" class="settings-action-btn">Download Template</button>
@@ -3215,7 +3813,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — SETTINGS MODAL
+       TIME TRACKER: SETTINGS MODAL
   ====================================================================== -->
   <div id="ttSettingsBackdrop" class="modal-backdrop" style="display: none;">
     <div id="ttSettingsModal" class="modal setup-modal">
@@ -3317,7 +3915,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — ADD ACTIVITY
+       TIME TRACKER: ADD ACTIVITY
   ====================================================================== -->
   <div id="ttActivityAddBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3346,7 +3944,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — EDIT ACTIVITY
+       TIME TRACKER: EDIT ACTIVITY
   ====================================================================== -->
   <div id="ttActivityEditBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3378,7 +3976,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — ADD PROJECT
+       TIME TRACKER: ADD PROJECT
   ====================================================================== -->
   <div id="ttProjectAddBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3411,7 +4009,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — EDIT PROJECT
+       TIME TRACKER: EDIT PROJECT
   ====================================================================== -->
   <div id="ttProjectEditBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3447,7 +4045,351 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — SETUP DELETE CONFIRM (shared by Activities and Projects)
+       TTS REPEATER: PRESETS
+       A preset is a full snapshot of the form (message, interval, repeat,
+       voice, rate/pitch/volume), so loading one restores an entire setup
+       rather than just the text.
+  ====================================================================== -->
+  <div id="tts-presets-backdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal modal-scrollable tts-presets-modal">
+      <div class="modal-header">
+        <span>TTS Repeater Presets</span>
+        <button id="tts-presets-close" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+        <div class="tts-preset-save-row">
+          <input id="tts-preset-name" type="text" placeholder="Name this setup…" autocomplete="off"
+            spellcheck="false" maxlength="60" />
+          <button id="tts-preset-save-btn">Save Current</button>
+        </div>
+        <div id="tts-preset-list" class="tts-preset-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       COUNTDOWN: SETUP
+  ====================================================================== -->
+  <div id="cd-setup-backdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal modal-scrollable cd-setup-modal">
+      <div class="modal-header">
+        <span>Countdown Timer Setup</span>
+        <button id="cd-setup-close" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Progress Style</span>
+          <div id="cd-progress-style" class="cd-seg-group">
+            <button class="toggle-btn" data-value="none">None</button>
+            <button class="toggle-btn active" data-value="bar">Bar</button>
+            <button class="toggle-btn" data-value="ring">Ring</button>
+            <button class="toggle-btn" data-value="hourglass">Hourglass</button>
+          </div>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Clock Format</span>
+          <div id="cd-clock-format" class="cd-seg-group">
+            <button class="toggle-btn active" data-value="colon">00:10:00</button>
+            <button class="toggle-btn" data-value="units">0h 10m 0s</button>
+          </div>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Detail</span>
+          <div id="cd-display-mode" class="cd-seg-group">
+            <button class="toggle-btn active" data-value="brief">Brief</button>
+            <button class="toggle-btn" data-value="partial">Partial Disclosure</button>
+            <button class="toggle-btn" data-value="full">Full Disclosure</button>
+          </div>
+          <span class="cd-setup-note">At 45 seconds: Brief reads <strong>45</strong>, Partial reads
+            <strong>00:45</strong> (hours hidden, minutes always shown), Full reads
+            <strong>00:00:45</strong>.</span>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">A Plain Number Means</span>
+          <div id="cd-bare-unit" class="cd-seg-group">
+            <button class="toggle-btn" data-value="seconds">Seconds</button>
+            <button class="toggle-btn active" data-value="minutes">Minutes</button>
+            <button class="toggle-btn" data-value="hours">Hours</button>
+          </div>
+          <span class="cd-setup-note">Applies when you type a duration with no units or colons, so
+            <strong>90</strong> becomes 90 of whichever you pick. Forms like <strong>25m</strong> and
+            <strong>1:30:00</strong> are unaffected.</span>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Time Tracker</span>
+          <div class="cd-effect-row">
+            <div class="cd-effect-label">
+              <span>Show "Log to Time Tracker"</span>
+              <span id="cd-tracker-note" class="cd-effect-note"></span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="cd-show-tracker" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Alarm</span>
+          <div class="cd-alarm-row">
+            <select id="cd-sound"></select>
+            <div class="cd-inline">
+              <span class="cd-unit">×</span>
+              <input id="cd-sound-repeats" type="number" min="1" max="20" step="1" value="1" />
+            </div>
+            <div class="cd-inline">
+              <input id="cd-sound-gap" type="number" min="150" max="5000" step="50" value="400" />
+              <span class="cd-unit">ms apart</span>
+            </div>
+            <button id="cd-sound-test" class="modal-cancel-btn" title="Play the alarm">Test</button>
+          </div>
+          <span class="cd-setup-note">Up to 20 pings, 150–5000 ms apart. Spacing is measured from the start of each
+            repeat, so a gap shorter than the clip overlaps them, which is useful for cues with long silent tails.</span>
+        </div>
+
+        <div class="cd-setup-actions">
+          <button id="cd-setup-reset" class="modal-cancel-btn" title="Restore default Countdown Timer settings">Reset to
+            Defaults</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       COUNTDOWN: PRESETS
+  ====================================================================== -->
+  <div id="cd-presets-backdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal modal-scrollable cd-presets-modal">
+      <div class="modal-header">
+        <span>Countdown Timer Presets</span>
+        <button id="cd-presets-close" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+        <div class="cd-preset-form">
+          <input id="cd-preset-label" type="text" placeholder="Label (optional)" autocomplete="off" maxlength="24" />
+          <input id="cd-preset-duration" type="text" placeholder="25m, 1:30:00, 90" autocomplete="off"
+            spellcheck="false" />
+          <button id="cd-preset-save">Add</button>
+          <button id="cd-preset-cancel" class="modal-cancel-btn" style="display:none;">Cancel</button>
+        </div>
+        <!-- Second sentence is rewritten from the bare-number setting; see
+             refreshBareUnitHints(). -->
+        <span id="cd-preset-hint" class="cd-setup-note">Leave the label blank to name it after the duration. A bare
+          number means minutes.</span>
+
+        <div id="cd-preset-list" class="cd-preset-list"></div>
+
+        <div class="cd-setup-actions">
+          <button id="cd-presets-reset" class="modal-cancel-btn">Restore Defaults</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       COUNTDOWN: CLEAR HISTORY CONFIRM
+  ====================================================================== -->
+  <div id="cd-clear-backdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Clear History</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p>Remove every logged countdown session? Entries already sent to the Time Tracker stay there. Only this
+          tool's history is cleared.</p>
+        <div class="exit-modal-actions">
+          <button id="cd-clear-confirm" class="danger-btn">Clear History</button>
+          <button id="cd-clear-cancel" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       TTS REPEATER: SETUP
+       Display View appearance only. Everything else about a run lives in the
+       tool body itself (and in presets), so this modal has exactly one job.
+  ====================================================================== -->
+  <div id="tts-setup-backdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal modal-scrollable tts-setup-modal">
+      <div class="modal-header">
+        <span>TTS Repeater Setup</span>
+        <button id="tts-setup-close" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+
+        <p class="tts-setup-intro">Display View shows only your message, filling the whole window: no sidebar, no
+          controls, nothing else. Press <strong>Esc</strong> to leave it.</p>
+
+        <div class="tts-setup-field">
+          <span class="tts-label">Colors</span>
+          <div id="tts-display-look" class="tts-seg-group">
+            <button class="toggle-btn active" data-value="theme">Follow theme</button>
+            <button class="toggle-btn" data-value="custom">Custom</button>
+          </div>
+        </div>
+
+        <!-- Shown only in Follow-theme mode; see syncSetupUI(). Custom colors
+             are deliberately flat. You picked two exact colors, so it shows
+             two exact colors. -->
+        <div id="tts-display-effects-row" class="tts-setup-field">
+          <span class="tts-label">Theme Effects</span>
+          <div class="tts-effect-row">
+            <div class="tts-effect-label">
+              <span>Glow</span>
+              <span id="tts-glow-note" class="tts-effect-note"></span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="tts-display-glow" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="tts-effect-row">
+            <div class="tts-effect-label">
+              <span>Animations</span>
+              <span id="tts-animate-note" class="tts-effect-note"></span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="tts-display-animate" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Shown only in Custom mode; see syncSetupUI(). -->
+        <div id="tts-display-custom-row" class="tts-setup-field" style="display:none;">
+          <div class="tts-color-row">
+            <label class="tts-color-field">
+              <span class="tts-slider-label">Background</span>
+              <input id="tts-display-bg" type="color" value="#000000" />
+            </label>
+            <label class="tts-color-field">
+              <span class="tts-slider-label">Text</span>
+              <input id="tts-display-fg" type="color" value="#ffffff" />
+            </label>
+          </div>
+        </div>
+
+        <div class="tts-setup-field">
+          <span class="tts-label">Alignment</span>
+          <div id="tts-display-align" class="tts-seg-group">
+            <button class="toggle-btn" data-value="left">Left</button>
+            <button class="toggle-btn active" data-value="center">Center</button>
+            <button class="toggle-btn" data-value="right">Right</button>
+          </div>
+        </div>
+
+        <div class="tts-setup-field">
+          <span class="tts-label">Text Size</span>
+          <div class="tts-slider-grid">
+            <span class="tts-slider-label">Size</span>
+            <input id="tts-display-size" type="range" min="16" max="200" step="1" value="72" />
+            <span class="tts-slider-readout">
+              <span id="tts-display-size-value" class="tts-slider-value"
+                title="Double-click to type an exact value">72px</span>
+              <input id="tts-display-size-entry" class="tts-slider-entry" type="number" min="16" max="200" step="1"
+                hidden />
+            </span>
+          </div>
+        </div>
+
+        <div class="tts-setup-field">
+          <span class="tts-label">Preview</span>
+          <div id="tts-display-preview" class="tts-display-preview">
+            <div id="tts-display-preview-chrome" class="tool-view-header" aria-hidden="true"></div>
+            <span id="tts-display-preview-text" class="tool-view-title">We'll be right back!</span>
+          </div>
+        </div>
+
+        <div class="tts-setup-actions">
+          <button id="tts-display-reset-btn" class="modal-cancel-btn"
+            title="Restore the default Display View appearance">Reset to Defaults</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       TTS REPEATER: DISPLAY VIEW
+       Full-window overlay, deliberately stacked ABOVE #toastContainer
+       (z-index 10000): this is meant to go on a stream, and a toast popping up
+       over a "we'll be back" card is exactly what it exists to prevent. Sits
+       below nothing else that can coexist with it. The lock screen only
+       appears during startup gating, long before a run can be going.
+  ====================================================================== -->
+  <div id="tts-display-overlay" style="display:none;">
+    <!-- Wears .tool-view-header purely to inherit whatever background the
+         active theme gives its top bar. Most themes put a gradient there, and
+         that's the theme's own character rather than something invented here.
+         Every layout property of that class is neutralised in
+         tts-repeater.css; this element is a colour layer and nothing else. -->
+    <div id="tts-display-chrome" class="tool-view-header" aria-hidden="true"></div>
+    <button id="tts-display-exit" title="Exit Display View (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
+    <!-- Same trick for the text: .tool-view-title is where each theme sets its
+         header colour AND, on the themes that have one, its glow (neon's cyan
+         bloom, terminal's green, Halloween's orange). Inheriting it means Glow
+         is genuinely the theme's glow, not an imitation. -->
+    <div id="tts-display-text" class="tool-view-title"></div>
+  </div>
+
+  <!-- Off-screen probe carrying the same title class, so the Setup modal can
+       ask whether the CURRENT theme actually has a glow to toggle. -->
+  <span id="tts-glow-probe" class="tool-view-title" aria-hidden="true"></span>
+
+  <!-- =====================================================================
+       TTS REPEATER: PRESET DELETE CONFIRM
+       Replaces the Presets modal (replaceModal) and re-opens it on close,
+       whichever button got you out.
+  ====================================================================== -->
+  <div id="tts-preset-delete-backdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Delete Preset</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="tts-preset-delete-message">Permanently delete this preset? This can't be undone.</p>
+        <div class="exit-modal-actions">
+          <button id="tts-preset-delete-confirm" class="danger-btn">Delete</button>
+          <button id="tts-preset-delete-cancel" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       TIME TRACKER: SETUP DELETE CONFIRM (shared by Activities and Projects)
   ====================================================================== -->
   <div id="ttSetupDeleteBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3465,7 +4407,7 @@
   </div>
 
   <!-- =====================================================================
-       TIME TRACKER — SETUP MERGE CONFIRM (shared by Activities and Projects)
+       TIME TRACKER: SETUP MERGE CONFIRM (shared by Activities and Projects)
   ====================================================================== -->
   <div id="ttMergeConfirmBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3483,8 +4425,30 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — CONFIRM DELETE MODAL
+       BUDGET TRACKER: CONFIRM DELETE MODAL
   ====================================================================== -->
+  <!-- =====================================================================
+       BUDGET TRACKER: MARK REVIEWED CONFIRM
+       Guards the header's Mark Reviewed button, which otherwise clears an
+       overdue reminder on a single click with nothing to undo it.
+  ====================================================================== -->
+  <div id="budgetReviewConfirmBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="budgetReviewConfirmModal" class="modal">
+      <div class="modal-header">
+        <span>Mark Budget Reviewed</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p>Are you sure you want to clear this reminder without adding any budget data?</p>
+        <p class="subhint">The reminder starts over from now, so you won't be nudged again until the next one is
+          due.</p>
+        <div class="exit-modal-actions">
+          <button id="budgetReviewConfirmBtn">Yes, mark it reviewed</button>
+          <button id="budgetReviewCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="budgetDeleteBackdrop" class="modal-backdrop" style="display: none;">
     <div id="budgetDeleteModal" class="modal">
       <div class="modal-header">
@@ -3501,10 +4465,10 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — SETUP MODAL
+       BUDGET TRACKER: SETUP MODAL
        Tabs: Recurring Bills (list + editor), Categories, Income Sources,
        Expense Sources (simple active/retired lists). Reuses .modal chrome but
-       its own .budget-tab* classes — kept separate from .te-tab* so the
+       its own .budget-tab* classes, kept separate from .te-tab* so the
        theme editor's global tab listener doesn't pick these up.
   ====================================================================== -->
   <div id="budgetSetupBackdrop" class="modal-backdrop" style="display: none;">
@@ -3585,6 +4549,62 @@
 
             <div class="settings-section-divider"></div>
 
+            <!-- REMINDERS
+                 Schedule sub-rows swap: "Every N days" for interval mode,
+                 "On days" for monthly mode. Both live inside the same
+                 collapse, which follows the enable toggle. -->
+            <div class="settings-row">
+              <span>Budget Reminders</span>
+              <div class="toggle-with-label">
+                <span id="budgetReminderLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="budgetReminderToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div id="budgetReminderSubsettings" class="subsettings" style="max-height: 0;">
+              <div class="settings-row">
+                <span>Schedule:</span>
+                <select id="budgetReminderModeSelect" class="settings-select">
+                  <option value="interval">Every N days</option>
+                  <option value="monthly">Days of the month</option>
+                </select>
+              </div>
+
+              <div class="settings-row" id="budgetReminderDaysRow">
+                <span>Remind after:</span>
+                <div class="budget-reminder-days-field">
+                  <input type="number" id="budgetReminderDays" min="1" max="366" step="1" value="7" />
+                  <span>days</span>
+                </div>
+              </div>
+
+              <div class="settings-row" id="budgetReminderMonthDaysRow" style="display:none;">
+                <span>Remind on day:</span>
+                <input type="text" id="budgetReminderMonthDays" class="budget-reminder-monthdays-field"
+                  placeholder="1, 15" spellcheck="false" />
+              </div>
+
+              <div class="settings-row">
+                <span>Mode:</span>
+                <div class="toggle-with-label">
+                  <span id="budgetReminderModeLabel">Gentle</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="budgetReminderAggressiveToggle" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <p id="budgetReminderHint" class="subhint">Nudges you to put your numbers in when the budget
+                hasn't been touched. Gentle shows a toast on startup; Aggressive opens a modal. Either way the sidebar
+                and this tool's header keep flagging it until you update something.</p>
+            </div>
+
+            <div class="settings-section-divider"></div>
+
             <!-- ENCRYPTION -->
             <div class="settings-row">
               <div class="budget-encrypt-label-col">
@@ -3605,7 +4625,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — ENABLE ENCRYPTION
+       BUDGET TRACKER: ENABLE ENCRYPTION
        Password entry + warnings before encrypting budget data.
   ====================================================================== -->
   <div id="budgetEncryptEnableBackdrop" class="modal-backdrop" style="display: none;">
@@ -3624,9 +4644,9 @@
         </button>
       </div>
       <div class="modal-body" style="text-align:left;">
-        <p>Encrypting your budget data protects it from anyone with direct file access to this machine — the data cannot be read without the correct password.</p>
+        <p>Encrypting your budget data protects it from anyone with direct file access to this machine. The data cannot be read without the correct password.</p>
         <ul class="budget-encrypt-info-list">
-          <li>This password is <strong>separate from App Lock</strong> — do not reuse your App Lock password.</li>
+          <li>This password is <strong>separate from App Lock</strong>. Do not reuse your App Lock password.</li>
           <li>There is <strong>no recovery method</strong>. Forget this password and your budget data is permanently inaccessible.</li>
           <li>Store it in a <strong>password manager</strong>.</li>
         </ul>
@@ -3678,7 +4698,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — DISABLE ENCRYPTION
+       BUDGET TRACKER: DISABLE ENCRYPTION
        Requires current password; warns that data will be stored in plaintext.
   ====================================================================== -->
   <div id="budgetEncryptDisableBackdrop" class="modal-backdrop" style="display: none;">
@@ -3697,7 +4717,7 @@
         </button>
       </div>
       <div class="modal-body" style="text-align:left;">
-        <p>Disabling encryption will permanently decrypt your budget data. Once disabled, the file is stored in plaintext — readable by anyone with direct file access to this machine.</p>
+        <p>Disabling encryption will permanently decrypt your budget data. Once disabled, the file is stored in plaintext, readable by anyone with direct file access to this machine.</p>
         <p style="margin-top:8px;">Enter your current budget password to confirm:</p>
         <div class="lock-password-wrap" style="width:100%; margin-top:10px;">
           <input id="budgetEncryptDisablePassword" class="lock-password-input" style="text-align:left;"
@@ -3719,9 +4739,9 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — DATA LOAD WARNING
+       BUDGET TRACKER: DATA LOAD WARNING
        Shown when the saved budget data file couldn't be parsed or was from
-       an incompatible version. The window still opens normally — this modal
+       an incompatible version. The window still opens normally. This modal
        appears shortly after as a non-blocking choice between resetting the
        data or continuing with an empty session.
   ====================================================================== -->
@@ -3745,9 +4765,9 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — SETUP: PERMANENT DELETE CONFIRM
+       BUDGET TRACKER: SETUP: PERMANENT DELETE CONFIRM
        Shared by all four Setup tabs. Only reachable for already-retired
-       items — the delete icon doesn't appear until then.
+       items. The delete icon doesn't appear until then.
   ====================================================================== -->
   <div id="budgetSetupDeleteBackdrop" class="modal-backdrop" style="display: none;">
     <div id="budgetSetupDeleteModal" class="modal">
@@ -3765,7 +4785,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — ADD INCOME SOURCE
+       BUDGET TRACKER: ADD INCOME SOURCE
   ====================================================================== -->
   <div id="budgetSourceAddBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3808,7 +4828,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — EDIT INCOME SOURCE
+       BUDGET TRACKER: EDIT INCOME SOURCE
   ====================================================================== -->
   <div id="budgetSourceEditBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3853,7 +4873,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — ADD EXPENSE CATEGORY
+       BUDGET TRACKER: ADD EXPENSE CATEGORY
   ====================================================================== -->
   <div id="budgetCategoryAddBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3912,7 +4932,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — EDIT EXPENSE CATEGORY
+       BUDGET TRACKER: EDIT EXPENSE CATEGORY
   ====================================================================== -->
   <div id="budgetCategoryEditBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -3973,7 +4993,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — ADD EXPENSE SOURCE
+       BUDGET TRACKER: ADD EXPENSE SOURCE
   ====================================================================== -->
   <div id="budgetExpSourceAddBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -4032,7 +5052,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — EDIT EXPENSE SOURCE
+       BUDGET TRACKER: EDIT EXPENSE SOURCE
   ====================================================================== -->
   <div id="budgetExpSourceEditBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -4093,7 +5113,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — MARK BILL PAID / EDIT PAYMENT
+       BUDGET TRACKER: MARK BILL PAID / EDIT PAYMENT
        Opened by clicking a bill row in the main view. "Pay" mode (pending or
        overdue rows) shows the Next Due field for review before it's advanced;
        "edit" mode (already-paid rows) hides it and shows Undo Payment instead.
@@ -4162,7 +5182,7 @@
   </div>
 
   <!-- =====================================================================
-       BUDGET TRACKER — ADD/EDIT RECURRING BILL
+       BUDGET TRACKER: ADD/EDIT RECURRING BILL
        Its own modal (not an inline accordion). Opening it closes the Setup
        modal and vice versa via the back-arrow/Cancel, following the
        README/Licensing "replace, don't stack" convention. The X dismisses
@@ -4207,7 +5227,7 @@
                 placeholder="Optional" />
             </div>
           </div>
-          <!-- Recurrence spans full width — interval + unit select -->
+          <!-- Recurrence spans full width, interval + unit select -->
           <div class="budget-setup-field">
             <label>Recurrence</label>
             <div class="budget-setup-recurrence">
@@ -4262,7 +5282,7 @@
   </div>
 
   <!-- =====================================================================
-       AUTO-BACKUP — PRESETS MODAL
+       AUTO-BACKUP: PRESETS MODAL
   ====================================================================== -->
   <div id="abPresetsBackdrop" class="modal-backdrop" style="display: none;">
     <div id="abPresetsModal" class="modal ab-presets-modal">
@@ -4343,7 +5363,7 @@
   </div>
 
   <!-- =====================================================================
-       AUTO-BACKUP — SETUP MODAL
+       AUTO-BACKUP: SETUP MODAL
   ====================================================================== -->
   <div id="abSetupBackdrop" class="modal-backdrop" style="display: none;">
     <div id="abSetupModal" class="modal ab-setup-modal">
@@ -4383,12 +5403,30 @@
         </div>
 
         <div id="ab-setup-reminder-subsettings" class="subsettings" style="max-height: 0;">
+          <!-- Schedule sub-rows swap: "Remind after N days" for interval mode,
+               "Remind on day" for monthly. Same pair Budget's reminder uses. -->
           <div class="settings-row">
+            <span class="ab-setup-label-with-info">
+              Schedule:
+              <button type="button" class="info-trigger-btn ab-info-btn"
+                data-tooltip="Every N days counts from your last completed backup. Days of the month fires on the dates you pick, which is useful if you back up on a fixed schedule rather than a rolling one.">ℹ</button>
+            </span>
+            <select id="ab-setup-reminder-schedule" class="settings-select">
+              <option value="interval">Every N days</option>
+              <option value="monthly">Days of the month</option>
+            </select>
+          </div>
+          <div class="settings-row" id="ab-setup-reminder-days-row">
             <span>Remind after:</span>
             <div class="ab-reminder-days-field">
               <input type="number" id="ab-setup-reminder-days" min="1" max="366" step="1" value="7" />
               <span>days</span>
             </div>
+          </div>
+          <div class="settings-row" id="ab-setup-reminder-monthdays-row" style="display:none;">
+            <span>Remind on day:</span>
+            <input type="text" id="ab-setup-reminder-monthdays" class="ab-reminder-monthdays-field" placeholder="1, 15"
+              spellcheck="false" />
           </div>
           <div class="settings-row">
             <span class="ab-setup-label-with-info">
@@ -4409,7 +5447,7 @@
   </div>
 
   <!-- ================================================================
-             AUTO-BACKUP — RUN CONFIRMATION MODAL
+             AUTO-BACKUP: RUN CONFIRMATION MODAL
         ================================================================ -->
   <div id="abRunConfirmBackdrop" class="modal-backdrop" style="display: none;">
     <div id="abRunConfirmModal" class="modal ab-run-confirm-modal">
@@ -4429,7 +5467,7 @@
           <span id="ab-confirm-drives">—</span>, which can
           <strong>add, edit, and delete</strong> files in the destination folders.
         </p>
-        <!-- Free-space warnings — one paragraph per destination that doesn't
+        <!-- Free-space warnings. One paragraph per destination that doesn't
              have room for its planned copy. Non-blocking: "size to copy"
              counts the full size of every changed file, not just the actual
              new bytes an overwrite adds, so this is a caution, not a hard
@@ -4444,7 +5482,7 @@
     </div>
   </div>
 
-  <!-- Skipped Files modal — files robocopy couldn't copy (locked/access
+  <!-- Skipped Files modal, files robocopy couldn't copy (locked/access
        error) on the last run. The destination still completed; these were
        skipped, not a run failure. -->
   <div id="abSkippedFilesBackdrop" class="modal-backdrop" style="display: none;">
@@ -4461,7 +5499,7 @@
       <div class="modal-body">
         <p>
           These files were locked or otherwise inaccessible when robocopy tried to copy
-          them, so they were skipped — the rest of the backup still ran normally.
+          them, so they were skipped. The rest of the backup still ran normally.
         </p>
         <p id="ab-skipped-files-count" class="ab-skipped-files-count">0 files couldn't be copied</p>
         <div id="ab-skipped-files-list" class="ab-skipped-files-list"></div>
@@ -4473,7 +5511,7 @@
   </div>
 
   <!-- ================================================================
-             AUTO-BACKUP — DIRS TO COPY INFO MODAL
+             AUTO-BACKUP: DIRS TO COPY INFO MODAL
         ================================================================ -->
   <div id="abDirsInfoBackdrop" class="modal-backdrop" style="display:none;">
     <div id="abDirsInfoModal" class="modal info-modal">
@@ -4491,7 +5529,7 @@
           <p class="info-heading">Why is this higher than Total Source Dirs?</p>
           <p>Because the backup also creates <strong>each source folder itself</strong> at the
             destination. Backing up <strong>C:\Photos</strong> into <strong>D:\Backup</strong>
-            produces <strong>D:\Backup\Photos</strong> — that root folder is one directory the
+            produces <strong>D:\Backup\Photos</strong>. That root folder is one directory the
             run has to create, on top of everything inside it. One extra root is counted per
             source, per destination.</p>
         </div>
@@ -4502,7 +5540,7 @@
             describes what exists <em>inside</em> your sources; <strong>Dirs to Copy</strong>
             describes the work the next run would do. Nudging the source stats to make the
             comparison tidier would make them lie about your actual folders.</p>
-          <p>This button only appears when the two disagree — on incremental runs, where the
+          <p>This button only appears when the two disagree, on incremental runs, where the
             roots already exist, it stays out of your way.</p>
         </div>
       </div>
@@ -4510,7 +5548,7 @@
   </div>
 
   <!-- ================================================================
-             AUTO-BACKUP — COPY SPEED INFO MODAL
+             AUTO-BACKUP: COPY SPEED INFO MODAL
         ================================================================ -->
   <div id="abSpeedInfoBackdrop" class="modal-backdrop" style="display:none;">
     <div id="abSpeedInfoModal" class="modal info-modal">
@@ -4528,7 +5566,7 @@
           <p class="info-heading">What it does</p>
           <p>This value is an <strong>estimating aid, nothing more</strong>. It seeds the
             <strong>Estimated Time</strong> shown in the Summary panel, and gives a running backup's
-            progress bar and ETA a starting speed to work with during the first moments of a run —
+            progress bar and ETA a starting speed to work with during the first moments of a run,
             before enough real data has flowed to measure the actual throughput.</p>
         </div>
         <div class="info-divider"></div>
@@ -4536,13 +5574,13 @@
           <p class="info-heading">What it does <em>not</em> do</p>
           <p>It does <strong>not</strong> limit, throttle, or control the speed of an actual backup in
             any way. Backups always run at whatever speed your drives can deliver. Setting this to 1
-            or 10,000 changes only the predictions on this screen — never the backup itself.</p>
+            or 10,000 changes only the predictions on this screen, never the backup itself.</p>
         </div>
         <div class="info-divider"></div>
         <div class="info-section">
           <p class="info-heading">It tunes itself</p>
           <p>After every successful backup that copies a meaningful amount of data (at least 100 MB),
-            the speed measured during that run is blended into this value — 70% old, 30% new — so the
+            the speed measured during that run is blended into this value (70% old, 30% new), so the
             estimates steadily converge on your machine's real-world throughput. Small incremental
             runs are ignored, since they're too brief to measure honestly.</p>
           <p>You can still type in your own value at any time; it simply becomes the new baseline that
@@ -4553,7 +5591,7 @@
   </div>
 
   <!-- ================================================================
-             DUMMY FILE GENERATOR — EXTENSION PICKER MODAL
+             DUMMY FILE GENERATOR: EXTENSION PICKER MODAL
         ================================================================ -->
   <div id="dfg-ext-backdrop" class="modal-backdrop" style="display:none;">
     <div id="dfg-ext-modal" class="modal dfg-ext-modal">
@@ -4688,14 +5726,14 @@
             will be no larger than the box you define, but its exact dimensions depend on each image's proportions.</p>
           <p>If you set only <strong>W</strong>, images are scaled to that width and height follows proportionally. If
             you set only <strong>H</strong>, the opposite applies. If you set both, images fit within that box. Leave
-            both blank to skip resizing entirely — you can still apply a canvas without resizing.</p>
+            both blank to skip resizing entirely. You can still apply a canvas without resizing.</p>
         </div>
         <div class="info-divider"></div>
         <div class="info-section">
           <p class="info-heading">Canvas</p>
           <p>Places each (optionally resized) image onto a fixed-size surface filled with the background color. Images
             smaller than the canvas are padded; images larger than the canvas are cropped.</p>
-          <p>Use canvas when all output files must share identical dimensions — for example, a carousel where every
+          <p>Use canvas when all output files must share identical dimensions, for example a carousel where every
             slide must be exactly 1920×1080.</p>
           <p><strong>Best practice:</strong> the canvas should always be equal to or larger than your largest source
             image, or your resize target if one is set. If the canvas is smaller, the image will be cropped.</p>
@@ -4726,7 +5764,7 @@
       </div>
       <div class="modal-body theme-editor-body">
 
-        <!-- Theme name + base picker row — always visible above tabs -->
+        <!-- Theme name + base picker row, always visible above tabs -->
         <div class="te-top-row">
           <div class="te-name-field">
             <label class="te-field-label">Theme Name</label>
@@ -4763,7 +5801,7 @@
           <button class="setup-tab" data-te-tab="advanced">Advanced</button>
         </div>
 
-        <!-- GENERAL TAB — color swatches -->
+        <!-- GENERAL TAB, color swatches -->
         <div id="teTabGeneral" class="te-tab-pane te-groups">
 
           <div class="te-group">
@@ -4939,7 +5977,7 @@
 
         </div><!-- /teTabGeneral -->
 
-        <!-- ADVANCED TAB — gradients and glows -->
+        <!-- ADVANCED TAB, gradients and glows -->
         <div id="teTabAdvanced" class="te-tab-pane te-groups" style="display:none;">
 
           <div class="te-group">
@@ -5169,7 +6207,7 @@
         </button>
       </div>
       <div class="modal-body set-lock-body">
-        <!-- Type picker — lets user choose PIN vs Password before entering it -->
+        <!-- Type picker, lets user choose PIN vs Password before entering it -->
         <div class="lock-credential-type" id="setLockTypePicker">
           <button id="setLockPickPin" class="lock-type-btn active">PIN</button>
           <button id="setLockPickPassword" class="lock-type-btn">Password</button>
@@ -5206,7 +6244,7 @@
     </div>
   </div>
   <!-- =====================================================================
-       BUDGET TRACKER — CHART EXPAND MODAL
+       BUDGET TRACKER: CHART EXPAND MODAL
        Shows the category or source breakdown chart at full size with axis
        labels and value ticks. Title and subtitle are set by openChartModal().
   ====================================================================== -->
@@ -5230,7 +6268,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — SETUP MODAL
+       GAME STATS: SETUP MODAL
   ====================================================================== -->
   <div id="gsSettingsBackdrop" class="modal-backdrop" style="display: none;">
     <div id="gsSettingsModal" class="modal setup-modal">
@@ -5257,7 +6295,7 @@
           <div id="gsProfilesList" class="setup-list"></div>
         </div>
 
-        <!-- TABLES — appear on their own the first time a roster is played,
+        <!-- TABLES, appear on their own the first time a roster is played,
              so there's no "+ New Table" button; only naming is manual. -->
         <div id="gsTabTables" class="setup-tab-pane" style="display:none;">
           <p class="gs-preference-hint gs-tables-intro">
@@ -5311,7 +6349,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — EDIT TABLE (name only; a table's roster is defined by
+       GAME STATS: EDIT TABLE (name only; a table's roster is defined by
        the games played at it and can't be edited here)
   ====================================================================== -->
   <div id="gsTableEditBackdrop" class="modal-backdrop" style="display: none;">
@@ -5335,7 +6373,7 @@
           <div class="setup-field">
             <label>Seat Order</label>
             <div id="gsTableEditSeats" class="gs-seat-list"></div>
-            <p class="gs-preference-hint">Drag to set the column order. Applies to every game at this table — past and future.</p>
+            <p class="gs-preference-hint">Drag to set the column order. Applies to every game at this table, past and future.</p>
           </div>
           <div class="setup-actions">
             <button id="gsTableEditSave">Save</button>
@@ -5347,7 +6385,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — IMPORT WORKBOOK
+       GAME STATS: IMPORT WORKBOOK
        Choose-then-run, mirroring Time Tracker's CSV Import modal. Nothing is
        written until the whole workbook validates, so a failed run's error
        list is a to-do for the spreadsheet, not a partial-failure log.
@@ -5370,7 +6408,7 @@
         </div>
 
         <p>Import an Excel workbook with one sheet per game, named &quot;Game 1&quot;, &quot;Game 2&quot;, and so on. The template explains the exact layout.</p>
-        <p>Every sheet is validated before anything is added — if even one game has a problem, the whole import is cancelled and nothing changes.</p>
+        <p>Every sheet is validated before anything is added. If even one game has a problem, the whole import is cancelled and nothing changes.</p>
         <p id="gsImportLastRow" class="gs-import-last">Never imported</p>
 
         <div class="gs-import-template-row">
@@ -5393,7 +6431,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — IMPORT RESULT
+       GAME STATS: IMPORT RESULT
        Replaces the Import Workbook modal (replaceModal) once Import Workbook
        is clicked. Errors send you back to that modal via "Try Again" (the
        chosen file stays selected); success sends you back to Setup.
@@ -5418,7 +6456,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — ADD PROFILE
+       GAME STATS: ADD PROFILE
   ====================================================================== -->
   <div id="gsProfileAddBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -5447,7 +6485,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — EDIT PROFILE
+       GAME STATS: EDIT PROFILE
   ====================================================================== -->
   <div id="gsProfileEditBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -5479,7 +6517,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — SETUP DELETE CONFIRM
+       GAME STATS: SETUP DELETE CONFIRM
   ====================================================================== -->
   <div id="gsProfileDeleteBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -5497,7 +6535,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — DELETE GAME CONFIRM
+       GAME STATS: DELETE GAME CONFIRM
   ====================================================================== -->
   <div id="gsGameDeleteBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal">
@@ -5515,7 +6553,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — OVERTIME CONFIRM
+       GAME STATS: OVERTIME CONFIRM
        Only reachable when the "Auto-Add Overtime Rounds" preference is off.
   ====================================================================== -->
   <div id="gsOvertimeConfirmBackdrop" class="modal-backdrop" style="display: none;">
@@ -5534,7 +6572,7 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — STAT DETAIL
+       GAME STATS: STAT DETAIL
        Opened by double-clicking a comparison-table cell that has more than
        one game behind it (career records, milestone games).
   ====================================================================== -->
@@ -5562,9 +6600,9 @@
   </div>
 
   <!-- =====================================================================
-       GAME STATS — CHART EXPAND
+       GAME STATS: CHART EXPAND
        Larger redraw of an inline chart (Win Chart or a game's progress
-       chart), with axis labels and a hover tooltip — like Budget Tracker's
+       chart), with axis labels and a hover tooltip, like Budget Tracker's
        chart-expand modal.
   ====================================================================== -->
   <div id="gsChartExpandBackdrop" class="modal-backdrop" style="display: none;">

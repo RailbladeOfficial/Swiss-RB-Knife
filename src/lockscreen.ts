@@ -1,15 +1,15 @@
 /* =============================================================================
-   LOCK SCREEN  — app-lock PIN/password gate + set/change credential modal
+   LOCK SCREEN: app-lock PIN/password gate + set/change credential modal
    -----------------------------------------------------------------------------
-   Owns the full-window lock screen overlay (not a Modal — no Escape, no drag,
+   Owns the full-window lock screen overlay (not a Modal. No Escape, no drag,
    no close except successful unlock) shown at startup when App Lock is on,
    and the Set/Change Credential modal used to configure it from Settings.
 
    Split out of shell.ts (Tier 6). One-directional dependency on shell.ts core
-   only (settings, flash, quitApp, saveSettings, settingsModal) — nothing here
+   only (settings, flash, quitApp, saveSettings, settingsModal). Nothing here
    is needed by theme-core/theme-editor/random-theme, and this file doesn't
    need docs.ts despite runStartupGates() (in docs.ts) being the thing that
-   calls showLockScreen() — that direction is docs.ts -> lockscreen.ts only.
+   calls showLockScreen(): that direction is docs.ts -> lockscreen.ts only.
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -121,8 +121,8 @@ export function showLockScreen(): Promise<void> {
 }
 
 /** Fades and removes the lock screen, then resolves the startup gate.
- *  Uses setTimeout matching the CSS transition duration (0.3s) — same pattern
- *  as modal.ts close() — to avoid early teardown from child transitionend events. */
+ *  Uses setTimeout matching the CSS transition duration (0.3s). Same pattern
+ *  as modal.ts close(): to avoid early teardown from child transitionend events. */
 function dismissLockScreen(): void {
   lockScreen.classList.add("lock-fading");
   setTimeout(() => {
@@ -230,7 +230,7 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// Show/hide password toggle — our own button; browser's native reveal is suppressed via CSS
+// Show/hide password toggle, our own button; browser's native reveal is suppressed via CSS
 lockShowPassword.addEventListener("click", () => {
   const isHidden = lockPasswordInput.type === "password";
   lockPasswordInput.type = isHidden ? "text" : "password";
@@ -270,7 +270,7 @@ appLockToggle.addEventListener("change", async () => {
     settingsModal.close();
     const saved = await openSetLockModal("enable");
     if (!saved) {
-      // User cancelled — leave lock off
+      // User cancelled, leave lock off
       settingsModal.open();
       return;
     }
@@ -381,7 +381,7 @@ function _applySetLockType(
   setLockConfirm.inputMode = isPin ? "numeric" : "text";
   setLockConfirm.pattern = isPin ? "[0-9]*" : "";
 
-  // Always show reveal buttons — useful for both PIN and password to verify entry
+  // Always show reveal buttons, useful for both PIN and password to verify entry
   setLockShowInput.style.display = "";
   setLockShowConfirm.style.display = "";
   _resetSetLockEye("setLockInputEye");
@@ -419,7 +419,7 @@ function openSetLockModal(mode: "enable" | "change"): Promise<boolean> {
     // Snapshot state so cancel can restore it
     const prevCredType = settings.lockCredentialType;
 
-    // Working type for the modal — user can switch before saving
+    // Working type for the modal, user can switch before saving
     let modalType: "pin" | "password" = settings.lockCredentialType;
 
     setLockTitle.textContent =

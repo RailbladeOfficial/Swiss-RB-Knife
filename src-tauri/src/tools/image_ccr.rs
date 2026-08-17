@@ -1,31 +1,31 @@
 /* =============================================================================
-   IMAGE CCR  — Combine / Compress / Resize
+   IMAGE CCR: Combine / Compress / Resize
    -----------------------------------------------------------------------------
    Tauri commands for the Image CCR tool. All image processing uses the `image`
    crate (v0.25); no ImageMagick dependency.
 
    Tabs / commands:
-     Combine  — stack 2+ images into one with gap, border, and format options
+     Combine:  stack 2+ images into one with gap, border, and format options
                 (get_image_info, preview_combine, combine_images)
-     Compress — scale a single image by percentage
+     Compress, scale a single image by percentage
                 (compress_image)
-     Resize   — batch-resize a set of images (a folder OR a hand-picked file
+     Resize:   batch-resize a set of images (a folder OR a hand-picked file
                 list) to a target dimension / canvas size, running on a
                 dedicated thread with live progress events
                 (scan_resize_sources, resize_images, cancel_resize)
-     Utility  — show_in_explorer (shared across tabs)
+     Utility:  show_in_explorer (shared across tabs)
 
    THREADING MODEL
    ---------------
    Every command here that touches image bytes is CPU-bound. A plain
    #[tauri::command] runs on the thread that services the IPC message, so a
-   heavy decode/encode loop there freezes the whole UI until it returns — which
+   heavy decode/encode loop there freezes the whole UI until it returns, which
    is exactly what a big Resize folder used to do (hundreds of full image
    decodes, synchronously, on the UI path). Two rules fix that class of bug:
 
      • Never fully decode an image just to read its size. get_image_info and
        the resize scan use image::image_dimensions(), which reads only the
-       header — orders of magnitude faster than image::open() on large files.
+       header, orders of magnitude faster than image::open() on large files.
 
      • Never do the CPU work on the IPC thread. The one-shot commands
        (get_image_info / preview_combine / combine_images / compress_image) are
@@ -40,7 +40,7 @@
        (std::thread + a shared atomic work-claim index, not a new dependency)
        instead of resizing one image at a time. The pool size is derived from
        available_parallelism(), minus one core left free for the OS/UI, and
-       capped at 8 — so a 16-core desktop actually uses its hardware, while a
+       capped at 8, so a 16-core desktop actually uses its hardware, while a
        2-core laptop falls back to a single worker (i.e. today's sequential
        behaviour) instead of contending with itself.
 ============================================================================= */
@@ -100,7 +100,7 @@ pub struct CompressResult {
 /// the chosen output folder or that Windows can't create. combine_images and
 /// compress_image join this straight onto the output dir, so a value with a
 /// path separator, ".." , or an absolute path would otherwise write OUTSIDE it
-/// — and because this app runs elevated, that write lands with the admin token.
+///, and because this app runs elevated, that write lands with the admin token.
 /// This is the same guard the Dummy File Generator (validate_name_part) and the
 /// Time Tracker CSV export (sanitize_filename) already apply to their
 /// user-supplied names; Image CCR just never had it.
@@ -121,7 +121,7 @@ fn validate_output_name(name: &str) -> Result<(), String> {
     }
     if crate::is_reserved_device_name(trimmed) {
         return Err(format!(
-            "'{trimmed}' is a reserved Windows device name — saving to it would write to the \
+            "'{trimmed}' is a reserved Windows device name. Saving to it would write to the \
              device instead of creating a file. Pick another name."
         ));
     }
@@ -134,7 +134,7 @@ fn validate_output_name(name: &str) -> Result<(), String> {
 
 /// async + spawn_blocking so a large source image never stalls the UI while
 /// its header is read. Uses image_dimensions() (header only) rather than a full
-/// image::open() decode — this command only needs width/height/size, and the
+/// image::open() decode. This command only needs width/height/size, and the
 /// Combine tab may call it once per file across a whole multi-select.
 #[tauri::command]
 pub async fn get_image_info(path: String) -> Result<ImageInfo, String> {
@@ -167,7 +167,7 @@ pub async fn get_image_info(path: String) -> Result<ImageInfo, String> {
 }
 
 // =============================================================================
-//  COMBINE  — shared compositing logic
+//  COMBINE: shared compositing logic
 // =============================================================================
 
 /// Parse a colour spec into [r, g, b, a].
@@ -210,7 +210,7 @@ const MAX_SOURCE_DIMENSION: u32 = 65_535;
 /// 512 MiB; this raises it enough for genuinely large photography (a 24-bit
 /// 20000x12000 TIFF decodes to ~960 MB as RGBA) while still refusing the
 /// unbounded case. Resize runs up to 8 workers, so the real worst case is this
-/// figure times the pool size — deliberately kept below what would page a
+/// figure times the pool size, deliberately kept below what would page a
 /// typical 16 GB machine into swap.
 const MAX_DECODE_ALLOC: u64 = 1_536 * 1024 * 1024;
 
@@ -218,14 +218,14 @@ const MAX_DECODE_ALLOC: u64 = 1_536 * 1024 * 1024;
 ///
 /// Every decode in this module goes through here rather than calling
 /// image::open() directly. image::open() applies Limits::default(), which sets
-/// no dimension bounds at all and caps allocation at 512 MiB — a cap the crate
+/// no dimension bounds at all and caps allocation at 512 MiB, a cap the crate
 /// documents as non-strict and which some decoders ignore. Declaring the
 /// limits explicitly makes the ceiling a property of this app rather than of
 /// whatever the crate's defaults happen to be after the next upgrade, and
 /// turns an oversized or corrupt file into a clear error rather than an
 /// allocation the process may not survive.
 ///
-/// Format detection is deliberately left as image::open() had it — derived
+/// Format detection is deliberately left as image::open() had it, derived
 /// from the file extension, NOT sniffed from the content. Adding
 /// with_guessed_format() here would quietly widen what the resize and compress
 /// tools accept, and would disagree with image_dimensions() (which is
@@ -253,7 +253,7 @@ fn open_image_limited(path: &(impl AsRef<Path> + ?Sized)) -> Result<DynamicImage
 
 /// Upper bound on the composited canvas, in pixels. At 4 bytes per RGBA pixel
 /// this caps the single largest allocation the combine path can make at ~1.6 GB
-/// — big enough for any realistic photo montage, small enough that an absurd
+///, big enough for any realistic photo montage, small enough that an absurd
 /// selection fails with a clear message instead of an allocation abort.
 const MAX_CANVAS_PIXELS: u64 = 400_000_000;
 
@@ -331,7 +331,7 @@ fn plan_combine(
 /// when it is about to be drawn and dropping it immediately afterwards.
 ///
 /// Peak memory is the canvas plus a single source, rather than the canvas plus
-/// every source at once — the previous version decoded all of them up front
+/// every source at once. The previous version decoded all of them up front
 /// into a Vec<DynamicImage> and then made a second full copy of each via
 /// to_rgba8() during the overlay, so a 20-image montage of 24 MP photos held
 /// well over a gigabyte before compositing even began.
@@ -339,7 +339,7 @@ fn plan_combine(
 /// The border is handled by insetting the draw offsets into a canvas that was
 /// allocated at full size from the start, pre-filled with the border colour.
 /// The old code composited at inner size and then copied the whole thing into
-/// a second, larger canvas — briefly holding two full-size images to add what
+/// a second, larger canvas, briefly holding two full-size images to add what
 /// is just a coloured margin.
 ///
 /// Images are NOT rotated to match orientation; mismatched sizes are padded
@@ -362,8 +362,8 @@ fn composite_streaming(
         image::Rgba(if border_px > 0 { border_rgba } else { canvas_rgba }),
     );
 
-    // Repaint the composited region, row by row into the existing buffer —
-    // no second full-size image is allocated to do it.
+    // Repaint the composited region, row by row into the existing buffer.
+    // No second full-size image is allocated to do it.
     //
     // Skipped when the canvas colour is transparent, which preserves the old
     // two-pass build's result exactly: that version composited onto a
@@ -533,7 +533,7 @@ pub async fn combine_images(
             ));
         }
 
-        // Guard the output name before doing any image work — a traversal or
+        // Guard the output name before doing any image work, a traversal or
         // absolute-path value must be rejected, not joined onto the output dir.
         validate_output_name(&output_name)?;
 
@@ -595,7 +595,7 @@ pub async fn compress_image(
             return Err("Percentage must be between 1 and 99.".to_string());
         }
 
-        // Guard the output name before touching the image — see validate_output_name.
+        // Guard the output name before touching the image, see validate_output_name.
         validate_output_name(&output_name)?;
 
         let clean_path = path.replace('/', "\\");
@@ -664,7 +664,7 @@ pub fn show_in_explorer(path: String) -> Result<(), String> {
         // entries makes Rust's process spawner rejoin them with a space when
         // it builds the actual Windows command line (e.g.
         // `explorer.exe /select, "C:\path"`), which explorer.exe's picky
-        // parser silently fails on — it just opens a bare window instead
+        // parser silently fails on. It just opens a bare window instead
         // (whatever your Explorer's default location is, e.g. Desktop) with
         // nothing selected. A single combined argument avoids that: Rust
         // will still quote it as a whole if the path contains spaces,
@@ -703,7 +703,7 @@ pub fn show_in_explorer(path: String) -> Result<(), String> {
 /// Result of a source scan: the concrete list of image paths the resize will
 /// operate on, plus dimension stats for the UI. Returning the resolved paths
 /// (rather than re-reading the folder at resize time) is what lets Resize work
-/// identically for a browsed folder and a hand-picked file selection — the run
+/// identically for a browsed folder and a hand-picked file selection. The run
 /// step just consumes this list.
 #[derive(serde::Serialize)]
 pub struct ResizeScanResult {
@@ -741,7 +741,7 @@ pub struct ResizeCompleteEvent {
 static RESIZE_CANCEL: AtomicBool = AtomicBool::new(false);
 
 /// True while a resize thread is alive. The frontend disables its Run button
-/// during a job, but the backend guards independently — two concurrent jobs
+/// during a job, but the backend guards independently. Two concurrent jobs
 /// would share one cancel flag and race each other's progress events.
 static RESIZE_RUNNING: AtomicBool = AtomicBool::new(false);
 
@@ -760,12 +760,12 @@ fn has_supported_ext(p: &Path) -> bool {
 
 /// Scans a set of source images and returns their dimension statistics plus the
 /// resolved path list. Accepts EITHER a `folder` (enumerated for supported
-/// images) OR an explicit `files` list (e.g. a hand-picked multi-select) — this
+/// images) OR an explicit `files` list (e.g. a hand-picked multi-select). This
 /// is how the Resize tab supports both "browse a folder" and "pick files".
 ///
 /// Runs on a blocking-pool thread (spawn_blocking) so the UI stays responsive
 /// even for a large folder, and reads each header with image_dimensions()
-/// rather than a full decode — the previous full-decode-per-file loop is what
+/// rather than a full decode. The previous full-decode-per-file loop is what
 /// made a big folder freeze the app for minutes. Progress is reported via
 /// "resize-scan-progress" events, throttled to ~1% steps so a huge folder
 /// doesn't flood the event channel.
@@ -867,7 +867,7 @@ pub fn resize_images(
     if paths.is_empty() {
         return Err("No source images selected.".to_string());
     }
-    // Refuse to start if a job is already in flight — swap() makes the
+    // Refuse to start if a job is already in flight, swap() makes the
     // check-and-claim atomic, so simultaneous invokes can't both proceed.
     if RESIZE_RUNNING.swap(true, Ordering::SeqCst) {
         return Err("A resize job is already running.".to_string());
@@ -964,7 +964,7 @@ fn resize_images_thread(
     let mut used_names: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     // If an output goes into the SAME directory as one of the originals, its
-    // name can collide with that original and overwrite it — actual data loss,
+    // name can collide with that original and overwrite it, actual data loss,
     // not just a lost output. Pre-seed the set with any source filename whose
     // parent directory is the output directory so those collisions take the
     // counter-suffix path instead. (Handles both "output = browsed folder" and
@@ -989,7 +989,7 @@ fn resize_images_thread(
     // across cores is the single biggest lever for a big batch. But not every
     // machine running this app is a workstation: leave one core free for the
     // OS/UI so the app doesn't itself become the reason things feel sluggish,
-    // and cap the upper bound — each in-flight worker holds a full decoded
+    // and cap the upper bound. Each in-flight worker holds a full decoded
     // bitmap in memory, so unlimited parallelism on a many-core box just trades
     // CPU headroom for a RAM/disk-I/O bottleneck instead. A 1-2 core machine
     // falls back to a single worker, i.e. today's sequential behaviour.
@@ -1000,18 +1000,18 @@ fn resize_images_thread(
         .clamp(1, 8);
 
     let next_index = AtomicU32::new(0);   // work-claim cursor into image_paths
-    let processed  = AtomicU32::new(0);   // attempted (saved or skipped) — drives the progress bar
-    let saved      = AtomicU32::new(0);   // actually written — drives the final count
+    let processed  = AtomicU32::new(0);   // attempted (saved or skipped) (drives the progress bar
+    let saved      = AtomicU32::new(0);   // actually written) drives the final count
     let cancelled  = AtomicBool::new(false);
     let aborted: Mutex<Option<String>> = Mutex::new(None); // first fatal save error, if any
 
     // std::thread::scope lets each worker borrow the function's local state
     // (image_paths, used_names, the atomics, …) directly instead of needing
-    // Arc everywhere — the scope guarantees every spawned thread has finished
+    // Arc everywhere. The scope guarantees every spawned thread has finished
     // before it returns, so those borrows stay valid for the whole call.
     std::thread::scope(|scope| {
         for _ in 0..worker_count {
-            // Fresh, per-iteration bindings: an owned AppHandle clone (cheap —
+            // Fresh, per-iteration bindings: an owned AppHandle clone (cheap,
             // it's Arc-backed internally) plus plain references to everything
             // else. References are Copy, so each loop iteration hands the
             // `move` closure its own copy without fighting over ownership.
@@ -1181,7 +1181,7 @@ fn resize_images_thread(
 }
 
 /* =============================================================================
-   TESTS — combine geometry
+   TESTS: combine geometry
    -----------------------------------------------------------------------------
    Covers the streaming compositor's layout maths: canvas sizing, cross-axis
    centring of mismatched sources, gap placement, direction reversal, and
@@ -1284,7 +1284,7 @@ mod tests {
     fn border_region_uses_the_canvas_colour_where_sources_do_not_reach() {
         let d = scratch("borderpad");
         // Narrower than the widest source, so there is cross-axis padding
-        // INSIDE the border — the region repainted by the row-fill path.
+        // INSIDE the border. The region repainted by the row-fill path.
         let a = solid(&d, "a.png", 4, 6, RED);
         let b = solid(&d, "b.png", 10, 6, BLUE);
 

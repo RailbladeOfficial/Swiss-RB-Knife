@@ -6,13 +6,13 @@
 
 **Author:** Railblade  
 **Copyright:** © 2026 Railblade  
-**License:** GNU Affero General Public License v3.0 (AGPL-3.0) — see [LICENSE](LICENSE)
+**License:** GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE)
 
 ---
 
 ## What Is It?
 
-Swiss RB Knife is an offline-by-default, open-source, personal desktop utility suite — a unified multi-tool of various micro-utilities that I could not find personally useful substitutes for on the interwebs.
+Swiss RB Knife is an offline-by-default, open-source, personal desktop utility suite: a unified multi-tool of various micro-utilities that I could not find personally useful substitutes for on the interwebs.
 
 From image editing and file management, to productivity tracking and other shitnanigans, there's something in here for everyone's niche workflows. Probably.
 
@@ -196,16 +196,16 @@ In my QA work, sometimes you just need a random assortment of meaningless files 
 
 Swiss RB Knife is built with [Tauri](https://tauri.app/), a framework for building lightweight desktop apps using a Rust backend and a web-based frontend.
 
-**Platform:** Windows only — Auto-Backup and several file operations shell out to Windows-native utilities (robocopy, fsutil).
+**Platform:** Windows only. Auto-Backup and several file operations shell out to Windows-native utilities (robocopy, fsutil).
 
 *If you like what I'm doing here and wanna help make a Mac/Linux port... be my guest, be my guest, make a port your personal quest. I'm unsure if I'd get sued so I'll not parody the rest.*
 
-**Frontend:** TypeScript, HTML, CSS — compiled with [Vite](https://vitejs.dev/)
-**Backend:** Rust via Tauri — handles file system access, window management, and native OS integration
+**Frontend:** TypeScript, HTML, CSS, compiled with [Vite](https://vitejs.dev/)
+**Backend:** Rust via Tauri, which handles file system access, window management, and native OS integration
 **Theming:** Multiple built-in CSS themes plus a random palette generator and ability to create and save custom themes
 **Sound Packs:** Multiplt built-in sound packs with unique success / error sounds for the notification toasts that flash across the top of the screen
 **State:** All settings and tool state are persisted locally via Tauri's invoke system (user data is saved in "C:\Users\{yourname}\AppData\Roaming\swiss-rb-knife")
-**Admin Elevation:** Admin Elevation is required on program launch for the Auto-Backup tool to function as expected — see Security & Privacy for more details
+**Admin Elevation:** Admin Elevation is required on program launch for the Auto-Backup tool to function as expected. See Security & Privacy for more details
 
 The app ships as a single compiled binary with no runtime dependencies required on the end user's machine.
 
@@ -219,15 +219,15 @@ A few things worth knowing before use:
 
 **Local by default.** No telemetry, no analytics, no phone-home, no accounts. Your data lives in `C:\Users\{yourname}\AppData\Roaming\swiss-rb-knife` and nowhere else.
 
-**There's exactly one optional network call, and it's off by default.** Turn on **New Version Notification** in General Settings and the app makes a single request to GitHub's public Releases API — once on startup, plus once right when you enable it — to see whether a newer version than the one you're running exists. That's the *only* time Swiss RB Knife ever touches the network. No personal data leaves your machine, as there's no need for that. It's the same public version-number lookup your browser makes when you visit the Releases page. Leave it off and the app stays fully offline, same as it ever was. You'll get a heads-up modal explaining all this any time you switch it on, and you can flip it back off whenever. If a newer version is found, a notice is added to the Top Bar of the Home page, the About icon pulses, and an "Update Available" link appears in the About modal that opens the Releases page in your browser — the app never downloads or installs anything on its own; grabbing the update is always your call. You can even choose to ignore the notification for that particular version if you're so inclined.
+**There's exactly one optional network call, and it's off by default.** Turn on **New Version Notification** in General Settings and the app makes a single request to GitHub's public Releases API (once on startup, plus once right when you enable it) to see whether a newer version than the one you're running exists. That's the *only* time Swiss RB Knife ever touches the network. No personal data leaves your machine, as there's no need for that. It's the same public version-number lookup your browser makes when you visit the Releases page. Leave it off and the app stays fully offline, same as it ever was. You'll get a heads-up modal explaining all this any time you switch it on, and you can flip it back off whenever. If a newer version is found, a notice is added to the Top Bar of the Home page, the About icon pulses, and an "Update Available" link appears in the About modal that opens the Releases page in your browser. The app never downloads or installs anything on its own; grabbing the update is always your call. You can even choose to ignore the notification for that particular version if you're so inclined.
 
 **Most data is stored as plaintext JSON.** Settings, time entries, backup presets are readable by anything with access to your user folder. That's a deliberate simplicity choice: it's *your* data on *your* machine, and plaintext means you can always inspect or recover it by hand.
 
-**The Budget Tracker is the exception.** With encryption enabled, budget data is encrypted with AES-256-GCM using a key derived from your password via Argon2id (64 MB, 3 iterations). Your password is never written to disk — only an Argon2 verification hash — and each encrypted file is a self-contained envelope, so there's no separate key material to lose or mismatch. Forget your password, though, and that data is gone. No backdoor, no recovery. I've only had this implemented for the Budget Tracker as some (read, I) would consider financial data, even just transactions, to be sensitive. That said, I made it an option in case people don't want to risk things being encrypted. User choice and all that.
+**The Budget Tracker is the exception.** With encryption enabled, budget data is encrypted with AES-256-GCM using a key derived from your password via Argon2id (64 MB, 3 iterations). Your password is never written to disk (only an Argon2 verification hash), and each encrypted file is a self-contained envelope, so there's no separate key material to lose or mismatch. Forget your password, though, and that data is gone. No backdoor, no recovery. I've only had this implemented for the Budget Tracker as some (read, I) would consider financial data, even just transactions, to be sensitive. That said, I made it an option in case people don't want to risk things being encrypted. User choice and all that.
 
-**App Lock is a door, not a safe.** The lock screen keeps casual snoops out of the *UI* — it does not encrypt anything, and it doesn't throttle guesses. If someone has access to your Windows account, they can read the data files directly regardless. This just prevents Grandma from easily getting in and running a backup without your knowledge or adding "made popsicles" to your time tracker entries.
+**App Lock is a door, not a safe.** The lock screen keeps casual snoops out of the *UI*. It does not encrypt anything, and it doesn't throttle guesses. If someone has access to your Windows account, they can read the data files directly regardless. This just prevents Grandma from easily getting in and running a backup without your knowledge or adding "made popsicles" to your time tracker entries.
 
-**Why does it demand admin rights?** Auto-Backup shells out to robocopy with `/COPYALL`, which preserves file ownership, ACLs, and auditing info — a *complete* mirror rather than a contents-only copy. Windows only grants the backup/restore privileges that requires to elevated processes. The free-space check (`fsutil` fallback) also wants elevation. If the elevation prompt bothers you, that's a healthy instinct — the tradeoff here is full-fidelity backups. For now, as this is a tool primarily for me, this is how it is, but for transparency, I've disclosed it here.
+**Why does it demand admin rights?** Auto-Backup shells out to robocopy with `/COPYALL`, which preserves file ownership, ACLs, and auditing info: a *complete* mirror rather than a contents-only copy. Windows only grants the backup/restore privileges that requires to elevated processes. The free-space check (`fsutil` fallback) also wants elevation. If the elevation prompt bothers you, that's a healthy instinct. The tradeoff here is full-fidelity backups. For now, as this is a tool primarily for me, this is how it is, but for transparency, I've disclosed it here.
 
 **The webview can display images from anywhere on disk.** Image CCR previews the images *you* select, which can live on any drive, so Tauri's asset protocol scope is intentionally broad. It's read-only display access and no image data ever leaves your machine.
 
@@ -239,12 +239,12 @@ Found something wrong in the code? Want a new tool / UX experience? Got an idea 
 
 Grab the latest installer from the [Releases](https://github.com/RailbladeOfficial/Swiss-RB-Knife/releases) page and run it.
 
-**Heads-up: the installer isn't code-signed.** I'm one person doing this for fun, and a code-signing certificate costs real money every year. Because it's unsigned, Windows will be suspicious of it — and that's expected, not a sign anything's wrong:
+**Heads-up: the installer isn't code-signed.** I'm one person doing this for fun, and a code-signing certificate costs real money every year. Because it's unsigned, Windows will be suspicious of it, and that's expected, not a sign anything's wrong:
 
 - SmartScreen will likely show a blue **"Windows protected your PC"** box. Click **More info → Run anyway**.
 - The UAC elevation prompt will say **Publisher: Unknown**.
 
-If that still makes you uneasy — a healthy instinct — don't take my word for it. [Build it yourself from source](#building-from-source) instead. The whole point of open-source is that you don't have to trust me.
+If that still makes you uneasy (a healthy instinct), don't take my word for it. [Build it yourself from source](#building-from-source) instead. The whole point of open-source is that you don't have to trust me.
 
 ---
 
@@ -278,9 +278,9 @@ Swiss RB Knife is licensed under the **GNU Affero General Public License v3.0 (A
 
 In plain terms:
 - You may use, modify, and distribute this software freely.
-- Any modifications or forks must also be released under AGPL-3.0 — you **cannot** take this code private or sell it as proprietary software.
+- Any modifications or forks must also be released under AGPL-3.0. You **cannot** take this code private or sell it as proprietary software.
 - If you run a modified version as a networked service, you must make the source available.
-- You **can** sell support, host a modified version commercially, or advertise around your fork — as long as the source remains open.
+- You **can** sell support, host a modified version commercially, or advertise around your fork, as long as the source remains open.
 - Credit to the original author (Railblade) must be preserved in all distributions.
 
 See [LICENSE](LICENSE) for the full license text, and [LICENSING.md](LICENSING.md) for a human-readable summary.

@@ -49,13 +49,13 @@
   --color-chart-8:             #990000;
 }
 
-/* Random-flash lightning is now handled in JS (see shell.ts — SEASONAL THEME
+/* Random-flash lightning is now handled in JS (see shell.ts. SEASONAL THEME
    EFFECTS) as a canvas overlay: it renders in front of panels instead of
    behind them, strikes are randomly timed and randomly shaped per-strike
    instead of looping fixed keyframes, and bolts are longer/thinner with a
    proper white-purple lightning color. */
 
-/* ── Time Tracker panels — orange / purple / yellow / red ── */
+/* ── Time Tracker panels, orange / purple / yellow / red ── */
 .input-panel    {
   background: linear-gradient(135deg, rgba(255, 102, 0, 0.07) 0%, #0f0800 100%);
   border-left: 4px solid #ff6600;
@@ -73,7 +73,7 @@
   border-left: 4px solid #cc0000;
 }
 
-/* ── Tool / section header — orange flicker ── */
+/* ── Tool / section header, orange flicker ── */
 .tool-view-header,
 .section-header {
   background: linear-gradient(90deg, rgba(255, 102, 0, 0.12), rgba(147, 112, 219, 0.08));
@@ -87,7 +87,7 @@
   text-shadow: 0 0 16px rgba(255, 102, 0, 0.6);
 }
 
-/* ── Modal — translucent: purple-tinted frosted glass (original look) ── */
+/* ── Modal, translucent: purple-tinted frosted glass (original look) ── */
 body:not(.solid-modals) .modal {
   background: linear-gradient(135deg, rgba(147, 112, 219, 0.08) 0%, rgba(13, 0, 21, 0.55) 100%);
   backdrop-filter: blur(20px);
@@ -96,7 +96,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 30px rgba(147, 112, 219, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Modal — solid: deep black-purple panel ── */
+/* ── Modal, solid: deep black-purple panel ── */
 body.solid-modals .modal {
   background: linear-gradient(135deg, #1e0a2e 0%, #0d0015 100%);
   border-color: rgba(147, 112, 219, 0.35);
@@ -117,7 +117,7 @@ body.solid-modals .modal {
   color: #ff6600;
 }
 
-/* ── Image CCR panels — orange glow ── */
+/* ── Image CCR panels, orange glow ── */
 #media-tool-image-ccr .panel {
   background: linear-gradient(135deg, rgba(255, 102, 0, 0.06) 0%, #0f0800 100%);
   border-color: rgba(255, 102, 0, 0.35);
@@ -220,13 +220,13 @@ body.solid-modals .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds — very dark with on-brand tints */
+/* Panel backgrounds, very dark with on-brand tints */
 #finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 102, 0, 0.09) 0%, #120a1a 100%); }
 #finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(147, 112, 219, 0.08) 0%, #120a1a 100%); }
 #finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(255, 204, 0, 0.07) 0%, #120a1a 100%); }
 #finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(204, 0, 0, 0.08) 0%, #120a1a 100%); }
 
-/* Annual Stats title panel — orange glow accent */
+/* Annual Stats title panel, orange glow accent */
 .budget-annual-stats-title-panel {
   border-left: 4px solid #ff6600;
   box-shadow: 0 0 16px rgba(255, 102, 0, 0.12);
@@ -268,7 +268,7 @@ body.solid-modals .modal {
   color: #ff6600;
 }
 
-/* View-mode active button — orange */
+/* View-mode active button, orange */
 .budget-view-mode-btn.active {
   background: #ff6600;
   color: #000000;

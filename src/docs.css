@@ -1,18 +1,18 @@
 /* =============================================================================
-   DOCS  — About/Changelog/Licensing/Full License/README/License-Agreement
+   DOCS: About/Changelog/Licensing/Full License/README/License-Agreement
            modal content, the README image lightbox, and the Markdown
            renderer output styling.
    -----------------------------------------------------------------------------
    Split out of shell.css (Tier 6). Mirrors docs.ts on the TypeScript side.
 
    The "Update Notice" block below is About-modal content specifically (the
-   "new version available" callout inside the About modal) — not to be
+   "new version available" callout inside the About modal), not to be
    confused with .home-update-notice, which is the Home dashboard's separate
    top-bar version of the same notice and lives in landing.css instead.
 ============================================================================= */
 
 /* =============================================================================
-   UPDATE NOTICE  (About modal — shown when a newer release is available)
+   UPDATE NOTICE  (About modal, shown when a newer release is available)
    -----------------------------------------------------------------------------
    The callout that slots in under the version line in the About modal, plus its
    "Ignore this Version" button. Toggled via inline display by refreshUpdateUI().
@@ -62,7 +62,7 @@
 
 
 /* =============================================================================
-   CHANGELOG MODAL STYLES  (moved here from time-tracker.css — now universal)
+   CHANGELOG MODAL STYLES  (moved here from time-tracker.css, now universal)
 ============================================================================= */
 
 #changelogModal,
@@ -232,7 +232,7 @@
 }
 
 /* =============================================================================
-   LICENSING MODAL — TABS
+   LICENSING MODAL: TABS
 ============================================================================= */
 
 .licensing-modal {
@@ -240,18 +240,18 @@
   flex-direction: column;
 }
 
-/* The tab buttons also carry .budget-summary-tab (see index.html for why) —
-   that shared class is what themes actually style, and it supplies flex:1 and
+/* The tab buttons also carry .budget-summary-tab (see index.html for why).
+   That shared class is what themes actually style, and it supplies flex:1 and
    centred text so the tabs fill this strip evenly. No width here needed for
    that: .licensing-modal is a column flexbox with the default align-items:
    stretch, which already sizes this row to the modal's full content width,
    correctly accounting for this rule's own padding. An explicit width: 100%
-   was tried here before and is deliberately NOT present — nothing in this
+   was tried here before and is deliberately NOT present. Nothing in this
    codebase sets box-sizing: border-box, so with the default content-box, a
    literal 100% width gets this row's 16px+16px padding added on TOP of that
    100%, overflowing 32px past the modal's right edge (the tabs render
    right-shifted / cut off, since the box stays pinned at the left and only
-   the right side spills over). Stretch alone doesn't have this bug — it sizes
+   the right side spills over). Stretch alone doesn't have this bug. It sizes
    to the content width directly, padding included.
    Everything below .licensing-tabs is the unthemed fallback; budget.css is
    later in the bundle, so it wins wherever the two rule sets overlap. */
@@ -367,7 +367,7 @@
   margin: 8px 0;
 }
 
-/* Collapsed blank-line spacer — one gap regardless of how many blank lines */
+/* Collapsed blank-line spacer. One gap regardless of how many blank lines */
 .md-gap {
   height: 6px;
 }
@@ -526,7 +526,7 @@ a.md-internal-link:hover {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--color-text);
-  /* Intentionally no padding-bottom — user must scroll to see footer */
+  /* Intentionally no padding-bottom, user must scroll to see footer */
 }
 
 .license-agreement-footer {

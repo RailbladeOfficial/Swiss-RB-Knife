@@ -8,7 +8,7 @@
   --color-text-muted:          #7aaabf;
   --color-hover:               #152035;
 
-  /* --color-btn is consumed across the shell as the BRIGHT accent — tool-card
+  /* --color-btn is consumed across the shell as the BRIGHT accent, tool-card
      icons, the About-icon pulse, the Home "Update Available" line, active
      borders, filled active states, and modal links all colour themselves from
      it. It must be vivid, NOT the dark navy the outlined buttons use: those
@@ -17,7 +17,7 @@
   --color-btn:                 #00dfff;
   --color-accent:              #00dfff;
   --color-btn-hover:           #42e5ff;
-  /* Dark ink that sits ON a --color-btn (cyan) fill — the pulse icon, filled
+  /* Dark ink that sits ON a --color-btn (cyan) fill. The pulse icon, filled
      active-state labels, etc. Kept near-black for contrast against the cyan. */
   --color-btn-text:            #04121c;
 
@@ -33,7 +33,7 @@
   --color-toggle-off:          #1e2d42;
   --color-toggle-on:           #00dfff;
 
-  /* ── Changelog accents ── Features (cyan) / Improvements (mint) / Bugfixes (magenta) / tool heading (violet) —
+  /* ── Changelog accents ── Features (cyan) / Improvements (mint) / Bugfixes (magenta) / tool heading (violet),
      mint and violet step outside the base cyan/magenta duotone so all four read as distinct. */
   --color-changelog-features:     #00dfff;
   --color-changelog-improvements: #2dffa1;
@@ -46,7 +46,7 @@
   --color-toast-error-bg:      #1a0020;
   --color-toast-error-border:  #ee2dff;
   --color-toast-error-text:    #fad0ff;
-  /* ── Budget chart palette ── Cyan / magenta / sky / deep-pink / teal / violet / hot-pink / mint — electric duotone palette */
+  /* ── Budget chart palette ── Cyan / magenta / sky / deep-pink / teal / violet / hot-pink / mint, electric duotone palette */
   --color-chart-1:             #00dfff;
   --color-chart-2:             #ee2dff;
   --color-chart-3:             #00aadd;
@@ -57,41 +57,41 @@
   --color-chart-8:             #2dffa1;
 }
 
-/* ── Panels — alternating cyan / magenta / cyan / magenta ── */
+/* ── Panels, alternating cyan / magenta / cyan / magenta ── */
 .panel {
   border-color: rgba(0, 207, 255, 0.35);
   box-shadow: 0 0 18px rgba(0, 207, 255, 0.12), inset 0 0 10px rgba(0, 207, 255, 0.04);
 }
 
-/* 1 — input-panel: cyan */
+/* 1, input-panel: cyan */
 .input-panel {
   background: linear-gradient(135deg, rgba(0, 207, 255, 0.07) 0%, #001a28 100%);
   border-color: rgba(0, 207, 255, 0.45);
   box-shadow: 0 0 22px rgba(0, 207, 255, 0.18), inset 0 0 12px rgba(0, 207, 255, 0.06);
 }
 
-/* 2 — controls-panel: magenta */
+/* 2, controls-panel: magenta */
 .controls-panel {
   background: linear-gradient(135deg, rgba(232, 121, 249, 0.07) 0%, #1a0025 100%);
   border-color: rgba(238, 45, 255, 0.45);
   box-shadow: 0 0 22px rgba(238, 45, 255, 0.15), inset 0 0 12px rgba(238, 45, 255, 0.05);
 }
 
-/* 3 — totals-panel: cyan */
+/* 3, totals-panel: cyan */
 .totals-panel {
   background: linear-gradient(135deg, rgba(0, 207, 255, 0.07) 0%, #001a28 100%);
   border-color: rgba(0, 207, 255, 0.45);
   box-shadow: 0 0 22px rgba(0, 207, 255, 0.18), inset 0 0 12px rgba(0, 207, 255, 0.06);
 }
 
-/* 4 — entries-panel: magenta */
+/* 4, entries-panel: magenta */
 .entries-panel {
   background: linear-gradient(135deg, rgba(232, 121, 249, 0.07) 0%, #1a0025 100%);
   border-color: rgba(238, 45, 255, 0.45);
   box-shadow: 0 0 22px rgba(238, 45, 255, 0.15), inset 0 0 12px rgba(238, 45, 255, 0.05);
 }
 
-/* ── Modal — translucent: magenta-tinted frosted glass (original look) ── */
+/* ── Modal, translucent: magenta-tinted frosted glass (original look) ── */
 body:not(.solid-modals) .modal {
   background: linear-gradient(135deg, rgba(232, 121, 249, 0.08) 0%, rgba(18, 0, 30, 0.55) 100%);
   backdrop-filter: blur(20px);
@@ -100,16 +100,16 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 30px rgba(238, 45, 255, 0.15), 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Modal — solid: deep navy panel with magenta glow ── */
+/* ── Modal, solid: deep navy panel with magenta glow ── */
 body.solid-modals .modal {
   background: linear-gradient(135deg, #1e0a2e 0%, #111827 100%);
   border-color: rgba(238, 45, 255, 0.35);
   box-shadow: 0 0 30px rgba(238, 45, 255, 0.15), 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Buttons — outlined cyan chips with a faint resting glow, magenta on hover.
+/* ── Buttons, outlined cyan chips with a faint resting glow, magenta on hover.
    The resting glow + brighter border lift them off the dark panels so they read
-   as real buttons — and so a primary/confirm button stands clearly apart from
+   as real buttons, and so a primary/confirm button stands clearly apart from
    the quiet .modal-cancel-btn ghost beside it in two-button modals. ── */
 button {
   background: #1e2d42;
@@ -125,7 +125,7 @@ button:hover {
   box-shadow: 0 0 16px rgba(238, 45, 255, 0.3);
 }
 
-/* Cancel / secondary button in two-button modals (exit, ignore, enable…) —
+/* Cancel / secondary button in two-button modals (exit, ignore, enable…),
    deliberately a quiet grey ghost with no glow, so the glowing cyan confirm
    button next to it clearly reads as the primary action. */
 .modal-cancel-btn {
@@ -142,7 +142,7 @@ button:hover {
   box-shadow: none;
 }
 
-/* Danger button — magenta outlined */
+/* Danger button, magenta outlined */
 .danger-btn {
   color: #ee2dff;
   border-color: rgba(238, 45, 255, 0.5);
@@ -162,32 +162,32 @@ button:hover {
   box-shadow: 0 0 10px rgba(0, 207, 255, 0.2);
 }
 
-/* ── Inputs — cyan focus glow ── */
+/* ── Inputs, cyan focus glow ── */
 input:focus {
   outline: none;
   border-color: rgba(0, 207, 255, 0.7);
   box-shadow: 0 0 10px rgba(0, 207, 255, 0.3);
 }
 
-/* ── Shell accents — icons, links, and the update-notifier signals ───────────
+/* ── Shell accents, icons, links, and the update-notifier signals ───────────
    With --color-btn now cyan, the shell elements that key off it already read
    bright; these rules add the extra glow / duotone hover the flat theme was
    missing so everything pops. ── */
 
-/* Left-sidebar icons + labels — lit cyan at rest. Hover/active keep their
+/* Left-sidebar icons + labels, lit cyan at rest. Hover/active keep their
    higher-specificity shell rules (near-white text, cyan active border). */
 .nav-item {
   color: #41c8ee;
 }
 
-/* Home tool-card icons — cyan with a soft electric glow (these were the dark
+/* Home tool-card icons, cyan with a soft electric glow (these were the dark
    navy --color-btn before). */
 .tool-card-icon {
   color: #00dfff;
   filter: drop-shadow(0 0 8px rgba(0, 223, 255, 0.4));
 }
 
-/* Home tool-card hover — magenta outline + glow. The base shell hover uses the
+/* Home tool-card hover, magenta outline + glow. The base shell hover uses the
    cyan --color-btn; this swaps it to the theme's magenta so a hovered card pops
    against the cyan resting borders. */
 .tool-card:hover {
@@ -195,7 +195,7 @@ input:focus {
   box-shadow: 0 0 14px rgba(238, 45, 255, 0.35);
 }
 
-/* Home top-bar "Update Available" line — cyan (matching the About-icon pulse),
+/* Home top-bar "Update Available" line, cyan (matching the About-icon pulse),
    with a glow, and the version link a brighter cyan that flips magenta on
    hover so the clickable part is obvious. */
 .home-update-notice {
@@ -208,7 +208,7 @@ input:focus {
   color: #ee2dff;
 }
 
-/* Modal links (What's New, README, the About-modal update link…) — bright cyan
+/* Modal links (What's New, README, the About-modal update link…), bright cyan
    at rest, magenta on hover. */
 .modal-body a {
   color: #24e3ff;
@@ -219,7 +219,7 @@ input:focus {
 
 /* ── Image CCR overrides ── */
 
-/* Tab buttons — outlined cyan/magenta style matching the standalone app */
+/* Tab buttons, outlined cyan/magenta style matching the standalone app */
 .tab-btn {
   color: var(--color-text-muted);
   border-color: transparent;
@@ -240,14 +240,14 @@ input:focus {
   box-shadow: none;
 }
 
-/* Panels used as Image CCR sections — cyan glow */
+/* Panels used as Image CCR sections, cyan glow */
 #media-tool-image-ccr .panel {
   background: linear-gradient(135deg, rgba(0, 207, 255, 0.07) 0%, #001a28 100%);
   border-color: rgba(0, 207, 255, 0.45);
   box-shadow: 0 0 18px rgba(0, 207, 255, 0.12), inset 0 0 10px rgba(0, 207, 255, 0.04);
 }
 
-/* Result panel — magenta like the standalone .result-section */
+/* Result panel, magenta like the standalone .result-section */
 #media-tool-image-ccr .result-panel {
   background: linear-gradient(135deg, rgba(232, 121, 249, 0.07) 0%, #1a0025 100%);
   border-color: rgba(238, 45, 255, 0.45);
@@ -255,12 +255,12 @@ input:focus {
   box-shadow: 0 0 18px rgba(238, 45, 255, 0.12), inset 0 0 10px rgba(238, 45, 255, 0.04);
 }
 
-/* Drop zone — dashed cyan border */
+/* Drop zone, dashed cyan border */
 .drop-zone {
   border-color: rgba(0, 207, 255, 0.35);
 }
 
-/* Primary button — cyan outlined, matching standalone .btn-primary */
+/* Primary button, cyan outlined, matching standalone .btn-primary */
 .primary-btn {
   background: rgba(0, 207, 255, 0.12);
   border-color: rgba(0, 207, 255, 0.45);
@@ -274,7 +274,7 @@ input:focus {
   color: #00dfff;
 }
 
-/* Dir buttons — keep neutral until active */
+/* Dir buttons, keep neutral until active */
 .dir-btn, .prv-btn {
   background: #1e2d42;
   color: var(--color-text-muted);
@@ -296,7 +296,7 @@ input:focus {
   box-shadow: none;
 }
 
-/* Anchor badge — cyan fill */
+/* Anchor badge, cyan fill */
 .anchor-badge {
   background: rgba(0, 207, 255, 0.85);
   color: #000;
@@ -318,7 +318,7 @@ input:focus {
   box-shadow: 0 0 14px rgba(238, 45, 255, 0.4);
 }
 
-/* Slider — cyan track and thumb */
+/* Slider, cyan track and thumb */
 .img-slider::-webkit-slider-thumb {
   background: #00dfff;
   border-color: #080a18;
@@ -344,12 +344,12 @@ input:range .img-slider {
   color: #00dfff;
 }
 
-/* Result preview border — magenta */
+/* Result preview border, magenta */
 .result-preview-wrap {
   border-color: rgba(238, 45, 255, 0.25);
 }
 
-/* Tool view header and category landing header — cyan gradient like standalone app-header */
+/* Tool view header and category landing header, cyan gradient like standalone app-header */
 .tool-view-header,
 .section-header {
   background: linear-gradient(90deg, rgba(0, 207, 255, 0.08), rgba(232, 121, 249, 0.06));
@@ -395,10 +395,10 @@ input:range .img-slider {
 
 /* Summary tabs. NOTE: .budget-summary-tab is a <button>, so this theme's global
    `button { color/background/border }` rule above otherwise wins over
-   these and forces the tab cyan — letting only text-shadow through, which is why
+   these and forces the tab cyan, letting only text-shadow through, which is why
    the active tab looked like cyan text with a magenta halo. Everything here is
-   therefore, so the active tab is LITERALLY magenta — fill, border,
-   glow and all — the way Neon does it (Neon's button rule only sets box-shadow,
+   therefore, so the active tab is LITERALLY magenta (fill, border,
+   glow and all) the way Neon does it (Neon's button rule only sets box-shadow,
    so it never had this fight). */
 .budget-summary-tab { color: #00dfff; }
 .budget-summary-tab:hover { color: #e8f4ff; }
@@ -410,7 +410,7 @@ input:range .img-slider {
   text-shadow: 0 0 10px rgba(238, 45, 255, 0.65);
 }
 
-/* View-mode toggle — cyan fill when active (was falling back to the base rule). */
+/* View-mode toggle, cyan fill when active (was falling back to the base rule). */
 .budget-view-mode-btn.active {
   background: #00dfff;
   color: #04121c;
@@ -449,25 +449,25 @@ input:range .img-slider {
    CSS, but this theme's global `button { … }` rule (top of file)
    overrides that, leaving them navy-with-cyan-text instead of the solid cyan
    fill. Re-assert the fill here with so they read like the Budget
-   view-mode buttons — cyan fill, dark ink, cyan glow.
+   view-mode buttons, cyan fill, dark ink, cyan glow.
 
    For .dir-btn this also supersedes the translucent `.dir-btn.active` rule
    earlier in this file (equal specificity, but this one comes later); .prv-btn
    is intentionally left on that earlier rule, untouched.
 ============================================================================= */
-.dir-btn.active,              /* Image CCR — Combine: Append Direction */
-.fmt-btn.active,              /* Image CCR — Combine: Output Format */
-.gravity-btn.active,          /* Image CCR — Resize: Image Placement */
-.resize-fmt-btn.active,       /* Image CCR — Resize: Output Format */
-.dfg-organize-btn.active,     /* Dummy File Generator — Organize */
-.dfg-naming-btn.active {      /* Dummy File Generator — output style (123 / abc / 0xF) */
+.dir-btn.active,              /* Image CCR. Combine: Append Direction */
+.fmt-btn.active,              /* Image CCR. Combine: Output Format */
+.gravity-btn.active,          /* Image CCR. Resize: Image Placement */
+.resize-fmt-btn.active,       /* Image CCR. Resize: Output Format */
+.dfg-organize-btn.active,     /* Dummy File Generator. Organize */
+.dfg-naming-btn.active {      /* Dummy File Generator, output style (123 / abc / 0xF) */
   background: #00dfff;
   color: #04121c;
   border-color: #00dfff;
   box-shadow: 0 0 12px rgba(0, 223, 255, 0.4);
 }
 
-/* Image CCR — Resize: the "N images found" count value uses var(--color-btn-text)
+/* Image CCR. Resize: the "N images found" count value uses var(--color-btn-text)
    in the tool CSS, which is this theme's dark ink (#04121c) → unreadable on the
    dark stat background. Recolour just that count to cyan. */
 .resize-stat-count .resize-stat-val {
@@ -494,7 +494,7 @@ input:range .img-slider {
   --gs-zebra:       rgba(232, 244, 255, 0.03);
 }
 
-/* Cyan-on-cyan needs the winner to separate from the accent — a magenta
+/* Cyan-on-cyan needs the winner to separate from the accent, a magenta
    under-glow does it without leaving the two-colour palette. */
 .gs-score-chip.leader,
 .gs-tile.gs-tile-alert {

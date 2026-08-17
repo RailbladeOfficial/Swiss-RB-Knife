@@ -1,0 +1,178 @@
+/* =============================================================================
+   DAYS BETWEEN DATES  (days-between.css)
+   All color references use var(--color-*) from the active theme.
+   Tool-unique classes are prefixed `dbd-`.
+============================================================================= */
+
+.dbd-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Date pickers ──────────────────────────────────────────────────────────── */
+
+/* Centred rather than bottom-aligned: each date column is now label + input +
+   its own nudge row, and the swap button belongs between the two columns
+   rather than pinned to either edge of them. */
+.dbd-dates-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.dbd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dbd-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dbd-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.dbd-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Sits in the middle column, aligned with the two inputs rather than their
+   labels, hence the grid's align-items: end. */
+#dbd-swap {
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .dbd-dates-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
+
+/* ── Nudge buttons ─────────────────────────────────────────────────────────── */
+
+.dbd-shift-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin-top: 3px;
+}
+
+.dbd-shift-caption {
+  font-size: 0.68rem;
+  opacity: 0.45;
+  width: 100%;
+  margin-bottom: 1px;
+}
+
+.dbd-shift-btn {
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Counting mode ─────────────────────────────────────────────────────────── */
+
+.dbd-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.dbd-seg-group {
+  display: flex;
+  gap: 4px;
+}
+
+.dbd-seg-group .toggle-btn {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
+/* ── Headline result ───────────────────────────────────────────────────────── */
+
+.dbd-headline-panel {
+  text-align: center;
+  padding: 20px 12px;
+}
+
+.dbd-headline {
+  font-size: clamp(2rem, 7vw, 3.4rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.dbd-headline-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+/* ── Breakdown rows ────────────────────────────────────────────────────────── */
+
+.dbd-breakdown {
+  display: flex;
+  flex-direction: column;
+}
+
+.dbd-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.dbd-row:last-child {
+  border-bottom: none;
+}
+
+.dbd-row-label {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  width: 150px;
+  flex-shrink: 0;
+}
+
+.dbd-row-value {
+  font-weight: 600;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dbd-row-hint {
+  font-size: 0.72rem;
+  opacity: 0.45;
+  margin-left: auto;
+  text-align: right;
+}
+
+@media (max-width: 480px) {
+  .dbd-row-label {
+    width: 110px;
+  }
+
+  .dbd-row-hint {
+    display: none;
+  }
+}

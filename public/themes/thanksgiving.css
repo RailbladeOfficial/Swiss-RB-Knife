@@ -50,7 +50,7 @@
   --color-chart-8:             #8b5a2e;
 }
 
-/* ── Time Tracker panels — orange / deep-red / bright-orange / cranberry ── */
+/* ── Time Tracker panels, orange / deep-red / bright-orange / cranberry ── */
 .input-panel {
   background: linear-gradient(135deg, rgba(224, 85, 26, 0.1) 0%, #201007 100%);
   border-left: 4px solid #e8631f;
@@ -68,7 +68,7 @@
   border-left: 4px solid #8a2846;
 }
 
-/* ── Tool / section header — burnt-orange to deep-red glow ── */
+/* ── Tool / section header, burnt-orange to deep-red glow ── */
 .tool-view-header,
 .section-header {
   background: linear-gradient(90deg, rgba(224, 85, 26, 0.15), rgba(194, 42, 30, 0.1));
@@ -82,7 +82,7 @@
   text-shadow: 0 0 16px rgba(255, 122, 46, 0.45);
 }
 
-/* ── Modal — translucent: warm red-orange-tinted frosted glass ── */
+/* ── Modal, translucent: warm red-orange-tinted frosted glass ── */
 body:not(.solid-modals) .modal {
   background: linear-gradient(135deg, rgba(224, 85, 26, 0.1) 0%, rgba(23, 12, 7, 0.55) 100%);
   backdrop-filter: blur(20px);
@@ -91,7 +91,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 30px rgba(194, 42, 30, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Modal — solid: deep brown-red panel ── */
+/* ── Modal, solid: deep brown-red panel ── */
 body.solid-modals .modal {
   background: linear-gradient(135deg, #3d2313 0%, #201209 100%);
   border-color: rgba(224, 85, 26, 0.4);

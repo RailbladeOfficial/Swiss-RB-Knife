@@ -1,5 +1,5 @@
 /* =============================================================================
-   IMAGE CCR  —  tool-specific styles
+   IMAGE CCR: tool-specific styles
    All colours reference CSS custom properties defined in shell.css / themes.
    Classes that already exist in shell.css are NOT redefined here.
    Load order: shell.css → image-ccr.css → active theme
@@ -9,10 +9,10 @@
    TAB NAV  (Combine / Compress switcher inside the tool view header)
    -----------------------------------------------------------------------------
    Positioning (group + push-right) comes from .tool-view-header-actions
-   (landing.css) — the markup carries both classes. .tab-nav itself is kept
+   (landing.css). The markup carries both classes. .tab-nav itself is kept
    as an empty marker class only because image-ccr.ts queries
    `.tab-nav .tab-btn` directly; removing it would silently break the tab
-   switcher. .tab-btn below is the actual tab look and stays tool-specific —
+   switcher. .tab-btn below is the actual tab look and stays tool-specific,
    it's a different visual treatment than budget's underline-style tabs.
 ============================================================================= */
 
@@ -201,7 +201,7 @@
 }
 
 /* =============================================================================
-   RESULT PANEL  (magenta/view accent — mirrors entries-panel pattern)
+   RESULT PANEL  (magenta/view accent, mirrors entries-panel pattern)
 ============================================================================= */
 
 .result-panel {
@@ -233,7 +233,7 @@
 }
 
 /* =============================================================================
-   PREVIEW STRIP  (combine — draggable image cards)
+   PREVIEW STRIP  (combine, draggable image cards)
 ============================================================================= */
 
 .preview-strip {
@@ -363,7 +363,7 @@
 }
 
 /* =============================================================================
-   DIRECTION GRID  (combine — Above/Below/Left/Right)
+   DIRECTION GRID  (combine. Above/Below/Left/Right)
 ============================================================================= */
 
 .direction-grid {
@@ -434,7 +434,7 @@
 }
 
 /* =============================================================================
-   LOADED FILE  (compress — thumbnail + metadata row)
+   LOADED FILE  (compress, thumbnail + metadata row)
 ============================================================================= */
 
 .loaded-file {
@@ -490,7 +490,7 @@
 }
 
 /* =============================================================================
-   SLIDER  (compress — quality/scale range input)
+   SLIDER  (compress, quality/scale range input)
 ============================================================================= */
 
 .slider-wrap {
@@ -641,7 +641,7 @@
 }
 
 /* =============================================================================
-   SIZE ESTIMATE  (compress — dimension / filesize preview table)
+   SIZE ESTIMATE  (compress, dimension / filesize preview table)
 ============================================================================= */
 
 .size-estimate {
@@ -672,7 +672,7 @@
 }
 
 /* =============================================================================
-   NUMBER INPUT ROW  (gap, thickness, radius — number field + "px" unit label)
+   NUMBER INPUT ROW  (gap, thickness, radius, number field + "px" unit label)
 ============================================================================= */
 
 .number-input-row {
@@ -786,7 +786,7 @@
   flex-wrap: wrap;
 }
 
-/* "Images found" cell — sits to the left, self-stretches to match grid height */
+/* "Images found" cell, sits to the left, self-stretches to match grid height */
 .resize-stat-count {
   align-self: stretch;
   justify-content: center;
@@ -885,7 +885,7 @@
   background: var(--color-btn-hover);
 }
 
-/* Resize format buttons — reuse fmt-btn look but scoped separately
+/* Resize format buttons, reuse fmt-btn look but scoped separately
    so theme overrides for .fmt-btn don't bleed across tabs */
 .resize-fmt-btn {
   padding: 6px 14px;
@@ -913,7 +913,7 @@
 }
 
 /* =============================================================================
-   RESIZE — action row (Run + Cancel + inline result)
+   RESIZE: action row (Run + Cancel + inline result)
 ============================================================================= */
 
 .resize-action-row {
@@ -938,7 +938,7 @@
 }
 
 /* =============================================================================
-   RESIZE — progress area
+   RESIZE: progress area
 ============================================================================= */
 
 #resize-progress-section {
@@ -966,7 +966,7 @@
 }
 
 /* =============================================================================
-   RESIZE — options header group (title + inline info button)
+   RESIZE: options header group (title + inline info button)
 ============================================================================= */
 
 .resize-options-header-group {
@@ -975,7 +975,7 @@
   gap: 10px;
 }
 
-/* Info button — size delta only; shared look (.info-trigger-btn) and hover
+/* Info button, size delta only; shared look (.info-trigger-btn) and hover
    are in shell.css. */
 .resize-info-btn {
   padding: 3px 10px;
@@ -1010,7 +1010,7 @@
   content: "🔒 ";
 }
 
-/* Grey only the body — the header (title + lock hint + any info button) stays
+/* Grey only the body. The header (title + lock hint + any info button) stays
    legible and, where relevant, still clickable. */
 .panel.is-disabled .tool-panel-body {
   opacity: 0.4;
@@ -1063,7 +1063,7 @@
 }
 
 /* =============================================================================
-   RESIZE — source scan progress (spinner + bar while a source is analysed)
+   RESIZE: source scan progress (spinner + bar while a source is analysed)
 ============================================================================= */
 
 .resize-scan-progress {

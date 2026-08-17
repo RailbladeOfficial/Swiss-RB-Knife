@@ -38,7 +38,7 @@
   --color-toast-error-border:  #dc2626;
   --color-toast-error-text:    #7f1d1d;
 
-  /* ── Budget chart palette ── Blue / teal / amber / red / violet / cyan / pink / green — medium sat for white bg */
+  /* ── Budget chart palette ── Blue / teal / amber / red / violet / cyan / pink / green, medium sat for white bg */
   --color-chart-1:             #2563eb;
   --color-chart-2:             #059669;
   --color-chart-3:             #d97706;
@@ -49,18 +49,18 @@
   --color-chart-8:             #16a34a;
 }
 
-/* ── Time Tracker panels — clean left-border accents on white ── */
+/* ── Time Tracker panels, clean left-border accents on white ── */
 .input-panel    { border-left: 4px solid #3b82f6; }
 .controls-panel { border-left: 4px solid #059669; }
 .totals-panel   { border-left: 4px solid #d97706; }
 .entries-panel  { border-left: 4px solid #dc2626; }
 
-/* ── Panel base — white cards with a soft shadow instead of glow ── */
+/* ── Panel base, white cards with a soft shadow instead of glow ── */
 .panel {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-/* ── Tool / section header — clean white with a blue bottom border ── */
+/* ── Tool / section header, clean white with a blue bottom border ── */
 .tool-view-header,
 .section-header {
   background: #ffffff;
@@ -73,7 +73,7 @@
   color: #1e40af;
 }
 
-/* ── Buttons — need explicit border since shell base has none ── */
+/* ── Buttons, need explicit border since shell base has none ── */
 button {
   border: 1px solid rgba(59, 130, 246, 0.3);
 }
@@ -101,14 +101,14 @@ button:hover {
   border-color: #dc2626;
 }
 
-/* ── Modal — solid: white card (original look) ── */
+/* ── Modal, solid: white card (original look) ── */
 body.solid-modals .modal {
   background: #ffffff;
   border-color: #cbd5e1;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
-/* ── Modal — translucent: frosted white glass ── */
+/* ── Modal, translucent: frosted white glass ── */
 body:not(.solid-modals) .modal {
   background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(24px);
@@ -202,7 +202,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds — white/near-white with very subtle tints on white panels */
+/* Panel backgrounds, white/near-white with very subtle tints on white panels */
 #finance-tool-budget .panel-accent-input  { background: #ffffff; box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6; }
 #finance-tool-budget .panel-accent-view   { background: #ffffff; box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669; }
 #finance-tool-budget .panel-accent-totals { background: #ffffff; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706; }
@@ -215,7 +215,7 @@ body:not(.solid-modals) .modal {
 /* Summary tab active */
 .budget-summary-tab.active { color: #1e40af; background: rgba(59, 130, 246, 0.1); border-bottom-color: #3b82f6; }
 
-/* Stats table values — darker for light background readability */
+/* Stats table values, darker for light background readability */
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }
 
@@ -239,14 +239,14 @@ body:not(.solid-modals) .modal {
   color: #1e40af;
 }
 
-/* Budget view-mode active button — ensure blue on white reads well */
+/* Budget view-mode active button, ensure blue on white reads well */
 .budget-view-mode-btn.active {
   background: #2563eb;
   color: #ffffff;
   border-color: #2563eb;
 }
 
-/* Stats section headings — slightly darker on white */
+/* Stats section headings, slightly darker on white */
 .budget-stats-section-heading { opacity: 0.55; color: #1e293b; }
 
 /* ── Game Stats ──

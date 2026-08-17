@@ -50,13 +50,13 @@
   --color-chart-8:             #34d399;
 }
 
-/* ── Time Tracker panels — desaturated accent borders ── */
+/* ── Time Tracker panels, desaturated accent borders ── */
 .input-panel    { border-left: 4px solid #6366f1; }
 .controls-panel { border-left: 4px solid #0d9488; }
 .totals-panel   { border-left: 4px solid #78716c; }
 .entries-panel  { border-left: 4px solid #b91c1c; }
 
-/* ── Tool / section header — very subtle, near-black ── */
+/* ── Tool / section header, very subtle, near-black ── */
 .tool-view-header,
 .section-header {
   background: #1a1a1a;
@@ -69,14 +69,14 @@
   opacity: 0.9;
 }
 
-/* ── Modal — solid: near-black panel ── */
+/* ── Modal, solid: near-black panel ── */
 body.solid-modals .modal {
   background: #141414;
   border-color: #2a2a2a;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Modal — translucent: deep frosted black ── */
+/* ── Modal, translucent: deep frosted black ── */
 body:not(.solid-modals) .modal {
   background: rgba(20, 20, 20, 0.25);
   backdrop-filter: blur(24px);
@@ -143,19 +143,23 @@ body:not(.solid-modals) .modal {
 .preview-card.drag-target  { border-color: #0d9488; }
 
 
-/* ── Update-notifier accents ──
+/* ── Attention-signal accents ──
    This theme's --color-btn is a neutral grey (its buttons are deliberately
-   understated), but the update signal needs to actually catch the eye — so the
-   pulse, the Home "Update Available" line, the tool-card icons, and modal links
-   are routed to the theme's indigo accent instead, leaving the grey buttons
-   untouched. The pulse is redirected by redefining --color-btn locally on the
-   pulsing element, which the shared keyframes read. */
-#aboutBtn.update-available {
+   understated), but an update/reminder signal needs to actually catch the eye,
+   so the sidebar pulses, the Home "Update Available" line, the tool-header
+   notices, the tool-card icons, and modal links are routed to the theme's
+   indigo accent instead, leaving the grey buttons untouched. The pulses are
+   redirected by redefining --color-btn locally on the pulsing element, which
+   the shared keyframes read. */
+#aboutBtn.update-available,
+.nav-item.attention-pulse,
+.tool-card.attention-pulse {
   --color-btn: #6366f1;
   --color-btn-text: #ffffff;
 }
 .tool-card-icon { color: #6366f1; }
 .home-update-notice { color: #6366f1; }
+.tool-header-notice { color: #6366f1; }
 .home-update-notice a { color: #818cf8; }
 .home-update-notice a:hover { color: #a5b4fc; }
 .modal-body a { color: #818cf8; }
@@ -163,7 +167,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds — near-black, minimal tint to preserve the dark theme's
+/* Panel backgrounds, near-black, minimal tint to preserve the dark theme's
    subdued aesthetic. Borders do the accent work. */
 #finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, #141414 100%); }
 #finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(13, 148, 136, 0.06) 0%, #141414 100%); }
@@ -177,7 +181,7 @@ body:not(.solid-modals) .modal {
 /* Summary tab active */
 .budget-summary-tab.active { color: #c4b5fd; background: rgba(99, 102, 241, 0.12); border-bottom-color: #6366f1; }
 
-/* View-mode toggle active — indigo accent (was missing; a grey fill wouldn't
+/* View-mode toggle active, indigo accent (was missing; a grey fill wouldn't
    read as "selected" in an all-grey theme). */
 .budget-view-mode-btn.active {
   background: #6366f1;
@@ -194,7 +198,7 @@ body:not(.solid-modals) .modal {
 .budget-stats-count-late    { color: #d97706; border-color: #d97706; }
 .budget-stats-count-overdue { color: #fb7185; border-color: #fb7185; }
 
-/* Chart buttons — match the dark theme's understated palette */
+/* Chart buttons, match the dark theme's understated palette */
 .budget-chart-cycle-btn,
 .budget-chart-expand-btn,
 .budget-chart-modal-cycle-btn {

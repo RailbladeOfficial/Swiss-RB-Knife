@@ -1,18 +1,18 @@
 /* =============================================================================
-   AUTO-BACKUP  — tool-scoped styles
+   AUTO-BACKUP: tool-scoped styles
    All colours reference CSS custom properties from the active theme.
    No hardcoded values.
 ============================================================================= */
 
 /* =============================================================================
-   LAYOUT — two-column config grid (sources | destinations)
+   LAYOUT: two-column config grid (sources | destinations)
 ============================================================================= */
 
 .ab-config-grid {
   display: grid;
   /* minmax(0, 1fr), NOT bare 1fr: a bare 1fr's implicit minimum is `auto`,
-     which lets one long unbreakable path push its column — and the whole
-     panel — past the window edge. minmax(0, …) makes the columns actually
+     which lets one long unbreakable path push its column (and the whole
+     panel) past the window edge. minmax(0, …) makes the columns actually
      honor their share of the width. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
@@ -100,7 +100,7 @@
 .ab-list-path {
   flex: 1;
   /* Without min-width: 0, a flex child refuses to shrink below its content
-     width — the ellipsis styling this rule used to carry never actually
+     width. The ellipsis styling this rule used to carry never actually
      engaged, and long paths just widened the row off-screen. */
   min-width: 0;
   font-size: 0.78rem;
@@ -145,7 +145,7 @@
   font-style: italic;
 }
 
-/* Inline edit input — replaces the path label on double-click */
+/* Inline edit input, replaces the path label on double-click */
 .ab-edit-input {
   flex: 1;
   min-width: 0;
@@ -213,7 +213,7 @@
    INFO BUTTON + INFO MODAL  (mirrors the Image Resizer's resize-info pattern)
 ============================================================================= */
 
-/* Run Estimate button — lives in the Summary panel header */
+/* Run Estimate button, lives in the Summary panel header */
 .ab-estimate-btn {
   display: inline-flex;
   align-items: center;
@@ -249,10 +249,10 @@
   gap: 6px;
 }
 
-/* Small ℹ button — size delta only; shared look (.info-trigger-btn) and hover
+/* Small ℹ button, size delta only; shared look (.info-trigger-btn) and hover
    are in shell.css. Also serves as the query hook for the Setup modal's
    click-to-toggle tooltip buttons (auto-backup.ts queries
-   .ab-info-btn[data-tooltip] directly) — kept as its own class for that
+   .ab-info-btn[data-tooltip] directly), kept as its own class for that
    reason even though its own CSS is now just two properties. */
 .ab-info-btn {
   padding: 1px 8px;
@@ -273,7 +273,7 @@
 }
 
 /* Groups a settings-row label with its (i) button so justify-content:
-   space-between on .settings-row still only sees two flex items — the
+   space-between on .settings-row still only sees two flex items. The
    label+icon group on the left, the control on the right. */
 .ab-setup-label-with-info {
   display: inline-flex;
@@ -295,6 +295,14 @@
   margin: 0;
 }
 
+/* Free-text day-of-month list ("1, 15"), wider than the days field since it
+   holds several numbers. Matches Budget's equivalent field. */
+.ab-reminder-monthdays-field {
+  width: 110px;
+  text-align: right;
+  margin: 0;
+}
+
 /* Hide the up/down spinner arrows on the reminder-days field, per spec. */
 #ab-setup-reminder-days::-webkit-inner-spin-button,
 #ab-setup-reminder-days::-webkit-outer-spin-button {
@@ -307,7 +315,7 @@
   -moz-appearance: textfield;
 }
 
-/* Click-to-toggle info popover for Setup modal (i) buttons — floats above
+/* Click-to-toggle info popover for Setup modal (i) buttons, floats above
    everything (including the modal), positioned in JS under whichever icon
    was clicked. Not a tooltip-on-hover: stays open until dismissed. */
 .ab-info-tooltip {
@@ -445,11 +453,11 @@
 }
 
 /* "View Skipped Files" sits between the current-file line above and the
-   Backup Progress bar below, left-aligned — only appears when there were
+   Backup Progress bar below, left-aligned, only appears when there were
    skips (the button itself is hidden via inline style until then). It's
    only ever shown post-completion, when the current-file line above is
    always blank but still reserves its min-height (so live runs don't jump)
-   — the negative margin pulls the button up into that reserved blank space
+:   the negative margin pulls the button up into that reserved blank space
    instead of stacking a second gap on top of it. */
 .ab-skipped-files-btn {
   align-self: flex-start;
@@ -457,10 +465,10 @@
   margin-top: -8px;
 }
 
-/* Progress bar — base track/fill (.progress-bar-track/-fill) promoted to
+/* Progress bar, base track/fill (.progress-bar-track/-fill) promoted to
    shell.css; only Auto-Backup-specific modifiers stay here. */
 
-/* Indeterminate state — shown during the preflight "Calculating…" phase,
+/* Indeterminate state, shown during the preflight "Calculating…" phase,
    before the plan (and therefore a meaningful percentage) exists. A short
    segment sweeps the track, Windows-style. */
 @keyframes ab-bar-sweep {
@@ -532,7 +540,7 @@
   color: var(--color-accent-entries);
 }
 
-/* Log file reference row — sits below the stats grid */
+/* Log file reference row, sits below the stats grid */
 .ab-log-row {
   display: flex;
   align-items: center;
@@ -550,7 +558,7 @@
 }
 
 /* =============================================================================
-   PROGRESS PANEL — always-visible state
+   PROGRESS PANEL: always-visible state
 ============================================================================= */
 
 .ab-progress-idle {
@@ -593,7 +601,7 @@
   min-height: 0;
 }
 
-/* Sidebar — preset list */
+/* Sidebar, preset list */
 .ab-presets-sidebar {
   width: 180px;
   flex-shrink: 0;
@@ -857,13 +865,13 @@
 }
 
 /* =============================================================================
-   FACE SWITCHER  — disclaimer ⇄ tool cross-fade
+   FACE SWITCHER: disclaimer ⇄ tool cross-fade
    Mirrors the Budget main ⇄ Annual Stats pattern (budget.css): only one face
    is ever in normal flow, JS fades the outgoing face out, swaps display at
    the midpoint, then fades the incoming face in.
 ============================================================================= */
 
-/* Transparent wrapper — faces behave as direct children of the tool view */
+/* Transparent wrapper, faces behave as direct children of the tool view */
 .ab-flip-card {
   display: contents;
 }
@@ -900,7 +908,7 @@
 }
 
 /* =============================================================================
-   DISCLAIMER FACE  — first-entry warning panel
+   DISCLAIMER FACE: first-entry warning panel
 ============================================================================= */
 
 .ab-disclaimer-panel {
@@ -931,7 +939,7 @@
   opacity: 0.85;
 }
 
-/* Checkbox row — sits above the action buttons, aligned with Continue (right) */
+/* Checkbox row, sits above the action buttons, aligned with Continue (right) */
 .ab-disclaimer-skip {
   display: flex;
   align-items: center;
@@ -974,7 +982,7 @@
 }
 
 /* =============================================================================
-   CONFIRM MODAL — free-space warnings
+   CONFIRM MODAL: free-space warnings
    -----------------------------------------------------------------------------
    Non-blocking cautions, not errors: "size to copy" counts the full size of
    every changed file, not the smaller number of bytes an overwrite actually

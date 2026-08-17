@@ -1,5 +1,5 @@
 /* =============================================================================
-   CYCLE THEME  — "Cycle" theme mode: sequential/random rotation through the
+   CYCLE THEME: "Cycle" theme mode: sequential/random rotation through the
    built-in (and optionally custom) themes, plus real-world Holiday Overrides.
    -----------------------------------------------------------------------------
    Owns everything about Cycle mode: which theme is currently showing
@@ -11,7 +11,7 @@
    Split out the same way random-theme.ts is split out of shell.ts: this file
    is one more node in the existing theme-core.ts <-> theme-editor.ts <->
    random-theme.ts circular-import graph (see theme-core.ts's header comment)
-   — imported bindings here are only ever used inside functions/handlers that
+:   imported bindings here are only ever used inside functions/handlers that
    run after the whole module graph has finished loading, never at this
    file's own top-level evaluation time, so the cycle is safe.
 ============================================================================= */
@@ -24,11 +24,11 @@ import { applyCustomThemeById, clearCustomTheme, customThemes } from "./theme-ed
 /* -----------------------------------------------------------------------------
    Holiday Override date math
    -----------------------------------------------------------------------------
-   Each Holiday-tab theme maps to a real-world date window — two possible
+   Each Holiday-tab theme maps to a real-world date window. Two possible
    windows, actually: a tight one (the exact traditional date) and a wide one
    (the whole traditional season), switched by settings.cycleHolidayFullSeason
    ("Full Holiday Season"). Mardi Gras is the one exception to the fixed-date
-   windows below — Fat Tuesday moves every year — so it's derived from Easter
+   windows below (Fat Tuesday moves every year) so it's derived from Easter
    (Meeus/Jones/Butcher Gregorian algorithm) rather than a fixed month/day.
 ----------------------------------------------------------------------------- */
 
@@ -97,7 +97,7 @@ function isMardiGrasActive(now: Date): boolean {
   return today >= seasonStart && today <= seasonEnd;
 }
 
-/** US Thanksgiving: the 4th Thursday of November — moves every year, so
+/** US Thanksgiving: the 4th Thursday of November, moves every year, so
  *  (like Mardi Gras) it's computed rather than a fixed month/day. */
 function computeThanksgiving(year: number): Date {
   const nov1 = new Date(year, 10, 1);
@@ -127,7 +127,7 @@ function isHolidayActive(themeId: string, now: Date): boolean {
   return win ? isWithinMonthDayRange(now, win) : false;
 }
 
-/** Returns the Holiday-tab theme id active right now, if any — checked in
+/** Returns the Holiday-tab theme id active right now, if any, checked in
  *  THEME_GROUPS' holiday-tab order (no two windows above overlap, so order
  *  only matters as a tiebreaker that never actually gets exercised). */
 function getActiveHolidayThemeId(now: Date = new Date()): string | null {
@@ -139,7 +139,7 @@ function getActiveHolidayThemeId(now: Date = new Date()): string | null {
 }
 
 /** Same "is a Holiday Override live right now" check resolveActiveCycleThemeId()
- *  uses to decide whether to force a holiday theme — exposed so shell.ts can
+ *  uses to decide whether to force a holiday theme, exposed so shell.ts can
  *  explain, in the Cycle pane, *why* the theme is pinned. Returns null
  *  whenever the override wouldn't actually fire (setting off, or no Holiday
  *  window active today), same as resolveActiveCycleThemeId's own check. */
@@ -148,7 +148,7 @@ export function getActiveHolidayOverrideThemeId(): string | null {
 }
 
 /** The last calendar day `themeId`'s currently-active window keeps it forced
- *  on (inclusive) — Mardi Gras/Thanksgiving via their own movable-date math,
+ *  on (inclusive). Mardi Gras/Thanksgiving via their own movable-date math,
  *  everything else via whichever of the two HOLIDAY_WINDOWS_* tables actually
  *  produced the active match, so this always agrees with isHolidayActive().
  *  Only meaningful to call while getActiveHolidayOverrideThemeId() returns
@@ -169,7 +169,7 @@ export function getHolidayOverrideEndDate(themeId: string, now: Date = new Date(
  *  Main/Holiday/Special theme, plus saved Custom themes if opted in. With
  *  "Restrict to Holiday Season" on, a Holiday theme is only pool-eligible
  *  during its own window (tight day or full season, per cycleHolidayFullSeason)
- *  — independent of Holiday Override, which is a separate force-switch check
+ *:  independent of Holiday Override, which is a separate force-switch check
  *  resolveActiveCycleThemeId() makes outside of pool membership entirely. */
 function buildCyclePool(): string[] {
   const holidayIds = new Set(
@@ -215,8 +215,8 @@ function pickNextInPool(pool: string[], current: string): string {
   return pool[(idx + 1) % pool.length]!;
 }
 
-/** Applies a specific theme id — a built-in theme name (loads its CSS) or a
- *  saved custom theme's id — directly onto themeLink/:root, independent of
+/** Applies a specific theme id (a built-in theme name (loads its CSS) or a
+ *  saved custom theme's id) directly onto themeLink/:root, independent of
  *  settings.theme. Mirrors theme-core.ts's standard/custom branches exactly
  *  (same "call sync + set onload" idiom) since Cycle needs to apply an
  *  arbitrary underlying theme without ever setting settings.theme away from
@@ -257,7 +257,7 @@ function applyResolvedCycleTheme(force = false): void {
   applyUnderlyingTheme(resolved);
 }
 
-/** Which real theme id Cycle mode is currently displaying — used by
+/** Which real theme id Cycle mode is currently displaying, used by
  *  theme-core.ts to decide whether to run a seasonal canvas effect (Cycle's
  *  own settings.theme value, "cycle", never matches christmas/halloween/halo,
  *  so the seasonal-effect switch needs the actual underlying id instead). */
@@ -277,7 +277,7 @@ function advanceCyclePointer(): void {
   applyResolvedCycleTheme(true);
 }
 
-/** "Cycle Now" button — always allowed while Cycle is the active theme,
+/** "Cycle Now" button, always allowed while Cycle is the active theme,
  *  regardless of the configured trigger mode. */
 export function advanceCycleNow(): void {
   if (settings.theme !== "cycle") return;
@@ -285,7 +285,7 @@ export function advanceCycleNow(): void {
 }
 
 /* -----------------------------------------------------------------------------
-   "Time" trigger — schedules the next advance instead of reacting to
+   "Time" trigger, schedules the next advance instead of reacting to
    interaction. Anchored on settings.cycleLastAdvance (persisted), so the
    countdown survives closing and reopening the app: on (re)schedule, elapsed
    time since the last advance is subtracted from the interval, and if that's
@@ -334,7 +334,7 @@ function rescheduleCycleTimer(): void {
 }
 
 /* -----------------------------------------------------------------------------
-   Holiday-boundary recheck — a periodic re-resolve so a Holiday Override
+   Holiday-boundary recheck, a periodic re-resolve so a Holiday Override
    engages/disengages at the right moment even if the app is left open across
    a date boundary (e.g. open at 11:50pm Dec 23rd, still open past midnight).
    Self-cancels the moment Cycle/Holiday-Override stops being relevant, so
@@ -358,7 +358,7 @@ function ensureHolidayCheckInterval(): void {
 }
 
 // Whether this session has already had its one shot at an "onStartup"
-// advance — set on the very first activateCycleTheme() call regardless of
+// advance, set on the very first activateCycleTheme() call regardless of
 // trigger, so switching the dropdown to "On Startup" mid-session never
 // retroactively fires a surprise advance; only a real app-launch activation
 // (settings.cycleTrigger already "onStartup" when the app first applies
@@ -368,7 +368,7 @@ let _cycleActivatedOnce = false;
 /** Single entry point theme-core.ts's applyTheme("cycle") dispatches to:
  *  resolves + (re)paints whatever Cycle should be showing right now, and
  *  (re)arms the time-trigger timer and holiday-boundary check. Safe to call
- *  repeatedly (Settings modal reopen, any cycle-setting change) — each piece
+ *  repeatedly (Settings modal reopen, any cycle-setting change). Each piece
  *  is independently idempotent, except the one-time "onStartup" advance
  *  below. */
 export function activateCycleTheme(): void {
@@ -384,13 +384,13 @@ export function activateCycleTheme(): void {
 }
 
 /* -----------------------------------------------------------------------------
-   Interaction-driven triggers — two independent trigger modes, each with its
+   Interaction-driven triggers. Two independent trigger modes, each with its
    own listener(s):
 
-     "click"      — mousedown anywhere (not just buttons): fires the instant
+     "click":      mousedown anywhere (not just buttons): fires the instant
                     the mouse goes down rather than waiting for the full
                     click, so it feels snappier. The simplest of the two.
-     "everything" — mirrors random-theme.ts's Regenerative reactivity exactly:
+     "everything", mirrors random-theme.ts's Regenerative reactivity exactly:
                     button clicks, Enter/Escape commits inside a field, and
                     checkbox/radio/select changes (capture phase, same
                     debounce window, same close/dismiss exclusions).
@@ -425,7 +425,7 @@ document.addEventListener(
   true,
 );
 
-// "everything" trigger — button clicks.
+// "everything" trigger, button clicks.
 document.addEventListener(
   "click",
   (e) => {
@@ -437,7 +437,7 @@ document.addEventListener(
   true,
 );
 
-// "everything" trigger — Enter/Escape field commits.
+// "everything" trigger. Enter/Escape field commits.
 document.addEventListener(
   "keydown",
   (e) => {
@@ -451,7 +451,7 @@ document.addEventListener(
   true,
 );
 
-// "everything" trigger — checkbox/radio/select changes.
+// "everything" trigger, checkbox/radio/select changes.
 document.addEventListener(
   "change",
   (e) => {

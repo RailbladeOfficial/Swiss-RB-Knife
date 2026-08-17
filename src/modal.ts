@@ -1,5 +1,5 @@
 /* =============================================================================
-   MODAL — shared primitive
+   MODAL: shared primitive
    -----------------------------------------------------------------------------
    Wraps a `.modal-backdrop` element (which contains a single `.modal` panel) and
    owns every behaviour common to all modals in the app:
@@ -13,8 +13,8 @@
 
    Content and per-modal wiring stay in the owning file (shell.ts / a tool .ts);
    this primitive only handles the chrome and behaviour. Per-modal hooks:
-     onOpen()   — runs after the modal is displayed (load content, reset tabs…)
-     onClosed() — runs after the close transition finishes & display:none is set
+     onOpen(): runs after the modal is displayed (load content, reset tabs…)
+     onClosed(): runs after the close transition finishes & display:none is set
                   (collapse resets, extra scroll resets, etc.)
 
    A single global open-hook (setGlobalModalOpenHook) runs before every open so
@@ -32,8 +32,8 @@ export interface ModalOptions {
   onClosed?: () => void;
   /**
    * When set, opening this modal immediately closes the given parent modal so
-   * they replace rather than stack. The parent's onClosed hook is NOT fired —
-   * the caller re-opens the parent if needed (e.g. via a back-arrow button).
+   * they replace rather than stack. The parent's onClosed hook is NOT fired.
+   * The caller re-opens the parent if needed (e.g. via a back-arrow button).
    * Standard pattern for secondary modals (bill editor, encryption settings…)
    * that should replace a parent rather than layer on top of it.
    */
@@ -41,7 +41,7 @@ export interface ModalOptions {
 }
 
 /* -----------------------------------------------------------------------------
-   Module-level shared state — one stack and one set of global listeners for the
+   Module-level shared state. One stack and one set of global listeners for the
    whole app, regardless of how many Modal instances exist.
 ----------------------------------------------------------------------------- */
 
@@ -54,7 +54,7 @@ const BASE_Z = 1000;
 // Must be >= the longest close transition in modal.css (.modal transform 0.25s).
 const MODAL_FADE_MS = 280;
 
-// Shared dim + blur overlay — one element, always a single layer.
+// Shared dim + blur overlay. One element, always a single layer.
 // Activated when the first modal opens, deactivated when the last closes.
 const _overlay = document.getElementById("modalOverlay")!;
 
@@ -81,7 +81,7 @@ function syncBodyClass(): void {
 }
 
 /* -----------------------------------------------------------------------------
-   Global listeners — bound once, on first open.
+   Global listeners, bound once, on first open.
    Escape: close only the top-most modal (if it allows Escape).
    Drag:   grab the top strip (top padding + header row) to move its .modal;
            position is reset on close.
@@ -101,15 +101,15 @@ function bindGlobalListeners(): void {
     }
   });
 
-  // Header-region drag — start a drag when the press lands in the top "chrome"
+  // Header-region drag, start a drag when the press lands in the top "chrome"
   // strip of a modal: the top padding plus the full-width header row. Anything at
-  // or below the header's bottom edge — the body, the side padding beside it, the
-  // header→body gap, and the bottom — is not a grab handle. Queried at pointerdown
+  // or below the header's bottom edge (the body, the side padding beside it, the
+  // header→body gap, and the bottom) is not a grab handle. Queried at pointerdown
   // so any modal (current or future) works.
   //
   // Pointer events + setPointerCapture instead of mouse events: with plain
   // mouse events, releasing the button OUTSIDE the window (or an alt-tab
-  // mid-drag) means mouseup never fires — leaving a live document-level
+  // mid-drag) means mouseup never fires, leaving a live document-level
   // mousemove handler and a modal glued to the cursor until the next click.
   // Capture guarantees the up/cancel event is delivered to the modal no
   // matter where the pointer is, and the AbortController tears down every
@@ -168,7 +168,7 @@ function bindGlobalListeners(): void {
       try {
         modal!.releasePointerCapture(e.pointerId);
       } catch {
-        // capture may already be gone (e.g. pointercancel) — nothing to do
+        // capture may already be gone (e.g. pointercancel). Nothing to do
       }
     }
 
@@ -209,7 +209,7 @@ export class Modal {
 
     bindGlobalListeners();
 
-    // Backdrop (dimmed area) click — does NOT close by default. A modal can opt
+    // Backdrop (dimmed area) click, does NOT close by default. A modal can opt
     // back in with closeOnBackdrop: true. Only acts when this modal is on top.
     backdrop.addEventListener("click", (e) => {
       if (topModal() !== this) return;
@@ -231,7 +231,7 @@ export class Modal {
     globalOpenHook?.();
 
     // Replace-mode: immediately hide the parent modal without firing its
-    // onClosed hook. The overlay stays active — no flicker between modals.
+    // onClosed hook. The overlay stays active. No flicker between modals.
     if (this.opts.replaceModal?.isOpen) {
       const parent = this.opts.replaceModal;
       const pi = openStack.indexOf(parent);

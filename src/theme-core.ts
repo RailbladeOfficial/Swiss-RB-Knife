@@ -1,18 +1,18 @@
 /* =============================================================================
-   THEME CORE  — applyTheme() dispatcher + seasonal canvas effects
+   THEME CORE: applyTheme() dispatcher + seasonal canvas effects
    -----------------------------------------------------------------------------
    Owns applyTheme() (the single entry point for switching to a named theme,
    Random, or a Custom theme) and the seasonal canvas animations (Christmas
    snow, Halloween lightning, Thanksgiving leaves, Halo swirl, Valentine
    hearts, Patriot fireworks, Mardi Gras beads, Rainbow sparkle trail). Also
-   owns `_activeCustomId` — which custom theme (if any) is currently active —
+   owns `_activeCustomId`, which custom theme (if any) is currently active,
    since that's fundamentally theme-selection state, not shell chrome.
 
    Split out of shell.ts (Tier 6). Genuinely two-way coupled with
    theme-editor.ts: this file calls applyCustomThemeById()/clearCustomTheme()
    (theme-editor.ts owns custom-theme storage), and theme-editor.ts calls
    applyTheme() (e.g. to revert a live preview). Standard ES module circular
-   import — both directions are plain function references only invoked from
+   import. Both directions are plain function references only invoked from
    event handlers/later calls, never at module top-level, so load order is
    never actually a problem. Flagging it here so it isn't a surprise later.
 ============================================================================= */
@@ -33,7 +33,7 @@ export const themeLink = document.getElementById("themeLink") as HTMLLinkElement
 /** Builds the URL for a theme's CSS file, stamped with the current build id.
  *  Theme CSS is swapped at runtime via themeLink.href rather than flowing
  *  through Vite's module graph, so it never gets a content hash like
- *  shell.css etc. do — without a cache-busting query string, WebView2's HTTP
+ *  shell.css etc. do. Without a cache-busting query string, WebView2's HTTP
  *  cache keeps serving old theme CSS after an in-place app update, since the
  *  URL never changes even though the file on disk did. Every place that sets
  *  themeLink.href (or fetches a theme's CSS directly) should go through this. */
@@ -41,7 +41,7 @@ export function themeCssUrl(themeId: string): string {
   return `/themes/${themeId}.css?v=${__BUILD_ID__}`;
 }
 
-/** Which custom theme (if any) is currently active. Theme-selection state —
+/** Which custom theme (if any) is currently active. Theme-selection state,
  *  owned here rather than in theme-editor.ts's storage/editing logic. Mutate
  *  only through setActiveCustomId(); the binding itself is exported read-only
  *  (live ES-module bindings update automatically for importers). */
@@ -115,7 +115,7 @@ export function applyTheme(themeName: string): void {
   themeLink.onload = () => {
     clearRandomPalette();
     clearCustomTheme();
-    // CSS file is now loaded and :root vars are live — notify tools.
+    // CSS file is now loaded and :root vars are live, notify tools.
     window.dispatchEvent(new CustomEvent("themechange"));
   };
   clearRandomPalette();
@@ -133,7 +133,39 @@ export function applyTheme(themeName: string): void {
    (including panels, which was the complaint with the old body::before/::after
    version) while staying below the toast/lock-screen layer (z-index 9999+).
    pointer-events stays off throughout, so nothing here can ever block a click.
+
+   The one exception to "below 9999" is Display View (TTS Repeater), a
+   full-window overlay that deliberately sits above even the toast layer. A
+   theme's snow or lightning is a big part of what that theme IS, so the
+   overlay can ask for the effect to be lifted above it, see
+   setSeasonalCanvasElevated().
 ============================================================================= */
+
+/** Normal stacking: above app content, below toasts and the lock screen. */
+const SEASONAL_CANVAS_Z = "5000";
+/** Lifted above the TTS Repeater Display View overlay (10001). */
+const SEASONAL_CANVAS_Z_ELEVATED = "10002";
+
+let seasonalCanvasElevated = false;
+
+/** Lifts the seasonal effect canvas above the TTS Repeater's Display View
+ *  overlay, or drops it back to its normal layer. Sticky across effect
+ *  restarts and theme changes: the canvas is created lazily, so the current
+ *  value is (re)applied by ensureSeasonalCanvas() rather than only here. */
+/** Whether a seasonal effect is actually running right now, i.e. the active
+ *  theme has one AND it isn't switched off. Lets a caller tell "this theme has
+ *  no animation" apart from "it has one and it's disabled" without duplicating
+ *  the ANIMATED_THEMES table and the settings lookup. */
+export function isSeasonalEffectRunning(): boolean {
+  return seasonalActiveTheme !== null;
+}
+
+export function setSeasonalCanvasElevated(elevated: boolean): void {
+  seasonalCanvasElevated = elevated;
+  if (seasonalCanvas) {
+    seasonalCanvas.style.zIndex = elevated ? SEASONAL_CANVAS_Z_ELEVATED : SEASONAL_CANVAS_Z;
+  }
+}
 
 interface Snowflake {
   x: number;
@@ -155,7 +187,7 @@ interface LightningStrike {
 
 interface Leaf {
   x: number;
-  y: number; // baseline y — actual draw position adds a sinusoidal bob on top
+  y: number; // baseline y, actual draw position adds a sinusoidal bob on top
   rotation: number;
   rotationSpeed: number;
   speed: number; // px/sec, left to right
@@ -171,7 +203,7 @@ interface HeartParticle {
   y: number;
   vy: number; // gentle upward float, px/sec
   rotation: number;
-  size: number; // base size — actual drawn size is this times the scale curve below
+  size: number; // base size, actual drawn size is this times the scale curve below
   maxScale: number; // how big it grows relative to `size` at the peak of its life (1.15-2.0, randomized per heart)
   color: string;
   bornAt: number;
@@ -190,17 +222,17 @@ let seasonalActiveTheme: string | null = null;
 let snowflakes: Snowflake[] = [];
 let snowPile: number[] = [];
 const SNOW_PILE_COLUMN_WIDTH = 5; // px per accumulation bucket along the bottom edge
-const SNOW_PILE_MAX_HEIGHT = 100; // px cap — settles into a bank instead of swallowing the UI
-const SNOW_MAX_SLOPE = 1.5; // px — max height difference tolerated between adjacent columns before it slides
+const SNOW_PILE_MAX_HEIGHT = 100; // px cap (settles into a bank instead of swallowing the UI
+const SNOW_MAX_SLOPE = 1.5; // px) max height difference tolerated between adjacent columns before it slides
 const SNOW_RELAX_PASSES = 4; // relaxation sweeps per frame; alternates direction, see relaxSnowPile()
-const SNOW_WANDER_ACCEL = 55; // px/sec² — magnitude of the random gust nudges applied to wanderVel each frame
+const SNOW_WANDER_ACCEL = 55; // px/sec², magnitude of the random gust nudges applied to wanderVel each frame
 const SNOW_WANDER_DAMPING = 0.86; // per-frame decay applied to wanderVel so gusts settle instead of accumulating forever
 
 let lightningStrikes: LightningStrike[] = [];
 let lightningTimeoutId: number | null = null;
 /** Pending double-strike timers. Unlike lightningTimeoutId (the scheduler,
- *  of which exactly one is ever in flight), several of these can overlap —
- *  each strike independently rolls for a quick restrike. They're collected
+ *  of which exactly one is ever in flight), several of these can overlap.
+ *  Each strike independently rolls for a quick restrike. They're collected
  *  so stopSeasonalEffect() can cancel every one; an untracked timer that
  *  fires after teardown would push onto the cleared lightningStrikes array
  *  with no animation loop left to drain it. */
@@ -209,26 +241,26 @@ const LIGHTNING_DARKEN_STRENGTH = 0.4; // how far the screen dims at peak flash 
 
 let leaves: Leaf[] = [];
 let leafTimeoutId: number | null = null;
-const LEAF_COLORS = ["#e8631f", "#c22a1e", "#ff8a3f", "#e8b93d", "#8b5a2e", "#d9432a"]; // burnt orange / deep red / bright orange / gold / saddle-brown / tomato — matches thanksgiving.css's chart palette
+const LEAF_COLORS = ["#e8631f", "#c22a1e", "#ff8a3f", "#e8b93d", "#8b5a2e", "#d9432a"]; // burnt orange / deep red / bright orange / gold / saddle-brown / tomato, matches thanksgiving.css's chart palette
 const LEAF_GUST_MIN_MS = 30_000;
 const LEAF_GUST_MAX_MS = 60_000; // gusts land 30-60s apart, randomized each time
 
 let heartParticles: HeartParticle[] = [];
-const HEART_COLORS = ["#e0294b", "#ff2d78", "#c9184a", "#ff6f9c"]; // crimson / hot pink / deep pink / blush — matches valentine.css
+const HEART_COLORS = ["#e0294b", "#ff2d78", "#c9184a", "#ff6f9c"]; // crimson / hot pink / deep pink / blush, matches valentine.css
 
 let fireworkRockets: FireworkRocket[] = [];
 let fireworkSparks: FireworkSpark[] = [];
 let fireworkFlashes: number[] = []; // bornAt timestamps of recent bursts, driving the darken-on-burst overlay
 let fireworkTimeoutId: number | null = null;
 const FIREWORK_COLORS_PATRIOT = ["#FF0000", "#0000FF", "#ffffff"]; // Old Glory Red / Old Glory Blue (official US flag hex values) / white
-const FIREWORK_COLORS_RAINBOW = ["#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#7f00ff", "#ff007f", "#ffffff"]; // full multi-colored spark palette — also what "single" bursts draw their one color from
-const FIREWORK_GOLDEN_ANGLE = 2.399963229728653; // radians — used to space points evenly across a disc/star for the dot-matrix shapes
-const FIREWORK_GRAVITY = 260; // px/sec² — pulls the rising rocket back down; it bursts the moment this crosses back past 0 (apex)
-const FIREWORK_SPARK_GRAVITY = 140; // px/sec² — lighter fall for the burst sparks
+const FIREWORK_COLORS_RAINBOW = ["#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#7f00ff", "#ff007f", "#ffffff"]; // full multi-colored spark palette (also what "single" bursts draw their one color from
+const FIREWORK_GOLDEN_ANGLE = 2.399963229728653; // radians) used to space points evenly across a disc/star for the dot-matrix shapes
+const FIREWORK_GRAVITY = 260; // px/sec², pulls the rising rocket back down; it bursts the moment this crosses back past 0 (apex)
+const FIREWORK_SPARK_GRAVITY = 140; // px/sec² (lighter fall for the burst sparks
 const FIREWORK_DARKEN_STRENGTH = 0.35; // how far the screen dims at peak burst brightness, so sparks pop by contrast
-const FIREWORK_FLASH_DURATION_MS = 6600; // how long the darken overlay takes to fully dissipate after a burst — 2x the previous duration, to stay lit through the now much longer-lived sparks
+const FIREWORK_FLASH_DURATION_MS = 6600; // how long the darken overlay takes to fully dissipate after a burst) 2x the previous duration, to stay lit through the now much longer-lived sparks
 const FIREWORK_LAUNCH_MIN_MS = 3600;
-const FIREWORK_LAUNCH_MAX_MS = 14000; // launches land 7.2-28s apart, randomized each time — half the previous cadence
+const FIREWORK_LAUNCH_MAX_MS = 14000; // launches land 7.2-28s apart, randomized each time, half the previous cadence
 
 interface FireworkRocket {
   x: number;
@@ -259,21 +291,21 @@ interface SwirlParticle {
 
 let swirlParticles: SwirlParticle[] = [];
 let swirlDotPattern: CanvasPattern | null = null;
-const SWIRL_RGB = "111, 160, 224"; // #6fa0e0 — matches this theme's --color-btn (halo.css), sampled off the Halo 3 menu's blue
-const SWIRL_GRID = 5; // px — dot-grid cell size; particles snap to it so the glow reads as lit pixels, not a blob
-const SWIRL_DOT_RADIUS = 2.4; // px — reactive dot size, deliberately bigger than the ambient grid's own dots
-const SWIRL_SPAWN_JITTER = 26; // px — spread applied around the cursor's motion path when spawning particles
+const SWIRL_RGB = "111, 160, 224"; // #6fa0e0 (matches this theme's --color-btn (halo.css), sampled off the Halo 3 menu's blue
+const SWIRL_GRID = 5; // px) dot-grid cell size; particles snap to it so the glow reads as lit pixels, not a blob
+const SWIRL_DOT_RADIUS = 2.4; // px (reactive dot size, deliberately bigger than the ambient grid's own dots
+const SWIRL_SPAWN_JITTER = 26; // px) spread applied around the cursor's motion path when spawning particles
 const SWIRL_MAX_PARTICLES = 1600; // hard cap so a frantic mouse can't runaway the particle count
-const SWIRL_VORTEX_ACCEL = 55; // px/sec² — force perpendicular to velocity that curls particles into little swirls
+const SWIRL_VORTEX_ACCEL = 55; // px/sec² (force perpendicular to velocity that curls particles into little swirls
 const SWIRL_DRAG = 0.92; // per-frame (at 60fps) velocity damping
-const SWIRL_HALO_RADIUS = 110; // px — soft glow pool, sized around the cursor while it's moving
-// Per-frame (at 60fps) decay of the halo's movement-driven visibility — the
+const SWIRL_HALO_RADIUS = 110; // px) soft glow pool, sized around the cursor while it's moving
+// Per-frame (at 60fps) decay of the halo's movement-driven visibility. The
 // knob to turn if the glow should linger longer (closer to 1) or vanish
 // faster (closer to 0) after the cursor stops. At 0.93 the halo fades to
 // ~1% opacity roughly 1 second after the last mousemove.
 const SWIRL_ACTIVITY_DECAY = 0.93;
 // Anchors the halo/particle origin a little off the literal cursor
-// coordinate — always opposite whichever direction the cursor last moved,
+// coordinate, always opposite whichever direction the cursor last moved,
 // so the glow trails behind the cursor no matter which way it's travelling
 // instead of sitting fixed to one side (which reads wrong once the cursor
 // heads toward that side).
@@ -294,9 +326,9 @@ interface BeadStrand {
 }
 
 let beadStrands: BeadStrand[] = [];
-const BEAD_COLORS = ["#7b2fbe", "#00a550", "#ffd700"]; // purple / green / gold — the traditional Mardi Gras trio, matches mardi-gras.css
-const BEAD_GRAVITY = 460; // px/sec² — heavier fall than snow, so beads read as solid plastic rather than drifting flakes
-const BEAD_BOUNCE_DAMPING = 0.45; // velocity kept per bounce — a couple of shrinking bounces, not endless
+const BEAD_COLORS = ["#7b2fbe", "#00a550", "#ffd700"]; // purple / green / gold (the traditional Mardi Gras trio, matches mardi-gras.css
+const BEAD_GRAVITY = 460; // px/sec²) heavier fall than snow, so beads read as solid plastic rather than drifting flakes
+const BEAD_BOUNCE_DAMPING = 0.45; // velocity kept per bounce, a couple of shrinking bounces, not endless
 
 interface SparkleParticle {
   x: number;
@@ -313,9 +345,9 @@ interface SparkleParticle {
 
 let sparkleParticles: SparkleParticle[] = [];
 let sparkleHueCursor = 0; // advances with every spawn so consecutive trail particles step through the spectrum
-const SPARKLE_HUE_STEP = 14; // degrees advanced per spawn — full spectrum cycles roughly every ~26 spawns
-const SPARKLE_MAX_PARTICLES = 900; // raised well above the Halo swirl's cap — a much longer-lived trail keeps far more particles alive at once
-const SPARKLE_ORIGIN_OFFSET = 26; // px — same "anchor opposite the direction of travel" trick as the Halo swirl, so the trail lags behind the cursor instead of centering on it
+const SPARKLE_HUE_STEP = 14; // degrees advanced per spawn (full spectrum cycles roughly every ~26 spawns
+const SPARKLE_MAX_PARTICLES = 900; // raised well above the Halo swirl's cap) a much longer-lived trail keeps far more particles alive at once
+const SPARKLE_ORIGIN_OFFSET = 26; // px. Same "anchor opposite the direction of travel" trick as the Halo swirl, so the trail lags behind the cursor instead of centering on it
 
 /** Creates (once) and returns the shared full-window canvas + context used by
  *  both seasonal effects, resizing it to the current window/DPR each call. */
@@ -328,9 +360,14 @@ function ensureSeasonalCanvas(): { ctx: CanvasRenderingContext2D } {
     seasonalCanvas.style.width = "100vw";
     seasonalCanvas.style.height = "100vh";
     seasonalCanvas.style.pointerEvents = "none";
-    seasonalCanvas.style.zIndex = "5000";
     document.body.appendChild(seasonalCanvas);
   }
+  // Outside the creation branch: Display View may have asked to be painted
+  // over before this theme's effect ever ran, and that request has to survive
+  // the canvas being created afterwards.
+  seasonalCanvas.style.zIndex = seasonalCanvasElevated
+    ? SEASONAL_CANVAS_Z_ELEVATED
+    : SEASONAL_CANVAS_Z;
   const ctx = seasonalCanvas.getContext("2d");
   if (!ctx)
     throw new Error("2d canvas context unavailable for seasonal effects");
@@ -411,7 +448,7 @@ function stopSeasonalEffect(): void {
 /** Every theme that has a canvas effect, with a short description of what it
  *  actually does. Single source of truth: applySeasonalEffect() dispatches on
  *  these ids, and the Theme Picker's Preferences tab builds its per-theme
- *  toggle list straight from this array — so adding an effect below is all it
+ *  toggle list straight from this array, so adding an effect below is all it
  *  takes for it to appear (and be switchable) in the UI. Ordered to match the
  *  Holiday tab's own order, with the one Special-tab effect (Halo) last. */
 export const ANIMATED_THEMES: { id: string; label: string; effect: string }[] = [
@@ -428,7 +465,7 @@ export const ANIMATED_THEMES: { id: string; label: string; effect: string }[] = 
 /** Whether the given theme's canvas effect is allowed to run: the master
  *  "Theme Animations" switch, then that theme's own opt-out. Themes with no
  *  effect at all return true here and simply match nothing in the dispatch
- *  below — this answers "is it permitted", not "does it have one". */
+ *  below. This answers "is it permitted", not "does it have one". */
 export function isThemeAnimationEnabled(themeId: string): boolean {
   if (!settings.themeAnimations) return false;
   return !settings.themeAnimationsOff.includes(themeId);
@@ -475,8 +512,8 @@ function applySeasonalEffect(themeName: string): void {
 }
 
 /** Christmas snowfall. Each flake is an independent object that falls,
- *  drifts side to side, and — once it reaches the accumulated snow line at
- *  its x position — "lands" (adding a little height to that column of the
+ *  drifts side to side, and (once it reaches the accumulated snow line at
+ *  its x position) "lands" (adding a little height to that column of the
  *  snowbank) and respawns at the top. Because every flake resets itself
  *  individually there's no shared loop for the whole layer to visibly snap
  *  back on; the snowfall is continuous for as long as the theme is active. */
@@ -494,7 +531,7 @@ function startChristmasSnow(): void {
       speed: 20 + Math.random() * 40, // px/sec
       drift: 10 + Math.random() * 20, // sway amplitude
       driftPhase: Math.random() * Math.PI * 2,
-      driftFreq: 0.25 + Math.random() * 0.9, // sway rate — varies per flake so they don't all swing in lockstep
+      driftFreq: 0.25 + Math.random() * 0.9, // sway rate, varies per flake so they don't all swing in lockstep
       wanderVel: 0, // slow random-walk "gust" velocity, built up frame to frame below
     };
   }
@@ -535,7 +572,7 @@ function startChristmasSnow(): void {
     }
   }
 
-  /** Enforces a maximum height difference between adjacent columns — real
+  /** Enforces a maximum height difference between adjacent columns, real
    *  snow has an angle of repose; ours didn't, which is why a busy pile
    *  turned into stalagmites instead of a level bank. Each pass nudges half
    *  the excess from a too-tall column into its shorter neighbor. Run a few
@@ -594,7 +631,7 @@ function startChristmasSnow(): void {
     for (const flake of snowflakes) {
       flake.driftPhase += dt * flake.driftFreq;
       // Smoothed random walk ("gusts"): nudge velocity randomly each frame,
-      // then decay it — an Ornstein-Uhlenbeck-style process. This is what
+      // then decay it, an Ornstein-Uhlenbeck-style process. This is what
       // actually breaks up the pure-sine look; the sine term alone just
       // offsets in phase/amplitude, which still reads as "the same wave"
       // repeating for every flake.
@@ -730,8 +767,8 @@ function startHalloweenLightning(): void {
     }, delay);
   }
 
-  /** Two-pulse Gaussian flicker curve — a quick bright flash, brief dip, a
-   *  fainter second pulse, then fade out — so each strike stutters like real
+  /** Two-pulse Gaussian flicker curve (a quick bright flash, brief dip, a
+   *  fainter second pulse, then fade out) so each strike stutters like real
    *  lightning instead of doing a simple linear fade. */
   function flickerIntensity(elapsedMs: number, lifespanMs: number): number {
     const t = elapsedMs / lifespanMs;
@@ -815,7 +852,7 @@ function startHalloweenLightning(): void {
   // Tracked in a module-level handle like every other seasonal listener, so
   // stopSeasonalEffect() can drop it. Left untracked, each switch back to
   // Halloween stacked another permanent listener, and clicks made AFTER
-  // leaving the theme still pushed onto lightningStrikes — an array the
+  // leaving the theme still pushed onto lightningStrikes, an array the
   // cancelled animation loop no longer drains.
   seasonalClickHandler = () => spawnStrike();
   document.addEventListener("click", seasonalClickHandler);
@@ -824,7 +861,7 @@ function startHalloweenLightning(): void {
 /** Thanksgiving leaves. Unlike the continuous Christmas snow, this is a
  *  one-shot gust: a small batch of leaves spawns off-screen to the left at a
  *  random height, blows straight across to off-screen on the right, and is
- *  discarded — then the next gust is scheduled 30-90s later. Each leaf bobs
+ *  discarded, then the next gust is scheduled 30-90s later. Each leaf bobs
  *  up and down on its own sine phase as it travels so the gust doesn't read
  *  as a single rigid row sliding across. */
 function startThanksgivingLeaves(): void {
@@ -921,7 +958,7 @@ function startThanksgivingLeaves(): void {
  *  local axis, then rotated as a whole) tumbling as it falls under real
  *  gravity. Instead of snow's pile-up-into-a-bank behavior, a strand bounces
  *  off the bottom edge a couple of times with each bounce losing speed, then
- *  resets to the top with fresh randomized properties — beads don't
+ *  resets to the top with fresh randomized properties, beads don't
  *  accumulate, they just keep tumbling through. */
 function startMardiGrasBeads(): void {
   const { ctx } = ensureSeasonalCanvas();
@@ -969,7 +1006,7 @@ function startMardiGrasBeads(): void {
       ctx.shadowBlur = 6;
       ctx.fill();
 
-      // Small offset highlight — reads as a shiny plastic bead instead of a flat dot.
+      // Small offset highlight, reads as a shiny plastic bead instead of a flat dot.
       ctx.beginPath();
       ctx.arc(-strand.beadRadius * 0.3, by - strand.beadRadius * 0.3, strand.beadRadius * 0.3, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
@@ -995,7 +1032,7 @@ function startMardiGrasBeads(): void {
       strand.rotation += strand.rotationSpeed * dt;
 
       // Conservative worst-case extent regardless of the strand's current
-      // rotation — simpler than tracking the true rotated bounding box, and
+      // rotation, simpler than tracking the true rotated bounding box, and
       // the couple of extra px of margin isn't visible at this size.
       const halfExtent = ((strand.beadCount - 1) / 2) * strand.beadSpacing + strand.beadRadius;
       if (strand.y + halfExtent >= groundY) {
@@ -1023,7 +1060,7 @@ function startMardiGrasBeads(): void {
 }
 
 /** Builds (once per effect start) the small repeating tile used to paint the
- *  ambient "pixelated background" — a faint, static dot grid — cheaply. One
+ *  ambient "pixelated background" (a faint, static dot grid) cheaply. One
  *  fillRect() with this pattern per frame stands in for the tens of thousands
  *  of individual dots a real grid at this density would otherwise cost. */
 function buildSwirlDotPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
@@ -1043,24 +1080,24 @@ function buildSwirlDotPattern(ctx: CanvasRenderingContext2D): CanvasPattern | nu
  *  background") with a light-blue glow that puffs out behind the cursor as
  *  it moves, inspired by obfuscator.io's WebGL fluid-sim hero effect (see
  *  the file header comment in public/themes/halo.css for what the real one
- *  does — this is a much cheaper canvas-2D approximation of the same idea:
+ *  does. This is a much cheaper canvas-2D approximation of the same idea:
  *  colored light injected near the cursor, curling into little vortices,
  *  sampled through a dot grid instead of rendered smooth).
  *
- *  Deliberately inert at rest — the glow exists only as a byproduct of
+ *  Deliberately inert at rest. The glow exists only as a byproduct of
  *  motion, so a still cursor leaves whatever's underneath fully readable.
  *  Two layers ride on movement: a soft radial halo whose visibility tracks a
  *  decaying "activity" value (1 on every mousemove, exponentially decayed to
- *  0 at rest — see SWIRL_ACTIVITY_DECAY, tune this to change how long the
+ *  0 at rest, see SWIRL_ACTIVITY_DECAY, tune this to change how long the
  *  glow lingers after the cursor stops), and a cloud of small particles
  *  ejected in the direction *opposite* the cursor's travel, like the wake
  *  the real site's dye leaves as it's dragged through the fluid, rather than
  *  a trail cast ahead of the motion. Each particle then curls via a force
  *  perpendicular to its own velocity (a cheap stand-in for real fluid
- *  vorticity), drags, and fades out — snapped to the same grid as the
+ *  vorticity), drags, and fades out, snapped to the same grid as the
  *  ambient pattern so it reads as extra-bright grid dots, not a free
  *  floating blob. Both layers are anchored SWIRL_ORIGIN_OFFSET px off the
- *  cursor, but not toward a fixed corner — the anchor always sits opposite
+ *  cursor, but not toward a fixed corner. The anchor always sits opposite
  *  whichever direction the cursor last travelled (dirX/dirY below), so the
  *  glow trails behind the cursor no matter which way it's moving instead of
  *  reading as "ahead" of it once the cursor heads toward a fixed offset. */
@@ -1074,8 +1111,8 @@ function startHaloSwirl(): void {
   let mouseY = 0;
   let lastMouseX = 0;
   let lastMouseY = 0;
-  let activity = 0; // 0..1 — driven up by movement, decays to 0 at rest
-  // Unit vector of the cursor's last travel direction — persists between
+  let activity = 0; // 0..1 (driven up by movement, decays to 0 at rest
+  // Unit vector of the cursor's last travel direction) persists between
   // moves (rather than resetting) so the anchor holds its trailing position
   // while activity decays after the cursor stops, instead of snapping away.
   let dirX = 0;
@@ -1108,7 +1145,7 @@ function startHaloSwirl(): void {
     const anchorY = mouseY - dirY * SWIRL_ORIGIN_OFFSET;
 
     // Wake puff: ejected opposite the direction of travel, from the anchor,
-    // so it's left behind as the cursor keeps moving forward — not cast
+    // so it's left behind as the cursor keeps moving forward, not cast
     // ahead of it.
     const wakeAngle = Math.atan2(dy, dx) + Math.PI;
     const count = Math.min(14, Math.max(3, Math.round(speed / 3)));
@@ -1144,7 +1181,7 @@ function startHaloSwirl(): void {
 
     activity *= Math.pow(SWIRL_ACTIVITY_DECAY, dt * 60);
 
-    // Soft halo pooled around the cursor — only visible while activity is
+    // Soft halo pooled around the cursor, only visible while activity is
     // still elevated from recent movement; fully gone at rest. Anchored
     // opposite the last travel direction, same as the particle wake.
     if (hasMouse && activity > 0.01) {
@@ -1209,7 +1246,7 @@ function startHaloSwirl(): void {
  *  (sparkleHueCursor advances by SPARKLE_HUE_STEP° per spawn) so the trail
  *  itself reads as a smooth rainbow gradient rather than randomly-colored
  *  confetti. Particles drift with a slight upward float (like glitter dust),
- *  shrink, and fade — reusing the Halo swirl's "spawn along the recent mouse
+ *  shrink, and fade, reusing the Halo swirl's "spawn along the recent mouse
  *  path, proportional to how far it moved" shape, but simpler: no ambient
  *  dot-grid background or idle halo, since this is meant to be inert at rest
  *  and only ever exist as a trail behind actual movement. */
@@ -1223,7 +1260,7 @@ function startRainbowSparkles(): void {
   let lastMouseX = 0;
   let lastMouseY = 0;
   let hasMouse = false;
-  // Unit vector of the cursor's last travel direction — persists between
+  // Unit vector of the cursor's last travel direction, persists between
   // moves (rather than resetting), same as the Halo swirl's dirX/dirY, so
   // the anchor holds its trailing position instead of snapping back to the
   // literal cursor point the instant the mouse stops.
@@ -1249,7 +1286,7 @@ function startRainbowSparkles(): void {
     dirX = dx / dist;
     dirY = dy / dist;
     // Anchor opposite the direction of travel, so the trail lags behind the
-    // cursor no matter which way it's moving — same trick the Halo swirl
+    // cursor no matter which way it's moving. Same trick the Halo swirl
     // uses for its wake/halo anchor.
     const anchorX = mouseX - dirX * SPARKLE_ORIGIN_OFFSET;
     const anchorY = mouseY - dirY * SPARKLE_ORIGIN_OFFSET;
@@ -1340,7 +1377,7 @@ function startRainbowSparkles(): void {
   window.addEventListener("resize", seasonalResizeHandler);
 }
 
-/** Draws a heart centered on (x, y) — the classic "top notch + two bezier
+/** Draws a heart centered on (x, y). The classic "top notch + two bezier
  *  lobes + point" construction, scaled to `size` and faded by `alpha`. */
 function drawHeart(
   ctx: CanvasRenderingContext2D,
@@ -1353,7 +1390,7 @@ function drawHeart(
 ): void {
   if (alpha <= 0 || size <= 0) return;
   const topCurveHeight = size * 0.3;
-  const hy = -size / 2; // top-center notch — shape spans roughly [-size/2, size/2]
+  const hy = -size / 2; // top-center notch, shape spans roughly [-size/2, size/2]
 
   ctx.save();
   ctx.translate(x, y);
@@ -1384,7 +1421,7 @@ function drawHeart(
 /** Valentine hearts. Every mousedown pops one heart into existence right at
  *  the cursor: it grows from a fraction of its final size up to full size
  *  while drifting gently upward and fading out, over a randomized 1-2s
- *  lifespan — one heart per click, like Halloween's onclick lightning strike
+ *  lifespan. One heart per click, like Halloween's onclick lightning strike
  *  is one bolt per click. */
 function startValentineHearts(): void {
   const { ctx } = ensureSeasonalCanvas();
@@ -1416,7 +1453,7 @@ function startValentineHearts(): void {
     for (const h of heartParticles) {
       const t = (now - h.bornAt) / h.lifespanMs; // 0..1
       const elapsedSec = (now - h.bornAt) / 1000;
-      const growEase = 1 - Math.pow(1 - t, 2); // easeOutQuad — fast start, settles near the end
+      const growEase = 1 - Math.pow(1 - t, 2); // easeOutQuad, fast start, settles near the end
       const scale = 0.25 + growEase * (h.maxScale - 0.25); // starts at 25% size, grows to h.maxScale (115%-200%)
       const alpha = 1 - t;
       const y = h.y + h.vy * elapsedSec;
@@ -1436,7 +1473,7 @@ function startValentineHearts(): void {
 /** Patriot fireworks. Autonomous, like Halloween's lightning strikes: rockets
  *  launch on their own as time passes (no click needed), from random x
  *  positions along the bottom of the screen, to random heights within the
- *  top two-thirds of the screen — each rocket's initial upward velocity is
+ *  top two-thirds of the screen. Each rocket's initial upward velocity is
  *  picked from a target apex height, so higher rockets are simply given more
  *  launch speed rather than bursting on a fixed timer. It rises with a
  *  trailing spark tail, arcing under gravity, and bursts the instant it
@@ -1444,19 +1481,19 @@ function startValentineHearts(): void {
  *  burst independently rolls a color mode (single locked color from the
  *  rainbow set, assorted rainbow colors, or assorted red/white/blue) and a
  *  shape (scattered, ring, dot-matrix filled circle, spike star, or a
- *  dot-matrix filled star) — see randomColorMode()/randomShapeMode() — so
+ *  dot-matrix filled star), see randomColorMode()/randomShapeMode(): so
  *  any color can pair with any shape and consecutive fireworks read as
  *  genuinely varied instead of the same explosion repeated. Occasionally two
  *  launch in quick succession,
  *  mirroring lightning's occasional double-strike. Each burst also registers
  *  a screen-darkening flash (the same "dim the world, then paint the effect
  *  on top" trick the lightning strikes use) so the burst reads as
- *  illuminated against the dimmed backdrop — held long enough to stay lit
+ *  illuminated against the dimmed backdrop, held long enough to stay lit
  *  through the sparks' now much longer lingering fall. */
 function startPatriotFireworks(): void {
   const { ctx } = ensureSeasonalCanvas();
 
-  // Color and shape are independent choices — any of the 3 color modes can
+  // Color and shape are independent choices. Any of the 3 color modes can
   // pair with any of the 5 shapes, instead of each burst "type" hard-coding
   // its own palette.
   type ColorMode = "single" | "multi" | "patriot";
@@ -1493,7 +1530,7 @@ function startPatriotFireworks(): void {
   }
 
   // Sparks now live 2x as long again as the last pass (4200-7200ms instead
-  // of 2100-3600ms), so the whole show — rise, burst, and fade — lasts even
+  // of 2100-3600ms), so the whole show (rise, burst, and fade) lasts even
   // longer per firework.
   function sparkLifespanMs(): number {
     return 4200 + Math.random() * 3000;
@@ -1502,7 +1539,7 @@ function startPatriotFireworks(): void {
   // Takes `now` from the calling frame rather than reading performance.now()
   // itself: burst() runs mid-frame (a rocket can cross its apex partway
   // through frame()'s rocket loop), and by the time it ran, a fresh
-  // performance.now() read would land a hair after the frame's own `now` —
+  // performance.now() read would land a hair after the frame's own `now`,
   // so on that same frame, `now - bornAt` would come out slightly negative
   // for anything just spawned, which used to send a disc's radius negative
   // and crash canvas's arc(). Sharing one clock avoids the skew entirely.
@@ -1511,7 +1548,7 @@ function startPatriotFireworks(): void {
 
     const colorMode = randomColorMode();
     // "single" locks the whole burst to one color, drawn from the rainbow
-    // set (not just red/white/blue) — chosen once up front and reused below.
+    // set (not just red/white/blue), chosen once up front and reused below.
     const lockedColor =
       colorMode === "single"
         ? FIREWORK_COLORS_RAINBOW[Math.floor(Math.random() * FIREWORK_COLORS_RAINBOW.length)]!
@@ -1525,14 +1562,14 @@ function startPatriotFireworks(): void {
     const shape = randomShapeMode();
 
     if (shape === "dotmatrix") {
-      // A filled-in circle built from dots, not just an expanding ring —
+      // A filled-in circle built from dots, not just an expanding ring,
       // sample points across the *whole* disc (not only its rim) with a
       // sunflower/Fibonacci distribution (r = R·√(fraction), angle = golden
       // angle steps), which spaces points evenly over the area instead of
       // randomly, so it reads as a deliberate dot-matrix pattern. Each dot's
       // outward speed is set so it reaches roughly its sampled radius after
       // ~0.5s, keeping the filled-circle shape recognizable as it blooms.
-      const count = 70 + Math.floor(Math.random() * 30); // 70-99 — denser than the ring, to read as "filled"
+      const count = 70 + Math.floor(Math.random() * 30); // 70-99, denser than the ring, to read as "filled"
       const maxRadius = 50 + Math.random() * 30;
       for (let i = 0; i < count; i++) {
         const r = maxRadius * Math.sqrt((i + 0.5) / count);
@@ -1591,9 +1628,9 @@ function startPatriotFireworks(): void {
     }
 
     if (shape === "star") {
-      // A handful of straight rays (5 points — a nod to the flag's stars)
+      // A handful of straight rays (5 points, a nod to the flag's stars)
       // each carrying a spread of sparks at increasing speed, so within a
-      // ray the sparks fan out into a spike instead of a scattered blob —
+      // ray the sparks fan out into a spike instead of a scattered blob,
       // together the rays read as a sparse star silhouette rather than a
       // circle (contrast the filled-in "dotmatrixStar" above).
       const points = 5;
@@ -1635,7 +1672,7 @@ function startPatriotFireworks(): void {
       return;
     }
 
-    // "scattered" — the classic randomized-angle, randomized-speed burst.
+    // "scattered". The classic randomized-angle, randomized-speed burst.
     const count = 36 + Math.floor(Math.random() * 24); // 36-59 sparks
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -1656,7 +1693,7 @@ function startPatriotFireworks(): void {
     // Target apex somewhere between 35% and 95% up from the bottom (i.e.
     // bursting anywhere from just above center to near the top, but never
     // lower than the top two-thirds of the screen), then back-solve the
-    // launch speed needed to reach it under gravity (v² = 2·g·h) — this is
+    // launch speed needed to reach it under gravity (v² = 2·g·h). This is
     // what makes rockets burst at varying heights instead of all popping at
     // the same point.
     const targetHeight = window.innerHeight * (0.35 + Math.random() * 0.6);
@@ -1682,7 +1719,7 @@ function startPatriotFireworks(): void {
     }, delay);
   }
 
-  /** Quick single-pulse flash curve for the burst's darken overlay — a fast
+  /** Quick single-pulse flash curve for the burst's darken overlay, a fast
    *  rise then a slow fade, unlike lightning's two-pulse flicker since a
    *  firework burst is one clean flash rather than a stuttering strike. */
   function flashIntensity(elapsedMs: number): number {

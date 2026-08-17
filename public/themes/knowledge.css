@@ -50,7 +50,7 @@
   --color-chart-8:             #d4820a;
 }
 
-/* ── Time Tracker panels — sage / amber alternating ── */
+/* ── Time Tracker panels, sage / amber alternating ── */
 .input-panel {
   background: linear-gradient(135deg, rgba(255, 196, 13, 0.05) 0%, #0d1a10 100%);
   border-left: 4px solid #ffc40d;
@@ -72,7 +72,7 @@
   border-color: rgba(18, 135, 111, 0.28);
 }
 
-/* ── Tool / section header — dark green with sage accent ── */
+/* ── Tool / section header, dark green with sage accent ── */
 .tool-view-header,
 .section-header {
   background: linear-gradient(90deg, rgba(104, 153, 111, 0.1), rgba(255, 196, 13, 0.06));
@@ -85,14 +85,14 @@
   opacity: 1;
 }
 
-/* ── Modal — solid: flat dark green panel (original look) ── */
+/* ── Modal, solid: flat dark green panel (original look) ── */
 body.solid-modals .modal {
   background: #111e14;
   border-color: rgba(104, 153, 111, 0.25);
   box-shadow: 0 0 24px rgba(104, 153, 111, 0.08), 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Modal — translucent: frosted forest glass ── */
+/* ── Modal, translucent: frosted forest glass ── */
 body:not(.solid-modals) .modal {
   background: rgba(17, 30, 20, 0.25);
   backdrop-filter: blur(24px);
@@ -101,7 +101,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 24px rgba(104, 153, 111, 0.08), 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Primary button — ghost sage with amber hover ── */
+/* ── Primary button, ghost sage with amber hover ── */
 .primary-btn {
   background: rgba(104, 153, 111, 0.12);
   border-color: rgba(104, 153, 111, 0.5);
@@ -115,7 +115,7 @@ body:not(.solid-modals) .modal {
 }
 
 
-/* ── Danger button — solid coral ── */
+/* ── Danger button, solid coral ── */
 .danger-btn {
   background: #fc6f6f;
   border-color: #fc6f6f;
@@ -210,20 +210,20 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds — dark forest with sage/amber tints */
+/* Panel backgrounds, dark forest with sage/amber tints */
 #finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 196, 13, 0.07) 0%, #111e14 100%); }
 #finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(104, 153, 111, 0.08) 0%, #111e14 100%); }
 #finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(255, 196, 13, 0.07) 0%, #111e14 100%); }
 #finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(18, 135, 111, 0.07) 0%, #111e14 100%); }
 
-/* Annual Stats title panel — amber accent */
+/* Annual Stats title panel, amber accent */
 .budget-annual-stats-title-panel {
   border-left: 4px solid #ffc40d;
   background: linear-gradient(135deg, rgba(255, 196, 13, 0.06) 0%, #111e14 100%);
 }
 .budget-annual-stats-title { color: #ffc40d; }
 
-/* Summary tab active — amber */
+/* Summary tab active, amber */
 .budget-summary-tab.active { color: #ffc40d; background: rgba(255, 196, 13, 0.12); border-bottom-color: #ffc40d; }
 
 /* Stats table values */
@@ -250,7 +250,7 @@ body:not(.solid-modals) .modal {
   color: #ffc40d;
 }
 
-/* View-mode active button — amber */
+/* View-mode active button, amber */
 .budget-view-mode-btn.active {
   background: #ffc40d;
   color: #0d1a10;

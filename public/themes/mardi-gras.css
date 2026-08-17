@@ -25,7 +25,7 @@
   --color-toggle-off:          #3a1a5a;
   --color-toggle-on:           #00a550;
 
-  /* ── Changelog accents ── Features (gold) / Improvements (green) / Bugfixes (red, matches --color-danger — the
+  /* ── Changelog accents ── Features (gold) / Improvements (green) / Bugfixes (red, matches --color-danger. The
      Mardi Gras trio of gold/green/purple has no natural "error" color, so red fills that semantic gap) /
      tool heading (purple, the third trinity color, reserved for this accent role) */
   --color-changelog-features:     #ffd700;
@@ -51,7 +51,7 @@
   --color-chart-8:             #cc7000;
 }
 
-/* ── Time Tracker panels — gold / green / purple / gold ── */
+/* ── Time Tracker panels, gold / green / purple / gold ── */
 .input-panel {
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%);
   border-left: 4px solid #ffd700;
@@ -77,7 +77,7 @@
   box-shadow: 0 0 16px rgba(255, 215, 0, 0.1);
 }
 
-/* ── Tool / section header — gold-to-purple festive gradient ── */
+/* ── Tool / section header, gold-to-purple festive gradient ── */
 .tool-view-header,
 .section-header {
   background: linear-gradient(90deg, rgba(255, 215, 0, 0.1), rgba(123, 47, 190, 0.1));
@@ -91,7 +91,7 @@
   opacity: 1;
 }
 
-/* ── Modal — translucent: purple-tinted frosted glass (original look) ── */
+/* ── Modal, translucent: purple-tinted frosted glass (original look) ── */
 body:not(.solid-modals) .modal {
   background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, rgba(15, 5, 32, 0.6) 100%);
   backdrop-filter: blur(20px);
@@ -100,14 +100,14 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 30px rgba(123, 47, 190, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Modal — solid: fully opaque deep purple panel ── */
+/* ── Modal, solid: fully opaque deep purple panel ── */
 body.solid-modals .modal {
   background: linear-gradient(135deg, #2a0f4a 0%, #0f0520 100%);
   border-color: rgba(123, 47, 190, 0.4);
   box-shadow: 0 0 30px rgba(123, 47, 190, 0.15), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Primary button — green outlined ── */
+/* ── Primary button, green outlined ── */
 .primary-btn {
   background: rgba(0, 165, 80, 0.12);
   border-color: rgba(0, 165, 80, 0.45);
@@ -204,13 +204,13 @@ body.solid-modals .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds — very dark purple with the Mardi Gras trinity tints */
+/* Panel backgrounds, very dark purple with the Mardi Gras trinity tints */
 #finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, #180a30 100%); }
 #finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(0, 165, 80, 0.07) 0%, #180a30 100%); }
 #finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, #180a30 100%); }
 #finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #180a30 100%); }
 
-/* Annual Stats title panel — gold with festive glow */
+/* Annual Stats title panel, gold with festive glow */
 .budget-annual-stats-title-panel {
   border-left: 4px solid #ffd700;
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.06) 0%, #180a30 100%);
@@ -221,7 +221,7 @@ body.solid-modals .modal {
   text-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
 }
 
-/* Summary tab active — gold, now with a filled tint + glow so it clearly
+/* Summary tab active, gold, now with a filled tint + glow so it clearly
    stands out from the muted-gold inactive tabs. */
 .budget-summary-tab.active {
   color: #ffd700;
@@ -230,7 +230,7 @@ body.solid-modals .modal {
   text-shadow: 0 0 10px rgba(255, 215, 0, 0.45);
 }
 
-/* Stats table values — green pos, gold neg for Mardi Gras flair */
+/* Stats table values, green pos, gold neg for Mardi Gras flair */
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }
 
@@ -254,7 +254,7 @@ body.solid-modals .modal {
   color: #ffd700;
 }
 
-/* View-mode active button — gold */
+/* View-mode active button, gold */
 .budget-view-mode-btn.active {
   background: #ffd700;
   color: #0f0520;

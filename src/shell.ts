@@ -1,5 +1,5 @@
 /* =============================================================================
-   SHELL  — Swiss RB Knife application shell
+   SHELL: Swiss RB Knife application shell
    -----------------------------------------------------------------------------
    Top-level orchestrator for the app. Owns:
 
@@ -10,18 +10,18 @@
      • Toast notification system with centralized audio
      • Window size save/restore (DPI-aware, logical pixels)
      • Exit confirm modal
-     • Modal instances for the Settings modal and Exit confirm (the rest —
+     • Modal instances for the Settings modal and Exit confirm (the rest (
        About, Changelog, Licensing, Full License, README, Security,
-       Contributing, License Agreement — live in docs.ts)
+       Contributing, License Agreement) live in docs.ts)
 
    As of Tier 6, the theme system, custom theme editor, lock screen, and the
    About/Changelog/Licensing/README/Security/Contributing/License-Agreement
    modal family have been split into their own files:
-     • theme-core.ts    — applyTheme() dispatcher + seasonal canvas effects
-     • random-theme.ts  — Random theme palette generation
-     • theme-editor.ts  — Custom Theme Editor modal + storage
-     • lockscreen.ts    — App Lock screen + Set/Change Credential modal
-     • docs.ts          — About/Changelog/Licensing/README/Security/
+     • theme-core.ts:    applyTheme() dispatcher + seasonal canvas effects
+     • random-theme.ts:  Random theme palette generation
+     • theme-editor.ts:  Custom Theme Editor modal + storage
+     • lockscreen.ts:    App Lock screen + Set/Change Credential modal
+     • docs.ts:          About/Changelog/Licensing/README/Security/
                            Contributing/License Agreement + startup gates
    This file wires them together via init() but no longer owns their internals.
 
@@ -47,8 +47,13 @@ import {
   setBudgetAmericanDates,
   onBudgetToolEntry,
   onBudgetToolExit,
+  getDueBudgetReminder,
+  markBudgetReviewed,
 } from "./tools/budget";
 import { initGameStats, onGameStatsToolEntry, onGameStatsIconClicked } from "./tools/game-stats";
+import { initTTSRepeater } from "./tools/tts-repeater";
+import { initCountdown } from "./tools/countdown";
+import { initDaysBetween } from "./tools/days-between";
 import {
   RANDOM_VARS,
   PERSISTENT_RANDOM_KEY,
@@ -97,14 +102,14 @@ import { applyUpdateSettings, checkForUpdates, runStartupGates } from "./docs";
 type ToastMeta = {
   id: number;
   timeout: ReturnType<typeof setTimeout> | null;
-  /** The toast's own requested duration, untouched by pausing — the floor a
+  /** The toast's own requested duration, untouched by pausing. The floor a
    *  return-from-away resume never shortens it below (see TOAST_RETURN_MS). */
   durationMs: number;
   remaining: number;
   startedAt: number;
   hovered: boolean;
   /** True only for a toast that fired while the app wasn't on screen and so
-   *  has never been shown to the user yet — its countdown hasn't started.
+   *  has never been shown to the user yet. Its countdown hasn't started.
    *  Cleared the first time the app becomes visible, after which the toast
    *  is "seen" and leaving the app again no longer pauses it. */
   awaitingFirstView: boolean;
@@ -116,7 +121,7 @@ type NavEntry = {
   tool?: string;
 };
 
-/** Static metadata for a real, navigable tool — one entry per sidebar/Home
+/** Static metadata for a real, navigable tool. One entry per sidebar/Home
  *  item. `key` is "section/tool", matching the format switchSection() already
  *  uses for _activeViewKey, so pin-state lookups can compare directly. */
 type ToolMeta = {
@@ -132,9 +137,14 @@ type ToolMeta = {
 type SidebarItemState = {
   key: string;
   pinned: boolean;
+  /** Epoch ms this tool was last opened. Absent until it has been. Feeds the
+   *  Most Recent sort. */
+  lastUsedAt?: number;
+  /** How many times it has been opened. Feeds the Most Used sort. */
+  useCount?: number;
 };
 
-/** Advanced visual overrides stored per custom theme. All fields optional —
+/** Advanced visual overrides stored per custom theme. All fields optional,
  *  absent means "no override" (flat colour from the CSS vars applies). */
 export type AdvancedOptions = {
   headerGradient?: { colorA: string; colorB: string; angle: number };
@@ -155,7 +165,7 @@ export type CustomTheme = {
 };
 
 /** A toast sound pack. `success`/`error` are URL paths under /sounds/ served
- *  from the public/sounds folder. Omit either (or both) to mute that cue —
+ *  from the public/sounds folder. Omit either (or both) to mute that cue,
  *  used by the built-in "None" pack. This is the single source of truth for
  *  the Sound Pack dropdown; add a pack here and it appears in Settings. */
 type SoundPack = {
@@ -191,7 +201,7 @@ type ShellSettings = {
   cycleIncludeCustom: boolean;
   /** Off by default: force-switches to the matching Holiday theme on its
    *  real-world date, overriding whatever the cycle would otherwise show.
-   *  Independent of cycleHolidaySeasonOnly — combine both if you want a
+   *  Independent of cycleHolidaySeasonOnly, combine both if you want a
    *  Holiday theme to appear ONLY by being force-switched to. */
   cycleHolidayOverride: boolean;
   /** Off by default, independent of cycleHolidayOverride: keeps each Holiday
@@ -201,12 +211,12 @@ type ShellSettings = {
   cycleHolidaySeasonOnly: boolean;
   /** Off by default: widens each Holiday theme's active window to its
    *  traditional season (e.g. all of October for Halloween) instead of just
-   *  its exact date — shared by both settings above, wherever either is on. */
+   *  its exact date, shared by both settings above, wherever either is on. */
   cycleHolidayFullSeason: boolean;
   /** Which pool member (built-in theme id or custom theme id) Cycle mode is
-   *  currently showing — persisted so reopening the app doesn't jump. */
+   *  currently showing, persisted so reopening the app doesn't jump. */
   cycleCurrentThemeId: string;
-  /** Epoch ms of the last cycle advance — the anchor the "time" trigger
+  /** Epoch ms of the last cycle advance. The anchor the "time" trigger
    *  counts from, persisted so the countdown survives an app restart. */
   cycleLastAdvance: number;
   /** On by default: master switch for every theme's canvas animation (snow,
@@ -214,17 +224,29 @@ type ShellSettings = {
    *  per-theme opt-outs below, which only make sense while this is on. */
   themeAnimations: boolean;
   /** Theme ids whose animation is individually switched off while
-   *  themeAnimations is still on — e.g. keeping Christmas snow but dropping
+   *  themeAnimations is still on, e.g. keeping Christmas snow but dropping
    *  Halloween's lightning. Stored as an opt-OUT list so a newly added effect
    *  is enabled by default without needing a migration. */
   themeAnimationsOff: string[];
   appLock: boolean;
   lockCredentialType: "pin" | "password";
   soundPack: string;
+  /** Toast cue loudness in decibels, relative to the volume the app has always
+   *  played at. 0 is that original level and the default; the usable range is
+   *  -25 to +5, with TOAST_VOLUME_MUTED_DB one step below the bottom standing
+   *  for silence. Decibels rather than a 0-100 percentage because loudness is
+   *  perceived logarithmically, so equal dB steps sound like equal steps. */
+  toastVolumeDb: number;
   /** Opt-in: run a single GitHub Releases check on startup (and on enable).
-   *  Off by default — the app is offline-by-default and only touches the
+   *  Off by default. The app is offline-by-default and only touches the
    *  network when this is explicitly turned on. */
   autoCheckUpdates: boolean;
+  /** How loudly a found update announces itself once per run, false (default)
+   *  is Gentle, a toast; true is Aggressive, a modal you have to dismiss.
+   *  Mirrors Auto-Backup's reminder mode. The passive signals (sidebar pulse,
+   *  Home top-bar line, About notice) show in BOTH modes. This only picks
+   *  which one-shot announcement rides along with them. */
+  updateNotifyAggressive: boolean;
   /** The release tag the user chose to "ignore" (e.g. "v0.3.4"). A release
    *  NEWER than this re-surfaces the notice; this exact one stays silent.
    *  Empty string = nothing ignored. */
@@ -234,6 +256,7 @@ type ShellSettings = {
    *  sidebar and Home dashboard; unpinned items are hidden from both but
    *  keep all their own data/settings untouched. */
   sidebarItems: SidebarItemState[];
+  sidebarSort: SidebarSortMode;
 };
 
 /** Result of a successful update check, shared by the sidebar pulse and the
@@ -258,7 +281,7 @@ export const LICENSE_VERSION = "1";
 const MAX_TOASTS = 4;
 
 /* Sound packs available for toast cues. Each pack is a subfolder under
-   public/sounds/ containing (at minimum) the files referenced below — see
+   public/sounds/ containing (at minimum) the files referenced below, see
    the "TOAST NOTIFICATIONS" section for how these are loaded/played.
    Add a new pack by dropping a folder in public/sounds/<id>/ and adding an
    entry here; the Settings dropdown is populated from this array. */
@@ -315,19 +338,88 @@ const SOUND_PACKS: SoundPack[] = [
 
 /* Every real, navigable tool in the app, in the app's original/default
    order. This is the single source of truth for the Edit Sidebar modal, the
-   Home dashboard, and the "Specific Tool" options in the On Startup select —
+   Home dashboard, and the "Specific Tool" options in the On Startup select,
    add a tool here (matching its data-section/data-tool attributes in
    index.html) and it's automatically pinnable/reorderable/hideable. */
 const ALL_TOOLS: ToolMeta[] = [
   { key: "finance/budget", section: "finance", tool: "budget", label: "Budget Tracker" },
   { key: "utility/time-tracker", section: "utility", tool: "time-tracker", label: "Time Tracker" },
   { key: "files/auto-backup", section: "files", tool: "auto-backup", label: "Auto-Backup" },
-  { key: "media/image-ccr", section: "media", tool: "image-ccr", label: "Image CCR" },
-  { key: "files/dummy-file-generator", section: "files", tool: "dummy-file-generator", label: "Dummy File Generator" },
+  { key: "utility/countdown", section: "utility", tool: "countdown", label: "Countdown Timer" },
   { key: "games/game-stats", section: "games", tool: "game-stats", label: "Game Stats" },
+  { key: "media/image-ccr", section: "media", tool: "image-ccr", label: "Image CCR" },
+  { key: "utility/days-between", section: "utility", tool: "days-between", label: "Days Between Dates" },
+  { key: "utility/tts-repeater", section: "utility", tool: "tts-repeater", label: "TTS Repeater" },
+  { key: "files/dummy-file-generator", section: "files", tool: "dummy-file-generator", label: "Dummy File Generator" },
 ];
 
-/** A fresh default sidebarItems array — all tools pinned, in ALL_TOOLS order.
+/** How the sidebar is ordered. "classic" is ALL_TOOLS' own order above;
+ *  "custom" is whatever the user last dragged it into, and is what a drag
+ *  switches you to, otherwise a live sort would immediately undo the drag. */
+type SidebarSortMode = "classic" | "az" | "za" | "recent" | "used" | "custom";
+
+const SIDEBAR_SORT_MODES: SidebarSortMode[] = ["classic", "az", "za", "recent", "used", "custom"];
+
+function toolLabel(key: string): string {
+  return ALL_TOOLS.find((t) => t.key === key)?.label ?? key;
+}
+
+/** Orders one group (shown or hidden) by the active mode. Every usage-driven
+ *  sort falls back to alphabetical so tools that have never been opened land
+ *  in a stable, predictable order instead of whatever the array happened to
+ *  hold. */
+function sortSidebarGroup(items: SidebarItemState[], mode: SidebarSortMode): SidebarItemState[] {
+  const byName = (a: SidebarItemState, b: SidebarItemState): number =>
+    toolLabel(a.key).localeCompare(toolLabel(b.key));
+  const copy = [...items];
+
+  switch (mode) {
+    case "classic": {
+      const rank = new Map(ALL_TOOLS.map((t, i) => [t.key, i]));
+      return copy.sort((a, b) => (rank.get(a.key) ?? 999) - (rank.get(b.key) ?? 999));
+    }
+    case "az":
+      return copy.sort(byName);
+    case "za":
+      return copy.sort((a, b) => byName(b, a));
+    case "recent":
+      return copy.sort((a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0) || byName(a, b));
+    case "used":
+      return copy.sort((a, b) => (b.useCount ?? 0) - (a.useCount ?? 0) || byName(a, b));
+    default:
+      return copy;
+  }
+}
+
+/** Re-orders settings.sidebarItems in place for the active mode. Shown and
+ *  hidden are sorted separately and re-concatenated, because the rest of the
+ *  sidebar code takes "pinned items come first" as a given. */
+function applySidebarSortMode(): void {
+  const mode = settings.sidebarSort;
+  if (mode === "custom") return;
+  settings.sidebarItems = [
+    ...sortSidebarGroup(settings.sidebarItems.filter((it) => it.pinned), mode),
+    ...sortSidebarGroup(settings.sidebarItems.filter((it) => !it.pinned), mode),
+  ];
+}
+
+/** Notes that a tool was opened, feeding the Most Recent / Most Used sorts.
+ *  Called from activateTool, so back/forward navigation counts too. You did
+ *  go there, whichever control took you. */
+function recordToolUsage(section: string, tool: string): void {
+  const item = settings.sidebarItems.find((it) => it.key === `${section}/${tool}`);
+  if (!item) return;
+  item.lastUsedAt = Date.now();
+  item.useCount = (item.useCount ?? 0) + 1;
+  // Under a usage-driven mode the order this just changed is on screen, so it
+  // has to be re-applied now rather than at next launch.
+  if (settings.sidebarSort === "recent" || settings.sidebarSort === "used") {
+    applySidebarOrder();
+  }
+  saveSettings();
+}
+
+/** A fresh default sidebarItems array. All tools pinned, in ALL_TOOLS order.
  *  Always call this rather than referencing a shared array literal: settings
  *  resets (`{...DEFAULT_SETTINGS}`) are shallow copies, so a single shared
  *  array instance would let a later reorder/pin mutation silently corrupt
@@ -339,7 +431,7 @@ function freshSidebarItems(): SidebarItemState[] {
 /** Enforces the "After Time Passes" trigger's floor: an interval under 10
  *  seconds is too fast to be a deliberate "ambient" cycle and mostly just
  *  thrashes the theme, so seconds-denominated intervals are clamped up to at
- *  least 10 — every other unit (minutes/hours/days) already clears that floor
+ *  least 10. Every other unit (minutes/hours/days) already clears that floor
  *  at an amount of 1, so it's a no-op there. */
 function clampCycleIntervalAmount(
   amount: number,
@@ -372,11 +464,14 @@ const DEFAULT_SETTINGS: ShellSettings = {
   appLock: false,
   lockCredentialType: "pin",
   soundPack: "default",
+  toastVolumeDb: 0, // 0 dB = the level the app shipped with
   autoCheckUpdates: false,
+  updateNotifyAggressive: false, // Gentle by default
   ignoredUpdateVersion: "",
-  // Placeholder — always overridden with freshSidebarItems() wherever settings
+  // Placeholder, always overridden with freshSidebarItems() wherever settings
   // get reset to defaults (see the comment on that function for why).
   sidebarItems: [],
+  sidebarSort: "classic",
 };
 
 /* =============================================================================
@@ -396,14 +491,14 @@ let navHistory: NavEntry[] = [];
 let navIndex = -1;
 let isNavigatingHistory = false;
 
-// In-memory shell state — kept in sync with disk so saveShellState never
+// In-memory shell state, kept in sync with disk so saveShellState never
 // needs to read back from Rust just to preserve fields it isn't changing.
 // Populated by loadShellState() on startup; updated incrementally thereafter.
 let _lastTool: string | null = null;
 let _lastToolSection: string | null = null;
 let _lastCategory: string | null = null;
 
-// App version string — fetched once during init and reused by both
+// App version string, fetched once during init and reused by both
 // loadAppVersion() (display) and runStartupGates() (changelog gate).
 let _appVersion = "";
 
@@ -466,7 +561,6 @@ const sidebarEditBtn = document.getElementById("sidebarEditBtn")!;
 const sidebarEditBackdrop = document.getElementById("sidebarEditBackdrop")!;
 const sidebarEditBack = document.getElementById("sidebarEditBack")!;
 const sidebarEditClose = document.getElementById("sidebarEditClose")!;
-const sidebarEditResetBtn = document.getElementById("sidebarEditResetBtn")!;
 const sidebarEditShownList = document.getElementById("sidebarEditShownList")!;
 const sidebarEditHiddenList = document.getElementById("sidebarEditHiddenList")!;
 const sidebarEditHiddenSection = document.getElementById("sidebarEditHiddenSection")!;
@@ -523,6 +617,18 @@ const backupReminderCancelBtn = document.getElementById(
   "backupReminderCancelBtn",
 )!;
 
+const budgetReminderBackdrop = document.getElementById(
+  "budgetReminderBackdrop",
+)!;
+const budgetReminderDaysEl = document.getElementById("budgetReminderDaysEl")!;
+const budgetReminderGoBtn = document.getElementById("budgetReminderGoBtn")!;
+const budgetReminderReviewedBtn = document.getElementById(
+  "budgetReminderReviewedBtn",
+)!;
+const budgetReminderCancelBtn = document.getElementById(
+  "budgetReminderCancelBtn",
+)!;
+
 /* =============================================================================
    CLOCK
 ============================================================================= */
@@ -552,14 +658,14 @@ setInterval(updateClock, 1000);
 updateClock();
 
 /**
- * Escapes a string for safe interpolation into innerHTML templates — both as
+ * Escapes a string for safe interpolation into innerHTML templates. Both as
  * element text AND inside double-quoted attribute values (hence &quot;).
  *
  * Most of the app builds DOM via createElement + textContent, which needs no
  * escaping. This exists for the handful of places that interpolate
  * user-entered strings (bill names, image filenames, filename prefixes…)
  * into template literals assigned to innerHTML. Unescaped, a value like
- * `<img src=x onerror=…>` executes as script inside the webview — and in a
+ * `<img src=x onerror=…>` executes as script inside the webview, and in a
  * Tauri app, webview script can reach every registered backend command.
  * Every `${...}` carrying user data inside an innerHTML template must pass
  * through this.
@@ -578,7 +684,7 @@ export function escapeHtml(value: unknown): string {
    -----------------------------------------------------------------------------
    Error-path logging that stays out of production builds. In a `vite build`,
    import.meta.env.DEV resolves to a compile-time `false`, so these calls never
-   run in the shipped app — the console stays clean for end users — while
+   run in the shipped app (the console stays clean for end users) while
    `npm run dev` keeps full diagnostics. The cast lets this typecheck without
    relying on the `vite/client` ambient types being in scope.
 ============================================================================= */
@@ -604,9 +710,9 @@ export function devWarn(...args: unknown[]): void {
  *  Used to detect leaving a tool so tools with pending state can flush it. */
 let _activeViewKey = "";
 
-/** Switches the active nav item and content section — does NOT touch tool/landing state.
- *  When toolKey is given, only nav items whose data-tool matches are marked active —
- *  this lets two sidebar items point at the same section (e.g. Auto-Backup and Dummy
+/** Switches the active nav item and content section, does NOT touch tool/landing state.
+ *  When toolKey is given, only nav items whose data-tool matches are marked active.
+ *  This lets two sidebar items point at the same section (e.g. Auto-Backup and Dummy
  *  File Generator both live in "files") and still highlight independently.
  *  Also triggers a palette regeneration when the theme is set to Regenerative Random. */
 function switchSection(sectionKey: string, toolKey?: string): void {
@@ -634,7 +740,7 @@ function switchSection(sectionKey: string, toolKey?: string): void {
   maybeRegenerateRandom();
 }
 
-/** Called when a sidebar icon is clicked — always resets to landing or default tool.
+/** Called when a sidebar icon is clicked, always resets to landing or default tool.
  *  If the section element has a data-default-tool attribute, goes directly to
  *  that tool instead of the landing page (used for single-tool sections). */
 function activateSection(sectionKey: string): void {
@@ -651,7 +757,7 @@ function activateSection(sectionKey: string): void {
 }
 
 /** Wraps activateTool() for explicit user clicks only (sidebar icon, Home
- *  tile, tool-card) — never for mouse back/forward history replay or
+ *  tile, tool-card), never for mouse back/forward history replay or
  *  restored-state entry, which call activateTool() directly. Game Stats uses
  *  this to jump back to its tile view even when the icon is clicked while
  *  the tool is already open; see onGameStatsIconClicked(). */
@@ -679,16 +785,16 @@ document.getElementById("sidebarToggle")!.addEventListener("click", () => {
 
 /* =============================================================================
    TOOL NAVIGATION
-   Categories have been retired — Home and the sidebar both link straight to
+   Categories have been retired. Home and the sidebar both link straight to
    tools now. This still handles two patterns, kept generic on purpose so the
    archived category markup (commented out in index.html) would "just work"
    again if it's ever restored:
    1. Dashboard tool buttons  (data-section + data-tool) → go to section, open tool
-      — also the pattern used by the new flat Home tool cards
+:      also the pattern used by the new flat Home tool cards
    2. Category card headers   (data-section, no data-tool) → go to section landing
-      — currently unreachable; only archived category markup used this
+:      currently unreachable; only archived category markup used this
    3. Tool card clicks        (.tool-card with data-section + data-tool) → open tool
-      — also the pattern used by the new flat Home tool cards
+:      also the pattern used by the new flat Home tool cards
 ============================================================================= */
 
 /** Shows a specific tool view within a section, hiding the category landing and section header.
@@ -696,7 +802,7 @@ document.getElementById("sidebarToggle")!.addEventListener("click", () => {
 function activateTool(section: string, tool: string): void {
   switchSection(section, tool);
 
-  // Hide the section header (category title) — not needed when inside a tool
+  // Hide the section header (category title), not needed when inside a tool
   const sectionHeader = document.querySelector<HTMLElement>(
     `#section-${section} > .section-header`,
   );
@@ -724,6 +830,7 @@ function activateTool(section: string, tool: string): void {
 
   saveShellState(section, tool);
   pushNavHistory(section, tool);
+  recordToolUsage(section, tool);
 }
 
 /** Returns to the category landing page, restoring the section header and hiding all tool views. */
@@ -779,7 +886,7 @@ document
     });
   });
 
-// Back buttons inside tool views — categories have been retired, so these now
+// Back buttons inside tool views, categories have been retired, so these now
 // always return to Home (previously: back to the category landing page).
 document
   .querySelectorAll<HTMLElement>(".tool-back-btn[data-section]")
@@ -789,7 +896,7 @@ document
     });
   });
 
-// Back buttons on category landing pages — return to Home
+// Back buttons on category landing pages, return to Home
 document.querySelectorAll<HTMLElement>(".section-back-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     activateSection("home");
@@ -801,13 +908,13 @@ document.querySelectorAll<HTMLElement>(".section-back-btn").forEach((btn) => {
 ============================================================================= */
 
 /** Persists the current navigation position to disk.
- *  Uses in-memory _last* vars to avoid a disk read — they are seeded by
+ *  Uses in-memory _last* vars to avoid a disk read. They are seeded by
  *  loadShellState() on startup and kept current on every call. */
 async function saveShellState(
   activeSection: string,
   activeTool?: string,
 ): Promise<void> {
-  // Update in-memory tracking fields — no disk read needed.
+  // Update in-memory tracking fields. No disk read needed.
   // _last* vars are seeded from disk by loadShellState() at startup and kept
   // current here, so we always have the right values without a round-trip.
   if (activeTool) {
@@ -837,11 +944,11 @@ async function saveShellState(
  *  navigates to the appropriate view based on the startupTarget setting.
  *  Target modes: "lastView" (exact restore), "lastTool", "lastCategory", "home",
  *  "section:tool-id" (specific tool), or a bare section key. */
-/** Activates a tool, unless it's currently hidden (unpinned) — in which case
+/** Activates a tool, unless it's currently hidden (unpinned), in which case
  *  Home is shown instead. Every startup-navigation path in loadShellState()
  *  routes through this rather than calling activateTool() directly, so a
  *  tool hidden via the Edit Sidebar modal is never landed on at launch, per
- *  spec. Relies on settings.sidebarItems already being loaded — init() awaits
+ *  spec. Relies on settings.sidebarItems already being loaded, init() awaits
  *  loadSettings() before loadShellState() runs. */
 function activateToolIfPinned(section: string, tool: string): void {
   if (isToolPinned(`${section}/${tool}`)) {
@@ -849,6 +956,124 @@ function activateToolIfPinned(section: string, tool: string): void {
   } else {
     activateSection("home");
   }
+}
+
+/* =============================================================================
+   GENTLE NUDGE TOASTS
+   -----------------------------------------------------------------------------
+   Gentle is the toast half of the startup nudges (the Aggressive half is a
+   modal). Three of them can come due on the same launch, and firing them
+   together stacks three toasts in the corner at once, which is a wall of text
+   nobody reads, and defeats the point of the quiet option.
+
+   So a Gentle nudge holds the queue in runStartupNudges() for as long as its
+   toast is up, exactly as an Aggressive one holds it until dismissed. Same
+   contract, so the queue doesn't have to care which mode each nudge is in.
+
+   One duration for all three rather than each keeping its own: they're read one
+   after another now, so a nudge that lingered twice as long as its neighbour
+   would just be an unexplained pause in the sequence.
+============================================================================= */
+
+const GENTLE_NUDGE_TOAST_MS = 5000;
+/** Breathing room after a toast expires before the next nudge starts, so they
+ *  read as separate messages rather than one replacing another mid-glance. */
+const GENTLE_NUDGE_GAP_MS = 400;
+
+/** Fires a Gentle nudge toast and resolves once it has had the screen to
+ *  itself. The wait is a fixed timer rather than anything hooked into the toast
+ *  itself: toasts pause their own countdown while the app is hidden, so on an
+ *  alt-tabbed launch these can still overlap slightly. Not worth threading a
+ *  completion callback through the toast system for a cosmetic edge case. */
+export function gentleNudge(message: string): Promise<void> {
+  flash(message, "success", GENTLE_NUDGE_TOAST_MS);
+  return new Promise<void>((resolve) =>
+    setTimeout(resolve, GENTLE_NUDGE_TOAST_MS + GENTLE_NUDGE_GAP_MS),
+  );
+}
+
+/** Trims an absolute path down to "parentFolder\file.ext" for display in a
+ *  toast. The full C:\Users\<name>\Downloads\... form wraps to three lines and
+ *  buries the only part that identifies the file; the parent folder is all the
+ *  context a "saved it here" message needs. Falls back to the input unchanged
+ *  if there's nothing to trim. */
+export function shortPath(fullPath: string): string {
+  const parts = fullPath.split(/[\\/]/).filter(Boolean);
+  return parts.length >= 2 ? parts.slice(-2).join("\\") : fullPath;
+}
+
+/** Length of one attention-pulse cycle. MUST match the animation-duration on
+ *  #aboutBtn.update-available / .nav-item.attention-pulse (shell.css) and
+ *  .tool-card.attention-pulse (landing.css). This is what those animations
+ *  get phase-locked against. */
+const ATTENTION_PULSE_MS = 2000;
+
+/** Toggles an attention-pulse class and locks the animation's phase to a clock
+ *  every pulsing element shares.
+ *
+ *  A CSS animation starts counting from the moment its class lands, and these
+ *  classes land whenever their reason turns up: the update check on a network
+ *  round-trip, the tool reminders during their tool's init, seconds apart. Same
+ *  2s period, different start times, and two things pulsing at the same rate
+ *  but out of phase don't read as "offset", they read as one of them running
+ *  slower than the others. A negative animation-delay drops the element into
+ *  the cycle wherever the shared clock already is, so everything peaks together
+ *  no matter when it started.
+ *
+ *  (performance.now() shares its origin with the document timeline the
+ *  animations run on. Even if it didn't, every element would inherit the same
+ *  offset, being in phase with EACH OTHER is the whole requirement.)
+ *
+ *  No-ops when the class is already in the requested state, so the repeat calls
+ *  from Budget's per-edit refresh don't rewrite style on every keystroke. */
+function setAttentionPulse(
+  el: HTMLElement,
+  className: string,
+  on: boolean,
+): void {
+  if (el.classList.contains(className) === on) return;
+  el.classList.toggle(className, on);
+  el.style.animationDelay = on
+    ? `-${performance.now() % ATTENTION_PULSE_MS}ms`
+    : "";
+}
+
+/** Raises or clears the update pulse on the About icon. Wired here rather than
+ *  in docs.ts so it shares setAttentionPulse's phase lock with the tool
+ *  signals. The About icon drifting against the sidebar was exactly the bug
+ *  that lock exists to fix. */
+export function setAboutUpdatePulse(on: boolean): void {
+  const aboutBtn = document.getElementById("aboutBtn");
+  if (aboutBtn) setAttentionPulse(aboutBtn, "update-available", on);
+}
+
+/** Raises or clears the "this tool is owed something" signal for a tool: the
+ *  sidebar row pulse and every dashboard card for it. Owned here rather than in
+ *  each tool because the two live in shell-owned markup and must move together
+ *:  a reminder that lit one and forgot the other would be a signal that
+ *  contradicts itself depending on where you happened to be looking.
+ *
+ *  Cards are plural: each tool has one on the Home dashboard and another on its
+ *  category landing page, and it's the same card in two places.
+ *
+ *  Called by Auto-Backup (backup overdue) and Budget (not updated in a while);
+ *  the About icon goes through setAboutUpdatePulse, since it isn't a tool and
+ *  has no card. */
+export function setToolAttention(
+  section: string,
+  tool: string,
+  on: boolean,
+): void {
+  const navItem = document.querySelector<HTMLElement>(
+    `.nav-item[data-section="${section}"][data-tool="${tool}"]`,
+  );
+  if (navItem) setAttentionPulse(navItem, "attention-pulse", on);
+
+  document
+    .querySelectorAll<HTMLElement>(
+      `.tool-card[data-section="${section}"][data-tool="${tool}"]`,
+    )
+    .forEach((card) => setAttentionPulse(card, "attention-pulse", on));
 }
 
 async function loadShellState(): Promise<void> {
@@ -865,7 +1090,7 @@ async function loadShellState(): Promise<void> {
     const target = settings.startupTarget ?? "lastView";
 
     if (target === "lastView") {
-      // Restore exactly where the user left off — tool, landing, or home
+      // Restore exactly where the user left off, tool, landing, or home
       if (state.activeTool && state.activeSection) {
         activateToolIfPinned(state.activeSection, state.activeTool);
       } else if (state.activeSection) {
@@ -881,7 +1106,7 @@ async function loadShellState(): Promise<void> {
         activateSection("home");
       }
     } else if (target === "lastCategory") {
-      // Restore the last real category visited — never Home
+      // Restore the last real category visited, never Home
       if (state.lastCategory) {
         activateSection(state.lastCategory);
       } else {
@@ -890,11 +1115,11 @@ async function loadShellState(): Promise<void> {
     } else if (target === "home") {
       activateSection("home");
     } else if (target.includes(":")) {
-      // Specific tool — format is "section:tool-id"
+      // Specific tool, format is "section:tool-id"
       const [section, tool] = target.split(":");
       activateToolIfPinned(section, tool);
     } else {
-      // Specific category — value matches a section key (e.g. "utility", "music")
+      // Specific category, value matches a section key (e.g. "utility", "music")
       activateSection(target);
     }
   } catch {
@@ -967,8 +1192,8 @@ export function setSubNavHandler(handler: SubNavHandler | null): void {
 /* Mouse button 3 = back, button 4 = forward (the extra side buttons on most
    mice).
 
-   Registered in the CAPTURE phase on `window` — the earliest point in the
-   dispatch — rather than bubbling up to `document`. A focused form control
+   Registered in the CAPTURE phase on `window` (the earliest point in the
+   dispatch) rather than bubbling up to `document`. A focused form control
    (e.g. a score cell in Game Stats' round grid) sits deep in the tree, and
    anything between it and `document` that consumes the event would silently
    swallow the navigation; capturing at the root can't be pre-empted.
@@ -1016,7 +1241,7 @@ window.addEventListener(
 );
 
 /* =============================================================================
-   SETTINGS — LOAD / SAVE / APPLY
+   SETTINGS: LOAD / SAVE / APPLY
 ============================================================================= */
 
 /** Pushes all current settings values into the UI controls and re-applies
@@ -1039,11 +1264,12 @@ export function applySettings(): void {
   startupSelect.value = settings.startupTarget;
   loadSoundPack(settings.soundPack);
   refreshSoundPackCurrentBadge();
+  applyToastVolumeSettings();
   themeSelect.value = settings.theme;
   refreshThemeCurrentBadge();
 
   // The Random tab's settings panel (visibility + enabled/greyed state) is
-  // managed by renderThemePickerTab(), not here — just keep the control
+  // managed by renderThemePickerTab(), not here, just keep the control
   // values themselves in sync so they're correct whenever that panel is
   // shown/enabled.
   randomModeToggle.checked = settings.randomPersistent;
@@ -1082,10 +1308,10 @@ export function applySettings(): void {
 /** Persists the shell's settings via a MERGE, not a whole-file write.
  *  settings.json has multiple owners (shell here, Time Tracker's and Budget's
  *  tool settings live alongside), and the shell's `settings` object holds
- *  ONLY shell-owned keys — its loadSettings whitelist guarantees that — so a
+ *  ONLY shell-owned keys (its loadSettings whitelist guarantees that) so a
  *  whole-file JSON.stringify(settings) was erasing every tool key on disk
  *  each time any main setting changed. merge_settings patches exactly the
- *  keys present and preserves everything else. Non-critical — a failure
+ *  keys present and preserves everything else. Non-critical, a failure
  *  flashes an error but does not block anything. */
 export async function saveSettings(): Promise<void> {
   try {
@@ -1099,7 +1325,7 @@ export async function saveSettings(): Promise<void> {
  *  with the wrong shape or an unknown key (e.g. a tool removed since this was
  *  saved), de-dupes repeated keys, and appends any ALL_TOOLS entry missing
  *  from the loaded array (e.g. a tool added since this was saved) as pinned
- *  at the end — so a fresh install and an upgrade both always cover every
+ *  at the end, so a fresh install and an upgrade both always cover every
  *  known tool exactly once. */
 function normalizeSidebarItems(raw: unknown): SidebarItemState[] {
   const candidates: SidebarItemState[] = Array.isArray(raw)
@@ -1230,7 +1456,7 @@ async function loadSettings(): Promise<void> {
         typeof merged.themeAnimations === "boolean"
           ? merged.themeAnimations
           : DEFAULT_SETTINGS.themeAnimations,
-      // Filtered to strings rather than trusted wholesale — this one is an
+      // Filtered to strings rather than trusted wholesale. This one is an
       // array, so a corrupted/hand-edited entry would otherwise reach
       // .includes() as a non-string and quietly never match.
       themeAnimationsOff: Array.isArray(merged.themeAnimationsOff)
@@ -1250,15 +1476,27 @@ async function loadSettings(): Promise<void> {
         SOUND_PACKS.some((p) => p.id === merged.soundPack)
           ? merged.soundPack
           : DEFAULT_SETTINGS.soundPack,
+      toastVolumeDb:
+        typeof merged.toastVolumeDb === "number" &&
+        Number.isFinite(merged.toastVolumeDb)
+          ? clampToastVolume(Math.round(merged.toastVolumeDb))
+          : DEFAULT_SETTINGS.toastVolumeDb,
       autoCheckUpdates:
         typeof merged.autoCheckUpdates === "boolean"
           ? merged.autoCheckUpdates
           : DEFAULT_SETTINGS.autoCheckUpdates,
+      updateNotifyAggressive:
+        typeof merged.updateNotifyAggressive === "boolean"
+          ? merged.updateNotifyAggressive
+          : DEFAULT_SETTINGS.updateNotifyAggressive,
       ignoredUpdateVersion:
         typeof merged.ignoredUpdateVersion === "string"
           ? merged.ignoredUpdateVersion
           : DEFAULT_SETTINGS.ignoredUpdateVersion,
       sidebarItems: normalizeSidebarItems(merged.sidebarItems),
+      sidebarSort: SIDEBAR_SORT_MODES.includes(merged.sidebarSort as SidebarSortMode)
+        ? (merged.sidebarSort as SidebarSortMode)
+        : DEFAULT_SETTINGS.sidebarSort,
     };
   } catch {
     settings = { ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() };
@@ -1274,7 +1512,7 @@ async function loadSettings(): Promise<void> {
    Drives three surfaces from a single source of truth (settings.sidebarItems):
    the sidebar nav-items, the Home dashboard's .tool-card-grid, and the
    "Specific Tool" options in the On Startup select. Reordering/hiding here
-   only ever moves/hides existing DOM nodes — it never touches a tool's own
+   only ever moves/hides existing DOM nodes. It never touches a tool's own
    data or settings, so a re-shown tool picks up exactly where it left off.
 ============================================================================= */
 
@@ -1286,7 +1524,7 @@ const SIDEBAR_DRAG_HANDLE_SVG = `
   </svg>`;
 
 // Same open-eye / eye-with-slash pair used elsewhere in the app to mark a
-// visible vs. hidden item — the slashed version here is Budget's exact
+// visible vs. hidden item. The slashed version here is Budget's exact
 // "Excluded from Charts" icon (see budget.ts's summary-row builder), reused
 // verbatim so "hidden" reads identically everywhere in the app.
 const EYE_SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
@@ -1294,7 +1532,7 @@ const EYE_SHOWN_SVG = `<svg ${EYE_SVG_ATTRS}><path d="M1 12s4-8 11-8 11 8 11 8-4
 const EYE_HIDDEN_SVG = `<svg ${EYE_SVG_ATTRS}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 
 /** Whether the given "section/tool" key is currently shown. Defaults to true
- *  for a key with no recorded state — normalizeSidebarItems() should always
+ *  for a key with no recorded state, normalizeSidebarItems() should always
  *  have added one for every known tool, so this is just a safety net. */
 function isToolPinned(key: string): boolean {
   return settings.sidebarItems.find((it) => it.key === key)?.pinned ?? true;
@@ -1304,7 +1542,7 @@ function isToolPinned(key: string): boolean {
  *  current visibility state: hides/disables options for hidden tools so a
  *  user never sees (or can pick) a tool that isn't on the sidebar. If the
  *  currently-selected startup target IS one of those now-hidden options,
- *  falls back to "lastView" and persists the change — otherwise the select
+ *  falls back to "lastView" and persists the change, otherwise the select
  *  would be silently pointed at an option the user can no longer choose. */
 function refreshStartupSelectOptions(): void {
   let selectedNowHidden = false;
@@ -1327,7 +1565,7 @@ function refreshStartupSelectOptions(): void {
   startupSelect.value = settings.startupTarget;
 }
 
-/** Updates the "Sidebar:" row's status badge in General Settings — hidden
+/** Updates the "Sidebar:" row's status badge in General Settings, hidden
  *  entirely when nothing is hidden, "N tools hidden" otherwise. Mirrors Time
  *  Tracker's CSV import status badge pattern. */
 function refreshSidebarHiddenBadge(): void {
@@ -1349,11 +1587,16 @@ function refreshSidebarHiddenBadge(): void {
  *  settings.sidebarItems (drag, show/hide toggle, reset, or a fresh
  *  settings load). */
 function applySidebarOrder(): void {
+  // Sorting happens here rather than only at the moment a sort button is
+  // clicked, so the usage-driven modes stay live: opening a tool re-ranks the
+  // sidebar on the spot instead of at next launch.
+  applySidebarSortMode();
+
   const shownKeys = settings.sidebarItems.filter((it) => it.pinned).map((it) => it.key);
   const shownSet = new Set(shownKeys);
 
   // Move shown items into order (appendChild on an already-attached node
-  // relocates it — repeated in desired order, this leaves everything in that
+  // relocates it, repeated in desired order, this leaves everything in that
   // order without disturbing the fixed, non-reorderable nav-items around it:
   // the sidebar-toggle control and Home always stay first).
   shownKeys.forEach((key) => {
@@ -1389,12 +1632,26 @@ function applySidebarOrder(): void {
 
   refreshStartupSelectOptions();
   refreshSidebarHiddenBadge();
+
+  // Every path that changes tool visibility funnels through here, so this is
+  // the one place a "sidebarchange" needs announcing. Tools that offer a
+  // hand-off to another tool (Countdown Timer → Time Tracker) listen for it so they
+  // can disable that offer when the target has been hidden.
+  window.dispatchEvent(new CustomEvent("sidebarchange"));
+}
+
+/** Whether a tool is currently shown in the sidebar / on Home. Exported for
+ *  tools that cross-link to another tool: a hand-off to something the user
+ *  has deliberately hidden shouldn't be on offer. Keys are the same
+ *  "section/tool" strings ALL_TOOLS uses. */
+export function isToolVisible(key: string): boolean {
+  return isToolPinned(key);
 }
 
 /** Shows or hides a tool, moving it to the end of its new group (shown
  *  entries stay a flat, freely-reorderable list; hidden entries have no
  *  meaningful order of their own). Persists immediately, re-renders both the
- *  live sidebar/Home and (if open) the Edit Sidebar modal, and — per spec —
+ *  live sidebar/Home and (if open) the Edit Sidebar modal, and, per spec,
  *  redirects to Home if the tool being hidden is the one currently open. */
 function setPinned(key: string, shown: boolean): void {
   const item = settings.sidebarItems.find((it) => it.key === key);
@@ -1431,8 +1688,8 @@ function attachSidebarDragHandlers(row: HTMLElement, key: string): void {
     if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
   });
 
-  // dragend fires unconditionally — whether or not the drag ended over a
-  // valid drop target — so the commit belongs here, not in "drop". Relying
+  // dragend fires unconditionally (whether or not the drag ended over a
+  // valid drop target) so the commit belongs here, not in "drop". Relying
   // on "drop" alone would leave the live (already-reordered) DOM out of
   // sync with settings.sidebarItems whenever the user releases outside any
   // row (e.g. drops on the modal's padding or off the modal entirely).
@@ -1470,8 +1727,21 @@ function commitShownOrderFromDom(): void {
     ...orderedKeys.map((key) => settings.sidebarItems.find((it) => it.key === key)!),
     ...hiddenItems,
   ];
+  // A hand-placed order IS the mode from here on. Without this the active sort
+  // would re-apply on the very next applySidebarOrder() and silently undo the
+  // drag the user just made.
+  settings.sidebarSort = "custom";
   applySidebarOrder();
   saveSettings();
+  refreshSidebarSortButtons();
+}
+
+/** Marks whichever sort button matches the active mode. Nothing is marked
+ *  under "custom", a dragged order isn't any of them. */
+function refreshSidebarSortButtons(): void {
+  document.querySelectorAll<HTMLButtonElement>(".sidebar-sort-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.sort === settings.sidebarSort);
+  });
 }
 
 function buildSidebarEditRow(item: SidebarItemState, draggable: boolean): HTMLElement {
@@ -1480,7 +1750,7 @@ function buildSidebarEditRow(item: SidebarItemState, draggable: boolean): HTMLEl
   row.dataset.key = item.key;
 
   const meta = ALL_TOOLS.find((t) => t.key === item.key);
-  if (!meta) return row; // defensive — normalizeSidebarItems() guarantees a match
+  if (!meta) return row; // defensive, normalizeSidebarItems() guarantees a match
 
   const handle = document.createElement("span");
   handle.className = draggable
@@ -1532,12 +1802,15 @@ function renderSidebarEditModal(): void {
   sidebarEditHiddenSection.style.display = hidden.length > 0 ? "" : "none";
 }
 
-// Replaces (rather than stacks on) the General Settings modal — same pattern
+// Replaces (rather than stacks on) the General Settings modal. Same pattern
 // Time Tracker's Setup → Add/Edit Activity / CSV Import modals use: opening
 // closes the parent first, and a back-arrow (not the X) is what reopens it.
 const sidebarEditModal = new Modal(sidebarEditBackdrop, {
   closeOnEsc: true,
-  onOpen: () => renderSidebarEditModal(),
+  onOpen: () => {
+    renderSidebarEditModal();
+    refreshSidebarSortButtons();
+  },
 });
 
 sidebarEditBtn.addEventListener("click", () => {
@@ -1552,12 +1825,45 @@ sidebarEditBack.addEventListener("click", () => {
 
 sidebarEditClose.addEventListener("click", () => sidebarEditModal.close());
 
-sidebarEditResetBtn.addEventListener("click", () => {
-  settings.sidebarItems = freshSidebarItems();
+/** Shows every hidden tool again. Restored items are appended after the
+ *  already-shown ones, keeping their relative order. That only matters under
+ *  a custom order, since every sort mode re-ranks the whole list anyway. */
+document.getElementById("sidebarUnhideAllBtn")!.addEventListener("click", () => {
+  const hidden = settings.sidebarItems.filter((it) => !it.pinned);
+  if (hidden.length === 0) return;
+
+  const shown = settings.sidebarItems.filter((it) => it.pinned);
+  hidden.forEach((it) => { it.pinned = true; });
+  settings.sidebarItems = [...shown, ...hidden];
+
   applySidebarOrder();
   saveSettings();
   renderSidebarEditModal();
-  flash("Sidebar reset to default", "success");
+  flash(
+    hidden.length === 1 ? "1 tool unhidden" : `${hidden.length} tools unhidden`,
+    "success",
+  );
+});
+
+const SIDEBAR_SORT_LABELS: Record<string, string> = {
+  classic: "Classic order",
+  az: "Sorted A-Z",
+  za: "Sorted Z-A",
+  recent: "Sorted by most recent",
+  used: "Sorted by most used",
+};
+
+document.querySelectorAll<HTMLButtonElement>(".sidebar-sort-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const mode = btn.dataset.sort as SidebarSortMode;
+    if (!SIDEBAR_SORT_MODES.includes(mode)) return;
+    settings.sidebarSort = mode;
+    applySidebarOrder();
+    saveSettings();
+    renderSidebarEditModal();
+    refreshSidebarSortButtons();
+    flash(SIDEBAR_SORT_LABELS[mode] ?? "Sidebar sorted", "success");
+  });
 });
 
 /* =============================================================================
@@ -1565,13 +1871,13 @@ sidebarEditResetBtn.addEventListener("click", () => {
    -----------------------------------------------------------------------------
    Replaces the old <select id="themeSelect"> dropdown with a tabbed grid of
    preview tiles (Main/Holiday/Special/Custom, matching the old optgroups).
-   themeSelect itself still exists in the DOM (hidden) — theme-editor.ts reads
+   themeSelect itself still exists in the DOM (hidden), theme-editor.ts reads
    and writes its .value directly, so it stays the one place that mapping is
    defined, but it no longer drives anything by firing "change".
 
    Built-in themes are previewed by fetching their CSS file and pulling a
-   handful of --color-* values out with a regex (cheap, cached per theme id —
-   these are small static files). Custom themes use their already-in-memory
+   handful of --color-* values out with a regex (cheap, cached per theme id.
+   These are small static files). Custom themes use their already-in-memory
    `vars` directly, no fetch needed. Random has no fixed palette to preview,
    so it gets a die icon instead; the Custom tab's "add" tile gets a palette
    icon for the same reason.
@@ -1630,7 +1936,7 @@ const PALETTE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>`;
 const TRASH_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>`;
 
-/** Returns the display name for whatever theme is currently active — a
+/** Returns the display name for whatever theme is currently active, a
  *  built-in theme's label, "Random", or the active custom theme's own name
  *  (falling back to "Custom" if none is resolvable). Drives both the
  *  Settings-row badge and (indirectly, via re-render) the picker's active
@@ -1661,11 +1967,11 @@ const THEME_PREVIEW_VAR_NAMES = [
   "--color-text-muted",
   "--color-btn",
   "--color-accent",
-  // Budget's 8-color chart palette — deliberately vivid/distinct per theme
+  // Budget's 8-color chart palette, deliberately vivid/distinct per theme
   // (see the "Blue / emerald / amber / red / violet / cyan / orange / mint"
   // comment in each theme's own CSS), so it doubles as a rich "fingerprint"
   // strip for the preview tile. Present in every built-in theme's CSS file
-  // AND in RANDOM_VARS (so custom themes carry it too) — safe for both tile
+  // AND in RANDOM_VARS (so custom themes carry it too), safe for both tile
   // kinds.
   "--color-chart-1",
   "--color-chart-2",
@@ -1688,7 +1994,7 @@ const CHART_VAR_NAMES = [
   "--color-chart-8",
 ] as const;
 
-// Keyed by theme id — these are small static files under /themes/, so a
+// Keyed by theme id. These are small static files under /themes/, so a
 // per-id fetch is cheap and only ever happens once per session.
 const themePreviewCache = new Map<string, Record<string, string>>();
 
@@ -1743,7 +2049,7 @@ function buildPreviewSwatchMarkup(): string {
   );
 }
 
-// Tiles are plain divs, not <button> — the global `button { color:
+// Tiles are plain divs, not <button>. The global `button { color:
 // var(--color-btn-text) }` rule (meant for solid-colored buttons) made tile
 // names unreadable against a transparent tile background on themes where
 // --color-btn-text is light (e.g. Light/Patriot), and custom theme tiles
@@ -1891,7 +2197,7 @@ function buildNewCustomThemeTile(): HTMLElement {
 
 let themePickerActiveTab: ThemePickerTab = "main";
 
-/** Which tab houses the currently active theme — main/holiday/special for a
+/** Which tab houses the currently active theme, main/holiday/special for a
  *  built-in theme, "random" or "custom" for those (regardless, for custom,
  *  of which saved one). */
 function tabForCurrentTheme(): ThemePickerTab {
@@ -1904,7 +2210,7 @@ function tabForCurrentTheme(): ThemePickerTab {
   return "main";
 }
 
-/** Shows/hides the Cycle pane's conditional rows — the interval row only
+/** Shows/hides the Cycle pane's conditional rows. The interval row only
  *  matters for the "time" trigger, the Full Holiday Season row only matters
  *  once one of Holiday Overrides / Restrict to Holiday Season is on (it's a
  *  shared window-widener for both, so either one turning it on is enough to
@@ -1917,7 +2223,7 @@ function syncCycleSettingsVisibility(): void {
 }
 
 /** Explains, right where the Holiday Override toggles live, why the theme is
- *  currently pinned to a Holiday theme regardless of the cycle rule — shown
+ *  currently pinned to a Holiday theme regardless of the cycle rule, shown
  *  only while an override is actually live today. Refreshed on tab render and
  *  on every "themechange" so it tracks Cycle Now, interaction/time advances,
  *  and the holiday-boundary recheck without needing its own polling. */
@@ -1950,7 +2256,7 @@ function refreshCycleHolidayNote(): void {
 /** Re-applies the seasonal-effect decision for whatever theme is showing.
  *  applySeasonalEffect() already listens for "themechange" and re-reads the
  *  animation settings on each one, so re-dispatching is all it takes to start
- *  or tear down an effect the moment a toggle flips — no direct call needed,
+ *  or tear down an effect the moment a toggle flips. No direct call needed,
  *  and Cycle's underlying-theme resolution stays in the one place that owns
  *  it (theme-core.ts). */
 function refreshSeasonalEffect(): void {
@@ -1958,7 +2264,7 @@ function refreshSeasonalEffect(): void {
 }
 
 /** Builds one toggle row per animated theme. Rebuilt on each render rather
- *  than diffed — it's eight rows behind a tab that has to be opened, so the
+ *  than diffed, it's eight rows behind a tab that has to be opened, so the
  *  simplicity is worth more than the churn. */
 function renderThemeAnimationRows(): void {
   themeAnimationsList.innerHTML = "";
@@ -2045,7 +2351,7 @@ function renderThemePickerTab(tab: ThemePickerTab): void {
     themePickerRandomTileWrap.innerHTML = "";
     themePickerRandomTileWrap.appendChild(buildRandomTile());
     // Settings are visible either way, but only interactive once Random is
-    // actually the active theme — not just being looked at.
+    // actually the active theme, not just being looked at.
     randomSubsettings.classList.toggle("inactive", settings.theme !== "random");
     return;
   }
@@ -2077,7 +2383,7 @@ function renderThemePickerTab(tab: ThemePickerTab): void {
 }
 
 /** Caps the grid at exactly two full tile rows and lets it scroll beyond
- *  that, instead of the old fixed 58vh cap — which could either clip a
+ *  that, instead of the old fixed 58vh cap, which could either clip a
  *  second row's titles or leave dead space, since tile height depends on
  *  how many columns the auto-fill grid ends up with. One or two rows: no
  *  cap, so the modal simply grows to fit. Three or more: capped to the
@@ -2113,7 +2419,7 @@ document.querySelectorAll<HTMLElement>(".theme-picker-tab").forEach((btn) => {
   btn.addEventListener("click", () => renderThemePickerTab(btn.dataset.themeTab as ThemePickerTab));
 });
 
-/** Selects a built-in theme or "random"/"custom" by id — same logic the old
+/** Selects a built-in theme or "random"/"custom" by id. Same logic the old
  *  themeSelect "change" handler used to run. Re-renders the picker's active
  *  tab afterward so the active-tile highlight tracks the new selection
  *  without closing the modal (letting you flip through a few before leaving). */
@@ -2142,7 +2448,7 @@ function selectCustomTheme(customId: string): void {
 // the next open, bypassing tabForCurrentTheme(). Consumed (and cleared) by
 // onOpen below. Needed because tabForCurrentTheme() tracks settings.theme,
 // which the Create/Edit/Delete Custom Theme flows don't necessarily change
-// (e.g. editing or deleting a custom theme that isn't the active one) — so
+// (e.g. editing or deleting a custom theme that isn't the active one), so
 // it alone can't be trusted to land back on the Custom tab for those flows.
 let themePickerForceTab: ThemePickerTab | null = null;
 
@@ -2162,7 +2468,7 @@ export const themePickerModal = new Modal(themePickerBackdrop, {
 });
 
 /** Reopens Choose Theme forced to the Custom tab. Exported for theme-editor.ts
- *  to call when returning from Create/Edit/Delete Custom Theme — see
+ *  to call when returning from Create/Edit/Delete Custom Theme, see
  *  themePickerForceTab's doc comment for why tabForCurrentTheme() alone
  *  isn't reliable for those flows. */
 export function reopenThemePickerOnCustomTab(): void {
@@ -2229,7 +2535,7 @@ solidModalsToggle.addEventListener("change", () => {
   saveSettings();
 });
 
-// themeSelect no longer has a visible UI of its own to fire "change" — theme
+// themeSelect no longer has a visible UI of its own to fire "change", theme
 // selection now happens via the Choose Theme modal's tiles, which call
 // selectTheme()/selectCustomTheme() (see the CHOOSE THEME MODAL section
 // below) instead of relying on this element's change event.
@@ -2240,11 +2546,11 @@ rerollBtn.addEventListener("click", () => {
 });
 
 /* -----------------------------------------------------------------------------
-   Save-random-as-custom button — sits to the immediate LEFT of the reroll die
+   Save-random-as-custom button, sits to the immediate LEFT of the reroll die
    in index.html (both shown only while the Random theme is active; see
-   applySettings). Captures the palette CURRENTLY applied to :root — which works
+   applySettings). Captures the palette CURRENTLY applied to :root (which works
    for both persistent and chaotic modes, since applyPalette writes every
-   RANDOM_VAR as an inline property on :root — and stores it as a new custom
+   RANDOM_VAR as an inline property on :root) and stores it as a new custom
    theme named "rng-<timestamp>". This lets a good roll be kept before chaotic
    mode regenerates it on the next modal open.
 ----------------------------------------------------------------------------- */
@@ -2261,7 +2567,7 @@ saveRandomBtn.addEventListener("click", async () => {
     if (val) vars[v] = val;
   }
   if (Object.keys(vars).length === 0) {
-    flash("No random palette to save.", "error");
+    flash("No random palette to save", "error");
     return;
   }
 
@@ -2280,7 +2586,7 @@ saveRandomBtn.addEventListener("click", async () => {
   setActiveCustomId(newTheme.id);
   await saveCustomThemes();
   // The Random settings panel (and this button) stays visible regardless of
-  // which tab is open — if that happens to be Custom, refresh it so the new
+  // which tab is open, if that happens to be Custom, refresh it so the new
   // tile shows up immediately instead of only on the next tab switch.
   if (themePickerActiveTab === "custom") renderThemePickerTab("custom");
   flash(`Saved palette as "${name}"`, "success");
@@ -2373,15 +2679,15 @@ cycleHolidayFullSeasonToggle.addEventListener("change", () => {
 });
 
 // Cycle can repaint for plenty of reasons that never touch the toggles above
-// — Cycle Now, an interaction/time-trigger advance, the holiday-boundary
-// recheck — so the note listens on "themechange" itself rather than being
+// (Cycle Now, an interaction/time-trigger advance, the holiday-boundary
+// recheck) so the note listens on "themechange" itself rather than being
 // called from each individual handler.
 window.addEventListener("themechange", refreshCycleHolidayNote);
 
 cycleNowBtn.addEventListener("click", () => advanceCycleNow());
 
 /* -----------------------------------------------------------------------------
-   Cycle tab's holiday-subsettings (i) buttons — click-to-toggle popover,
+   Cycle tab's holiday-subsettings (i) buttons, click-to-toggle popover,
    styled and behaved identically to auto-backup.ts's own info-tooltip
    feature (see that file's "Info tooltips" section) but reimplemented here
    rather than imported, matching its own established convention of keeping
@@ -2446,14 +2752,63 @@ startupSelect.addEventListener("change", () => {
    CHOOSE SOUND PACK MODAL
    -----------------------------------------------------------------------------
    Tile cards, same modal-replaces-Settings pattern as Sidebar/Theme. Unlike
-   Theme's tiles, these don't preview a different palette — a sound pack has
+   Theme's tiles, these don't preview a different palette, a sound pack has
    no visuals of its own, so the cards just render in the app's own current
    theme. Each card has two icon buttons that play that pack's success/error
    cue directly (independent of the currently *active* pack, and without
-   selecting it) — selecting the pack itself happens by clicking the tile.
+   selecting it), selecting the pack itself happens by clicking the tile.
 ============================================================================= */
 
 const SPEAKER_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+
+/* =============================================================================
+   SOUND API FOR TOOLS
+   -----------------------------------------------------------------------------
+   Tools that need their own alert cue (Countdown Timer's timer-end alarm) pick from
+   the same packs the app ships rather than bundling audio of their own. The
+   pack list stays private; these two functions are the whole surface.
+============================================================================= */
+
+/** Every cue in every pack (both the success and the error sound) as
+ *  pickable options. Ids are "<packId>:<kind>", and an EMPTY pack id means
+ *  "whichever pack the app is set to", resolved late so changing the app's
+ *  sound pack changes the tool's cue with it. */
+export function getSoundOptions(): { id: string; name: string }[] {
+  const options: { id: string; name: string }[] = [
+    { id: ":success", name: "App pack: Success" },
+    { id: ":error", name: "App pack: Error" },
+  ];
+  SOUND_PACKS.forEach((p) => {
+    options.push({ id: `${p.id}:success`, name: `${p.name}: Success` });
+    options.push({ id: `${p.id}:error`, name: `${p.name}: Error` });
+  });
+  return options;
+}
+
+/** Resolves a stored sound id to a playable url. Accepts "<packId>:<kind>",
+ *  and tolerates the older bare "<packId>" (and "") forms, which meant that
+ *  pack's success cue. Returns null when the pack no longer exists
+ *  (uninstalled/renamed) so callers degrade to silence rather than throwing. */
+export function resolveSoundUrl(soundId: string): string | null {
+  const [packPart, kindPart] = soundId.split(":");
+  const wanted = packPart || settings.soundPack;
+  const pack = SOUND_PACKS.find((p) => p.id === wanted);
+  if (!pack) return null;
+  return (kindPart === "error" ? pack.error : pack.success) ?? null;
+}
+
+/** Plays a cue once and resolves when it finishes (or immediately fails
+ *  quiet). Resolving on `ended` is what lets a caller chain repeats without
+ *  them overlapping into mush. */
+export function playSoundUrl(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const audio = new Audio(url);
+    const done = (): void => resolve();
+    audio.addEventListener("ended", done, { once: true });
+    audio.addEventListener("error", done, { once: true });
+    audio.play().catch(done);
+  });
+}
 
 function refreshSoundPackCurrentBadge(): void {
   const pack = SOUND_PACKS.find((p) => p.id === settings.soundPack);
@@ -2461,11 +2816,11 @@ function refreshSoundPackCurrentBadge(): void {
 }
 
 /** Tracks whatever preview cue is currently playing so a new preview click
- *  can stop it — without this, rapid clicks across tiles/buttons stack up
+ *  can stop it. Without this, rapid clicks across tiles/buttons stack up
  *  and play over each other instead of replacing one another. */
 let _soundPackPreviewAudio: HTMLAudioElement | null = null;
 
-/** Plays one specific pack's cue directly — a standalone preview, not tied
+/** Plays one specific pack's cue directly, a standalone preview, not tied
  *  to the active successAudio/errorAudio elements used by flash(). Only one
  *  preview ever plays at a time; starting a new one kills the last. */
 function previewSoundPackCue(pack: SoundPack, kind: "success" | "error"): void {
@@ -2482,10 +2837,12 @@ function previewSoundPackCue(pack: SoundPack, kind: "success" | "error"): void {
   audio.addEventListener("ended", () => {
     if (_soundPackPreviewAudio === audio) _soundPackPreviewAudio = null;
   });
-  audio.play().catch(() => {});
+  // Through playCue so a preview is heard at the volume the cue will actually
+  // play at, which is the whole point of previewing it.
+  playCue(audio);
 }
 
-/** Selects a sound pack — same effect the old dropdown's "change" handler
+/** Selects a sound pack. Same effect the old dropdown's "change" handler
  *  had: applies it, persists it, and flashes a success toast (which, using
  *  the newly-loaded pack, doubles as an audible confirmation). */
 function selectSoundPack(id: string): void {
@@ -2559,27 +2916,176 @@ soundPackPickerBack.addEventListener("click", () => {
 
 soundPackPickerClose.addEventListener("click", () => soundPackPickerModal.close());
 
+/* ── Notification volume ──────────────────────────────────────────────────
+   Lives in the sound pack modal because it's the same decision: what the
+   toast cues sound like. Persisting is debounced off the "change" event
+   rather than "input", so dragging across the range writes settings once at
+   the end instead of thirty times on the way. */
+
+const soundVolumeSlider = document.getElementById(
+  "soundVolumeSlider",
+) as HTMLInputElement;
+const soundVolumeValue = document.getElementById("soundVolumeValue")!;
+const soundVolumeReset = document.getElementById("soundVolumeReset")!;
+
+/** How the current value reads on screen. Three cases, because the two ends of
+ *  the range aren't levels: the bottom notch is silence and the centre is the
+ *  app's original loudness. */
+function toastVolumeLabel(db: number): string {
+  if (db <= TOAST_VOLUME_MUTED_DB) return "Muted";
+  if (db === 0) return "Default";
+  return `${db > 0 ? "+" : ""}${db} dB`;
+}
+
+/** Syncs the slider, its read-out, and the Reset button's enabled state to the
+ *  current setting. Called from applySettings(), so load, reset-to-defaults and
+ *  reopening the modal all stay in step. */
+function applyToastVolumeSettings(): void {
+  const db = settings.toastVolumeDb;
+  soundVolumeSlider.value = String(db);
+  soundVolumeValue.textContent = toastVolumeLabel(db);
+  soundVolumeValue.classList.toggle("is-muted", db <= TOAST_VOLUME_MUTED_DB);
+  (soundVolumeReset as HTMLButtonElement).disabled = db === 0;
+}
+
+/** Live feedback while dragging: the read-out tracks the thumb, but nothing is
+ *  written to disk until the drag ends. */
+soundVolumeSlider.addEventListener("input", () => {
+  settings.toastVolumeDb = clampToastVolume(Number(soundVolumeSlider.value));
+  applyToastVolumeSettings();
+});
+
+soundVolumeSlider.addEventListener("change", () => {
+  void saveSettings();
+  // Play the active pack's success cue at the new level, so the setting is
+  // judged by ear at the moment it's chosen. Muted plays nothing, which is
+  // itself the correct preview.
+  if (successAudio) playCue(successAudio);
+});
+
+soundVolumeReset.addEventListener("click", () => {
+  settings.toastVolumeDb = 0;
+  applyToastVolumeSettings();
+  void saveSettings();
+  if (successAudio) playCue(successAudio);
+});
+
+/** Double-click the read-out to type an exact dB value, matching the inline
+ *  edits elsewhere in the app (Auto-Backup's paths, Budget's amounts, the
+ *  Countdown clock): Enter or Tab commits, Escape cancels, blur commits.
+ *
+ *  Typing is the only way to hit a specific number on a 36-step slider without
+ *  fighting the thumb, and "mute"/"muted"/"off" are accepted as words since the
+ *  bottom notch has no number to type. */
+function beginToastVolumeEdit(): void {
+  if (soundVolumeValue.querySelector("input")) return; // already editing
+
+  const original = settings.toastVolumeDb;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "sound-volume-edit";
+  input.value =
+    original <= TOAST_VOLUME_MUTED_DB ? "muted" : String(original);
+  input.setAttribute("aria-label", "Notification volume in decibels");
+
+  soundVolumeValue.textContent = "";
+  soundVolumeValue.appendChild(input);
+  input.focus();
+  input.select();
+
+  let handledByKeydown = false;
+
+  function finish(db: number): void {
+    settings.toastVolumeDb = db;
+    applyToastVolumeSettings();
+    void saveSettings();
+    if (successAudio) playCue(successAudio);
+  }
+
+  function commit(): void {
+    const raw = input.value.trim().toLowerCase();
+    if (raw === "muted" || raw === "mute" || raw === "off") {
+      finish(TOAST_VOLUME_MUTED_DB);
+      return;
+    }
+    // "Default" is what the read-out shows at 0, so accept it back.
+    if (raw === "default") {
+      finish(0);
+      return;
+    }
+    // Tolerates a typed "dB" suffix and a leading "+".
+    const parsed = Number(raw.replace(/\s*db$/, "").replace(/^\+/, ""));
+    if (!Number.isFinite(parsed)) {
+      applyToastVolumeSettings(); // put the old value back
+      flash(
+        `Enter a number between ${TOAST_VOLUME_MIN_DB} and ${TOAST_VOLUME_MAX_DB}, or "muted"`,
+        "error",
+      );
+      return;
+    }
+    finish(clampToastVolume(parsed));
+  }
+
+  input.addEventListener("keydown", (e) => {
+    // The slider is a sibling control; stop arrow keys from reaching it.
+    e.stopPropagation();
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      handledByKeydown = true;
+      commit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      handledByKeydown = true;
+      applyToastVolumeSettings();
+    }
+  });
+
+  input.addEventListener("blur", () => {
+    if (handledByKeydown) return;
+    commit();
+  });
+}
+
+soundVolumeValue.addEventListener("dblclick", beginToastVolumeEdit);
+
 /* =============================================================================
-   BACKUP REMINDER MODAL  (universal — owned by shell; Aggressive mode)
+   BACKUP REMINDER MODAL  (universal, owned by shell; Aggressive mode)
    -----------------------------------------------------------------------------
-   Gentle mode is just a flash() toast — no modal needed. Aggressive mode
+   Gentle mode is just a flash() toast. No modal needed. Aggressive mode
    uses this modal, shown once per startup (see runStartupGates / the
    changelog onClosed hook above) when Auto-Backup's getDueBackupReminder()
    says a reminder is due.
+
+   Returns a promise so runStartupNudges() can show the startup nudges one at a
+   time instead of stacking them, see that function for the ordering. The
+   resolver hangs off the Modal's onClosed rather than the buttons, so EVERY
+   way out (button, Escape, X) advances the queue; a close path that forgot to
+   resolve would strand the rest of the nudges behind a modal nobody can see.
 ============================================================================= */
 
-const backupReminderModal = new Modal(backupReminderBackdrop);
+let _backupReminderResolve: (() => void) | null = null;
 
-export function maybeShowBackupReminder(): void {
+const backupReminderModal = new Modal(backupReminderBackdrop, {
+  onClosed: () => {
+    const resolve = _backupReminderResolve;
+    _backupReminderResolve = null;
+    resolve?.();
+  },
+});
+
+export function maybeShowBackupReminder(): Promise<void> {
   const status = getDueBackupReminder();
-  if (!status) return;
+  if (!status) return Promise.resolve();
 
-  if (status.aggressive) {
-    backupReminderDaysEl.textContent = String(status.elapsedDays);
-    backupReminderModal.open();
-  } else {
-    flash("Time to backup your shit!", "success");
+  if (!status.aggressive) {
+    return gentleNudge("Time to backup your shit!");
   }
+
+  backupReminderDaysEl.textContent = String(status.elapsedDays);
+  return new Promise<void>((resolve) => {
+    _backupReminderResolve = resolve;
+    backupReminderModal.open();
+  });
 }
 
 backupReminderGoBtn.addEventListener("click", () => {
@@ -2589,6 +3095,62 @@ backupReminderGoBtn.addEventListener("click", () => {
 
 backupReminderCancelBtn.addEventListener("click", () => {
   backupReminderModal.close();
+});
+
+/* =============================================================================
+   BUDGET REMINDER MODAL  (universal, owned by shell; Aggressive mode)
+   -----------------------------------------------------------------------------
+   Same shape as the backup reminder above, for the same reason it lives here:
+   it fires during the startup sequence, before the tool it points at has
+   necessarily been opened. Gentle mode is just a flash() toast.
+
+   Budget's persistent signals (sidebar pulse + header notice) are managed
+   inside budget.ts and clear themselves as soon as anything is updated. The
+   one extra action here is "mark it reviewed", which clears the reminder
+   without entering data. Budget is the only one of the three reminders with
+   no natural clearing event of its own. See markBudgetReviewed().
+============================================================================= */
+
+let _budgetReminderResolve: (() => void) | null = null;
+
+const budgetReminderModal = new Modal(budgetReminderBackdrop, {
+  onClosed: () => {
+    const resolve = _budgetReminderResolve;
+    _budgetReminderResolve = null;
+    resolve?.();
+  },
+});
+
+export function maybeShowBudgetReminder(): Promise<void> {
+  const status = getDueBudgetReminder();
+  if (!status) return Promise.resolve();
+
+  if (!status.aggressive) {
+    return gentleNudge(
+      `Your budget hasn't been updated in ${status.elapsedDays} days.`,
+    );
+  }
+
+  budgetReminderDaysEl.textContent = String(status.elapsedDays);
+  return new Promise<void>((resolve) => {
+    _budgetReminderResolve = resolve;
+    budgetReminderModal.open();
+  });
+}
+
+budgetReminderGoBtn.addEventListener("click", () => {
+  budgetReminderModal.close();
+  activateTool("finance", "budget");
+});
+
+budgetReminderReviewedBtn.addEventListener("click", () => {
+  budgetReminderModal.close();
+  markBudgetReviewed();
+  flash("Budget marked as reviewed", "success");
+});
+
+budgetReminderCancelBtn.addEventListener("click", () => {
+  budgetReminderModal.close();
 });
 
 /* =============================================================================
@@ -2615,7 +3177,7 @@ export async function quitApp(): Promise<void> {
   try {
     await onBudgetToolExit();
   } catch {
-    // Quitting must never be blocked by a failed flush — the debounce window
+    // Quitting must never be blocked by a failed flush. The debounce window
     // is 400 ms, so in the overwhelmingly common case there's nothing queued.
   }
   allowAppClose = true;
@@ -2630,7 +3192,7 @@ exitConfirmBtn.addEventListener("click", quitApp);
 
 // Intercept Alt+F4 / OS-level close requests and route them to the exit modal.
 // Exception: when the lock screen is showing, close immediately without
-// prompting — the user has no access to app content yet, so there's nothing
+// prompting. The user has no access to app content yet, so there's nothing
 // to confirm discarding.
 // The custom titlebar X already calls openExitModal directly, so it bypasses this.
 // quitApp() removes this listener before closing, so a confirmed exit goes through.
@@ -2651,7 +3213,7 @@ getCurrentWindow()
 
 // Tauri keeps JS-registered window listeners alive on the Rust side across a
 // webview reload (Ctrl+R / F5). Left in place, the stale close-request listener
-// from the previous page poisons the close flow — the new page's Alt+F4 stops
+// from the previous page poisons the close flow. The new page's Alt+F4 stops
 // reaching the exit modal and close() no longer quits. Tearing it down on unload
 // guarantees the next page starts with a single, working listener.
 window.addEventListener("beforeunload", () => {
@@ -2663,7 +3225,7 @@ window.addEventListener("beforeunload", () => {
    TOAST NOTIFICATIONS
 ============================================================================= */
 
-// Active pack's audio elements — swapped out by loadSoundPack() whenever the
+// Active pack's audio elements, swapped out by loadSoundPack() whenever the
 // Sound Pack setting changes. Null means that cue is muted for this pack.
 let successAudio: HTMLAudioElement | null = null;
 let errorAudio: HTMLAudioElement | null = null;
@@ -2678,22 +3240,138 @@ function loadSoundPack(id: string): void {
 }
 loadSoundPack(DEFAULT_SETTINGS.soundPack);
 
-/* A toast that fires while the app isn't on screen — window unfocused
+/* =============================================================================
+   TOAST CUE VOLUME
+   -----------------------------------------------------------------------------
+   settings.toastVolumeDb shifts every cue up or down from the level the app
+   has always played at. 0 dB is that level, so an untouched install sounds
+   exactly as it did before this existed.
+
+   Two mechanisms, because one alone can't cover the range:
+
+     quieter (<= 0 dB)  HTMLAudioElement.volume, which is a 0..1 multiplier.
+     louder  (>  0 dB)  volume is already pinned at its 1.0 ceiling, so a boost
+                        has to go through a Web Audio GainNode, which has no
+                        upper limit.
+
+   The Web Audio graph is built lazily, per element, and ONLY when a boost is
+   actually asked for. Cues are load-bearing feedback, and routing every one of
+   them through an AudioContext that might be suspended or unavailable would
+   risk silence for people who never touch this slider. Quieter and default
+   keep the plain, proven path.
+
+   Once an element has been wired it stays wired, which is fine: the element's
+   own `volume` is applied before the graph sees it, so the two multiply
+   cleanly and attenuation still works on a wired element.
+============================================================================= */
+
+const TOAST_VOLUME_MAX_DB = 5;
+const TOAST_VOLUME_MIN_DB = -25;
+/** One step below the quietest real setting, standing for silence rather than
+ *  for a level. -25 dB is already very quiet but still audible, and there was
+ *  no way to say "off" without a value that means it. */
+const TOAST_VOLUME_MUTED_DB = TOAST_VOLUME_MIN_DB - 1;
+
+/** Holds a stored or typed value inside the slider's range, including the mute
+ *  notch at the bottom. */
+function clampToastVolume(db: number): number {
+  if (!Number.isFinite(db)) return 0;
+  return Math.min(TOAST_VOLUME_MAX_DB, Math.max(TOAST_VOLUME_MUTED_DB, Math.round(db)));
+}
+
+/** Linear amplitude for a decibel offset. 0 dB is 1.0 (unchanged), +6 dB is
+ *  roughly double, -6 dB roughly half, and the mute notch is a hard 0. */
+function dbToGain(db: number): number {
+  if (db <= TOAST_VOLUME_MUTED_DB) return 0;
+  return Math.pow(10, db / 20);
+}
+
+let _audioCtx: AudioContext | null = null;
+/** Gain node per boosted element. Also serves as the "is this one wired yet"
+ *  check, since createMediaElementSource() may only be called once per
+ *  element and throws on a second attempt. */
+const _boostNodes = new WeakMap<HTMLAudioElement, GainNode>();
+
+/** Returns the shared AudioContext, creating it on first boost. Null when the
+ *  browser has no Web Audio at all, which sends callers back to the plain path
+ *  rather than failing. */
+function audioContext(): AudioContext | null {
+  if (_audioCtx) return _audioCtx;
+  try {
+    _audioCtx = new AudioContext();
+  } catch {
+    _audioCtx = null;
+  }
+  return _audioCtx;
+}
+
+/** Applies the current volume setting to one cue element and plays it from the
+ *  start. Never throws: a rejected play() (autoplay policy, missing file) is
+ *  swallowed exactly as it was before, and any Web Audio failure degrades to
+ *  the plain element at its 1.0 ceiling rather than to silence. */
+function playCue(audio: HTMLAudioElement): void {
+  const gain = dbToGain(settings.toastVolumeDb);
+
+  // Muted: don't start playback at all rather than playing at volume 0, so a
+  // muted cue costs nothing and can't be heard through a boosted graph.
+  if (gain === 0) return;
+
+  audio.volume = Math.min(1, gain);
+
+  if (gain > 1) {
+    try {
+      const ctx = audioContext();
+      if (ctx) {
+        // A context created before any user gesture starts suspended.
+        if (ctx.state === "suspended") void ctx.resume();
+
+        const existing = _boostNodes.get(audio);
+        if (existing) {
+          existing.gain.value = gain;
+        } else if (ctx.state === "running") {
+          // Only ever wire an element into a RUNNING graph. Connecting a media
+          // element to Web Audio replaces its normal output, so wiring into a
+          // suspended context would mute the cue outright. A boosted setting
+          // restored at launch, before any click has resumed audio, would then
+          // silence the very first toast. Skipping the boost costs loudness for
+          // one cue; wiring blind costs the cue.
+          const node = ctx.createGain();
+          ctx.createMediaElementSource(audio).connect(node);
+          node.connect(ctx.destination);
+          node.gain.value = gain;
+          _boostNodes.set(audio, node);
+        }
+      }
+    } catch {
+      /* Boost unavailable; the element still plays at full volume. */
+    }
+  } else {
+    // Back down to unity so an element wired during an earlier boost doesn't
+    // keep multiplying after the slider comes back down.
+    const node = _boostNodes.get(audio);
+    if (node) node.gain.value = 1;
+  }
+
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+}
+
+/* A toast that fires while the app isn't on screen (window unfocused
    (alt-tabbed away, covered by another window) or the document hidden
-   (minimized) — doesn't start its countdown at all. It waits, and the
+   (minimized)) doesn't start its countdown at all. It waits, and the
    taskbar flashes, until the user comes back and can actually read it; the
    timer then starts with TOAST_RETURN_MS of fresh time, since a toast that
    expires the instant attention returns defeats the point of holding it.
 
    Only that FIRST view is waited for. Once a toast has been on screen its
-   countdown just runs, and alt-tabbing away again does not pause it — a
+   countdown just runs, and alt-tabbing away again does not pause it, a
    toast you've already seen shouldn't be able to outlive the moment it
    belongs to, and a toast fired while you're looking at the app was never
    waiting on anything to begin with. */
 let _appVisible = document.visibilityState === "visible" && document.hasFocus();
 
 // A toast resuming because the user came back gets AT LEAST this much visible
-// time — longer than the standard 5s, since attention was elsewhere and a
+// time, longer than the standard 5s, since attention was elsewhere and a
 // just-expired-or-nearly-expired toast would otherwise vanish before it's
 // even read. Only a floor: a toast whose own requested duration is already
 // longer (e.g. an 8s error) keeps that instead.
@@ -2718,7 +3396,7 @@ function _setAppVisible(visible: boolean): void {
       meta.awaitingFirstView = false;
       meta.remaining = Math.max(meta.durationMs, TOAST_RETURN_MS);
     }
-    // Already counting down — leave it be. Hovered — mouseleave owns the
+    // Already counting down, leave it be. Hovered, mouseleave owns the
     // restart, and now reads the remaining set just above. The rest is a
     // toast left paused by a mouseleave that happened while the app was
     // away (which couldn't restart it then); this is where it recovers.
@@ -2736,21 +3414,20 @@ window.addEventListener("blur", () => _setAppVisible(_isAppVisible()));
  *  Plays the corresponding audio cue, enforces a MAX_TOASTS cap by evicting the
  *  oldest toast, and supports hover-to-pause and click-to-dismiss. A toast
  *  fired while the app is unfocused/hidden holds its countdown until the user
- *  is back to see it; once shown, it counts down regardless — see
+ *  is back to see it; once shown, it counts down regardless, see
  *  _setAppVisible() above. */
 export function flash(
   message: string,
   type: "success" | "error" = "success",
   durationMs = 5000,
+  /** Suppresses the toast's own cue. For callers that play their own audio for
+   *  the same event (Countdown Timer's configurable end-of-timer alarm) where the
+   *  toast sound would otherwise land on top of it as an extra, unasked-for
+   *  repeat. */
+  silent = false,
 ): void {
-  if (type === "success" && successAudio) {
-    successAudio.currentTime = 0;
-    successAudio.play().catch(() => {});
-  }
-  if (type === "error" && errorAudio) {
-    errorAudio.currentTime = 0;
-    errorAudio.play().catch(() => {});
-  }
+  if (!silent && type === "success" && successAudio) playCue(successAudio);
+  if (!silent && type === "error" && errorAudio) playCue(errorAudio);
 
   if (toastMetas.length >= MAX_TOASTS) {
     const oldest = toastMetas.shift()!;
@@ -2816,7 +3493,7 @@ export function flash(
     // keeps doing so even if the user alt-tabs off mid-toast.
     startTimer(durationMs);
   } else {
-    // Unseen, so no timer yet — _setAppVisible(true) starts it on return with
+    // Unseen, so no timer yet, _setAppVisible(true) starts it on return with
     // TOAST_RETURN_MS of fresh time. Flash the taskbar meanwhile, so a toast
     // firing in the background (e.g. a backup finishing while alt-tabbed away)
     // doesn't go unnoticed. Windows clears the flash on its own once the user
@@ -2826,7 +3503,7 @@ export function flash(
 }
 
 /* Dev-only: type "debugtoast" anywhere outside a text field to fire a toast
-   5 seconds later — long enough to alt-tab away and confirm it's still
+   5 seconds later, long enough to alt-tab away and confirm it's still
    waiting, unstarted, when you come back (and that it then counts down and
    goes, even if you alt-tab away again). Stripped from production builds
    along with every other __DEV__ block. */
@@ -2847,13 +3524,13 @@ if (__DEV__) {
     if (_debugToastBuffer !== DEBUG_TOAST_PHRASE) return;
     _debugToastBuffer = "";
 
-    console.log("[debugtoast] firing in 5s — alt-tab away now");
-    setTimeout(() => flash("Debug toast — fired 5s ago, still here?", "success"), 5000);
+    console.log("[debugtoast] firing in 5s, alt-tab away now");
+    setTimeout(() => flash("Debug toast: fired 5s ago, still here?", "success"), 5000);
   });
 }
 
 /* =============================================================================
-   WINDOW SIZE — SAVE / RESTORE
+   WINDOW SIZE: SAVE / RESTORE
 ============================================================================= */
 
 // Last known non-maximized dimensions (logical pixels).
@@ -2935,7 +3612,7 @@ async function restoreWindowSize(): Promise<void> {
 ============================================================================= */
 
 async function init(): Promise<void> {
-  // loadSettings() must finish before loadShellState() runs — the latter
+  // loadSettings() must finish before loadShellState() runs. The latter
   // uses settings.sidebarItems (via activateToolIfPinned) to decide whether
   // the saved startup target is still valid, so it can't race against the
   // settings load that populates it.
@@ -2959,7 +3636,7 @@ async function init(): Promise<void> {
     if (activeId) applyCustomThemeById(activeId);
   }
 
-  // Fetch the app version once and cache it — used for both the About modal
+  // Fetch the app version once and cache it, used for both the About modal
   // display and the startup gates (changelog seen check).
   try {
     const { getVersion } = await import("@tauri-apps/api/app");
@@ -2979,6 +3656,9 @@ async function init(): Promise<void> {
   await initAutoBackup();
   await initBudget();
   initGameStats();
+  initTTSRepeater();
+  initCountdown();
+  initDaysBetween();
 
   let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
   getCurrentWindow().onResized(() => {
@@ -3010,13 +3690,13 @@ async function init(): Promise<void> {
 
   await getCurrentWindow().show();
 
-  // Opt-in update check — fire-and-forget so a slow or unreachable network can
+  // Opt-in update check, fire-and-forget so a slow or unreachable network can
   // never delay startup. Off by default; on failure it silently no-ops.
   if (settings.autoCheckUpdates) {
     void checkForUpdates();
   }
 
-  // Run after window is visible — license gate then auto-changelog
+  // Run after window is visible, license gate then auto-changelog
   await runStartupGates(_appVersion !== "unknown" ? _appVersion : "accepted");
 }
 
@@ -3025,9 +3705,9 @@ async function init(): Promise<void> {
 
    The window is created with "visible": false (tauri.conf.json) and only shown
    by the getCurrentWindow().show() at the end of init(). That means ANY throw
-   before that line — a renamed element id tripping one of the getElementById
+   before that line (a renamed element id tripping one of the getElementById
    non-null assertions, a tool's init rejecting, a corrupt data file getting
-   past its parser — leaves a running process with no window at all. No error,
+   past its parser) leaves a running process with no window at all. No error,
    no UI, nothing to report: the user double-clicks the icon and believes the
    app is broken.
 
@@ -3041,7 +3721,7 @@ init().catch(async (err: unknown) => {
 
   // Built with createElement/textContent rather than innerHTML: `err` can
   // carry arbitrary text (file contents, paths) and must never be parsed as
-  // markup — least of all on the one path where the rest of the app's
+  // markup, least of all on the one path where the rest of the app's
   // safeguards clearly aren't running.
   try {
     const banner = document.createElement("div");
@@ -3073,7 +3753,7 @@ init().catch(async (err: unknown) => {
 
     document.body.appendChild(banner);
   } catch {
-    // DOM itself is unusable — nothing further to try; still show the window
+    // DOM itself is unusable. Nothing further to try; still show the window
     // below so the failure is at least visible rather than silent.
   }
 

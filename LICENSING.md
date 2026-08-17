@@ -18,13 +18,13 @@ The full license text is available in the [LICENSE](LICENSE) file included with 
 - **Study** how it works and learn from the source code.
 - **Modify** the software to suit your own needs.
 - **Distribute** copies of the original or your modified version.
-- **Sell services** around this software — support, consulting, hosted versions, etc.
+- **Sell services** around this software: support, consulting, hosted versions, etc.
 - **Advertise** modifications or forks you've made.
 
 ### Under These Conditions:
 
 - **Keep it open.** Any modifications or forks you distribute must also be released under AGPL-3.0. You cannot make the code proprietary or sell it as closed-source software.
-- **Network use counts as distribution.** If you run a modified version as a networked service (e.g., a hosted web app), you must make the modified source code publicly available — this is what sets AGPL apart from standard GPL.
+- **Network use counts as distribution.** If you run a modified version as a networked service (e.g., a hosted web app), you must make the modified source code publicly available. This is what sets AGPL apart from standard GPL.
 - **Preserve attribution.** All distributions must retain the original copyright notice and credit to Railblade as the original author.
 - **State your changes.** If you modify the software and distribute it, you must clearly indicate what changes were made.
 

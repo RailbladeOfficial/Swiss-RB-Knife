@@ -1,5 +1,5 @@
 /* =============================================================================
-   THEME EDITOR  — custom theme editor modal + CSS-var-name tooltip
+   THEME EDITOR: custom theme editor modal + CSS-var-name tooltip
    -----------------------------------------------------------------------------
    Split out of shell.css (Tier 6). Mirrors theme-editor.ts.
 ============================================================================= */
@@ -60,7 +60,7 @@
   box-sizing: border-box;
 }
 
-/* Scrollable groups area — used by both tab panes */
+/* Scrollable groups area, used by both tab panes */
 .te-groups {
   flex: 1;
   overflow-y: auto;
@@ -71,15 +71,15 @@
   min-height: 0;
 }
 
-/* Tab bar chrome is the shared .setup-tabs/.setup-tab (shell.css) now — same
+/* Tab bar chrome is the shared .setup-tabs/.setup-tab (shell.css) now. Same
    as Budget's and Time Tracker's Setup modals. theme-editor.ts scopes its
    querySelectorAll to "#themeEditorModal .setup-tab" so it only toggles its
    own two tabs. Only the tab PANE keeps a local rule: unlike the Setup modal
    panes (which scroll themselves via max-height + overflow-y), this pane needs
-   flex:1/min-height:0 so its .te-groups child does the scrolling instead — a
+   flex:1/min-height:0 so its .te-groups child does the scrolling instead, a
    real behavioural difference, not duplication. */
 
-/* Tab pane — each tab's scrollable content area */
+/* Tab pane. Each tab's scrollable content area */
 .te-tab-pane {
   flex: 1;
   min-height: 0;
@@ -253,7 +253,7 @@
 }
 
 /* =============================================================================
-   THEME EDITOR — CSS VAR NAME TOOLTIP
+   THEME EDITOR: CSS VAR NAME TOOLTIP
 ============================================================================= */
 
 .te-var-tooltip {

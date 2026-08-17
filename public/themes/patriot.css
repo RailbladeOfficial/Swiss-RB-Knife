@@ -38,7 +38,7 @@
   --color-toast-error-border:  #e63946;
   --color-toast-error-text:    #ffd7db;
 
-  /* ── Budget chart palette ── Red / blue / silver / bright-red / navy-blue / white / light-blue / steel-grey — red, white, blue on a dark navy field */
+  /* ── Budget chart palette ── Red / blue / silver / bright-red / navy-blue / white / light-blue / steel-grey, red, white, blue on a dark navy field */
   --color-chart-1:             #d62839;
   --color-chart-2:             #4cc9f0;
   --color-chart-3:             #c7d2e8;
@@ -49,14 +49,14 @@
   --color-chart-8:             #7a869e;
 }
 
-/* ── Patriotic gradient background — deep navy field, easy on the eyes
+/* ── Patriotic gradient background, deep navy field, easy on the eyes
    instead of the old blinding white, with red/white/blue reserved for
    accents and content instead of the page itself. ── */
 body {
   background: linear-gradient(160deg, #0a1128 0%, #0d1734 30%, #101c44 60%, #0c1330 100%) fixed;
 }
 
-/* ── Time Tracker panels — red / icy-blue / silver / gold on dark navy ── */
+/* ── Time Tracker panels, red / icy-blue / silver / gold on dark navy ── */
 .input-panel {
   background: linear-gradient(135deg, rgba(214, 40, 57, 0.10) 0%, #0d1128 100%);
   border-left: 4px solid #d62839;
@@ -74,7 +74,7 @@ body {
   border-left: 4px solid #e0b13c;
 }
 
-/* ── Tool / section header — red-to-blue gradient ── */
+/* ── Tool / section header, red-to-blue gradient ── */
 .tool-view-header,
 .section-header {
   background: linear-gradient(90deg, rgba(214, 40, 57, 0.15), rgba(76, 201, 240, 0.1));
@@ -88,14 +88,14 @@ body {
   text-shadow: 0 0 14px rgba(76, 201, 240, 0.35);
 }
 
-/* ── Modal — solid: deep navy panel ── */
+/* ── Modal, solid: deep navy panel ── */
 body.solid-modals .modal {
   background: linear-gradient(135deg, #101c44 0%, #0a1128 100%);
   border-color: rgba(76, 201, 240, 0.3);
   box-shadow: 0 0 30px rgba(76, 201, 240, 0.1), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Modal — translucent: navy-red frosted glass ── */
+/* ── Modal, translucent: navy-red frosted glass ── */
 body:not(.solid-modals) .modal {
   background: linear-gradient(135deg, rgba(214, 40, 57, 0.08) 0%, rgba(10, 17, 40, 0.6) 100%);
   backdrop-filter: blur(24px);
@@ -104,7 +104,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 30px rgba(76, 201, 240, 0.1), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Primary button — solid red ── */
+/* ── Primary button, solid red ── */
 .primary-btn {
   background: #d62839;
   border-color: #d62839;
@@ -117,7 +117,7 @@ body:not(.solid-modals) .modal {
   color: #ffffff;
 }
 
-/* ── Danger button — brighter alert red ── */
+/* ── Danger button, brighter alert red ── */
 .danger-btn {
   background: #e63946;
   border-color: #e63946;

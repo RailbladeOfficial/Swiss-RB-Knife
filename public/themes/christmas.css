@@ -25,7 +25,7 @@
   --color-toggle-off:          #4a0000;
   --color-toggle-on:           #228b22;
 
-  /* ── Changelog accents ── Features (forest green) / Improvements (gold) / Bugfixes (red) / tool heading (icy frost-blue —
+  /* ── Changelog accents ── Features (forest green) / Improvements (gold) / Bugfixes (red) / tool heading (icy frost-blue,
      a fourth hue outside the red/green/gold trio, evoking snow) */
   --color-changelog-features:     #228b22;
   --color-changelog-improvements: #ffd700;
@@ -50,13 +50,13 @@
   --color-chart-8:             #006400;
 }
 
-/* Snowfall is now handled in JS (see shell.ts — SEASONAL THEME EFFECTS) as a
+/* Snowfall is now handled in JS (see shell.ts. SEASONAL THEME EFFECTS) as a
    canvas overlay: each flake resets itself individually as it falls, so
    there's no shared animation loop for the whole layer to visibly "snap
    back" on, and flakes slowly build a snowbank across the bottom of the
    window instead of just disappearing. */
 
-/* ── Time Tracker panels — green / gold / red / amber ── */
+/* ── Time Tracker panels, green / gold / red / amber ── */
 .input-panel {
   background: linear-gradient(135deg, rgba(34, 139, 34, 0.08) 0%, #0a1a0a 100%);
   border-left: 4px solid #228b22;
@@ -74,7 +74,7 @@
   border-left: 4px solid #b8860b;
 }
 
-/* ── Tool / section header — festive red-to-green gradient ── */
+/* ── Tool / section header, festive red-to-green gradient ── */
 .tool-view-header,
 .section-header {
   background: linear-gradient(90deg, rgba(204, 0, 0, 0.15), rgba(34, 139, 34, 0.1));
@@ -88,7 +88,7 @@
   text-shadow: 0 0 16px rgba(255, 215, 0, 0.4);
 }
 
-/* ── Modal — translucent: deep red-tinted frosted glass (original look) ── */
+/* ── Modal, translucent: deep red-tinted frosted glass (original look) ── */
 body:not(.solid-modals) .modal {
   background: linear-gradient(135deg, rgba(204, 0, 0, 0.08) 0%, rgba(26, 0, 0, 0.55) 100%);
   backdrop-filter: blur(20px);
@@ -97,7 +97,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 30px rgba(204, 0, 0, 0.12), 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Modal — solid: deep crimson panel ── */
+/* ── Modal, solid: deep crimson panel ── */
 body.solid-modals .modal {
   background: linear-gradient(135deg, #3a0a0a 0%, #1a0000 100%);
   border-color: rgba(204, 0, 0, 0.35);
@@ -118,7 +118,7 @@ body.solid-modals .modal {
   color: #4ade80;
 }
 
-/* ── Image CCR panels — green glow ── */
+/* ── Image CCR panels, green glow ── */
 #media-tool-image-ccr .panel {
   background: linear-gradient(135deg, rgba(34, 139, 34, 0.06) 0%, #0a1500 100%);
   border-color: rgba(34, 139, 34, 0.35);
@@ -221,13 +221,13 @@ body.solid-modals .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds — deep dark red with subtle green/gold tints */
+/* Panel backgrounds, deep dark red with subtle green/gold tints */
 #finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(34, 139, 34, 0.08) 0%, #2a0000 100%); }
 #finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(255, 215, 0, 0.06) 0%, #2a0000 100%); }
 #finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(204, 0, 0, 0.1) 0%, #2a0000 100%); }
 #finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(184, 134, 11, 0.07) 0%, #2a0000 100%); }
 
-/* Annual Stats title panel — gold accent */
+/* Annual Stats title panel, gold accent */
 .budget-annual-stats-title-panel {
   border-left: 4px solid #ffd700;
   box-shadow: 0 0 16px rgba(255, 215, 0, 0.1);
@@ -237,7 +237,7 @@ body.solid-modals .modal {
   text-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
 }
 
-/* Summary tab active — festive green */
+/* Summary tab active, festive green */
 .budget-summary-tab.active {
   color: #4ade80;
   background: rgba(34, 139, 34, 0.12);
@@ -269,7 +269,7 @@ body.solid-modals .modal {
   color: #4ade80;
 }
 
-/* View-mode active button — forest green */
+/* View-mode active button, forest green */
 .budget-view-mode-btn.active {
   background: #228b22;
   color: #ffffff;

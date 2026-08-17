@@ -1,5 +1,5 @@
 /* =============================================================================
-   TIME TRACKER — COMPONENT STYLES
+   TIME TRACKER: COMPONENT STYLES
    Shell-level styles (body, buttons, inputs, modals, toasts, title bar,
    scrollbars, toggles, settings rows) all live in shell.css.
    Everything here is specific to the Time Tracker tool.
@@ -10,7 +10,7 @@
 ============================================================================= */
 
 /* Takes up the free space to the right of the Start/End rows and centers
-   the (fixed-size) duration box within it — the box itself doesn't stretch,
+   the (fixed-size) duration box within it. The box itself doesn't stretch,
    it just floats mid-way through whatever room is left. */
 .duration-preview-wrap {
   flex: 1;
@@ -170,7 +170,7 @@
 }
 
 /* =============================================================================
-   INPUT PANEL — LAYOUT
+   INPUT PANEL: LAYOUT
    -----------------------------------------------------------------------------
    The form flows top-to-bottom as a single logical sequence: what/when (date +
    activity) → time range → notes → smart entry shortcut → submit actions.
@@ -239,7 +239,7 @@
 }
 
 /* =============================================================================
-   INPUT PANEL — TIME FIELDS
+   INPUT PANEL: TIME FIELDS
 ============================================================================= */
 
 .time-fields {
@@ -248,7 +248,7 @@
   align-items: center;
   gap: 16px;
   /* Without an explicit width, this flex item (the sole child of
-     .tt-form-row) shrinks to fit its content instead of filling the row —
+     .tt-form-row) shrinks to fit its content instead of filling the row,
      which would leave .duration-preview-wrap's flex:1 with no actual free
      space to center within. */
   width: 100%;
@@ -296,7 +296,7 @@
   box-sizing: border-box;
 }
 
-/* Same look as .tt-add-btn (the base themed button) — just narrower, since
+/* Same look as .tt-add-btn (the base themed button), just narrower, since
    "Now" is a short label. */
 .tt-now-btn {
   flex-shrink: 0;
@@ -352,7 +352,7 @@
 }
 
 /* =============================================================================
-   TOTALS PANEL — two-column layout (Totals | Stats)
+   TOTALS PANEL: two-column layout (Totals | Stats)
 ============================================================================= */
 
 .totals-columns {
@@ -412,11 +412,11 @@
 }
 
 /* =============================================================================
-   ENTRIES LIST  (Time Tracker specific — column layout only)
+   ENTRIES LIST  (Time Tracker specific, column layout only)
    -----------------------------------------------------------------------------
    Shared ledger row primitives (.entries-header-row, .entry-date-subheader,
    .entry-row, .entry-field, .entry-edit-input, .entry-cal-btn,
-   .entry-date-picker, .entry-delete-btn) are promoted to shell.css — Budget's
+   .entry-date-picker, .entry-delete-btn) are promoted to shell.css. Budget's
    ledger uses them directly too. Only Time Tracker's own column types
    (.entry-col-project/-activity/-time/-duration) stay here.
 ============================================================================= */
@@ -456,7 +456,7 @@
   background: var(--color-hover);
 }
 
-/* Project is optional — an empty value still needs a visible, clickable
+/* Project is optional, an empty value still needs a visible, clickable
    target rather than a blank gap in the row. */
 .entry-col-project:empty::before {
   content: "—";
@@ -526,7 +526,7 @@
   background: var(--color-hover);
 }
 
-/* Notes is optional — an empty value still needs a normal-height, visible
+/* Notes is optional, an empty value still needs a normal-height, visible
    clickable target rather than collapsing to a thin blank strip. */
 .entry-col-notes:empty::before {
   content: "—";
@@ -534,7 +534,7 @@
 }
 
 /* =============================================================================
-   SETTINGS — TIME TRACKER SPECIFIC
+   SETTINGS: TIME TRACKER SPECIFIC
    (The collapsible .subsettings primitive used here lives in shell.css, since
    it's shared with the General Settings modal and the Budget setup modals.)
 ============================================================================= */
@@ -551,7 +551,7 @@
 }
 
 /* =============================================================================
-   EDIT NOTES MODAL — CONTEXT SUBLINE
+   EDIT NOTES MODAL: CONTEXT SUBLINE
 ============================================================================= */
 
 .tt-notes-edit-context {
@@ -569,7 +569,7 @@
 }
 
 /* =============================================================================
-   EDIT DATES MODAL — TIME VALUES (Input Panel layout: Date+Time per row)
+   EDIT DATES MODAL: TIME VALUES (Input Panel layout: Date+Time per row)
 ============================================================================= */
 
 .tt-date-edit-time-value {
@@ -586,9 +586,9 @@
 }
 
 /* =============================================================================
-   SETTINGS — LABEL + STATUS BADGE ROW
+   SETTINGS: LABEL + STATUS BADGE ROW
    Same look as Budget's encryption row (.budget-encrypt-label-col /
-   .budget-encrypt-status-badge in budget.css) — duplicated here rather than
+   .budget-encrypt-status-badge in budget.css), duplicated here rather than
    shared across tool stylesheets to keep each tool's CSS self-contained.
 ============================================================================= */
 

@@ -1,14 +1,14 @@
 /* =============================================================================
-   LANDING  — Home dashboard, category landing pages, tool cards, and the
+   LANDING: Home dashboard, category landing pages, tool cards, and the
               standardized tool-view title bar
    -----------------------------------------------------------------------------
    Split out of shell.css (Tier 6). Category-landing-page markup/CSS is kept
    even though categories are currently retired (Home + sidebar link straight
-   to tools) — the archived category markup in index.html would "just work"
+   to tools). The archived category markup in index.html would "just work"
    again if categories come back, and this is where that support lives.
 
    Also includes the standardized .tool-view-header-actions group (Tier 6
-   consolidation — see file-end note) used by every tool's header for
+   consolidation, see file-end note) used by every tool's header for
    multi-button action groups (Presets/Setup, View Annual Stats/Setup, etc.).
 ============================================================================= */
 
@@ -104,7 +104,7 @@
   font-style: italic;
 }
 
-/* "Coming Soon" badge — sits in a dashboard-card-header next to the title
+/* "Coming Soon" badge, sits in a dashboard-card-header next to the title
    for categories with no implemented tools yet. */
 .coming-soon-badge {
   margin-left: auto;
@@ -122,7 +122,7 @@
 }
 
 /* =============================================================================
-   COMING SOON  — category landing placeholder (e.g. Music)
+   COMING SOON: category landing placeholder (e.g. Music)
 ============================================================================= */
 
 .coming-soon-panel {
@@ -192,6 +192,60 @@
   border-color: var(--color-btn);
 }
 
+/* =============================================================================
+   TOOL CARD ATTENTION PULSE
+   -----------------------------------------------------------------------------
+   The Home/landing counterpart to .nav-item.attention-pulse (shell.css),
+   raised together by setToolAttention() whenever a tool is owed something: a
+   backup that's overdue, a budget that hasn't been updated.
+
+   Same RHYTHM as the sidebar row, different amplitude: identical 2s ease-out
+   cycle, hold-to-15%-then-ease-back shape, so a pulsing card and a pulsing
+   sidebar row throb together instead of drifting in and out of phase. A card
+   is six times the size of a nav row, though, so a full inversion to the button
+   colours would shout. This lights the border, fades a soft ring in around it,
+   and dims the card 10%. The dim is what makes it read at a glance; the ring
+   is what makes it read as "flagged" rather than "greyed out".
+
+   filter: brightness() rather than a background swap, so :hover still visibly
+   answers on a pulsing card. The hover background change happens underneath
+   the dim instead of being overridden by it.
+============================================================================= */
+
+@keyframes tool-card-attention-pulse {
+  0% {
+    border-color: var(--color-btn);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-btn) 38%, transparent);
+    filter: brightness(0.9);
+  }
+  15% {
+    border-color: var(--color-btn);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-btn) 38%, transparent);
+    filter: brightness(0.9);
+  }
+  100% {
+    border-color: var(--color-border);
+    box-shadow: 0 0 0 0 transparent;
+    filter: brightness(1);
+  }
+}
+
+.tool-card.attention-pulse {
+  animation: tool-card-attention-pulse 2s ease-out infinite;
+}
+
+/* Respect reduced-motion: no pulsing, but hold the lit state so the signal
+   isn't lost entirely for those users. The dim is dropped here, a card that's
+   permanently darker than its neighbours reads as disabled rather than
+   flagged, and it's the throb that made it mean "look at me". */
+@media (prefers-reduced-motion: reduce) {
+  .tool-card.attention-pulse {
+    animation: none;
+    border-color: var(--color-btn);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-btn) 38%, transparent);
+  }
+}
+
 .tool-card-icon {
   display: flex;
   align-items: center;
@@ -236,6 +290,15 @@
   border-bottom: 1px solid var(--color-border);
   border-radius: 8px 8px 0 0;
   flex-shrink: 0;
+  /* Positioning context for .tool-header-notice-wrap, centred across the full
+     bar independent of the left-aligned title. Same arrangement .section-header
+     uses for the Home dashboard's #homeUpdateNotice. */
+  position: relative;
+  /* Cross-fades the palette on a theme change rather than cutting to it, see
+     the note on .panel (shell.css). */
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition);
 }
 
 .tool-view-title {
@@ -251,7 +314,7 @@
 }
 
 /* Right-aligned GROUP of multiple action buttons in a tool view header (e.g.
-   "Presets" + "Setup", or "View Annual Stats" + "Setup") — the buttons sit
+   "Presets" + "Setup", or "View Annual Stats" + "Setup"). The buttons sit
    together at the header's right edge with a small gap between them.
    Individual buttons inside this wrapper do NOT also need
    .tool-view-header-action; the wrapper already handles the push-right, and
@@ -259,7 +322,7 @@
 
    Tier 6 consolidation: previously reimplemented three times as
    .ab-header-nav (auto-backup.css), .budget-header-actions (budget.css),
-   and the wrapper role of .tab-nav (image-ccr.css) — all three were the same
+   and the wrapper role of .tab-nav (image-ccr.css). All three were the same
    `display: flex; gap: 6px; margin-left: auto;` under a different name.
    image-ccr's markup keeps the empty .tab-nav class alongside this one since
    image-ccr.ts queries `.tab-nav .tab-btn` directly. */
@@ -268,6 +331,47 @@
   gap: 6px;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+/* Attention line in a tool view header. The tool-level counterpart to
+   .home-update-notice on the Home dashboard, and deliberately identical to it:
+   absolutely centred across the full bar, same size, weight and --color-btn
+   colouring, so "something wants your attention" reads the same wherever it
+   appears. Used by Auto-Backup's backup-due notice and Budget's update-due
+   notice.
+
+   Taken out of flow so the centring is on the BAR, not on the space left over
+   beside the title, and so it can't shove the header's action buttons around.
+   The wrapper exists (rather than centring .tool-header-notice directly) so a
+   notice with an action button attached, like Budget's Mark Reviewed, travels
+   with its text as one centred unit. */
+.tool-header-notice-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.tool-header-notice {
+  color: var(--color-btn);
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Action attached to a .tool-header-notice (currently Budget's "Mark
+   Reviewed"). Deliberately smaller and quieter than the header's real action
+   buttons. It belongs to the notice beside it, not to the row of tool actions
+   on the right. Otherwise it inherits the theme's plain <button> look, same as
+   every other header button. */
+.tool-header-notice-btn {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  flex-shrink: 0;
 }
 
 /* Shared back-arrow button used in tool view headers (.tool-back-btn) and
@@ -324,12 +428,12 @@
   cursor: pointer;
   /* Smooth colour fade on hover, matching modal-body links (which get their
      transition from modal.css). Without this the hover snapped. It lives here
-     in the shared shell so every theme — including random and custom, which
-     have no per-theme hover rule of their own — fades smoothly. */
+     in the shared shell so every theme (including random and custom, which
+     have no per-theme hover rule of their own) fades smoothly. */
   transition: color var(--hover-transition);
 }
 
-/* Base hover — lightens toward the palette's button-hover colour. Named themes
+/* Base hover, lightens toward the palette's button-hover colour. Named themes
    may override with their own accent; random and custom themes (which use
    default.css as a base and set --color-btn-hover from their palette) pick this
    up automatically, so the link still reacts under them. */

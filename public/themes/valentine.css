@@ -50,14 +50,14 @@
   --color-chart-8:             #f7c6d9;
 }
 
-/* ── Valentine gradient background — deliberately more saturated than the
+/* ── Valentine gradient background, deliberately more saturated than the
    pale panel/card tones below so cards visibly pop forward off the page
    instead of blending into a wash of same-strength pink. ── */
 body {
   background: linear-gradient(160deg, #ffd6e3 0%, #ffc7db 40%, #ffb4cd 70%, #ff9ebd 100%) fixed;
 }
 
-/* ── Time Tracker panels — pale rose cards, alternating panel/input-bg tones ── */
+/* ── Time Tracker panels, pale rose cards, alternating panel/input-bg tones ── */
 .input-panel {
   background: #fff5f8;
   border-left: 4px solid #e0294b;
@@ -88,7 +88,7 @@ body {
   color: #c9184a;
 }
 
-/* ── Buttons — need explicit border since shell base has none ── */
+/* ── Buttons, need explicit border since shell base has none ── */
 button {
   border: 1px solid rgba(224, 41, 75, 0.3);
 }
@@ -98,14 +98,14 @@ button:hover {
   box-shadow: 0 0 0 2px rgba(224, 41, 75, 0.15);
 }
 
-/* ── Modal — solid: pale pink card, popping off the richer page background ── */
+/* ── Modal, solid: pale pink card, popping off the richer page background ── */
 body.solid-modals .modal {
   background: #fff5f8;
   border-color: rgba(224, 41, 75, 0.3);
   box-shadow: 0 8px 32px rgba(201, 24, 74, 0.15), 0 24px 48px rgba(0, 0, 0, 0.2);
 }
 
-/* ── Modal — translucent: frosted pale-pink glass ── */
+/* ── Modal, translucent: frosted pale-pink glass ── */
 body:not(.solid-modals) .modal {
   background: rgba(255, 245, 248, 0.6);
   backdrop-filter: blur(24px);
@@ -114,7 +114,7 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 8px 32px rgba(201, 24, 74, 0.12), 0 24px 48px rgba(0, 0, 0, 0.15);
 }
 
-/* ── Primary button — solid rose ── */
+/* ── Primary button, solid rose ── */
 .primary-btn {
   background: #e0294b;
   border-color: #e0294b;
@@ -127,7 +127,7 @@ body:not(.solid-modals) .modal {
   color: #ffffff;
 }
 
-/* ── Danger button — solid crimson ── */
+/* ── Danger button, solid crimson ── */
 .danger-btn {
   background: #d6293f;
   border-color: #d6293f;

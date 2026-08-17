@@ -3,14 +3,14 @@
    -----------------------------------------------------------------------------
    Frontend logic for the Game Stats tool. Tracks card/board game results
    (Five Crowns first) and computes stats automatically from the logged game
-   history — no hand-maintained spreadsheet formulas.
+   history. No hand-maintained spreadsheet formulas.
 
    Architecture notes:
      • Profiles are a single global pool shared across every game type this
-       tool ever grows to support (not a per-game-type roster) — a profile's
+       tool ever grows to support (not a per-game-type roster), a profile's
        individual stats view breaks totals down by game/table instead.
      • Running totals, "table" groupings (the exact set of players in a game),
-       and completion state are always DERIVED from `games`, never stored —
+       and completion state are always DERIVED from `games`, never stored,
        editing a historical game just mutates the array and everything
        downstream recomputes, so there's nothing to reconcile.
      • Everything Five-Crowns-specific (round structure, overtime tie-break
@@ -18,7 +18,7 @@
        small GameDefinition-shaped interface, so a second game later doesn't
        require changes here.
      • Unlike Time Tracker's Activities/Projects, a profile with 1+ logged
-       games can only be retired, never permanently deleted — Game Stats'
+       games can only be retired, never permanently deleted. Game Stats'
        table/stat identity is keyed on player id, so reassigning history to
        an "Unknown" placeholder (Time Tracker's approach) would corrupt table
        groupings and stats instead of just losing a label.
@@ -30,7 +30,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { devError, flash, setSubNavHandler } from "../shell";
+import { devError, flash, setSubNavHandler, shortPath } from "../shell";
 import { Modal } from "../modal";
 import {
   buildFixedRounds,
@@ -87,7 +87,7 @@ export type Profile = { id: string; name: string; status: ProfileStatus };
 export type RoundEntry = {
   roundIndex: number;
   isOvertime: boolean;
-  // Who plays this round — all of a game's players for rounds 3-13, but only
+  // Who plays this round. All of a game's players for rounds 3-13, but only
   // the currently-tied players for an overtime round.
   participantIds: string[];
   // profileId -> that player's score for this round, null until entered.
@@ -107,7 +107,7 @@ export function gameTypeLabel(type: GameType): string {
 /** A roster + game type the user has actually played, so it can be given a
  *  friendly name ("Thursday Crew") instead of always reading as a list of
  *  names. Created automatically the first time a game is saved with a new
- *  roster — see ensureTableFor() — and only ever edited, never hand-added,
+ *  roster, see ensureTableFor(): and only ever edited, never hand-added,
  *  mirroring how profiles appear when you type a new name into a game.
  *  `name: ""` means "no custom name", so the display falls back to the
  *  joined player names and keeps tracking profile renames. */
@@ -134,7 +134,7 @@ export type GameInstance = {
   playerIds: string[]; // entry order, drives column order in the grid
   rounds: RoundEntry[];
   // Set when the user explicitly declines to play overtime for a tie
-  // (only reachable when settings.autoOvertime is off) — lets the tie stand
+  // (only reachable when settings.autoOvertime is off), lets the tie stand
   // as a shared win instead of leaving the game stuck "in progress" forever.
   tieAccepted?: boolean;
   createdAt: string;
@@ -197,7 +197,7 @@ async function loadFromDisk(): Promise<void> {
     settings = { ...DEFAULT_SETTINGS };
   }
   // Backfills table records for games logged before tables existed. Purely
-  // additive — it never touches gameNumber, so historical numbering (and its
+  // additive. It never touches gameNumber, so historical numbering (and its
   // correspondence to a paper scoresheet) is preserved exactly as saved.
   backfillTables();
 }
@@ -212,12 +212,12 @@ async function saveToDisk(): Promise<void> {
 }
 
 /* =============================================================================
-   TABLES — registry of every roster+game-type actually played
+   TABLES: registry of every roster+game-type actually played
    -----------------------------------------------------------------------------
    Tables are auto-discovered from `games`, never hand-created: the moment a
    game is saved with a roster that's never been seen, a record appears so the
    user can name it later. The `games` array stays the source of truth for
-   which tables EXIST — this registry only adds the user-supplied name on top,
+   which tables EXIST. This registry only adds the user-supplied name on top,
    so a stale record can never invent a table that has no games.
 ============================================================================= */
 
@@ -234,7 +234,7 @@ function ensureTableFor(game: GameInstance): GameTable {
 
 function backfillTables(): void {
   games.forEach((game) => ensureTableFor(game));
-  // Drop records whose last game was deleted — otherwise a since-emptied
+  // Drop records whose last game was deleted, otherwise a since-emptied
   // table lingers in every picker forever.
   const live = new Set(games.map(tableKeyOf));
   tables = tables.filter((t) => live.has(t.key));
@@ -252,16 +252,16 @@ function tableLabelForKey(key: string): string {
   return table.name || autoTableLabel(table.playerIds);
 }
 
-/** How many games have been logged at a table — drives the Setup list badge. */
+/** How many games have been logged at a table, drives the Setup list badge. */
 function tableGameCount(key: string): number {
   return games.filter((g) => tableKeyOf(g) === key).length;
 }
 
 /* =============================================================================
-   PROFILES — shared helpers
+   PROFILES: shared helpers
 ============================================================================= */
 
-/** Number of logged games a profile appears in — drives the Setup list's
+/** Number of logged games a profile appears in, drives the Setup list's
  *  count badge, the Edit modal's context line, and the delete gate below. */
 function gameCountFor(profileId: string): number {
   return games.filter((g) => g.playerIds.includes(profileId)).length;
@@ -271,7 +271,7 @@ function gameCountLabel(count: number): string {
   return `${count} ${count === 1 ? "game" : "games"}`;
 }
 
-/** A profile can only be permanently deleted once retired AND unused —
+/** A profile can only be permanently deleted once retired AND unused,
  *  otherwise deleting it would corrupt table groupings and stats for every
  *  historical game it played in. Retiring (which never touches history)
  *  is always available instead. */
@@ -363,7 +363,7 @@ function renderProfilesList(): void {
   if (profiles.length === 0) {
     const empty = document.createElement("div");
     empty.className = "gs-empty";
-    empty.textContent = "No profiles yet — add one above, or just type a name when starting a game.";
+    empty.textContent = "No profiles yet. Add one above, or just type a name when starting a game.";
     container.appendChild(empty);
     return;
   }
@@ -377,7 +377,7 @@ function renderProfilesList(): void {
 }
 
 /* =============================================================================
-   MODAL — GS SETUP (Profiles / Preferences tabs)
+   MODAL: GS SETUP (Profiles / Preferences tabs)
    Module-level so the Add/Edit/Delete modals can reopen Setup afterward.
 ============================================================================= */
 
@@ -431,7 +431,7 @@ function getGsSetupModal(): Modal {
         _gsSetupPanesToReset.add("gsTabTables");
         _gsSetupPanesToReset.add("gsTabPreferences");
         // Adding/retiring a profile changes Home's Players tile, and Setup is
-        // usually opened from Home — repaint so it isn't left stale.
+        // usually opened from Home, repaint so it isn't left stale.
         if (currentGsView === "home") renderHomeDashboard();
       },
     });
@@ -448,7 +448,7 @@ function getGsSetupModal(): Modal {
 }
 
 /* =============================================================================
-   MODAL — PROFILE ADD / EDIT
+   MODAL: PROFILE ADD / EDIT
 ============================================================================= */
 
 let gsProfileAddModal: Modal | null = null;
@@ -507,7 +507,7 @@ function getProfileEditModal(): Modal {
 
       // Profiles are referenced by id everywhere (unlike Time Tracker's
       // free-text activity/project names), so a rename never needs to touch
-      // historical games — just block colliding with another active profile.
+      // historical games, just block colliding with another active profile.
       if (name.toLowerCase() !== item.name.toLowerCase()) {
         const collision = profiles.find(
           (p) => p.id !== item.id && p.name.toLowerCase() === name.toLowerCase(),
@@ -563,7 +563,7 @@ function openProfileEdit(item: Profile): void {
 }
 
 /* =============================================================================
-   MODAL — TABLE EDIT (rename only)
+   MODAL: TABLE EDIT (rename only)
    -----------------------------------------------------------------------------
    A table's identity IS its roster + game, so there's nothing else to edit and
    no delete: removing a table would mean deleting its games. Clearing the name
@@ -581,7 +581,7 @@ function buildTableRow(table: GameTable): HTMLElement {
   nameSpan.className = "setup-item-name";
   nameSpan.textContent = table.name || autoTableLabel(table.playerIds);
   if (table.name) {
-    // Custom name replaces the roster in the list, so show the roster too —
+    // Custom name replaces the roster in the list, so show the roster too,
     // otherwise there'd be no way to tell two named tables apart.
     const roster = document.createElement("span");
     roster.className = "gs-table-roster";
@@ -614,7 +614,7 @@ function renderTablesList(): void {
   if (live.length === 0) {
     const empty = document.createElement("div");
     empty.className = "gs-empty";
-    empty.textContent = "No tables yet — one appears here the first time a group plays a game.";
+    empty.textContent = "No tables yet. One appears here the first time a group plays a game.";
     container.appendChild(empty);
     return;
   }
@@ -626,7 +626,7 @@ function renderTablesList(): void {
 }
 
 /* -----------------------------------------------------------------------
-   Seat order — the order a table's players appear in, everywhere. Stored on
+   Seat order. The order a table's players appear in, everywhere. Stored on
    the table record and mirrored onto every game at that table, because it's
    each GAME's playerIds that drives its round-grid columns and its stats
    columns; leaving those alone would make the setting look ignored on the
@@ -709,8 +709,8 @@ function applySeatOrder(table: GameTable, orderedIds: string[]): void {
   games.forEach((game) => {
     if (tableKeyOf(game) !== table.key) return;
     game.playerIds = [...game.playerIds].sort(bySeat);
-    // Overtime rounds carry only the tied players, so this is a subset sort —
-    // it keeps those rows reading left-to-right in the same order as the rest.
+    // Overtime rounds carry only the tied players, so this is a subset sort.
+    // It keeps those rows reading left-to-right in the same order as the rest.
     game.rounds.forEach((round) => {
       round.participantIds = [...round.participantIds].sort(bySeat);
     });
@@ -782,7 +782,7 @@ function openTableEdit(table: GameTable): void {
    -----------------------------------------------------------------------------
    Import is all-or-nothing by design. A game log is a record of things that
    actually happened, and a half-applied import leaves the user unable to tell
-   which half — so every sheet is validated first and the whole workbook is
+   which half, so every sheet is validated first and the whole workbook is
    rejected on any problem, with every problem listed at once so the fixes can
    be made in a single pass through Excel.
 
@@ -795,7 +795,7 @@ function openTableEdit(table: GameTable): void {
 const GS_TEMPLATE_MAX_SHEETS = 200;
 
 /** Builds a Read Me plus one blank scoresheet per game, named "Game 1",
- *  "Game 2", ... "Game <count>" — ready to fill in and re-import as-is. */
+ *  "Game 2", ... "Game <count>", ready to fill in and re-import as-is. */
 async function downloadGameTemplate(count: number): Promise<void> {
   try {
     const sheets: { name: string; rows: string[][] }[] = [{ name: "Read Me", rows: templateReadmeRows() }];
@@ -816,20 +816,20 @@ async function downloadGameTemplate(count: number): Promise<void> {
       filename: `five-crowns-game-log-template-${timestamp}.xlsx`,
       dataBase64: toBase64(bytes),
     });
-    flash(`Template saved to ${path}`, "success");
+    flash(`Template saved to ${shortPath(path)}`, "success");
   } catch (err) {
     devError("Game Stats template download failed", err);
     flash(String(err), "error");
   }
 }
 
-/** A validated game, still holding player NAMES — profiles aren't created
+/** A validated game, still holding player NAMES, profiles aren't created
  *  until the entire workbook has passed. */
 type PendingImport = { parsed: ParsedSheetGame; ids: string[]; game: GameInstance };
 
 /** Maps a sheet's player names onto profile ids, inventing a stable stand-in
  *  id for anyone not yet known. The stand-ins are swapped for real profiles at
- *  commit time — validation must not have side effects, or a rejected import
+ *  commit time, validation must not have side effects, or a rejected import
  *  would still litter the profile list. */
 function provisionalPlayerIds(names: string[], pending: Map<string, string>): string[] {
   return names.map((name) => {
@@ -886,7 +886,7 @@ function prepareImport(sheets: { name: string; rows: string[][] }[], gameType: G
       gameType,
       gameNumber: parsed.gameNumber,
       // Spreadsheets carry no date, and the app has always allowed games
-      // without one — see the Require Date preference.
+      // without one, see the Require Date preference.
       date: "",
       playerIds: ids,
       rounds: parsed.rounds.map((round) => {
@@ -913,11 +913,11 @@ function prepareImport(sheets: { name: string; rows: string[][] }[], gameType: G
     }
     claimed.add(key);
 
-    // The rules decide whether a scoresheet is actually finished — an
+    // The rules decide whether a scoresheet is actually finished, an
     // unresolved tie after round 13 needs overtime rows that aren't there.
     if (!deriveGameState(game).isComplete) {
       errors.push(
-        `${sheet.name}: the game isn't finished — the final totals are tied, so it needs overtime rows.`,
+        `${sheet.name}: the game isn't finished: the final totals are tied, so it needs overtime rows.`,
       );
       continue;
     }
@@ -942,7 +942,7 @@ function commitImport(imports: PendingImport[], newProfiles: Map<string, string>
     .forEach(({ game }) => {
       game.playerIds = canonicalSeatOrder(game.gameType, game.playerIds);
       // The rounds were built in the sheet's column order, so re-sort their
-      // participant lists to match — same invariant applySeatOrder() keeps.
+      // participant lists to match. Same invariant applySeatOrder() keeps.
       const seat = new Map(game.playerIds.map((id, i) => [id, i]));
       game.rounds.forEach((round) => {
         round.participantIds = [...round.participantIds].sort(
@@ -963,7 +963,7 @@ function commitImport(imports: PendingImport[], newProfiles: Map<string, string>
 }
 
 /* =============================================================================
-   MODAL — IMPORT WORKBOOK
+   MODAL: IMPORT WORKBOOK
    Choose-then-run, mirroring Time Tracker's CSV Import modal
    (getCsvImportModal() in time-tracker.ts): pick a file, then confirm with a
    separate Import button, with the result (or every validation error) shown
@@ -1022,7 +1022,7 @@ function getGsImportResultModal(): Modal {
       replaceModal: getGsImportModal(),
     });
 
-    // Abandons the whole flow regardless of outcome — same destination as a
+    // Abandons the whole flow regardless of outcome. Same destination as a
     // successful "Done", since there's nothing left on the Import modal worth
     // returning to once the result modal's X is clicked.
     const finish = () => {
@@ -1069,7 +1069,7 @@ async function runGsImport(): Promise<void> {
     runBtn.disabled = false;
     openGsImportResult(
       "error",
-      `Nothing was imported — ${errors.length} ${errors.length === 1 ? "problem" : "problems"} to fix`,
+      `Nothing was imported: ${errors.length} ${errors.length === 1 ? "problem" : "problems"} to fix`,
       errors,
     );
     return;
@@ -1143,9 +1143,9 @@ function openGsImportModal(): void {
 }
 
 /* =============================================================================
-   MODAL — PROFILE DELETE CONFIRM
+   MODAL: PROFILE DELETE CONFIRM
    Only reachable via canDeleteProfile()'s gate (retired AND zero logged
-   games) — Delete Permanently is hidden otherwise, so no "reassign history"
+   games). Delete Permanently is hidden otherwise, so no "reassign history"
    handling is needed here.
 ============================================================================= */
 
@@ -1203,7 +1203,7 @@ const GS_VIEW_IDS: Record<GsView, string> = {
 let currentGsView: GsView = "home";
 
 /* Each of the three working views picks a game type FIRST, then narrows to a
-   table/player within it — tables are per game type, so the game is the outer
+   table/player within it, tables are per game type, so the game is the outer
    axis everywhere. Kept per-view rather than as one global so switching views
    never silently re-scopes another one. */
 let gsNewGameType: GameType = "five-crowns";
@@ -1214,12 +1214,12 @@ let gsStatsGameType: GameType = "five-crowns";
  * Filter lifetime, per the rule "only reset if you leave the view as a whole":
  * a view's own selections survive detours into a game's detail screen (which
  * is a SUB-view of wherever you came from), and are only cleared when you
- * deliberately go somewhere else — the other nav destinations, a view's own
+ * deliberately go somewhere else. The other nav destinations, a view's own
  * Back button, or another tool entirely (see onGameStatsToolEntry).
  *
  * So the reset is NOT done here on every departure. It's driven by the
  * caller, since only the caller knows whether this is a detour or a real
- * exit — showGsView() can't tell "opened a game from Historical" apart from
+ * exit, showGsView() can't tell "opened a game from Historical" apart from
  * "clicked New Game" when both land on the same view id.
  */
 function showGsView(view: GsView): void {
@@ -1235,7 +1235,7 @@ function showGsView(view: GsView): void {
 }
 
 /** Clears whatever the view you're leaving had selected. Called only from
- *  real exits — nav buttons, Back, and tool re-entry — never from opening a
+ *  real exits (nav buttons, Back, and tool re-entry) never from opening a
  *  game, which is a sub-view of the list you opened it from. */
 function leaveGsView(from: GsView): void {
   if (from === "historical") resetHistoricalFilters();
@@ -1243,7 +1243,7 @@ function leaveGsView(from: GsView): void {
 }
 
 /* -----------------------------------------------------------------------
-   Mouse back/forward — a small history stack local to this tool's own
+   Mouse back/forward, a small history stack local to this tool's own
    sub-pages, claimed via shell.ts's setSubNavHandler() only while the
    Game Stats tool view is actually visible (see gsSubNavBack/Forward).
 
@@ -1281,7 +1281,7 @@ function applyGsHistoryEntry(entry: GsHistoryEntry): void {
   gsIsNavigatingHistory = false;
 }
 
-/** Whether the tool is actually rendered right now — checking this element's
+/** Whether the tool is actually rendered right now, checking this element's
  *  own style.display isn't enough, since leaving the tool for another one
  *  hides it by removing the .active class from its ancestor #section-games
  *  (a CSS-level hide), not by touching this element's inline style at all.
@@ -1313,7 +1313,7 @@ function playerName(id: string): string {
   return profiles.find((p) => p.id === id)?.name ?? "?";
 }
 
-/** Games newest-first — the order Historical lists them in. Delegates to the
+/** Games newest-first. The order Historical lists them in. Delegates to the
  *  stats engine's play-order rule (game number within a table, date/entry
  *  time across tables) and reverses it, so the list can't disagree with what
  *  the streaks and win chart consider "most recent". */
@@ -1322,10 +1322,10 @@ function gamesNewestFirst(source: GameInstance[]): GameInstance[] {
 }
 
 /* =============================================================================
-   HOME — dashboard tiles + recent games
+   HOME: dashboard tiles + recent games
    -----------------------------------------------------------------------------
    Everything here is derived from `games`/`profiles` on each render, same as
-   the rest of the tool — nothing is cached or stored.
+   the rest of the tool. Nothing is cached or stored.
 ============================================================================= */
 
 function buildTile(
@@ -1357,7 +1357,7 @@ function buildTile(
   return tile;
 }
 
-/** Wins per player across every completed game — a tie counts as a win for
+/** Wins per player across every completed game, a tie counts as a win for
  *  each winner, matching how deriveGameState reports shared victories. */
 function winLeader(): { name: string; wins: number } | null {
   const tally = new Map<string, number>();
@@ -1390,8 +1390,8 @@ function formatImportTimestamp(iso: string): string {
 }
 
 /** Home is a launchpad, not a dashboard: four destinations plus a thin strip
- *  of at-a-glance numbers. It deliberately shows no game list — browsing
- *  belongs to Historical, which can filter — and no game-type switcher, since
+ *  of at-a-glance numbers. It deliberately shows no game list (browsing
+ *  belongs to Historical, which can filter) and no game-type switcher, since
  *  each destination picks its own game type on arrival. */
 function renderHomeDashboard(): void {
   const tiles = document.getElementById("gsHomeTiles");
@@ -1429,18 +1429,18 @@ function renderHomeDashboard(): void {
 }
 
 /* =============================================================================
-   NEW GAME — step 1: title / date / players
+   NEW GAME: step 1: title / date / players
 ============================================================================= */
 
-// The game instance under construction — only exists once "Start Game" has
+// The game instance under construction, only exists once "Start Game" has
 // been clicked (step 2). Discarded on Save, Cancel, or "Start Over".
 let newGameDraft: GameInstance | null = null;
-// Non-null while editing an already-saved game from the Historical list —
+// Non-null while editing an already-saved game from the Historical list.
 // Save replaces that record in place instead of pushing a new one, and
 // player editing (step 1) is skipped entirely since changing an existing
 // game's players is a bigger structural edit than this flow supports.
 let editingGameId: string | null = null;
-// Where Save/Cancel should return to — Home for a fresh game, Historical
+// Where Save/Cancel should return to. Home for a fresh game, Historical
 // Games when editing an existing record from that list.
 let newGameReturnView: GsView = "home";
 
@@ -1460,7 +1460,7 @@ function refreshProfileDatalist(): void {
 }
 
 /** Resolves a typed player name to a profile id: matches an existing profile
- *  case-insensitively (reactivating it if retired — entering someone in a
+ *  case-insensitively (reactivating it if retired, entering someone in a
  *  new game means they're playing again), or silently creates a new active
  *  profile if there's no match. Returns null only for a blank name. */
 function resolvePlayerName(name: string): string | null {
@@ -1485,7 +1485,7 @@ function buildPlayerPickerRow(index: number): HTMLElement {
   const row = document.createElement("div");
   row.className = "gs-player-picker-row";
 
-  // Seat number — the row order here becomes the game's column order, so it's
+  // Seat number. The row order here becomes the game's column order, so it's
   // worth making explicit rather than leaving it implied by the placeholder.
   const seat = document.createElement("span");
   seat.className = "gs-player-index";
@@ -1536,7 +1536,7 @@ function renumberPlayerPickerRows(): void {
 }
 
 /** Footer line under the setup panel: how many seats are filled, and (once
- *  the minimum is met) whether any name is new to the profile pool — the only
+ *  the minimum is met) whether any name is new to the profile pool. The only
  *  place the silent profile creation in resolvePlayerName() is surfaced
  *  before it happens. */
 function refreshPlayerCountHint(): void {
@@ -1550,7 +1550,7 @@ function refreshPlayerCountHint(): void {
   const seats = container.children.length;
 
   if (names.length < GS_MIN_PLAYERS) {
-    hint.textContent = `${names.length} of ${seats} seats filled — a game needs at least ${GS_MIN_PLAYERS} players.`;
+    hint.textContent = `${names.length} of ${seats} seats filled, a game needs at least ${GS_MIN_PLAYERS} players.`;
     return;
   }
   const newNames = names.filter(
@@ -1558,7 +1558,7 @@ function refreshPlayerCountHint(): void {
   );
   const base = `${names.length} ${names.length === 1 ? "player" : "players"} ready`;
   hint.textContent = newNames.length
-    ? `${base} — new profile${newNames.length === 1 ? "" : "s"} for ${newNames.join(", ")}.`
+    ? `${base}. New profile${newNames.length === 1 ? "" : "s"} for ${newNames.join(", ")}.`
     : `${base}.`;
 }
 
@@ -1568,7 +1568,7 @@ function refreshPlayerPickerState(): void {
   container.querySelectorAll<HTMLButtonElement>(".gs-player-remove-btn").forEach((btn) => {
     btn.disabled = !canRemove;
   });
-  // "+ Add Player" stays enabled at the cap on purpose — addPlayerPickerRow()
+  // "+ Add Player" stays enabled at the cap on purpose, addPlayerPickerRow()
   // flashes why, which is more useful than a silently dead button. Clear is
   // different: at the default two empty seats it would do literally nothing,
   // so it greys out instead of pretending to act.
@@ -1577,7 +1577,7 @@ function refreshPlayerPickerState(): void {
   refreshPlayerCountHint();
 }
 
-/** True when Clear Players has something to undo — either extra seats or any
+/** True when Clear Players has something to undo. Either extra seats or any
  *  name typed into one. */
 function isPlayerPickerDirty(): boolean {
   const container = document.getElementById("gsPlayerPickers")!;
@@ -1586,7 +1586,7 @@ function isPlayerPickerDirty(): boolean {
 }
 
 /** Empties the roster back to the default blank seats. The "fill from table"
- *  select is reset alongside it — leaving it pointing at a table whose players
+ *  select is reset alongside it, leaving it pointing at a table whose players
  *  are no longer on screen would misreport where the game number came from. */
 function clearPlayerPickers(): void {
   const container = document.getElementById("gsPlayerPickers")!;
@@ -1618,7 +1618,7 @@ function addPlayerPickerRow(): void {
   renumberPlayerPickerRows();
 }
 
-/** The next number for a specific table — game type + exact roster. Scoping
+/** The next number for a specific table, game type + exact roster. Scoping
  *  it this way is what stops a game at some OTHER table from punching a hole
  *  in this table's sequence: your 176th game with the same three people is
  *  Game 176 no matter what else got logged in between.
@@ -1639,7 +1639,7 @@ function refreshFillFromTableOptions(): void {
   select.innerHTML = "";
   const blank = document.createElement("option");
   blank.value = "";
-  blank.textContent = "— None —";
+  blank.textContent = "(None)";
   select.appendChild(blank);
   listAllTables(gsNewGameType).forEach((t) => {
     const opt = document.createElement("option");
@@ -1669,7 +1669,7 @@ function applyFillFromTable(key: string): void {
 }
 
 /* -----------------------------------------------------------------------
-   Suggested game number — shown on the setup panel BEFORE the game starts,
+   Suggested game number, shown on the setup panel BEFORE the game starts,
    so it can be checked against a paper scoresheet while the roster is still
    on screen. Locked by default (the auto value is right whenever games are
    entered in order); the unlock toggle is there for the rare transcription
@@ -1679,7 +1679,7 @@ function applyFillFromTable(key: string): void {
 let gsGameNumberUnlocked = false;
 
 /** Profile ids for whatever's currently typed into the player rows, without
- *  creating any profiles — resolvePlayerName() does that, but only once the
+ *  creating any profiles, resolvePlayerName() does that, but only once the
  *  game actually starts. Unknown names simply don't resolve yet, so the
  *  suggested number treats the roster as new until they exist. */
 function draftPlayerIds(): string[] {
@@ -1702,7 +1702,7 @@ function suggestedGameNumber(): number {
 function refreshSuggestedGameNumber(): void {
   const input = document.getElementById("gsGameNumberInput") as HTMLInputElement | null;
   if (!input) return;
-  // While unlocked the user owns the value — recomputing would stomp on what
+  // While unlocked the user owns the value, recomputing would stomp on what
   // they're mid-way through typing.
   if (!gsGameNumberUnlocked) input.value = String(suggestedGameNumber());
   refreshGameNumberHint();
@@ -1723,7 +1723,7 @@ function refreshGameNumberHint(): void {
     hint.classList.remove("gs-hint-warn");
     hint.textContent =
       suggested === 1
-        ? "First game for this table — numbering starts at 1."
+        ? "First game for this table, so numbering starts at 1."
         : `Counts within ${tableLabel || "this table"} only.`;
     return;
   }
@@ -1741,7 +1741,7 @@ function refreshGameNumberHint(): void {
     hint.textContent = `This table already has a Game ${typed}.`;
   } else if (typed > suggested) {
     hint.classList.add("gs-hint-warn");
-    hint.textContent = `Skips ${typed - suggested} number${typed - suggested === 1 ? "" : "s"} — leaves a gap after Game ${suggested - 1}.`;
+    hint.textContent = `Skips ${typed - suggested} number${typed - suggested === 1 ? "" : "s"}, leaving a gap after Game ${suggested - 1}.`;
   } else {
     hint.classList.remove("gs-hint-warn");
     hint.textContent = `Suggested: ${suggested}.`;
@@ -1762,7 +1762,7 @@ function setGameNumberUnlocked(unlocked: boolean): void {
 }
 
 /* -----------------------------------------------------------------------
-   Game mode — "create" is the original New Game flow (Save Game/Cancel at
+   Game mode, "create" is the original New Game flow (Save Game/Cancel at
    the bottom, players editable in step 1). "view"/"edit" are reached by
    double-clicking a Historical card: read-only with an Edit button in the
    header and a Delete Game button at the bottom, until Edit is clicked,
@@ -1776,7 +1776,7 @@ let gsGameMode: GsGameMode = "create";
 // to it regardless of how many edits were made since.
 let gsPreEditSnapshot: GameInstance | null = null;
 
-/** True while the round grid's score inputs should be disabled — only in
+/** True while the round grid's score inputs should be disabled, only in
  *  "view" mode. Consulted by renderRoundGrid(). */
 let gsGameReadOnly = false;
 
@@ -1803,7 +1803,7 @@ function applyGsGameMode(): void {
 
   document.getElementById("gsGameCarousel")!.style.display = isView ? "" : "none";
   // The centered carousel bar is the one place "Game N" shows in read-only
-  // view — the header's own title would just be a redundant second copy.
+  // view. The header's own title would just be a redundant second copy.
   document.getElementById("gsPlayersSummary")!.style.display = isView ? "none" : "";
 
   gsGameReadOnly = isView;
@@ -1812,7 +1812,7 @@ function applyGsGameMode(): void {
 }
 
 /* -----------------------------------------------------------------------
-   Game header — title, status badges and the live scoreboard strip.
+   Game header, title, status badges and the live scoreboard strip.
    The scoreboard restates the running totals from the grid's footer in a
    glanceable form, so the current standings are readable without tracking
    the bottom row across a wide, horizontally-scrolled grid.
@@ -1842,14 +1842,14 @@ function renderGameBadges(game: GameInstance): void {
 }
 
 /** Rewrites the scoreboard chips in place. Cheap enough to call on every
- *  score edit — it never touches the grid, so focus is unaffected. */
+ *  score edit. It never touches the grid, so focus is unaffected. */
 function renderScoreboard(game: GameInstance): void {
   const board = document.getElementById("gsScoreboard");
   if (!board) return;
   board.innerHTML = "";
 
   const state = deriveGameState(game);
-  // Five Crowns is low-score-wins, so the leader is the current minimum —
+  // Five Crowns is low-score-wins, so the leader is the current minimum,
   // once complete, defer to the derived winners (which handle accepted ties).
   const best = Math.min(...game.playerIds.map((id) => state.totals[id]));
 
@@ -1874,7 +1874,7 @@ function renderScoreboard(game: GameInstance): void {
   });
 }
 
-/** Full header refresh — title, date field, badges, scoreboard, carousel. */
+/** Full header refresh, title, date field, badges, scoreboard, carousel. */
 function renderGameHeader(): void {
   if (!newGameDraft) return;
   const game = newGameDraft;
@@ -1886,16 +1886,16 @@ function renderGameHeader(): void {
 }
 
 /* -----------------------------------------------------------------------
-   GAME DETAIL CAROUSEL — read-only view only (applyGsGameMode toggles its
+   GAME DETAIL CAROUSEL: read-only view only (applyGsGameMode toggles its
    visibility). Steps to whichever game has the next/previous stable
-   gameNumber — independent of however Historical's filter got you here, so
-   the sequence stays predictable — and double-clicking the Game ID swaps in
+   gameNumber (independent of however Historical's filter got you here, so
+   the sequence stays predictable) and double-clicking the Game ID swaps in
    a number input to jump straight to any game.
 ------------------------------------------------------------------------ */
 
 /* Both of these stay WITHIN the current game's table. Game numbers only mean
-   anything relative to their own table — stepping from a T/V/S Game 176 into
-   an unrelated A/B/C Game 177 would be nonsense — so the carousel walks that
+   anything relative to their own table (stepping from a T/V/S Game 176 into
+   an unrelated A/B/C Game 177 would be nonsense) so the carousel walks that
    table's own sequence and the jump field resolves against it. */
 
 function gameByNumberAtTable(current: GameInstance, num: number): GameInstance | undefined {
@@ -1903,7 +1903,7 @@ function gameByNumberAtTable(current: GameInstance, num: number): GameInstance |
   return games.find((g) => tableKeyOf(g) === key && g.gameNumber === num);
 }
 
-/** Nearest game at the same table in the given direction — skips over any
+/** Nearest game at the same table in the given direction, skips over any
  *  numbers whose game was since deleted, since numbers are never reused. */
 function adjacentGame(current: GameInstance, direction: 1 | -1): GameInstance | undefined {
   const key = tableKeyOf(current);
@@ -1913,7 +1913,7 @@ function adjacentGame(current: GameInstance, direction: 1 | -1): GameInstance | 
     .sort((a, b) => (direction === 1 ? a.gameNumber - b.gameNumber : b.gameNumber - a.gameNumber))[0];
 }
 
-/** Swaps the detail view to another already-saved game, staying read-only —
+/** Swaps the detail view to another already-saved game, staying read-only,
  *  shared by the carousel arrows and the Game ID jump-to-number edit. Always
  *  lands in "view" mode: there's nothing to lose by abandoning an in-progress
  *  edit, since edits aren't written back until Save Changes is clicked. */
@@ -1925,7 +1925,7 @@ function renderGameCarousel(): void {
   if (!newGameDraft) return;
   document.getElementById("gsGameCarouselLabel")!.textContent = gameLabel(newGameDraft);
   // Which table's sequence you're walking, since the number alone no longer
-  // says — two tables can each have a Game 40.
+  // says. Two tables can each have a Game 40.
   document.getElementById("gsGameCarouselTable")!.textContent = tableLabelForKey(tableKeyOf(newGameDraft));
   (document.getElementById("gsGameCarouselPrevBtn") as HTMLButtonElement).disabled = !adjacentGame(newGameDraft, -1);
   (document.getElementById("gsGameCarouselNextBtn") as HTMLButtonElement).disabled = !adjacentGame(newGameDraft, 1);
@@ -1987,11 +1987,11 @@ function resetNewGameSetup(): void {
 /* Chain of games visited without going back to the list, so the detail
    view's own Back button can retrace it. Opening a game from Historical
    starts a fresh chain; the carousel and the jump-to-number field extend it.
-   Only ids are kept — the game is re-read from `games` on the way back, so a
+   Only ids are kept. The game is re-read from `games` on the way back, so a
    deletion mid-chain can't resurrect stale data. */
 let gsGameViewChain: string[] = [];
 
-/** Opens an already-saved game read-only (step 1 is skipped — this flow
+/** Opens an already-saved game read-only (step 1 is skipped. This flow
  *  doesn't support changing an existing game's players). Views a deep copy
  *  so nothing is written back until Save Changes is explicitly clicked.
  *
@@ -2008,7 +2008,7 @@ function openGameForView(
   gsGameMode = "view";
   gsPreEditSnapshot = null;
   // A fresh entry point (from a list) or a mouse-back/forward jump both start
-  // the chain over — only walking games in-place (carousel, jump-to-number)
+  // the chain over, only walking games in-place (carousel, jump-to-number)
   // extends it, since that's the only case Back should retrace.
   if (opts.returnView || opts.recordHistory === false) gsGameViewChain = [];
   gsGameViewChain.push(game.id);
@@ -2016,7 +2016,7 @@ function openGameForView(
   document.getElementById("gsNewGameSetup")!.style.display = "none";
   document.getElementById("gsNewGameEntry")!.style.display = "";
   // Show the view (making the whole subtree visible) before rendering the
-  // grid/chart — drawLineChart() reads canvas.clientWidth, which is 0 for
+  // grid/chart, drawLineChart() reads canvas.clientWidth, which is 0 for
   // anything still inside a display:none ancestor.
   if (opts.recordHistory === false) {
     currentGsView = "new-game";
@@ -2046,7 +2046,7 @@ function gameDetailBack(): void {
   editingGameId = null;
   showGsView(returnView);
   // The selections were preserved, but the numbers behind them may not have
-  // been — the game just left could have been edited or deleted from its
+  // been. The game just left could have been edited or deleted from its
   // detail view. Recomputing is cheap next to showing a stale record.
   if (returnView === "stats") refreshStatsView();
 }
@@ -2080,7 +2080,7 @@ function discardGameChanges(): void {
 /** Seats a known table's players in the order that table already uses,
  *  whatever order the names were typed in. Table identity ignores order (S/T/V
  *  and T/V/S are the same table), so this doesn't change which table the game
- *  joins — it just stops the round grid's columns, and every stat table built
+ *  joins. It just stops the round grid's columns, and every stat table built
  *  from them, from shuffling between games at the same table.
  *
  *  A roster that isn't a known table keeps the typed order, which then becomes
@@ -2108,7 +2108,7 @@ function startNewGame(): void {
   const ids = canonicalSeatOrder(gsNewGameType, typedIds);
 
   // Auto value unless the lock was explicitly opened. A hand-typed number is
-  // still rejected if it would collide — a table can't have two Game 42s,
+  // still rejected if it would collide, a table can't have two Game 42s,
   // since the number is how a game is referred to everywhere else.
   const numberInput = document.getElementById("gsGameNumberInput") as HTMLInputElement;
   let gameNumber = nextGameNumber(gsNewGameType, ids);
@@ -2148,7 +2148,7 @@ function startNewGame(): void {
 }
 
 /* =============================================================================
-   NEW GAME — step 2: round entry grid
+   NEW GAME: step 2: round entry grid
 ============================================================================= */
 
 function buildTotalsRow(game: GameInstance): HTMLTableRowElement {
@@ -2182,9 +2182,9 @@ function updateTotalsFooter(): void {
 
 /** One running-total snapshot per round, carrying a player's total forward
  *  unchanged on rounds they don't participate in (overtime rounds they're
- *  not tied into) — mirrors the paired score/total columns from the user's
+ *  not tied into), mirrors the paired score/total columns from the user's
  *  original spreadsheet. */
-/** Rewrites just the per-round running-total cells in place — never touches
+/** Rewrites just the per-round running-total cells in place, never touches
  *  the score <input>s, so focus is never disturbed. Safe to call after any
  *  score edit that didn't change the number of rounds. */
 function updateRunningTotalsDisplay(): void {
@@ -2293,7 +2293,7 @@ function renderRoundGrid(): void {
 }
 
 /** Live line chart of each player's running total, round by round, as the
- *  grid is filled in — same drawLineChart() used for the table Win Chart. */
+ *  grid is filled in. Same drawLineChart() used for the table Win Chart. */
 function progressChartSeries(game: GameInstance): { series: GsChartSeries[]; xLabels: string[] } {
   const snapshots = computeRunningTotalsPerRound(game);
   return {
@@ -2319,7 +2319,7 @@ function openProgressChartExpand(): void {
   const winners = newGameDraft.playerIds
     .map((id, i) => (winnerIds.includes(id) ? i : -1))
     .filter((i) => i >= 0);
-  openChartExpand({ title: `${gameLabel(newGameDraft)} — Progress`, series, xLabels, winners });
+  openChartExpand({ title: `${gameLabel(newGameDraft)}: Progress`, series, xLabels, winners });
 }
 
 /** Reads one cell's typed value into the draft's round data and rebuilds the
@@ -2350,7 +2350,7 @@ function commitRoundScore(input: HTMLInputElement): void {
   if (pending) openOvertimeConfirmModal(pending);
 }
 
-/** True for the last player-cell of the grid's current last round — the one
+/** True for the last player-cell of the grid's current last round. The one
  *  spot where Tab/Enter needs to be intercepted, since the next round (if
  *  any) may not exist in the DOM yet until overtime is reconciled. Every
  *  other cell uses native Tab order / normal column navigation. */
@@ -2368,7 +2368,7 @@ function focusCell(wrap: HTMLElement, roundIndex: number, playerId: string): voi
     ?.focus();
 }
 
-/** All rounds a given player actually participates in, in order — a
+/** All rounds a given player actually participates in, in order, a
  *  "column" for Enter/Shift+Enter navigation. Always starts at round 3
  *  (every player plays every fixed round); only its bottom varies, since a
  *  player drops out once they're no longer tied in an overtime round. */
@@ -2378,7 +2378,7 @@ function columnRoundsFor(game: GameInstance, playerId: string): RoundEntry[] {
 
 /** Enter moves down a player's column to their next round; Shift+Enter moves
  *  up. At the bottom of a column, Enter continues at the top of the next
- *  player's column (round 3) — except at the grid's true last cell, where
+ *  player's column (round 3), except at the grid's true last cell, where
  *  it defers to the same commit/reconcile/append-or-save logic as Tab. At
  *  the top of a column, Shift+Enter continues at the bottom of the previous
  *  player's column. Off either end of the whole grid, it's a no-op. */
@@ -2437,7 +2437,7 @@ function wireRoundGridEvents(): void {
     commitRoundScore(input);
     if (!newGameDraft) return;
     // Only rebuild the whole table when the overtime tail actually changed
-    // shape (a round appeared/disappeared) — otherwise just refresh the
+    // shape (a round appeared/disappeared), otherwise just refresh the
     // totals footer and running-total cells in place so focus isn't yanked
     // away from wherever the browser's own Tab handling already sent it.
     if (newGameDraft.rounds.length !== roundsBefore) {
@@ -2479,8 +2479,8 @@ function wireRoundGridEvents(): void {
 }
 
 /* =============================================================================
-   MODAL — OVERTIME CONFIRM
-   Only reached when settings.autoOvertime is off — reconcileOvertimeRounds()
+   MODAL: OVERTIME CONFIRM
+   Only reached when settings.autoOvertime is off, reconcileOvertimeRounds()
    reports the round it would add without committing it, so a decline here
    just leaves the game as-is (tieAccepted marks the tie as the final
    result instead of leaving the game stuck "in progress").
@@ -2562,7 +2562,7 @@ function cancelNewGame(): void {
 
 type GsHistFilterMode = "player" | "table";
 let gsHistFilterMode: GsHistFilterMode = "player";
-// Nothing renders until a player, table, or "All" is explicitly picked —
+// Nothing renders until a player, table, or "All" is explicitly picked,
 // avoids loading/rendering the whole game log just to land on the view.
 // Reset to false every time the Historical view is freshly opened.
 let gsHistoricalHasSelection = false;
@@ -2586,7 +2586,7 @@ function activateGsHistLayout(layout: GsHistLayout): void {
 }
 
 /** One game card, shared by the Historical list and Home's Recent strip.
- *  The whole card is a single-click target — no hidden double-click, and no
+ *  The whole card is a single-click target. No hidden double-click, and no
  *  separate "Open" button competing with it. It's given button semantics so
  *  the keyboard reaches it the same way the pointer does. */
 function buildGameRow(game: GameInstance): HTMLElement {
@@ -2708,7 +2708,7 @@ function renderHistoricalList(): void {
     return;
   }
 
-  // Game type is the outer axis — tables only exist within one game.
+  // Game type is the outer axis, tables only exist within one game.
   let filtered = games.filter((g) => g.gameType === gsHistGameType);
   if (gsHistFilterMode === "player") {
     const filterId = (document.getElementById("gsHistoricalFilter") as HTMLSelectElement).value;
@@ -2776,7 +2776,7 @@ function refreshHistoricalFilterOptions(): void {
   allOpt.value = "";
   allOpt.textContent = "All players";
   select.appendChild(allOpt);
-  // Only players who've actually played this game — a profile with no games
+  // Only players who've actually played this game, a profile with no games
   // here would filter to an empty list every time.
   const playedIds = new Set(
     games.filter((g) => g.gameType === gsHistGameType).flatMap((g) => g.playerIds),
@@ -2808,7 +2808,7 @@ function refreshHistoricalFilterOptions(): void {
   tableSelect.value = [...tableSelect.options].some((o) => o.value === currentTable) ? currentTable : "";
 }
 
-/** Populates any game-type <select> — one option per supported game. */
+/** Populates any game-type <select>. One option per supported game. */
 function fillGameTypeSelect(select: HTMLSelectElement, current: GameType): void {
   select.innerHTML = "";
   GAME_TYPES.forEach((t) => {
@@ -2821,7 +2821,7 @@ function fillGameTypeSelect(select: HTMLSelectElement, current: GameType): void 
 }
 
 /* =============================================================================
-   MODAL — DELETE GAME CONFIRM
+   MODAL: DELETE GAME CONFIRM
 ============================================================================= */
 
 let gsGameDeleteModal: Modal | null = null;
@@ -2878,7 +2878,7 @@ let gsStatsMode: GsStatsMode = "profile";
 const GS_MAX_COMPARE = 4;
 
 /** "Game 5" for one entry; "Game 5 (+2 more)" for several tied for the same
- *  record — N is the first game where the record occurred, X is the count
+ *  record. N is the first game where the record occurred, X is the count
  *  of additional games that tie it. */
 function formatGameRefs(refs: GameReference[]): string {
   if (refs.length === 0) return "—";
@@ -2886,19 +2886,19 @@ function formatGameRefs(refs: GameReference[]): string {
   return `${refs[0].gameTitle} (+${refs.length - 1} more)`;
 }
 
-/* The three helpers below return the VALUE half of a table-stats record only —
-   the label is rendered as its own column by the .gs-record-row grid, so
+/* The three helpers below return the VALUE half of a table-stats record only.
+   The label is rendered as its own column by the .gs-record-row grid, so
    baking "Label: " into the string would double it up. */
 
 function recordListText(entries: (GameReference & { value: number })[]): string {
   if (entries.length === 0) return "—";
-  return `${entries[0].value} — ${formatGameRefs(entries)}`;
+  return `${entries[0].value}: ${formatGameRefs(entries)}`;
 }
 
 function marginGameText(entries: MarginGame[]): string {
   if (entries.length === 0) return "—";
   const e = entries[0];
-  return `${playerName(e.firstPlaceId)} ${e.firstScore} vs ${playerName(e.secondPlaceId)} ${e.secondScore} (margin ${e.margin}) — ${formatGameRefs(entries)}`;
+  return `${playerName(e.firstPlaceId)} ${e.firstScore} vs ${playerName(e.secondPlaceId)} ${e.secondScore} (margin ${e.margin}): ${formatGameRefs(entries)}`;
 }
 
 function overtimeGamesText(refs: OvertimeGameRef[]): string {
@@ -2907,7 +2907,7 @@ function overtimeGamesText(refs: OvertimeGameRef[]): string {
   return parts.join(", ");
 }
 
-/** Looks up a game's stable gameNumber for streak-range display — falls
+/** Looks up a game's stable gameNumber for streak-range display, falls
  *  back gracefully if the game was since deleted (the streak itself is
  *  still valid history, it just can't cite an exact game anymore). */
 function gameNumberFor(gameId: string): number | null {
@@ -2919,17 +2919,17 @@ function streakCell(streak: Streak | null): StatDetailRow {
   const fromNum = gameNumberFor(streak.fromGameId);
   const toNum = gameNumberFor(streak.toGameId);
   const gameRef = fromNum == null || toNum == null ? "—" : fromNum === toNum ? `Game ${fromNum}` : `Games ${fromNum}-${toNum}`;
-  // Opens at the streak's first game — the natural place to start reading it.
+  // Opens at the streak's first game. The natural place to start reading it.
   return { value: String(streak.length), gameRef, gameId: streak.fromGameId };
 }
 
 /* -----------------------------------------------------------------------
-   Double-click detail — a ranked breakdown behind any stat cell that has
+   Double-click detail, a ranked breakdown behind any stat cell that has
    more than one number behind it (career records, milestone games).
 ------------------------------------------------------------------------ */
 
 // gameId lets a detail row double-click straight through to that game's
-// detail view — the row already names the game, so it should be reachable.
+// detail view. The row already names the game, so it should be reachable.
 type StatDetailRow = { value: string; gameRef: string; gameId?: string };
 type StatDetail = { title: string; rows: StatDetailRow[] };
 
@@ -2942,7 +2942,7 @@ function topGameScoresDetail(playerId: string, scopedGames: GameInstance[], dir:
     .map((g) => ({ game: g, value: deriveGameState(g).totals[playerId] }))
     .sort((a, b) => (dir === "desc" ? b.value - a.value : a.value - b.value));
   return {
-    title: `${playerName(playerId)} — ${dir === "desc" ? "Highest" : "Lowest"} Game Scores`,
+    title: `${playerName(playerId)}: ${dir === "desc" ? "Highest" : "Lowest"} Game Scores`,
     rows: scored.map((s) => ({ value: String(s.value), gameRef: gameLabel(s.game), gameId: s.game.id })),
   };
 }
@@ -2963,7 +2963,7 @@ function topRoundScoresDetail(playerId: string, scopedGames: GameInstance[]): St
     gameRef: r.gameRef,
     gameId: r.gameId,
   }));
-  return { title: `${playerName(playerId)} — Highest Round Scores`, rows };
+  return { title: `${playerName(playerId)}: Highest Round Scores`, rows };
 }
 
 function topOutsDetail(playerId: string, scopedGames: GameInstance[], dir: "desc" | "asc"): StatDetail {
@@ -2971,7 +2971,7 @@ function topOutsDetail(playerId: string, scopedGames: GameInstance[], dir: "desc
     .map((g) => ({ game: g, value: outsInGame(g, playerId) }))
     .sort((a, b) => (dir === "desc" ? b.value - a.value : a.value - b.value));
   return {
-    title: `${playerName(playerId)} — ${dir === "desc" ? "Most" : "Fewest"} Outs by Game`,
+    title: `${playerName(playerId)}: ${dir === "desc" ? "Most" : "Fewest"} Outs by Game`,
     rows: scored.map((s) => ({ value: String(s.value), gameRef: gameLabel(s.game), gameId: s.game.id })),
   };
 }
@@ -2981,7 +2981,7 @@ function mostOutsInARowDetail(playerId: string, scopedGames: GameInstance[]): St
     .map((g) => ({ game: g, value: mostOutsInARowInGame(g, playerId) }))
     .sort((a, b) => b.value - a.value);
   return {
-    title: `${playerName(playerId)} — Most Outs in a Row by Game`,
+    title: `${playerName(playerId)}: Most Outs in a Row by Game`,
     rows: scored.map((s) => ({ value: String(s.value), gameRef: gameLabel(s.game), gameId: s.game.id })),
   };
 }
@@ -2992,7 +2992,7 @@ function milestoneDetail(playerId: string, scopedGames: GameInstance[], threshol
     .filter((s) => s.value >= threshold)
     .sort((a, b) => b.value - a.value);
   return {
-    title: `${playerName(playerId)} — ${threshold}+ Point Games`,
+    title: `${playerName(playerId)}: ${threshold}+ Point Games`,
     rows: scored.map((s) => ({ value: String(s.value), gameRef: gameLabel(s.game), gameId: s.game.id })),
   };
 }
@@ -3003,7 +3003,7 @@ function topWinningScoresDetail(playerId: string, scopedGames: GameInstance[]): 
     .map((g) => ({ game: g, value: deriveGameState(g).totals[playerId] }))
     .sort((a, b) => b.value - a.value);
   return {
-    title: `${playerName(playerId)} — Highest Winning Scores`,
+    title: `${playerName(playerId)}: Highest Winning Scores`,
     rows: scored.map((s) => ({ value: String(s.value), gameRef: gameLabel(s.game), gameId: s.game.id })),
   };
 }
@@ -3014,13 +3014,13 @@ function bottomLosingScoresDetail(playerId: string, scopedGames: GameInstance[])
     .map((g) => ({ game: g, value: deriveGameState(g).totals[playerId] }))
     .sort((a, b) => a.value - b.value);
   return {
-    title: `${playerName(playerId)} — Lowest Losing Scores`,
+    title: `${playerName(playerId)}: Lowest Losing Scores`,
     rows: scored.map((s) => ({ value: String(s.value), gameRef: gameLabel(s.game), gameId: s.game.id })),
   };
 }
 
 /** Every game where the player crossed `threshold`, ranked by how early they
- *  crossed it. Games that finished under the line aren't listed — there's no
+ *  crossed it. Games that finished under the line aren't listed, there's no
  *  round to report for a line never crossed. */
 function paceDetail(
   playerId: string,
@@ -3033,7 +3033,7 @@ function paceDetail(
     .filter((s): s is { game: GameInstance; round: RoundEntry } => s.round !== null)
     .sort((a, b) => (dir === "asc" ? a.round.roundIndex - b.round.roundIndex : b.round.roundIndex - a.round.roundIndex));
   return {
-    title: `${playerName(playerId)} — ${dir === "asc" ? "Quickest" : "Slowest"} to ${threshold}`,
+    title: `${playerName(playerId)}: ${dir === "asc" ? "Quickest" : "Slowest"} to ${threshold}`,
     rows: scored.map((s) => ({
       value: `Rd ${roundLabel(s.round)}`,
       gameRef: gameLabel(s.game),
@@ -3042,7 +3042,7 @@ function paceDetail(
   };
 }
 
-/** Every game where the player finished in exactly this place — backs the
+/** Every game where the player finished in exactly this place, backs the
  *  Runner Up / Third Place / ... rows, all of which share this same shape. */
 function placeDetail(playerId: string, scopedGames: GameInstance[], place: number, label: string): StatDetail {
   const scored = completedGamesFor(playerId, scopedGames)
@@ -3050,7 +3050,7 @@ function placeDetail(playerId: string, scopedGames: GameInstance[], place: numbe
     .map((g) => ({ game: g, value: deriveGameState(g).totals[playerId] }))
     .sort((a, b) => a.value - b.value);
   return {
-    title: `${playerName(playerId)} — ${label} Finishes`,
+    title: `${playerName(playerId)}: ${label} Finishes`,
     rows: scored.map((s) => ({
       value: String(s.value),
       gameRef: gameLabel(s.game),
@@ -3059,7 +3059,7 @@ function placeDetail(playerId: string, scopedGames: GameInstance[], place: numbe
   };
 }
 
-/** Wins ranked by how decisive they were — the biggest blowouts first. */
+/** Wins ranked by how decisive they were. The biggest blowouts first. */
 function winMarginDetail(playerId: string, scopedGames: GameInstance[]): StatDetail {
   const scored = completedGamesFor(playerId, scopedGames)
     .filter((g) => deriveGameState(g).winnerIds.includes(playerId))
@@ -3073,7 +3073,7 @@ function winMarginDetail(playerId: string, scopedGames: GameInstance[]): StatDet
     .filter((s): s is { game: GameInstance; value: number } => s !== null)
     .sort((a, b) => b.value - a.value);
   return {
-    title: `${playerName(playerId)} — Margins in Wins`,
+    title: `${playerName(playerId)}: Margins in Wins`,
     rows: scored.map((s) => ({
       value: `${s.value} ahead`,
       gameRef: gameLabel(s.game),
@@ -3082,7 +3082,7 @@ function winMarginDetail(playerId: string, scopedGames: GameInstance[]): StatDet
   };
 }
 
-/** Losses ranked by how close they were — the games that got away first. */
+/** Losses ranked by how close they were. The games that got away first. */
 function lossMarginDetail(playerId: string, scopedGames: GameInstance[]): StatDetail {
   const scored = completedGamesFor(playerId, scopedGames)
     .filter((g) => !deriveGameState(g).winnerIds.includes(playerId))
@@ -3093,7 +3093,7 @@ function lossMarginDetail(playerId: string, scopedGames: GameInstance[]): StatDe
     })
     .sort((a, b) => a.value - b.value);
   return {
-    title: `${playerName(playerId)} — Margins in Losses`,
+    title: `${playerName(playerId)}: Margins in Losses`,
     rows: scored.map((s) => ({
       value: `${s.value} behind`,
       gameRef: gameLabel(s.game),
@@ -3109,7 +3109,7 @@ function ordinal(n: number): string {
 }
 
 // Runner Up (2) through Twelfth Place (12) spelled out, matching how a
-// person actually says a standing out loud — beyond that a card-game table
+// person actually says a standing out loud, beyond that a card-game table
 // is implausible enough that falling back to "13th Place" etc. is fine.
 const PLACE_ORDINAL_WORDS = [
   "", "First", "Second", "Third", "Fourth", "Fifth", "Sixth",
@@ -3123,18 +3123,18 @@ function placeStatLabel(place: number): string {
   return PLACE_ORDINAL_WORDS[place] ? `${PLACE_ORDINAL_WORDS[place]} Place` : `${ordinal(place)} Place`;
 }
 
-/** Every win (or loss) streak the player's ever had, longest first — the
+/** Every win (or loss) streak the player's ever had, longest first. The
  *  breakdown behind double-clicking Longest Win/Losing Streak. */
 function streakListDetailRows(playerId: string, scopedGames: GameInstance[], type: "win" | "loss"): StatDetail {
   const chronological = sortChronologically(completedGamesFor(playerId, scopedGames));
   return {
-    title: `${playerName(playerId)} — ${type === "win" ? "Winning" : "Losing"} Streaks`,
+    title: `${playerName(playerId)}: ${type === "win" ? "Winning" : "Losing"} Streaks`,
     rows: streakListDetail(chronological, playerId, type).map(streakCell),
   };
 }
 
 /* -----------------------------------------------------------------------
-   Table-level detail — the same double-click breakdown the per-player stats
+   Table-level detail. The same double-click breakdown the per-player stats
    get, but for the whole-table records. Each one re-ranks EVERY game at the
    table rather than listing only the games tied for the record, so the
    record row is just the top of a list you can read down and open games from.
@@ -3152,7 +3152,7 @@ function combinedScoreDetail(table: TableOption, scopedGames: GameInstance[], di
     })
     .sort((a, b) => (dir === "desc" ? b.value - a.value : a.value - b.value));
   return {
-    title: `${table.label} — ${dir === "desc" ? "Highest" : "Lowest"} Combined Scores`,
+    title: `${table.label}: ${dir === "desc" ? "Highest" : "Lowest"} Combined Scores`,
     rows: scored.map((s) => ({ value: String(s.value), gameRef: gameLabel(s.game), gameId: s.game.id })),
   };
 }
@@ -3173,10 +3173,10 @@ function marginDetail(table: TableOption, scopedGames: GameInstance[], dir: "asc
     })
     .sort((a, b) => (dir === "asc" ? a.value - b.value : b.value - a.value));
   return {
-    title: `${table.label} — ${dir === "asc" ? "Closest" : "Most Lopsided"} Games`,
+    title: `${table.label}: ${dir === "asc" ? "Closest" : "Most Lopsided"} Games`,
     rows: scored.map((s) => ({
       value: String(s.value),
-      gameRef: `${gameLabel(s.game)} — ${s.matchup}`,
+      gameRef: `${gameLabel(s.game)}: ${s.matchup}`,
       gameId: s.game.id,
     })),
   };
@@ -3188,7 +3188,7 @@ function leadChangeDetail(table: TableOption, scopedGames: GameInstance[]): Stat
     .map((g) => ({ game: g, value: leadChangesInGame(g) }))
     .sort((a, b) => b.value - a.value);
   return {
-    title: `${table.label} — Most Lead Changes`,
+    title: `${table.label}: Most Lead Changes`,
     rows: scored.map((s) => ({
       value: `${s.value} ${s.value === 1 ? "change" : "changes"}`,
       gameRef: gameLabel(s.game),
@@ -3198,7 +3198,7 @@ function leadChangeDetail(table: TableOption, scopedGames: GameInstance[]): Stat
 }
 
 /** Games where the eventual winner trailed at some point, deepest hole first.
- *  Wire-to-wire games are dropped rather than listed as a 0-point comeback —
+ *  Wire-to-wire games are dropped rather than listed as a 0-point comeback,
  *  they're the opposite thing, and they have their own record. */
 function comebackDetail(table: TableOption, scopedGames: GameInstance[]): StatDetail {
   const scored = completedTableGames(scopedGames)
@@ -3208,7 +3208,7 @@ function comebackDetail(table: TableOption, scopedGames: GameInstance[]): StatDe
     )
     .sort((a, b) => b.comeback.deficit - a.comeback.deficit);
   return {
-    title: `${table.label} — Comebacks`,
+    title: `${table.label}: Comebacks`,
     rows: scored.map((s) => ({
       value: `${playerName(s.comeback.playerId)}, ${s.comeback.deficit} behind (Rd ${roundLabel(s.comeback.round)})`,
       gameRef: gameLabel(s.game),
@@ -3217,7 +3217,7 @@ function comebackDetail(table: TableOption, scopedGames: GameInstance[]): StatDe
   };
 }
 
-/** "Tim, 74 behind after Rd 7 — Game 12". Who and when are both part of the
+/** "Tim, 74 behind after Rd 7. Game 12". Who and when are both part of the
  *  record: a bare deficit leaves you cross-referencing the game to find out
  *  which player it refers to and where in the game they bottomed out. */
 function comebackText(
@@ -3225,13 +3225,13 @@ function comebackText(
 ): string {
   if (entries.length === 0 || entries[0].value === 0) return "none";
   const top = entries[0];
-  return `${playerName(top.playerId)}, ${top.value} behind after Rd ${top.roundLabel} — ${formatGameRefs(entries)}`;
+  return `${playerName(top.playerId)}, ${top.value} behind after Rd ${top.roundLabel}: ${formatGameRefs(entries)}`;
 }
 
 function wireToWireDetail(table: TableOption, scopedGames: GameInstance[]): StatDetail {
   const wins = completedTableGames(scopedGames).filter(isWireToWire);
   return {
-    title: `${table.label} — Wire-to-Wire Wins`,
+    title: `${table.label}: Wire-to-Wire Wins`,
     rows: wins.map((g) => ({
       value: playerName(deriveGameState(g).winnerIds[0]),
       gameRef: gameLabel(g),
@@ -3246,7 +3246,7 @@ function overtimeDetail(table: TableOption, scopedGames: GameInstance[]): StatDe
     .filter((s) => s.value > 0)
     .sort((a, b) => b.value - a.value);
   return {
-    title: `${table.label} — Overtime Games`,
+    title: `${table.label}: Overtime Games`,
     rows: scored.map((s) => ({
       value: `${s.value} ${s.value === 1 ? "round" : "rounds"}`,
       gameRef: gameLabel(s.game),
@@ -3256,16 +3256,16 @@ function overtimeDetail(table: TableOption, scopedGames: GameInstance[]): StatDe
 }
 
 /* -----------------------------------------------------------------------
-   The comparison table itself — shared by Profile Compare mode and Table
+   The comparison table itself, shared by Profile Compare mode and Table
    Stats mode (auto-populated with everyone at that table), so career
    records sit right in the same ranked/highlighted table as the rate
    stats instead of a separate, non-comparable card underneath.
 ------------------------------------------------------------------------ */
 
-/** Every stat cell is (value, game reference) — for rate stats the game
+/** Every stat cell is (value, game reference) (for rate stats the game
  *  column is just blank, but keeping the shape uniform is what lets the
  *  comparison table give every player two physical sub-columns (like the
- *  round-entry grid's Score/Total split) instead of cramming "value — Game
+ *  round-entry grid's Score/Total split) instead of cramming "value) Game
  *  N" into one string. */
 type StatCell = { value: string; gameRef: string; gameId?: string };
 
@@ -3290,7 +3290,7 @@ function recordCell(entries: (GameReference & { value: number })[]): StatCell {
 type StatRow = {
   key: string;
   label: string;
-  /** Section this row belongs to — rendered as a full-width divider row the
+  /** Section this row belongs to, rendered as a full-width divider row the
    *  first time it appears, so a 19-row table reads as four short lists
    *  instead of one undifferentiated block. Purely presentational. */
   group: string;
@@ -3303,7 +3303,7 @@ type StatRow = {
 const STAT_ROWS: StatRow[] = [
   { key: "gamesPlayed", label: "Games Played", group: "Rates", polarity: "neutral", rank: (s) => s.rates.gamesPlayed, cell: (s) => ({ value: String(s.rates.gamesPlayed), gameRef: "" }) },
   { key: "wins", label: "Wins", group: "Rates", polarity: "neutral", rank: (s) => s.rates.wins, cell: (s) => ({ value: String(s.rates.wins), gameRef: "" }) },
-  // Runner Up / Third Place / ... are spliced in right here, dynamically —
+  // Runner Up / Third Place / ... are spliced in right here, dynamically,
   // see placeStatRows() below and its call site in buildStatsComparisonTable.
   { key: "winPct", label: "Win %", group: "Rates", polarity: "higher-better", rank: (s) => s.rates.winPct, cell: (s) => ({ value: `${s.rates.winPct.toFixed(1)}%`, gameRef: "" }) },
   { key: "totalPoints", label: "Total Points", group: "Rates", polarity: "neutral", rank: (s) => s.rates.totalPoints, cell: (s) => ({ value: String(s.rates.totalPoints), gameRef: "" }) },
@@ -3392,7 +3392,7 @@ const STAT_ROWS: StatRow[] = [
     cell: (s) => ({ value: String(s.rates.count300), gameRef: s.rates.count300 ? formatGameRefs(s.rates.games300) : "—" }),
     detail: (pid, g) => milestoneDetail(pid, g, 300),
   },
-  // Pace — one Quickest/Slowest pair per threshold, generated rather than
+  // Pace. One Quickest/Slowest pair per threshold, generated rather than
   // written out six times so a new threshold is a one-line change.
   ...PACE_THRESHOLDS.flatMap((threshold): StatRow[] => [
     {
@@ -3433,7 +3433,7 @@ const STAT_ROWS: StatRow[] = [
   },
 ];
 
-/** "Runner Up", "Third Place", ... — one row per place beyond 1st, but only
+/** "Runner Up", "Third Place", .... One row per place beyond 1st, but only
  *  for places that are a distinct standing at SOME game someone here has
  *  played: place N only exists once a game has had N+1 players (at a
  *  2-player table, "2nd" is just "lost"). Generated from the actual
@@ -3459,7 +3459,7 @@ function placeStatRows(statsList: PlayerStats[]): StatRow[] {
 
 /** Best gets green; worst additionally gets red once 3+ are being compared
  *  (matches the 2-vs-3+ behavior described for the Compare view). Neutral
- *  stats (plain counts/totals) are never highlighted — there's no
+ *  stats (plain counts/totals) are never highlighted, there's no
  *  meaningful "best" games-played count. A row where everyone ties gets no
  *  highlight either. */
 function highlightForRow(values: number[], polarity: StatPolarity): ("best" | "worst" | "none")[] {
@@ -3479,16 +3479,16 @@ function highlightForRow(values: number[], polarity: StatPolarity): ("best" | "w
 
 /** Shared by Profile Compare mode (manually selected players, scoped to
  *  their whole history) and Table Stats mode (every player at that table,
- *  scoped to just that table's games) — same table shape either way. Each
+ *  scoped to just that table's games). Same table shape either way. Each
  *  player gets two physical sub-columns (Value / Game), matching the
- *  round-entry grid's Score/Total split, instead of squeezing "value —
+ *  round-entry grid's Score/Total split, instead of squeezing "value.
  *  Game N" into one string. */
 function buildStatsComparisonTable(
   profileIds: string[],
   statsList: PlayerStats[],
   scopedGames: GameInstance[],
 ): HTMLElement {
-  // Scroll container — carries the rounded frame and gives the sticky stat-name
+  // Scroll container, carries the rounded frame and gives the sticky stat-name
   // column and sticky header something to pin against.
   const wrap = document.createElement("div");
   wrap.className = "gs-stats-table-wrap";
@@ -3524,7 +3524,7 @@ function buildStatsComparisonTable(
   thead.appendChild(subRow);
   table.appendChild(thead);
 
-  // Runner Up / Third Place / ... spliced in right after Wins — see
+  // Runner Up / Third Place / ... spliced in right after Wins, see
   // placeStatRows().
   const winsIndex = STAT_ROWS.findIndex((r) => r.key === "wins");
   const rows = [
@@ -3598,7 +3598,7 @@ function renderProfileCompare(profileIds: string[]): void {
   if (profileIds.length === 0) {
     const empty = document.createElement("div");
     empty.className = "gs-empty";
-    empty.textContent = "Pick a profile to see their stats — add up to four to compare side by side.";
+    empty.textContent = "Pick a profile to see their stats. Add up to four to compare side by side.";
     container.appendChild(empty);
     return;
   }
@@ -3610,7 +3610,7 @@ function renderProfileCompare(profileIds: string[]): void {
 type TableOption = { key: string; gameType: GameType; playerIds: string[]; label: string };
 
 /** Every table with at least one logged game, newest-name-first alphabetical.
- *  Optionally narrowed to a single game type — the Historical and Stats views
+ *  Optionally narrowed to a single game type. The Historical and Stats views
  *  both pick a game first, then a table within it. */
 function listAllTables(gameType?: GameType): TableOption[] {
   const live = new Set(games.map(tableKeyOf));
@@ -3639,7 +3639,7 @@ function refreshStatsTableOptions(): void {
 }
 
 /* -----------------------------------------------------------------------
-   Table Stats face switcher — the same cross-fade Budget Tracker uses for
+   Table Stats face switcher. The same cross-fade Budget Tracker uses for
    Annual Stats. The main face carries the head-to-head card with the player
    breakdowns underneath it; the Win Chart and its table live on the second
    face, since together they're a full screen's worth of content that would
@@ -3651,7 +3651,7 @@ function refreshStatsTableOptions(): void {
 
 type GsTableStatsFace = "main" | "winchart";
 let gsTableStatsFace: GsTableStatsFace = "main";
-// Deferred so the chart can be drawn at the moment its face becomes visible —
+// Deferred so the chart can be drawn at the moment its face becomes visible,
 // drawLineChart() reads canvas.clientWidth, which is 0 while display:none.
 let gsWinChartDraw: (() => void) | null = null;
 const GS_FACE_FADE_MS = 400; // must match the gs-face-* animation duration
@@ -3709,7 +3709,7 @@ function renderTableStats(): void {
   if (!chosen) {
     const empty = document.createElement("div");
     empty.className = "gs-empty";
-    empty.textContent = "No games logged yet — tables appear once a game has been saved.";
+    empty.textContent = "No games logged yet. Tables appear once a game has been saved.";
     container.appendChild(empty);
     updateWinChartToggleBtn(false);
     return;
@@ -3736,7 +3736,7 @@ function renderTableStats(): void {
   header.appendChild(heading);
   card.appendChild(header);
 
-  // Head-to-head win counts get the tile treatment — this is the one number
+  // Head-to-head win counts get the tile treatment. This is the one number
   // people actually come to this view for.
   const h2hTiles = document.createElement("div");
   h2hTiles.className = "gs-h2h-tiles";
@@ -3750,7 +3750,7 @@ function renderTableStats(): void {
 
   const recordList = document.createElement("div");
   recordList.className = "gs-record-list";
-  // `detail` is built lazily — it walks every game at the table, which is
+  // `detail` is built lazily. It walks every game at the table, which is
   // wasted work for a row nobody double-clicks.
   const records: { label: string; value: string; detail?: () => StatDetail }[] = [
     {
@@ -3792,7 +3792,7 @@ function renderTableStats(): void {
     {
       label: "Wire-to-Wire Wins",
       value: stats.wireToWireGames.length
-        ? `${stats.wireToWireGames.length} — ${formatGameRefs(stats.wireToWireGames)}`
+        ? `${stats.wireToWireGames.length}: ${formatGameRefs(stats.wireToWireGames)}`
         : "none",
       detail: stats.wireToWireGames.length ? () => wireToWireDetail(chosen, scopedGames) : undefined,
     },
@@ -3849,7 +3849,7 @@ function renderTableStats(): void {
   const showingWinChart = gsTableStatsFace === "winchart";
   front.style.display = showingWinChart ? "none" : "flex";
   back.style.display = showingWinChart ? "flex" : "none";
-  // Only draw once the face is actually displayed — a canvas inside a
+  // Only draw once the face is actually displayed, a canvas inside a
   // display:none ancestor reports clientWidth 0 and renders blank.
   if (showingWinChart) winChart.draw();
   updateWinChartToggleBtn(true);
@@ -3859,7 +3859,7 @@ function renderTableStats(): void {
    CHARTS
    -----------------------------------------------------------------------------
    Bespoke Canvas 2D line chart (no charting library dependency, matching
-   Budget Tracker's own hand-rolled chart drawing) — small enough to keep
+   Budget Tracker's own hand-rolled chart drawing), small enough to keep
    local to this tool rather than sharing budget.ts's private helpers.
 ============================================================================= */
 
@@ -3870,8 +3870,8 @@ function gsCssVar(name: string): string {
 /** Canvas fillStyle/strokeStyle silently ignore anything it can't parse, which
  *  would leave a chart drawn in whatever colour was last set. Themes state
  *  colours as hex OR rgb()/rgba()/hsl() (e.g. cake's translucent muted text),
- *  so all of those pass; anything else — empty, or a `var()`/`color-mix()`
- *  that came back unsubstituted — takes the fallback. */
+ *  so all of those pass; anything else (empty, or a `var()`/`color-mix()`
+ *  that came back unsubstituted) takes the fallback. */
 function gsSafeColor(raw: string, fallback: string): string {
   const value = raw.trim();
   if (/^#[0-9a-fA-F]{3,8}$/.test(value)) return value;
@@ -3892,7 +3892,7 @@ type GsDrawChartOptions = { height?: number; showXLabels?: boolean };
 /** Draws a simple multi-series line chart with a bottom legend, returning
  *  the geometry used (needed by attachChartHover() to map a mouse x back to
  *  a data index without recomputing padding logic separately). `xLabels` is
- *  only actually rendered along the axis when `showXLabels` is set — the
+ *  only actually rendered along the axis when `showXLabels` is set. The
  *  inline versions of these charts skip it to stay compact; the expanded
  *  modal versions turn it on. */
 function drawLineChart(
@@ -3988,7 +3988,7 @@ function drawLineChart(
 }
 
 /** Tracks mouse position over an expanded chart and shows a tooltip with
- *  every series' value at the nearest data point — only wired for the
+ *  every series' value at the nearest data point, only wired for the
  *  modal ("expanded") chart, not the compact inline ones. */
 function attachChartHover(
   canvas: HTMLCanvasElement,
@@ -4000,11 +4000,11 @@ function attachChartHover(
   const winnerIndexes = new Set(winners);
   const tooltip = document.getElementById("gsChartExpandTooltip")!;
   // The tooltip is absolutely positioned inside this same wrap (canvas's
-  // direct parent, position:relative — see .gs-chart-expand-canvas-wrap),
+  // direct parent, position:relative, see .gs-chart-expand-canvas-wrap),
   // so its bounds are what "off the edge" is measured against.
   const wrap = canvas.parentElement!;
   const xStep = geometry.n > 1 ? geometry.chartW / (geometry.n - 1) : 0;
-  // Read once per attach rather than per mousemove — drawExpandedChart()
+  // Read once per attach rather than per mousemove, drawExpandedChart()
   // re-attaches after every draw (theme repaints included), so this is never
   // stale, and gsChartPalette() is 8 getComputedStyle reads.
   const palette = gsChartPalette();
@@ -4022,7 +4022,7 @@ function attachChartHover(
     header.className = "gs-chart-tooltip-header";
     header.textContent = xLabels[idx];
     tooltip.appendChild(header);
-    // Rows stay in seat order — the same order every round, and the same
+    // Rows stay in seat order. The same order every round, and the same
     // order as the legend and the score grid. Sorting by score would make
     // names jump between positions as the cursor moves across the chart,
     // which costs more in re-reading than the ranking is worth.
@@ -4056,7 +4056,7 @@ function attachChartHover(
     tooltip.style.display = "block";
 
     // Default to the cursor's bottom-right, but flip to whichever side
-    // actually has room — otherwise near the wrap's right/bottom edge the
+    // actually has room, otherwise near the wrap's right/bottom edge the
     // tooltip gets clipped by the modal instead of just repositioning.
     const gap = 14;
     const tw = tooltip.offsetWidth;
@@ -4080,7 +4080,7 @@ type GsChartExpandConfig = {
   series: GsChartSeries[];
   xLabels: string[];
   /** Series indexes to mark with a star at the LAST data point. Only charts
-   *  whose final point is a result have one — the Win Chart's last point is
+   *  whose final point is a result have one. The Win Chart's last point is
    *  just the current standings, not a game anyone won. */
   winners?: number[];
 };
@@ -4123,11 +4123,11 @@ function openChartExpand(config: GsChartExpandConfig): void {
   getChartExpandModal().open();
 }
 
-/** Win Chart — cumulative wins per player at this table, game by game, as
+/** Win Chart, cumulative wins per player at this table, game by game, as
  *  both a table (matching the user's original spreadsheet) and a line
  *  graph on top of it. */
 /** Builds the Win Chart panel (table + line canvas) without drawing the
- *  chart yet — drawLineChart() reads canvas.clientWidth, which is 0 until
+ *  chart yet, drawLineChart() reads canvas.clientWidth, which is 0 until
  *  the canvas is actually attached to the visible document. Callers must
  *  append `element` first, then call `draw()`. */
 function buildWinChartSection(
@@ -4246,13 +4246,13 @@ function buildWinChartSection(
 }
 
 /* =============================================================================
-   MODAL — STAT DETAIL
+   MODAL: STAT DETAIL
 ============================================================================= */
 
 let gsStatDetailModal: Modal | null = null;
 const GS_DETAIL_PAGE_SIZE = 10;
 let gsStatDetailRows: StatDetailRow[] = [];
-// -1 means "show all" — reached by paging right past the last numbered page.
+// -1 means "show all", reached by paging right past the last numbered page.
 let gsStatDetailPage = 0;
 
 function getStatDetailModal(): Modal {
@@ -4306,7 +4306,7 @@ function renderStatDetailPage(): void {
       gameTd.textContent = row.gameRef;
       tr.appendChild(gameTd);
 
-      // The row names a game, so make it openable — same double-click gesture
+      // The row names a game, so make it openable. Same double-click gesture
       // that got you into this modal from the comparison table.
       const target = row.gameId ? games.find((g) => g.id === row.gameId) : undefined;
       if (target) {
@@ -4371,10 +4371,10 @@ function commitStatDetailPageJump(cancelled = false): void {
 }
 
 /** Leaves Stats for a game's detail view. Unlike opening one from Historical
- *  this DOES clear the stats selection on the way out — you're leaving the
+ *  this DOES clear the stats selection on the way out, you're leaving the
  *  view proper, and Back from the game returns to Historical where the game
  *  actually lives. */
-/** Opening a game from a stat detail is a detour, not an exit — so the Stats
+/** Opening a game from a stat detail is a detour, not an exit, so the Stats
  *  selections are deliberately NOT cleared, and Back returns to Stats with
  *  the same table (or compared profiles) still chosen. Only a real exit from
  *  Stats resets them; see leaveGsView(). */
@@ -4392,7 +4392,7 @@ function openStatDetailModal(title: string, rows: StatDetailRow[]): void {
 
 /**
  * Repaints every surface whose text is derived from profile or table names,
- * for after any edit that changes them — a profile rename/retire/delete, a
+ * for after any edit that changes them, a profile rename/retire/delete, a
  * table rename, or a seat reorder.
  *
  * Each of these views renders once on arrival rather than re-deriving on
@@ -4403,13 +4403,13 @@ function openStatDetailModal(title: string, rows: StatDetailRow[]): void {
  *
  * The wide net is deliberate: table LABELS are auto-generated from their
  * players' names (autoTableLabel), so renaming one person re-labels every
- * table they're in — which reaches the Historical filters, the Stats table
+ * table they're in, which reaches the Historical filters, the Stats table
  * picker, the New Game "fill from table" list, and the game carousel, not
  * just the obvious player-name spots. The datalist matters most of all: a
  * stale suggestion there gets a renamed player retyped as a brand new
  * duplicate profile rather than matched to the existing one.
  *
- * Safe to call regardless of which view is on screen — every one of these
+ * Safe to call regardless of which view is on screen. Every one of these
  * no-ops or writes into a hidden container when its view isn't active, all
  * of them preserve any current dropdown selection, and the game-detail pair
  * is guarded on there actually being a draft loaded.
@@ -4418,7 +4418,7 @@ function refreshGsNameDependentUI(): void {
   renderHomeDashboard();
 
   // The Setup modal re-renders these on open anyway, so this is belt-and-
-  // braces for an edit made while it's already showing — and the Tables list
+  // braces for an edit made while it's already showing, and the Tables list
   // needs it regardless, since its rows are labelled from player names.
   renderProfilesList();
   renderTablesList();
@@ -4439,7 +4439,7 @@ function refreshGsNameDependentUI(): void {
   if (newGameDraft) {
     // Covers the grid's player-column headers, the scoreboard, the badges and
     // the progress chart's series names; the carousel adds the game's table
-    // label. renderGameHeader() is deliberately NOT used here — it also
+    // label. renderGameHeader() is deliberately NOT used here. It also
     // rewrites the date input, which has nothing to do with names.
     renderRoundGrid();
     renderGameCarousel();
@@ -4467,7 +4467,7 @@ function activateGsStatsMode(mode: GsStatsMode): void {
   refreshStatsView();
 }
 
-/** Called the moment you leave Stats (see showGsView) — resets back to
+/** Called the moment you leave Stats (see showGsView), resets back to
  *  Profile mode with a single blank picker and no table chosen, so coming
  *  back later doesn't show a leftover table selection with nothing
  *  rendered under it, or a stale set of compared profiles. */
@@ -4482,7 +4482,7 @@ function resetStatsSelections(): void {
 /**
  * Who can still be added to a comparison, given who's already picked.
  *
- * Comparing players who've never sat at the same table is meaningless — their
+ * Comparing players who've never sat at the same table is meaningless. Their
  * numbers come from different opponents, different score variance, and in
  * general a different game entirely. So candidates are drawn only from tables
  * that contain EVERY already-selected player: pick S from tables A/B/S and
@@ -4527,7 +4527,7 @@ function populateProfileOptions(
   select.value = [...select.options].some((o) => o.value === current) ? current : "";
 }
 
-/** Refreshes every compare select's option list — to pick up profile renames,
+/** Refreshes every compare select's option list, to pick up profile renames,
  *  to re-apply the "hide already picked elsewhere" exclusion, and to re-narrow
  *  each dropdown to players who share a table with everything picked in the
  *  others. */
@@ -4583,7 +4583,7 @@ function refreshStatsProfileSelectsState(): void {
     .map((s) => s.value)
     .filter(Boolean);
   // Hide + Compare at the cap, and also once no eligible player is left to
-  // add — an extra empty dropdown with nothing valid in it is just clutter.
+  // add, an extra empty dropdown with nothing valid in it is just clutter.
   const noneLeft =
     picked.length > 0 && [...eligibleCompareIds(picked)].every((id) => picked.includes(id));
   addBtn.style.display =
@@ -4667,7 +4667,7 @@ export function initGameStats(): void {
 
   document.getElementById("gsNavNewGameBtn")!.addEventListener("click", () => {
     // Deliberately a real exit from wherever you were, so Historical/Stats
-    // selections are cleared — unlike opening a game, which is a sub-view.
+    // selections are cleared, unlike opening a game, which is a sub-view.
     leaveGsView(currentGsView);
     resetNewGameSetup();
     showGsView("new-game");
@@ -4714,7 +4714,7 @@ export function initGameStats(): void {
     leaveGsView(currentGsView);
     refreshStatsProfileSelectOptions();
     refreshStatsTableOptions();
-    // Show the view before rendering — chart drawing reads canvas.clientWidth,
+    // Show the view before rendering, chart drawing reads canvas.clientWidth,
     // which is 0 while any ancestor is still display:none.
     showGsView("stats");
     refreshStatsView();
@@ -4729,7 +4729,7 @@ export function initGameStats(): void {
   document.querySelectorAll<HTMLButtonElement>("[data-gs-back]").forEach((btn) => {
     // The game detail view's Back retraces the chain of games you walked
     // through (carousel / jump-to-number) before returning to the list it
-    // started from — the static data-gs-back attribute only covers the
+    // started from. The static data-gs-back attribute only covers the
     // simple "always goes Home" case for the other views.
     const isNewGameBack = btn.closest("#gsViewNewGame") != null;
     btn.addEventListener("click", () => {
@@ -4838,7 +4838,7 @@ export function initGameStats(): void {
   // the old palette until it's redrawn. Same approach as Budget Tracker:
   // defer one frame so the browser has committed the new custom properties to
   // computed styles before gsCssVar() reads them back, then repaint whichever
-  // canvases are actually on screen — a canvas inside a display:none ancestor
+  // canvases are actually on screen, a canvas inside a display:none ancestor
   // has clientWidth 0 and would repaint blank.
   window.addEventListener("themechange", () => {
     requestAnimationFrame(() => {
@@ -4869,7 +4869,7 @@ export function initGameStats(): void {
 
 /** Called by shell.ts whenever the Game Stats tool is opened. Leaving for
  *  another tool and coming back is a fresh start, so any Historical/Stats
- *  selection is cleared — matching what the nav buttons do within the tool. */
+ *  selection is cleared, matching what the nav buttons do within the tool. */
 export function onGameStatsToolEntry(): void {
   resetHistoricalFilters();
   resetStatsSelections();
@@ -4877,7 +4877,7 @@ export function onGameStatsToolEntry(): void {
 
 /** Called by shell.ts only when the user explicitly clicks the Game Stats
  *  sidebar icon or Home tile (never on mouse back/forward history replay,
- *  which calls onGameStatsToolEntry() directly) — jumps to the tile view,
+ *  which calls onGameStatsToolEntry() directly), jumps to the tile view,
  *  even from deep inside a game. Goes through showGsView() rather than a
  *  direct currentGsView assignment so the jump is recorded in Game Stats'
  *  own sub-nav history stack: the mouse back button then returns to

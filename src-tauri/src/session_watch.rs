@@ -1,8 +1,8 @@
 /* =============================================================================
-   SESSION WATCH  — Windows OS session lock/unlock detection
+   SESSION WATCH: Windows OS session lock/unlock detection
    -----------------------------------------------------------------------------
    The frontend needs to know when the WINDOWS SESSION locks (Win+L, the
-   hardware lock key, idle lock, "Switch user") — not just when this app's own
+   hardware lock key, idle lock, "Switch user"), not just when this app's own
    window loses focus. There's no web-platform signal for that: neither
    visibilitychange nor window blur/focus fire reliably (or at all) for an OS
    session lock in a WebView2 host, since the app's top-level window doesn't
@@ -11,12 +11,12 @@
    Windows exposes exactly one reliable channel for this: WM_WTSSESSION_CHANGE,
    delivered to a window that has called WTSRegisterSessionNotification. That
    requires hooking the window's message loop directly, which Tauri's window
-   API doesn't expose — so this installs a window subclass (SetWindowSubclass,
+   API doesn't expose, so this installs a window subclass (SetWindowSubclass,
    comctl32) that watches for WTS_SESSION_LOCK / WTS_SESSION_UNLOCK and passes
    everything else through unchanged to the real window procedure.
 
    Used by the Budget Tracker to re-lock itself on OS session lock when
-   "re-auth on every entry" is the active encryption mode — the same way a
+   "re-auth on every entry" is the active encryption mode. The same way a
    password manager like Bitwarden re-locks its vault when the machine locks,
    rather than only on next use. See src/tools/budget.ts's
    "session-lock-changed" listener for the frontend half.
@@ -31,12 +31,12 @@ use windows::Win32::System::RemoteDesktop::{NOTIFY_FOR_THIS_SESSION, WTSRegister
 use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{WM_WTSSESSION_CHANGE, WTS_SESSION_LOCK, WTS_SESSION_UNLOCK};
 
-/// Arbitrary but unique-enough subclass ID — only one subclass is ever
+/// Arbitrary but unique-enough subclass ID, only one subclass is ever
 /// installed (on the single main window), so collision isn't a real concern.
 const SUBCLASS_ID: usize = 0x5B5D_C5E5;
 
 /// The window subclass procedure. Runs on the UI thread, alongside wry/tao's
-/// own window proc — SetWindowSubclass chains rather than replaces, so every
+/// own window proc. SetWindowSubclass chains rather than replaces, so every
 /// message not handled here must be forwarded to DefSubclassProc or the real
 /// window (drag, resize, paint, etc.) would stop working.
 unsafe extern "system" fn subclass_proc(
@@ -55,7 +55,7 @@ unsafe extern "system" fn subclass_proc(
         };
         if let Some(locked) = locked {
             // dwrefdata is a raw pointer to a leaked AppHandle set up in
-            // init() below — valid for the lifetime of the process/window.
+            // init() below, valid for the lifetime of the process/window.
             let app = unsafe { &*(dwrefdata as *const tauri::AppHandle) };
             let _ = app.emit("session-lock-changed", locked);
         }

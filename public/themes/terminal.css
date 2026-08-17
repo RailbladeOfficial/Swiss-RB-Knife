@@ -26,9 +26,9 @@
   --color-toggle-on:           #00cc00;
 
   /* ── Changelog accents ── Monochrome green is the whole point of this theme, so true
-     hue contrast isn't on the table — instead: Features gets the brightest green,
+     hue contrast isn't on the table, instead: Features gets the brightest green,
      Improvements a mid-brightness step down, Bugfixes borrows the existing red
-     danger color (a real, semantically-fitting contrast — errors are red on a
+     danger color (a real, semantically-fitting contrast, errors are red on a
      terminal), and the tool heading gets a dim green step so it recedes below
      the three category colors. */
   --color-changelog-features:     #00ff00;
@@ -42,7 +42,7 @@
   --color-toast-error-bg:      #1a0000;
   --color-toast-error-border:  #ff0000;
   --color-toast-error-text:    #ff6666;
-  /* ── Budget chart palette ── Green brightness steps — authentic monochrome terminal palette */
+  /* ── Budget chart palette ── Green brightness steps, authentic monochrome terminal palette */
   --color-chart-1:             #00ff00;
   --color-chart-2:             #007700;
   --color-chart-3:             #00cc00;
@@ -69,7 +69,7 @@ body::after {
   z-index: 9998;
 }
 
-/* ── Time Tracker panels — green shades, starkly left-bordered ── */
+/* ── Time Tracker panels, green shades, starkly left-bordered ── */
 .input-panel {
   border-left: 4px solid #00ff00;
   border-color: rgba(0, 255, 0, 0.25);
@@ -108,14 +108,14 @@ input:focus {
   opacity: 1;
 }
 
-/* ── Modal — solid: pure black with green border ── */
+/* ── Modal, solid: pure black with green border ── */
 body.solid-modals .modal {
   background: #040a04;
   border-color: #0a2a0a;
   box-shadow: 0 0 20px rgba(0, 255, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.9);
 }
 
-/* ── Modal — translucent: frosted black glass with green tint ── */
+/* ── Modal, translucent: frosted black glass with green tint ── */
 body:not(.solid-modals) .modal {
   background: rgba(4, 10, 4, 0.35);
   backdrop-filter: blur(24px);
@@ -137,7 +137,7 @@ body:not(.solid-modals) .modal {
   color: #00ff00;
 }
 
-/* ── Danger button — red ── */
+/* ── Danger button, red ── */
 .danger-btn {
   background: #1a0000;
   border-color: #cc0000;

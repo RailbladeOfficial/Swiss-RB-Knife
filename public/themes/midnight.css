@@ -37,7 +37,7 @@
   --color-toast-error-bg:      #1a0000;
   --color-toast-error-border:  #ff0000;
   --color-toast-error-text:    #ffcccc;
-  /* ── Budget chart palette ── Blue / green / yellow / red / cyan / lime / magenta / white — pure RGB on pure black */
+  /* ── Budget chart palette ── Blue / green / yellow / red / cyan / lime / magenta / white, pure RGB on pure black */
   --color-chart-1:             #0000ff;
   --color-chart-2:             #00ff00;
   --color-chart-3:             #ffff00;
@@ -48,7 +48,7 @@
   --color-chart-8:             #ffffff;
 }
 
-/* ── Time Tracker panels — pure RGB, stark left borders ── */
+/* ── Time Tracker panels, pure RGB, stark left borders ── */
 .input-panel {
   border-left: 4px solid #0000ff;
   border-color: rgba(0, 0, 255, 0.3);
@@ -66,7 +66,7 @@
   border-color: rgba(255, 0, 0, 0.2);
 }
 
-/* ── Tool / section header — pure black, blue bottom border ── */
+/* ── Tool / section header, pure black, blue bottom border ── */
 .tool-view-header,
 .section-header {
   background: #050505;
@@ -79,14 +79,14 @@
   opacity: 1;
 }
 
-/* ── Modal — solid: pure black panel (original look) ── */
+/* ── Modal, solid: pure black panel (original look) ── */
 body.solid-modals .modal {
   background: #050505;
   border-color: #141414;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.9);
 }
 
-/* ── Modal — translucent: deep frosted void ── */
+/* ── Modal, translucent: deep frosted void ── */
 body:not(.solid-modals) .modal {
   background: rgba(5, 5, 5, 0.25);
   backdrop-filter: blur(24px);
