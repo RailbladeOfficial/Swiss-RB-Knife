@@ -227,6 +227,7 @@ const SNOW_MAX_SLOPE = 1.5; // px) max height difference tolerated between adjac
 const SNOW_RELAX_PASSES = 4; // relaxation sweeps per frame; alternates direction, see relaxSnowPile()
 const SNOW_WANDER_ACCEL = 55; // px/sec², magnitude of the random gust nudges applied to wanderVel each frame
 const SNOW_WANDER_DAMPING = 0.86; // per-frame decay applied to wanderVel so gusts settle instead of accumulating forever
+const SNOW_ENTRY_STAGGER_S = 6; // seconds across which the opening snowfall enters from above the top edge, see spawnSnowflake()
 
 let lightningStrikes: LightningStrike[] = [];
 let lightningTimeoutId: number | null = null;
@@ -241,6 +242,10 @@ const LIGHTNING_DARKEN_STRENGTH = 0.4; // how far the screen dims at peak flash 
 
 let leaves: Leaf[] = [];
 let leafTimeoutId: number | null = null;
+/** The deferred initial snow seeding. Tracked so a theme switch inside its
+ *  300ms window can cancel it, rather than letting it repopulate snowflakes
+ *  for an effect that has already been torn down. */
+let snowSeedTimeoutId: number | null = null;
 const LEAF_COLORS = ["#e8631f", "#c22a1e", "#ff8a3f", "#e8b93d", "#8b5a2e", "#d9432a"]; // burnt orange / deep red / bright orange / gold / saddle-brown / tomato, matches thanksgiving.css's chart palette
 const LEAF_GUST_MIN_MS = 30_000;
 const LEAF_GUST_MAX_MS = 60_000; // gusts land 30-60s apart, randomized each time
@@ -406,6 +411,10 @@ function stopSeasonalEffect(): void {
     window.clearTimeout(leafTimeoutId);
     leafTimeoutId = null;
   }
+  if (snowSeedTimeoutId !== null) {
+    window.clearTimeout(snowSeedTimeoutId);
+    snowSeedTimeoutId = null;
+  }
   if (fireworkTimeoutId !== null) {
     window.clearTimeout(fireworkTimeoutId);
     fireworkTimeoutId = null;
@@ -523,12 +532,27 @@ function startChristmasSnow(): void {
   const pileColumns = Math.ceil(window.innerWidth / SNOW_PILE_COLUMN_WIDTH) + 1;
   snowPile = new Array(pileColumns).fill(0);
 
-  function spawnSnowflake(randomY: boolean): Snowflake {
+  /** `stagger` is for the opening snowfall only. It seeds the flake ABOVE the
+   *  top edge by however far it travels in a random slice of
+   *  SNOW_ENTRY_STAGGER_S, so the effect builds from the top over a few
+   *  seconds. Seeding at a random height down the screen instead (what this
+   *  did before) meant switching to Christmas dropped you into snow already
+   *  halfway fallen, with nothing ever appearing to fall FROM anywhere.
+   *
+   *  Scaling the offset by the flake's own speed rather than using one fixed
+   *  pixel band is what keeps the onset even: a slow flake seeded as far up as
+   *  a fast one would trail minutes behind it. In speed-scaled terms every
+   *  flake crosses the top edge at a uniformly random point in the window.
+   *
+   *  Respawns after landing pass false: by then snow is already falling, and
+   *  they should re-enter immediately at the top. */
+  function spawnSnowflake(stagger: boolean): Snowflake {
+    const speed = 20 + Math.random() * 40; // px/sec
     return {
       x: Math.random() * window.innerWidth,
-      y: randomY ? Math.random() * window.innerHeight : -10,
+      y: stagger ? -10 - Math.random() * speed * SNOW_ENTRY_STAGGER_S : -10,
       r: 1.5 + Math.random() * 2.5,
-      speed: 20 + Math.random() * 40, // px/sec
+      speed,
       drift: 10 + Math.random() * 20, // sway amplitude
       driftPhase: Math.random() * Math.PI * 2,
       driftFreq: 0.25 + Math.random() * 0.9, // sway rate, varies per flake so they don't all swing in lockstep
@@ -536,7 +560,8 @@ function startChristmasSnow(): void {
     };
   }
 
-  window.setTimeout(() => {
+  snowSeedTimeoutId = window.setTimeout(() => {
+    snowSeedTimeoutId = null;
     const flakeCount = Math.min(200, Math.round((window.innerWidth * window.innerHeight) / 2000),);
     snowflakes = Array.from({ length: flakeCount }, () => spawnSnowflake(true));
   }, 300); // give the window time to reach its final/restored size first

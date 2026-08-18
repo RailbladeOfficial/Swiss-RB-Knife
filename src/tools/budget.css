@@ -942,7 +942,9 @@ span.entry-col-category:not(.entry-field) {
 .budget-summary-tab.active {
   color: var(--color-btn);
   border-bottom-color: var(--color-btn);
-  background: transparent;
+  /* Themes override this with their own hex; the mix is what a Custom theme
+     falls back to. See .setup-tab.active in shell.css. */
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
 }
 
 /* =============================================================================

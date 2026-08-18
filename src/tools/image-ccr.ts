@@ -16,6 +16,7 @@
 ============================================================================= */
 
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { listen }         from "@tauri-apps/api/event";
 import { open }           from "@tauri-apps/plugin-dialog";
 import { Modal }          from "../modal";
 import { flash, escapeHtml } from "../shell";
@@ -857,7 +858,6 @@ export async function initImageCCR(): Promise<void> {
     }
 
     setResizeScanUI(true);
-    const { listen } = await import("@tauri-apps/api/event");
     const unlistenScan = await listen<{ done: number; total: number }>(
       "resize-scan-progress",
       ({ payload }) => {
@@ -1029,8 +1029,6 @@ export async function initImageCCR(): Promise<void> {
 
   // ── Resize: event listeners (attached fresh each run) ──
   async function attachResizeListeners() {
-    const { listen } = await import("@tauri-apps/api/event");
-
     const unlistenProgress = await listen<{ current_file: string; done: number; total: number }>(
       "resize-progress",
       ({ payload }) => {

@@ -24,7 +24,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped) | 25.9.5 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [esbuild](https://github.com/evanw/esbuild) | 0.25.12 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [fdir](https://github.com/thecodrr/fdir) | 6.5.0 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [nanoid](https://github.com/ai/nanoid) | 3.3.17 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [nanoid](https://github.com/ai/nanoid) | 3.3.18 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [picocolors](https://github.com/alexeyraspopov/picocolors) | 1.1.1 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [picomatch](https://github.com/micromatch/picomatch) | 4.0.5 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [postcss](https://github.com/postcss/postcss) | 8.5.26 | [MIT](https://spdx.org/licenses/MIT.html) |

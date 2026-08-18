@@ -149,6 +149,14 @@ This application uses various curated Sound Packs (selectable in the General Set
 
 ---
 
+## Trademarks
+
+**Five Crowns** is a trademark of Set Enterprises, Inc. Swiss RB Knife is not affiliated with, endorsed by, or sponsored by Set Enterprises.
+
+The Game Stats tool keeps score for games you already own. It contains none of the game's rules text, artwork, or components, and the name is used only to identify which game a given set of scores belongs to.
+
+---
+
 ## Technologies
 
 Swiss RB Knife is built with the following open-source technologies:

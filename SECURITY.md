@@ -26,6 +26,10 @@ These are deliberate choices, explained in the README's **Security & Privacy** s
 - Most data is plaintext JSON on purpose; only Budget Tracker offers encryption.
 - App Lock is a UI gate, not encryption.
 - The asset-protocol scope is broad so Image CCR can display images from anywhere you pick.
+- Game Stats reads a workbook you pick from anywhere on disk, and writes its exports and blank templates to your Downloads folder (Time Tracker's CSV export does the same). Those are the only two places anything lands outside the app's own data folder.
+- Game Stats' `.xlsx` reader is hand-rolled (no library) and parses a file you chose. Deliberate, since the app ships no runtime JS dependencies and the needed slice of the format is tiny, but it *is* a parser being fed outside input, so bugs in it are fair game to report.
+- Budget Tracker's "re-auth on every entry" mode, and its re-locking when Windows locks, are session gates on top of the existing encryption. Not a second layer of crypto, and not a replacement for it.
+- To notice a Windows lock at all, the app subclasses its own window and registers for session notifications (`WM_WTSSESSION_CHANGE`). It watches for lock/unlock and passes every other message straight through; it reads nothing about the session.
 - New Version Notification is opt-in and off by default. When it's on, the app makes a single read-only request to GitHub's public Releases API to check for a newer version. That's the app's only network call, and it sends no personal data (see the README's **Security & Privacy** section).
 - The installer is unsigned, so SmartScreen will likely moan about it.
 

@@ -733,7 +733,7 @@ const licensingModal = new Modal(licensingBackdrop);
 
 function openLicensing(tab = "license"): void {
   activeTab = tab;
-  document.querySelectorAll<HTMLElement>(".licensing-tab").forEach((btn) => {
+  document.querySelectorAll<HTMLElement>(".licensing-tabs .setup-tab").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === tab);
   });
   licensingModal.open();
@@ -802,6 +802,16 @@ document.getElementById("readmeBody")!.addEventListener("click", (e) => {
     return;
   }
 
+  const jump = target.closest<HTMLAnchorElement>("a.md-anchor-link");
+  if (jump) {
+    e.preventDefault();
+    scrollToDocAnchor(
+      document.getElementById("readmeBody")!,
+      jump.getAttribute("href") ?? "",
+    );
+    return;
+  }
+
   const anchor = target.closest<HTMLAnchorElement>("a.md-internal-link");
   if (!anchor) return;
   e.preventDefault();
@@ -814,12 +824,14 @@ document.getElementById("readmeBody")!.addEventListener("click", (e) => {
   INTERNAL_DOC_LINKS[doc]();
 });
 
-// Tab switching
-document.querySelectorAll<HTMLElement>(".licensing-tab").forEach((btn) => {
+// Tab switching. Every query here is scoped to this strip on purpose:
+// .setup-tab is the shared app-wide modal tab, so an unscoped selector would
+// reach into every Setup/Settings modal's tabs as well.
+document.querySelectorAll<HTMLElement>(".licensing-tabs .setup-tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     const tab = btn.dataset.tab!;
     activeTab = tab;
-    document.querySelectorAll<HTMLElement>(".licensing-tab").forEach((b) => {
+    document.querySelectorAll<HTMLElement>(".licensing-tabs .setup-tab").forEach((b) => {
       b.classList.toggle("active", b.dataset.tab === tab);
     });
     loadLicensingTab(tab);
@@ -999,6 +1011,18 @@ function wireDocLinks(
   reopenSelf: () => void,
 ): void {
   document.getElementById(bodyId)!.addEventListener("click", (e) => {
+    const jump = (e.target as HTMLElement).closest<HTMLAnchorElement>(
+      "a.md-anchor-link",
+    );
+    if (jump) {
+      e.preventDefault();
+      scrollToDocAnchor(
+        document.getElementById(bodyId)!,
+        jump.getAttribute("href") ?? "",
+      );
+      return;
+    }
+
     const anchor = (e.target as HTMLElement).closest<HTMLAnchorElement>(
       "a.md-internal-link",
     );
@@ -1152,6 +1176,57 @@ const INTERNAL_DOC_LINKS: Record<string, () => void> = {
   "CONTRIBUTING.md": () => openContributing(),
 };
 
+/** GitHub-compatible heading slug, so an in-page "#some-section" link written
+ *  for GitHub's renderer resolves to the same heading here. GitHub slugs the
+ *  RENDERED heading rather than its markdown source, so inline syntax is
+ *  reduced to its text first, then anything that isn't a word character,
+ *  space, or hyphen is dropped and each remaining space becomes a hyphen.
+ *  Runs are deliberately NOT collapsed, matching github-slugger: dropping the
+ *  "&" from "Security & Privacy" leaves two spaces, so the id is
+ *  "security--privacy" on GitHub and has to be that here too. */
+function slugifyHeading(md: string): string {
+  return md
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // links reduce to their label
+    .replace(/[`*_~]/g, "") // code / bold / italic / strikethrough markers
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s/g, "-");
+}
+
+/** Namespace for every id the markdown renderer emits. Rendered docs share the
+ *  document with the whole app, and their headings slug to ordinary words:
+ *  ATTRIBUTION.md's "## Project" lands on plain "project", which is already
+ *  Time Tracker's project input. Two elements with one id is invalid HTML and
+ *  makes getElementById a coin toss, so nothing generated here goes into the
+ *  document without this in front of it. The markdown source still writes the
+ *  bare "#some-section" that GitHub expects; only the DOM id carries it. */
+const DOC_ANCHOR_PREFIX = "doc-";
+
+/** Scrolls a doc modal's body to the heading a "#section" link points at.
+ *  These are handled in JS rather than left to the browser because the modal
+ *  body is the scroll container, not the document, and because a real
+ *  navigation would resolve the hash against the app's own origin and hand
+ *  that URL (tauri.localhost) to the system browser instead of moving. */
+function scrollToDocAnchor(body: HTMLElement, href: string): void {
+  const id = href.slice(1);
+  if (!id) {
+    body.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  const target = body.querySelector<HTMLElement>(
+    `[id="${CSS.escape(DOC_ANCHOR_PREFIX + id)}"]`,
+  );
+  if (!target) return; // dead anchor, better to do nothing than jump somewhere wrong
+  // Offset math rather than scrollIntoView: the heading sits several levels
+  // deep inside the body, and this stays correct regardless of nesting.
+  const top =
+    target.getBoundingClientRect().top -
+    body.getBoundingClientRect().top +
+    body.scrollTop;
+  body.scrollTo({ top, behavior: "smooth" });
+}
+
 function renderMarkdown(md: string): string {
   const lines = md.split("\n");
   const out: string[] = [];
@@ -1159,6 +1234,8 @@ function renderMarkdown(md: string): string {
   let tableHeaderDone = false;
   let inCodeBlock = false;
   let codeLines: string[] = [];
+  // Heading slug -> times emitted, for GitHub's -1/-2 collision suffixes.
+  const usedHeadingIds = new Map<string, number>();
 
   // Void elements never carry a closing tag, so a line that opens one of
   // these is always "complete" on its own. No block-mode needed.
@@ -1243,6 +1320,12 @@ function renderMarkdown(md: string): string {
           if (INTERNAL_DOC_LINKS[href]) {
             return `<a href="#" class="md-internal-link" data-doc="${href}">${label}</a>`;
           }
+          // In-page section links scroll this modal instead. Without this
+          // they'd pick up target="_blank" like any other link and leave the
+          // app entirely (see scrollToDocAnchor for why).
+          if (href.startsWith("#")) {
+            return `<a href="${href}" class="md-anchor-link">${label}</a>`;
+          }
           return `<a href="${href}" target="_blank">${label}</a>`;
         },
       );
@@ -1320,8 +1403,15 @@ function renderMarkdown(md: string): string {
     const hMatch = line.match(/^(#{1,4})\s+(.*)/);
     if (hMatch) {
       const level = hMatch[1].length;
+      const base = slugifyHeading(hMatch[2]);
+      let id = base;
+      if (base) {
+        const seen = usedHeadingIds.get(base) ?? 0;
+        usedHeadingIds.set(base, seen + 1);
+        if (seen > 0) id = `${base}-${seen}`;
+      }
       out.push(
-        `<h${level} class="md-h${level}">${inlineFormat(hMatch[2])}</h${level}>`,
+        `<h${level} class="md-h${level}"${id ? ` id="${DOC_ANCHOR_PREFIX}${id}"` : ""}>${inlineFormat(hMatch[2])}</h${level}>`,
       );
       continue;
     }

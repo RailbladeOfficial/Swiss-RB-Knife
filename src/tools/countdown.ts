@@ -43,6 +43,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import {
   flash, escapeHtml, isToolVisible, getSoundOptions, resolveSoundUrl, playSoundUrl,
+  settings,
 } from "../shell";
 import { Modal } from "../modal";
 import { addTimeTrackerEntry } from "./time-tracker";
@@ -477,10 +478,21 @@ function formatDuration(ms: number): string {
   return `${s}s`;
 }
 
+/** A time of day for display. Follows the app's own 12/24-hour setting rather
+ *  than the OS locale (toLocaleTimeString would ignore the setting entirely),
+ *  and renders it the same way Time Tracker does, so the same moment reads
+ *  identically in both tools. Read live from the shell's settings, so a change
+ *  in General Settings lands on the next repaint. */
 function formatWallClock(ts: number): string {
-  return new Date(ts).toLocaleTimeString(undefined, {
-    hour: "numeric", minute: "2-digit", second: "2-digit",
-  });
+  const d = new Date(ts);
+  const rest = `${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  if (!settings.hour12) return `${pad(d.getHours())}:${rest}`;
+
+  let h = d.getHours();
+  const suffix = h >= 12 ? "pm" : "am";
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${rest}${suffix}`;
 }
 
 function localDateIso(ts: number): string {
@@ -920,13 +932,90 @@ function layoutHourglass(): void {
   );
 }
 
+/* ── The falling stream ────────────────────────────────────────────────────
+   Flipping a real hourglass doesn't put a column of sand on the floor
+   instantly: the first grains have to fall the length of the glass. The
+   stream is drawn by revealing the grain group through a clip rect anchored
+   at the throat, so "the sand is still on its way down" is just that rect
+   being shorter than the gap it will eventually span.
+
+   Two reasons this is driven frame by frame from a timestamp instead of being
+   left to the steady-state CSS transition on the clip:
+
+     • The rect keeps whatever height the last run left on it, so on the
+       second and later starts there was nothing for a transition to animate
+       FROM. The stream simply appeared at full length.
+     • Even on a first run, a repaint lands every TICK_MS and would retarget
+       an in-flight transition, restarting it from wherever it had got to.
+       The drop stretches into a decelerating creep instead of falling.
+
+   The pile below is deliberately NOT held back during the drop. It's derived
+   from elapsed time like everything else here, and over half a second on a
+   timer measured in minutes the difference is far below one pixel. Fudging
+   the fill to match the visual would be trading honest numbers for nothing. */
+const HG_FALL_MS = 600;
+/** When the current pour began, or 0 when nothing is pouring. */
+let hgFlowStartedAt = 0;
+let hgFallRaf: number | null = null;
+
+/** Sizes the clip rect: full span from the throat to the pile once the sand
+ *  has landed, a fraction of it while the leading edge is still falling. */
+function hgPaintStream(level: number): void {
+  const full = HG_BOTTOM_NECK_Y + level - HG_TOP_NECK_Y;
+  const elapsed = hgFlowStartedAt === 0 ? HG_FALL_MS : Date.now() - hgFlowStartedAt;
+  if (elapsed >= HG_FALL_MS) {
+    // Landed. Hand the rect back to the CSS transition, which from here on
+    // eases it shorter as the pile rises to meet it.
+    hgStreamRect.classList.remove("cd-hg-dropping");
+    hgStreamRect.setAttribute("height", String(full));
+    return;
+  }
+  hgStreamRect.setAttribute("height", String(full * (elapsed / HG_FALL_MS)));
+}
+
+/** Own frames for the drop only. TICK_MS is 250, which would give the whole
+ *  fall two frames; it stops as soon as the sand lands. */
+function hgScheduleFallFrames(): void {
+  if (hgFallRaf !== null) return;
+  const step = (): void => {
+    hgFallRaf = null;
+    if (hgFlowStartedAt === 0 || !session) return;
+    hgPaintStream(hgHeightForArea(clampFraction(remainingMs(session) / spanMs(session))));
+    if (Date.now() - hgFlowStartedAt < HG_FALL_MS) hgFallRaf = requestAnimationFrame(step);
+  };
+  hgFallRaf = requestAnimationFrame(step);
+}
+
+function hgCancelFallFrames(): void {
+  if (hgFallRaf !== null) {
+    cancelAnimationFrame(hgFallRaf);
+    hgFallRaf = null;
+  }
+}
+
+function clampFraction(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
 /** Paints whichever progress figure is selected. `fraction` is time REMAINING,
  *  1 → 0, so every figure empties as the clock runs down. `flowing` is whether
  *  the clock is actually moving right now, which only the hourglass cares
  *  about: sand shouldn't pour while the timer sits paused or finished. */
 function renderProgress(fraction: number, flowing = false): void {
   const style = cdSettings.progressStyle;
-  const f = Math.min(1, Math.max(0, fraction));
+  const f = clampFraction(fraction);
+
+  // Pour bookkeeping runs whatever figure is selected, so switching styles
+  // mid-run can't strand the drop state in a half-poured position.
+  if (flowing && hgFlowStartedAt === 0) {
+    hgFlowStartedAt = Date.now();
+    hgStreamRect.classList.add("cd-hg-dropping");
+    if (style === "hourglass") hgScheduleFallFrames();
+  } else if (!flowing && hgFlowStartedAt !== 0) {
+    hgFlowStartedAt = 0;
+    hgStreamRect.classList.remove("cd-hg-dropping");
+    hgCancelFallFrames();
+  }
 
   barWrap.style.display = style === "bar" ? "" : "none";
   ringSvg.style.display = style === "ring" ? "" : "none";
@@ -954,9 +1043,7 @@ function renderProgress(fraction: number, flowing = false): void {
     // falling at a fixed rate the whole time; it's the drop that gets shorter,
     // which is the same thing the real object does.
     hgStream.style.display = flowing ? "" : "none";
-    if (flowing) {
-      hgStreamRect.setAttribute("height", String(HG_BOTTOM_NECK_Y + level - HG_TOP_NECK_Y));
-    }
+    if (flowing) hgPaintStream(level);
   }
 }
 

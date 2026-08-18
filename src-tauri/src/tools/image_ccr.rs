@@ -439,6 +439,11 @@ fn composite_streaming(
 /// Generates a downscaled preview into the system temp directory.
 /// Does NOT save to the user's chosen output folder.
 /// Returns the temp file path so the frontend can display it via asset protocol.
+// Tauri commands take their parameters flat from the IPC payload, so the
+// arity mirrors the tool's option set rather than any missing abstraction.
+// Bundling these into a struct would change the invoke() contract on the
+// frontend for no gain here.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn preview_combine(
     paths: Vec<String>,
@@ -508,6 +513,11 @@ pub async fn preview_combine(
 //  combine_images
 // =============================================================================
 
+// Tauri commands take their parameters flat from the IPC payload, so the
+// arity mirrors the tool's option set rather than any missing abstraction.
+// Bundling these into a struct would change the invoke() contract on the
+// frontend for no gain here.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn combine_images(
     paths: Vec<String>,
@@ -817,7 +827,7 @@ pub async fn scan_resize_sources(
                 max_h = max_h.max(h);
             }
             scanned += 1;
-            if scanned % step == 0 || scanned == total {
+            if scanned.is_multiple_of(step) || scanned == total {
                 let _ = app.emit("resize-scan-progress", ResizeScanProgressEvent {
                     done: scanned,
                     total,
@@ -850,6 +860,11 @@ pub async fn scan_resize_sources(
 /// `source_folder`, when present, is used only to name the default output
 /// folder (`<folder>/resized-<ts>`); with a picked file list it's None and the
 /// default lands next to the first source image instead.
+// Tauri commands take their parameters flat from the IPC payload, so the
+// arity mirrors the tool's option set rather than any missing abstraction.
+// Bundling these into a struct would change the invoke() contract on the
+// frontend for no gain here.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn resize_images(
     app: AppHandle,
@@ -887,6 +902,9 @@ pub fn resize_images(
     Ok(())
 }
 
+// Mirrors resize_images' parameter list one-for-one (see the allow there); a
+// struct would have to be threaded through both anyway.
+#[allow(clippy::too_many_arguments)]
 fn resize_images_thread(
     app: AppHandle,
     image_paths: Vec<PathBuf>,

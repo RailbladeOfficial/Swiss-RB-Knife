@@ -52,7 +52,7 @@ pub(crate) fn get_data_path(app: &tauri::AppHandle, filename: &str) -> PathBuf {
         path.push("data");
         let _ = std::fs::create_dir_all(&path);
         path.push(filename);
-        return path;
+        path
     }
 
     #[cfg(not(debug_assertions))]
@@ -353,21 +353,30 @@ fn load_window_size(app: tauri::AppHandle) -> Result<String, String> {
 ============================================================================= */
 
 /* Removed: save_settings (whole-file write of settings.json).
-   settings.json has several writers (shell, Time Tracker, Budget), and a
-   whole-file write from any one of them clobbers the others' keys. The exact
-   bug merge_settings exists to fix. It was kept registered for backward
-   compatibility long after the last caller was gone; leaving a footgun IPC
-   command exposed to the webview earns nothing when nothing invokes it.
-   Use merge_settings (below), or save_tool_settings for per-tool state. */
+   settings.json USED to have several writers (shell, Time Tracker, Budget),
+   and a whole-file write from any one of them clobbered the others' keys.
+   That's the bug merge_settings was written to fix. It was kept registered
+   for backward compatibility long after the last caller was gone; leaving a
+   footgun IPC command exposed to the webview earns nothing when nothing
+   invokes it. Use merge_settings (below), or save_tool_settings for per-tool
+   state. */
 
 /// Merges a JSON patch into settings.json: only the TOP-LEVEL keys present in
 /// the patch are written; every other key on disk is preserved untouched.
 ///
-/// This is the only safe way to write a file with multiple owners. Each
-/// subsystem (shell, Time Tracker, Budget) patches exactly the keys it owns,
-/// so none of them can erase another's, which is precisely the bug this
-/// replaces: the shell's whole-file saves were silently wiping the tools'
-/// settings keys on every Settings-modal change.
+/// NOTE ON THE CURRENT OWNERSHIP MODEL: since tool settings moved into their
+/// own per-tool files (see the section below), the shell is the only writer
+/// of settings.json left. Time Tracker and Budget still READ it, both for the
+/// shell-owned display prefs they have to honour and to pick up legacy keys
+/// of theirs still sitting there from before the split, but neither writes to
+/// it any more. So the multi-writer hazard this command was built for no
+/// longer exists in practice.
+///
+/// It stays the write path regardless, for two reasons: a patch that touches
+/// only the shell's own keys cannot corrupt those legacy tool keys that are
+/// still being read (a whole-file write would drop them), and the guarantee
+/// stops being something that has to be re-argued the next time anything
+/// needs to write here.
 ///
 /// The read-merge-write runs under a process-wide mutex, closing the
 /// interleaving window where two near-simultaneous saves could each read the

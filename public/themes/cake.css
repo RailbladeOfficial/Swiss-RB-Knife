@@ -225,10 +225,12 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title { color: #36c0f1; }
 
 /* Summary tab active, alternating orange/blue matches cake theme personality */
-.budget-summary-tab.active { color: #ffa500; background: rgba(255, 165, 0, 0.12); border-bottom-color: #ffa500; }
+.budget-summary-tab.active,
+.setup-tab.active { color: #ffa500; background: rgba(255, 165, 0, 0.12); border-bottom-color: #ffa500; }
 
 /* View-mode toggle active, sky-blue primary (was missing) */
-.budget-view-mode-btn.active {
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
   background: #36c0f1;
   color: #ffffff;
   border-color: #36c0f1;

@@ -3527,21 +3527,15 @@
           </svg>
         </button>
       </div>
-      <!-- These carry .budget-summary-tab alongside .licensing-tab on purpose.
-           All 18 built-in themes (and any user-made Custom theme) style
-           .budget-summary-tab unscoped with their own hover/active colours;
-           .licensing-tab has no such theme coverage. Sharing the class is the
-           only way to get identical highlight behaviour under every theme (
-           including custom ones we can't edit) without restating the rule in
-           each theme file. It also brings flex:1 + centred text, so the tabs
-           fill and centre the strip the same way the Budget summary panel's
-           do. .licensing-tab still supplies the JS hooks and is kept as a
-           fallback; where the two collide, budget.css wins (it's later in the
-           bundle than docs.css). -->
+      <!-- .setup-tab is the app-wide modal tab, defined once in shell.css and
+           used by every Setup/Settings modal. It draws its colours from theme
+           variables, so it follows built-in AND custom themes with nothing
+           restated per theme. The strip keeps .licensing-tabs purely for its
+           own padding; the JS hook is data-tab, scoped to this container. -->
       <div class="licensing-tabs">
-        <button class="licensing-tab budget-summary-tab active" data-tab="license">Licensing</button>
-        <button class="licensing-tab budget-summary-tab" data-tab="attribution">Attributions</button>
-        <button class="licensing-tab budget-summary-tab" data-tab="thirdparty">Third-Party</button>
+        <button class="setup-tab active" data-tab="license">Licensing</button>
+        <button class="setup-tab" data-tab="attribution">Attributions</button>
+        <button class="setup-tab" data-tab="thirdparty">Third-Party</button>
       </div>
       <div id="licensingBody" class="modal-body changelog-body">
         <p class="changelog-loading">Loading...</p>

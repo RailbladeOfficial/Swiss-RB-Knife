@@ -179,11 +179,13 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title { color: #d1d5db; }
 
 /* Summary tab active */
-.budget-summary-tab.active { color: #c4b5fd; background: rgba(99, 102, 241, 0.12); border-bottom-color: #6366f1; }
+.budget-summary-tab.active,
+.setup-tab.active { color: #c4b5fd; background: rgba(99, 102, 241, 0.12); border-bottom-color: #6366f1; }
 
 /* View-mode toggle active, indigo accent (was missing; a grey fill wouldn't
    read as "selected" in an all-grey theme). */
-.budget-view-mode-btn.active {
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
   background: #6366f1;
   color: #ffffff;
   border-color: #6366f1;

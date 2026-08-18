@@ -1441,7 +1441,7 @@ fn run_destination(
             // Parse as f32 so both "50%" and "50.5%" are accepted; cast to u8 for the event.
             let all_pct = !cr_segments.is_empty() && cr_segments.iter().all(|s| {
                 s.strip_suffix('%')
-                    .map(|n| n.trim().parse::<f32>().map(|v| v >= 0.0 && v <= 100.0).unwrap_or(false))
+                    .map(|n| n.trim().parse::<f32>().map(|v| (0.0..=100.0).contains(&v)).unwrap_or(false))
                     .unwrap_or(false)
             });
 
@@ -1536,9 +1536,8 @@ fn run_destination(
                 // The filename is the last tab-delimited token.
                 let current_file = trimmed
                     .split('\t')
-                    .last()
+                    .next_back()
                     .unwrap_or("")
-                    .trim()
                     .split_whitespace()
                     .take_while(|tok| !tok.ends_with('%'))
                     .collect::<Vec<_>>()
@@ -1623,20 +1622,17 @@ fn run_destination(
                                 .and_then(|mut fh| writeln!(fh, "{}  ->  {}", f, skip_dest));
                         }
                     }
-                } else if !is_robocopy_dir_line(t) {
-                    if parse_robocopy_file_line(t).is_some() {
-                        let name = t
-                            .split('\t')
-                            .last()
-                            .unwrap_or("")
-                            .trim()
-                            .split_whitespace()
-                            .take_while(|tok| !tok.ends_with('%'))
-                            .collect::<Vec<_>>()
-                            .join(" ");
-                        if !name.is_empty() {
-                            prev_file = Some(name);
-                        }
+                } else if !is_robocopy_dir_line(t) && parse_robocopy_file_line(t).is_some() {
+                    let name = t
+                        .split('\t')
+                        .next_back()
+                        .unwrap_or("")
+                        .split_whitespace()
+                        .take_while(|tok| !tok.ends_with('%'))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if !name.is_empty() {
+                        prev_file = Some(name);
                     }
                 }
             }

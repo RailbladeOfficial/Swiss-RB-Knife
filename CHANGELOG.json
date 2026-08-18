@@ -1,5 +1,73 @@
 [
   {
+    "version": "0.6.0",
+    "date": "2026-08-18",
+    "changes": {
+      "features": {
+        "Budget Tracker": [
+          "Added setting Budget Reminders, which lets you set an interval to be reminded after and a mode by which to get a reminder.",
+          "You can also choose specific days of the month on which to get a reminder, instead of picking a repeating interval.",
+          "When there is an active reminder, the tool's sidebar listing and Home card will flash, and a message will display at the top of the tool."
+        ],
+        "Auto-Backup": [
+          "Added ability to set reminders on specific days of the month, instead of choosing specific repeating intervals."
+        ],
+        "Countdown Timer": [
+          "Added new tool that gives you a big pretty countdown timer.",
+          "Visually persists during focus-loss / obfuscation, so you can pop this up on a screen-share during a meeting break, but then go do your Amazon ordering in peace.",
+          "Customize the timer style and alert sound via the Setup modal.",
+          "Add memo notes to track what a timer was for, and see a historical log of timer runs.",
+          "Historical timer runs have a button to add their event to the Time Tracker tool as a logged entry, allowing for Pomodoro use.",
+          "You also have the ability to create presets for your most frequent timers."
+        ],
+        "Game Stats": [
+          "Added new tool that allows tracking stats of games, starting with Five Crowns.",
+          "Import existing game data via Excel or enter manually.",
+          "See individual player stats and compare them against others they've played against.",
+          "See stats at the 'table' level, where a table is a set grouping of specific player profiles."
+        ],
+        "Days Between Dates": [
+          "Added new tool that allows for input of a starting and ending date, and gives the number of elapsed days after the start date.",
+          "Shows breakdowns in raw days, as well as weeks, hours, minutes, and more.",
+          "Has option to include the start date in the calculation, useful for counting booking stays."
+        ],
+        "TTS Repeater": [
+          "Added new tool that lets you input a message and have a Text-to-Speech voice repeat it.",
+          "Can set it to repeat every so many seconds or minutes, as well as to run a certain number of times or endlessly.",
+          "Choose the built-in voice you wish to use for the spoken message, including adjusting its Rate, Pitch, and Volume.",
+          "Includes a Display View if you need an audio-accessible stream screen for events or large calls.",
+          "You can customize the look and feel of the Display View from Setup, including choosing a theme-related style or going your own way with a custom style.",
+          "You can save presets for messages you intend to broadcast frequently."
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "Notification Toasts that fire while the app isn't focused or is obfuscated now also flash the taskbar to let you know something happened.",
+          "Improved consistency of toasts firing for similar actions and consistency of their message formatting.",
+          "New Version Notifications now accept a mode, allowing for notification via toast or modal, just like Budget and Backup reminders.",
+          "When customizing the Sidebar, you can now snap tools into five ordering modes: Classic, Sort A-Z, Sort Z-A, Most Recent, and Most Used, the latter of which is determined by number of times a tool is accessed.",
+          "Added ability to set volume for notification toasts when picking a sound pack, including ability to Mute toasts."
+        ],
+        "Budget Tracker": [
+          "When clicking on a recurring bill to pay it, renamed modal to 'Pay {BillName}'.",
+          "When encryption is enabled and set to 'on every tool entry', a Windows system lock screen also locks the budget tracker."
+        ],
+        "Auto-Backup": [
+          "Backup Reminders now flash the tool on the sidebar and Home Card, and display a message at the top of the tool."
+        ]
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Toasts now properly stick around if they fired while you weren't looking at the app.",
+          "Fixed issues with tabs and pills styling."
+        ],
+        "Budget Tracker": [
+          "Fixed labels in the Add/Edit/Pay {BillName} modals being centered instead of left-aligned."
+        ]
+      }
+    }
+  },
+  {
     "version": "0.5.0",
     "date": "2026-08-06",
     "changes": {
@@ -23,7 +91,7 @@
           "If you manually type a new Project / Activity name into its field, it'll automatically be saved as a known Project / Activity in the Setup modal.",
           "Previously used / 'known' Projects / Activities show under their fields as you type, allowing quick selection for repeat events.",
           "Added an End Date field to the Input panel, allowing for multi-day events.",
-          "Added Support for timestamps being captured to the exact second.",
+          "Added support for timestamps being captured to the exact second.",
           "Added setting under Preferences to 'Round 'Now' to Whole Minute'.",
           "When enabled, hitting the Now button next to Start/End Time only inputs the Hour/Minute. When disabled, seconds are included.",
           "Added Stats/Averages next to the Totals box in the Summary Panel."
@@ -41,7 +109,7 @@
           "Refactored all TS and CSS files to better organize and componentize them, where possible.",
           "Ensured that styles that were being shared across tools are now coming from the shell files.",
           "Changed Theme Select from a dropdown select to its own modal, with previews of the themes.",
-          "Changed Sound Pack Select from a dropdown select to its own modal, with previes of the sound packs.",
+          "Changed Sound Pack Select from a dropdown select to its own modal, with previews of the sound packs.",
           "Updated the Mardi Gras and Rainbow themes to have unique animations.",
           "Redesigned the Patriot theme and gave it unique animations."
         ],
@@ -53,7 +121,7 @@
         ],
         "Auto-Backup": [
           "Added ability to create a preset from the currently selected paths listed in the tool.",
-          "Added validation to the Preset Name filed."
+          "Added validation to the Preset Name field."
 
         ]
       },
@@ -200,13 +268,13 @@
           "Added new tool that allows you to track personal cashflow to help with simple budgeting.",
           "Track income and expenses, and set up recurring scheduled bills, helping to visualize obligations you still need to pay soon.",
           "Set month-based Income Expectations and Expense Thresholds to help you reach financial goals.",
-          "View various stats and metrics to analyze how and where your money is going, and now how much you need each month to live.",
+          "View various stats and metrics to analyze how and where your money is going, and know how much you need each month to live.",
           "Optionally enable encryption for this tool, ensuring your data is only loaded in memory and not viewable by anyone else accessing your device."
         ]
       },
       "improvements": {
         "App Overall": [
-          "Alt+F4 just closes app in on the App Lock screen instead of launching a close modal.",
+          "Alt+F4 just closes the app on the App Lock screen instead of launching a close modal.",
           "Renamed Settings Modal to General Settings and removed App Overall subheader.",
           "Removed Tool Categories and Category Landing pages, for now.",
           "The sidebar now just lists the exact tools by name."
@@ -244,7 +312,7 @@
           "Added new tool that allows you to quickly generate multiple dummy files for testing purposes.",
           "Can be used to generate batches of files of various file types - text files will have text added into their files.",
           "When generating multiple batches, you can choose to generate all files in one folder, sort the output by extension, or sort by line.",
-          "Selecting '123', 'abc', or '0xF' specifies how the filenames should increment - either numerically, alphabetically, or hexidecimally.",
+          "Selecting '123', 'abc', or '0xF' specifies how the filenames should increment - either numerically, alphabetically, or hexadecimally.",
           "You can also add a filename prefix or suffix to all generated files in a batch.",
           "For the extension type, you can either manually type in an extension, or use the in-field extension picker to choose an extension from the popup modal."
         ],
@@ -313,9 +381,9 @@
         ],
         "Image CCR": [
           "Added new tool to the Files Category that allows the user to combine images or compress an image.",
-          "Combine mode allows you to select mutliple image files and append them to eachother in a specified direction.",
+          "Combine mode allows you to select multiple image files and append them to eachother in a specified direction.",
           "The first image is the anchor image - you then choose a direction below by which to add subsequent images to the anchor image.",
-          "Compress mode allows you to select one image and shrink it's size / dimensions quickly and easily for uploading to websites with filesize constraints."
+          "Compress mode allows you to select one image and shrink its size / dimensions quickly and easily for uploading to websites with filesize constraints."
         ],
         "Auto-Backup": [
           "Added new tool that allows you to define one or many source folders and one or multiple destination folders for a backup.",
@@ -387,7 +455,7 @@
       },
       "bugfixes": {
         "App Overall": [
-          "Fixed an issue where notifications weren't persiting when hovered over, and weren't clearing when clicked.",
+          "Fixed an issue where notifications weren't persisting when hovered over, and weren't clearing when clicked.",
           "Prevented scrolling of the background app while a modal was open."
         ],
         "Time Tracker": [

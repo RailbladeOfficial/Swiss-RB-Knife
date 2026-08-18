@@ -1177,10 +1177,16 @@ button:hover {
   background: transparent;
 }
 
+/* The tinted fill is derived from the theme's own accent, so a Custom theme
+   (which has no file of its own to add a rule to) still gets the same
+   treatment the 18 built-ins hand-write. Deliberately NOT !important: every
+   built-in theme overrides these to its own hex, and themeLink loads after
+   this stylesheet, so equal specificity lets the theme win. The class
+   selectors already outrank any theme's bare `button` rule. */
 .setup-tab.active {
-  color: var(--color-btn) !important;
-  border-bottom-color: var(--color-btn) !important;
-  background: transparent !important;
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
 }
 
 .setup-tab-pane {
@@ -1538,6 +1544,12 @@ button:hover {
   color: var(--color-text);
 }
 
+/* These are pills in a wrapped row, not a strip, so they keep a SOLID fill:
+   a tint reads as unselected at this size. Each theme points this at the same
+   colour it gives .budget-view-mode-btn.active, its designated "selected
+   control" fill, which is picked to stay legible against the theme's own text
+   colour (Dark's grey --color-btn would vanish in an all-grey theme, hence
+   indigo there). This is the Custom-theme fallback. */
 .theme-picker-tab.active {
   background: var(--color-btn);
   color: var(--color-btn-text);

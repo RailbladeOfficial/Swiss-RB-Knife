@@ -243,7 +243,11 @@ const SAVE_DEBOUNCE_MS = 400;
 
 let encryptionEnabled = false;
 let sessionUnlockMode = false;  // true = auth once per session; false = auth on every tool entry
-let sessionUnlocked = false;    // only meaningful when sessionUnlockMode is true
+// Set on every successful auth, in BOTH modes. It gates re-entry only when
+// sessionUnlockMode is true, but the OS-session-lock listener reads it in the
+// other mode too, to tell "re-auth mode with a live authenticated session"
+// apart from "already locked" (see the session-lock-changed listener).
+let sessionUnlocked = false;
 let sessionPassword = "";       // in-memory only; "" when not authenticated
 
 /* =============================================================================
@@ -1736,11 +1740,18 @@ function buildTotalRow(label: string, value: number): HTMLElement {
   return row;
 }
 
-/* Switches the visible summary pane and re-renders its content. */
+/* Switches the visible summary pane and re-renders its content.
+   Scoped to .budget-summary-tabs rather than querying the bare class. That
+   class used to be borrowed by the Licensing modal for its theme styling,
+   and this query reached across and marked those tabs active too (while
+   blanking every pane here, since they carry no data-summary-tab). The
+   Licensing modal now uses shell.css's .setup-tab like every other modal, so
+   nothing shares this class today; the scope stays because a presentational
+   class is never a safe thing to query globally. */
 function activateSummaryTab(tab: SummaryTab): void {
   activeSummaryTab = tab;
   document
-    .querySelectorAll<HTMLButtonElement>(".budget-summary-tab")
+    .querySelectorAll<HTMLButtonElement>(".budget-summary-tabs .budget-summary-tab")
     .forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.summaryTab === tab);
     });
@@ -5715,13 +5726,18 @@ async function _continueInit(): Promise<void> {
       .getElementById("budgetAnnualStatsBtn")!
       .addEventListener("click", () => toggleAnnualStats());
 
-    // Summary panel tabs
+    // Summary panel tabs, scoped for the same reason activateSummaryTab's own
+    // query is (see the note there).
     document
-      .querySelectorAll<HTMLButtonElement>(".budget-summary-tab")
+      .querySelectorAll<HTMLButtonElement>(".budget-summary-tabs .budget-summary-tab")
       .forEach((btn) => {
-        btn.addEventListener("click", () =>
-          activateSummaryTab(btn.dataset.summaryTab as SummaryTab),
-        );
+        btn.addEventListener("click", () => {
+          // The cast below can't vouch for the attribute actually being there,
+          // so check before trusting it rather than passing undefined on.
+          const tab = btn.dataset.summaryTab;
+          if (!tab) return;
+          activateSummaryTab(tab as SummaryTab);
+        });
       });
 
     // Chart cycle buttons, toggle bar ↔ pie, update label, redraw

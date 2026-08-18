@@ -262,7 +262,8 @@ body.solid-modals .modal {
   text-shadow: 0 0 12px rgba(0, 255, 255, 0.7);
 }
 
-.budget-summary-tab.active {
+.budget-summary-tab.active,
+.setup-tab.active {
   color: #ff00ff;
   background: rgba(255, 0, 255, 0.14);
   border-bottom-color: #ff00ff;
@@ -296,6 +297,14 @@ body.solid-modals .modal {
   color: #ffffff;
   border-color: #ff00ff;
   box-shadow: 0 0 12px rgba(255, 0, 255, 0.5);
+}
+/* Split from the view-mode rule above so it does NOT restate box-shadow: the
+   picker pills are ordinary buttons and should carry this theme's standard
+   `button` glow, not the view-mode toggle's bespoke one. */
+.theme-picker-tab.active {
+  background: #ff00ff;
+  color: #ffffff;
+  border-color: #ff00ff;
 }
 .budget-stats-section-heading { color: #00ffff; text-shadow: 0 0 8px rgba(0, 255, 255, 0.4); }
 

@@ -253,40 +253,15 @@
    right-shifted / cut off, since the box stays pinned at the left and only
    the right side spills over). Stretch alone doesn't have this bug. It sizes
    to the content width directly, padding included.
-   Everything below .licensing-tabs is the unthemed fallback; budget.css is
-   later in the bundle, so it wins wherever the two rule sets overlap. */
+   The buttons inside are .setup-tab (shell.css), the same tab every Setup and
+   Settings modal uses, so this rule only owns the strip's padding and the
+   shared border it sits on. */
 .licensing-tabs {
   display: flex;
   border-bottom: 1px solid var(--color-border);
   padding: 0 16px;
   gap: 2px;
   flex-shrink: 0;
-}
-
-.licensing-tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 8px 12px;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition:
-    color var(--hover-transition),
-    border-color var(--hover-transition);
-  margin-bottom: -1px;
-}
-
-.licensing-tab:hover {
-  color: var(--color-text);
-}
-
-.licensing-tab.active {
-  color: var(--color-btn);
-  border-bottom-color: var(--color-btn);
 }
 
 .full-license-btn {
@@ -485,14 +460,16 @@
   text-decoration: underline;
 }
 
-/* Internal doc links styled same as external links */
-a.md-internal-link {
+/* Internal doc + in-page section links styled same as external links */
+a.md-internal-link,
+a.md-anchor-link {
   color: var(--color-btn);
   text-decoration: none;
   cursor: pointer;
 }
 
-a.md-internal-link:hover {
+a.md-internal-link:hover,
+a.md-anchor-link:hover {
   text-decoration: underline;
 }
 

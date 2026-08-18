@@ -161,10 +161,12 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title { color: var(--color-accent); }
 
 /* Summary tab active indicator */
-.budget-summary-tab.active { color: var(--color-accent); background: color-mix(in srgb, var(--color-btn) 12%, transparent); border-bottom-color: var(--color-btn); }
+.budget-summary-tab.active,
+.setup-tab.active { color: var(--color-accent); background: color-mix(in srgb, var(--color-btn) 12%, transparent); border-bottom-color: var(--color-btn); }
 
 /* View-mode toggle active, solid accent */
-.budget-view-mode-btn.active {
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
   background: var(--color-btn);
   color: var(--color-btn-text);
   border-color: var(--color-btn);

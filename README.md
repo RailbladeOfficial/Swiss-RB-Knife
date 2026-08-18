@@ -38,7 +38,7 @@ I'm not a dev, just a QA guy with a brain that doesn't like to settle or deal wi
 
 ## Philosophy
 
-Swiss RB Knife is open-source for two reasons; 1). I've spent three months working on this and trying to make it look nice while also being functional, so it feels like it'd be a shame to have it just sit on my computer, and 2). I personally believe that more software, especially when coded with AI, should be free and open to the masses. To many propietary tools out there, too many subscription-centric softwares that have flooded the market. Software should always be user-centered and user-owned.
+Swiss RB Knife is open-source for two reasons; 1). I've spent three months working on this and trying to make it look nice while also being functional, so it feels like it'd be a shame to have it just sit on my computer, and 2). I personally believe that more software, especially when coded with AI, should be free and open to the masses. Too many proprietary tools out there, too many subscription-centric softwares that have flooded the market. Software should always be user-centered and user-owned.
 
 ---
 
@@ -93,7 +93,7 @@ Input Income earned and Expenses incurred. Yeah, your bank statement may tell yo
 </p>
 
 ### - **Time Tracker**
-Log and track time entries with pay period summaries, running totals, and CSV export. See how much time you spend doing various activites, or itemize your work-from-home time so your boss actually has a paper-trail of what you've been doing between meetings.
+Log and track time entries with pay period summaries, running totals, and CSV export. See how much time you spend doing various activities, or itemize your work-from-home time so your boss actually has a paper-trail of what you've been doing between meetings.
 
 <p align="center">
   <a href="./screenshots/time-tracker/time-tracker-base.png" target="_blank">
@@ -143,6 +143,24 @@ Configure source and destination folder pairs and run mirror backups via Windows
   </a>
 </p>
 
+### - **Countdown Timer**
+"Why do you need a timer?" you might ask. Sure, plenty of apps have timers. Fewer have Pomodoro functionality. None that I've found so far play nice with screen-share applications when you're sharing just the screen with the timer and you wanna go do some Amazon orders while you're displaying how much time is left for your work meeting's lunch break. So this exists for that, and it also lets you set aside time for work and then log those entries to the Time Tracker, if you use that tool. Save presets of your most common timers. Customize the look of your timer to make it feel comfy. Set a timer notification sound and customize how it fires.
+
+<p align="center">
+  <a href="./screenshots/countdown-timer/countdown-timer-main.png" target="_blank">
+    <img class="md-img" src="./screenshots/countdown-timer/countdown-timer-main.png" width="100%" alt="Countdown Timer" />
+  </a>
+</p>
+
+### - **Game Stats**
+I'm a stats nerd, I like tracking numbers, clearly. That said, I'm getting kinda tired of Excel. Powerful, sure, but also lowkey tedious, especially for bigger operations. I've been tracking Five Crowns games in Excel for a few years, and having to manually update formulas is notably tedious - I'd rather have it automated and give it a pretty interface. So now it's here, with a generalized approach. Add player profiles, log Five Crowns game data, see stats based on player groupings (aka Tables), see who gets 200 points the most often. Import existing game data via an Excel workbook. Designed such that other games can be added in in the future with ease.
+
+<p align="center">
+  <a href="./screenshots/game-stats/game-stats-main.png" target="_blank">
+    <img class="md-img" src="./screenshots/game-stats/game-stats-main.png" width="100%" alt="Game Stats" />
+  </a>
+</p>
+
 ### - **Image CCR**
 Combine multiple images along a specified side, compress an image to help upload it to websites with strict dimension / filesize restrictions, or resize a set of images to have homogenized dimensions (great for uploading them to a website's image carousel).
 
@@ -170,6 +188,24 @@ Combine multiple images along a specified side, compress an image to help upload
   </a>
   <a href="./screenshots/image-ccr/resize-3.png" target="_blank">
     <img class="md-img" src="./screenshots/image-ccr/resize-3.png" width="100%" alt="Image CCR: Resize Results" />
+  </a>
+</p>
+
+### - **Days Between Dates**
+I used to have an app on my phone that told you the number of elapsed days between two dates. Google now tells me I can't have that app anymore because its old. Some online calculators don't get the math right, or cryptically include the start date. I'm about clarity and ease of access. So now we have a tool to quickly calculate the days between dates, with options for including the start date if that really makes you feel warm and fuzzy inside.
+
+<p align="center">
+  <a href="./screenshots/days-between-dates/dbd-main.png" target="_blank">
+    <img class="md-img" src="./screenshots/days-between-dates/dbd-main.png" width="100%" alt="Days Between Dates" />
+  </a>
+</p>
+
+### - **TTS Repeater**
+Ever be sharing your screen during a stream, meeting, or other event, and need to broadcast a message while you step away? Want to remind your spouse to get the kitten out of the dryer before throwing the laundry in? Use this tool to have a 1990s-era TTS voice repeat a message at you, every so many seconds/minutes or a fixed number of times. Save your most frequent messages as a preset. Use a Display View while the message is running so your screen-share viewers can see but also accessibly hear that you plan to be back soon and are just polishing off that bottle of gin.
+
+<p align="center">
+  <a href="./screenshots/tts-repeater/tts-repeater-main.png" target="_blank">
+    <img class="md-img" src="./screenshots/tts-repeater/tts-repeater-main.png" width="100%" alt="TTS Repeater" />
   </a>
 </p>
 
@@ -203,7 +239,8 @@ Swiss RB Knife is built with [Tauri](https://tauri.app/), a framework for buildi
 **Frontend:** TypeScript, HTML, CSS, compiled with [Vite](https://vitejs.dev/)
 **Backend:** Rust via Tauri, which handles file system access, window management, and native OS integration
 **Theming:** Multiple built-in CSS themes plus a random palette generator and ability to create and save custom themes
-**Sound Packs:** Multiplt built-in sound packs with unique success / error sounds for the notification toasts that flash across the top of the screen
+**Sound Packs:** Multiple built-in sound packs with unique success / error sounds for the notification toasts that flash across the top of the screen
+**Speech:** TTS Repeater talks through the voices Windows already has installed, via the browser's built-in speech engine. Nothing is downloaded and nothing is sent anywhere, which is also why the voice list (and how robotic it sounds) differs from machine to machine
 **State:** All settings and tool state are persisted locally via Tauri's invoke system (user data is saved in "C:\Users\{yourname}\AppData\Roaming\swiss-rb-knife")
 **Admin Elevation:** Admin Elevation is required on program launch for the Auto-Backup tool to function as expected. See Security & Privacy for more details
 
@@ -217,13 +254,17 @@ The app ships as a single compiled binary with no runtime dependencies required 
 
 A few things worth knowing before use:
 
-**Local by default.** No telemetry, no analytics, no phone-home, no accounts. Your data lives in `C:\Users\{yourname}\AppData\Roaming\swiss-rb-knife` and nowhere else.
+**Local by default.** No telemetry, no analytics, no phone-home, no accounts. Your data lives in `C:\Users\{yourname}\AppData\Roaming\swiss-rb-knife`.
 
-**There's exactly one optional network call, and it's off by default.** Turn on **New Version Notification** in General Settings and the app makes a single request to GitHub's public Releases API (once on startup, plus once right when you enable it) to see whether a newer version than the one you're running exists. That's the *only* time Swiss RB Knife ever touches the network. No personal data leaves your machine, as there's no need for that. It's the same public version-number lookup your browser makes when you visit the Releases page. Leave it off and the app stays fully offline, same as it ever was. You'll get a heads-up modal explaining all this any time you switch it on, and you can flip it back off whenever. If a newer version is found, a notice is added to the Top Bar of the Home page, the About icon pulses, and an "Update Available" link appears in the About modal that opens the Releases page in your browser. The app never downloads or installs anything on its own; grabbing the update is always your call. You can even choose to ignore the notification for that particular version if you're so inclined.
+The only things that ever land outside that folder are the ones you explicitly ask for: Time Tracker's CSV export and Game Stats' spreadsheet export both write to your Downloads folder, and Game Stats reads the workbook you pick when importing, wherever on disk it happens to live. Nothing else is written anywhere else, and nothing is read that you didn't point it at.
+
+**There's exactly one optional network call, and it's off by default.** Turn on **New Version Notification** in General Settings and the app makes a single request to GitHub's public Releases API (once on startup, plus once right when you enable it) to see whether a newer version than the one you're running exists. That's the *only* time Swiss RB Knife ever touches the network. No personal data leaves your machine, as there's no need for that. It's the same public version-number lookup your browser makes when you visit the Releases page. Leave it off and the app stays fully offline, same as it ever was. You'll get a heads-up modal explaining all this any time you switch it on, and you can flip it back off whenever. If a newer version is found, a notice is added to the Top Bar of the Home page, the About icon pulses, and an "Update Available" link appears in the About modal that opens the Releases page in your browser. The app never downloads or installs anything on its own; grabbing the update is always your call. You can even choose to ignore the notification for that particular version if you're so inclined. You can also pick how loudly it tells you: **Gentle** (the default) is a toast that slides past, **Aggressive** is a modal you have to dismiss. That only changes the one-off announcement, not how often anything is checked. The check itself is still once on startup and once when you enable it, either way.
 
 **Most data is stored as plaintext JSON.** Settings, time entries, backup presets are readable by anything with access to your user folder. That's a deliberate simplicity choice: it's *your* data on *your* machine, and plaintext means you can always inspect or recover it by hand.
 
 **The Budget Tracker is the exception.** With encryption enabled, budget data is encrypted with AES-256-GCM using a key derived from your password via Argon2id (64 MB, 3 iterations). Your password is never written to disk (only an Argon2 verification hash), and each encrypted file is a self-contained envelope, so there's no separate key material to lose or mismatch. Forget your password, though, and that data is gone. No backdoor, no recovery. I've only had this implemented for the Budget Tracker as some (read, I) would consider financial data, even just transactions, to be sensitive. That said, I made it an option in case people don't want to risk things being encrypted. User choice and all that.
+
+**If you use the re-auth-on-every-entry mode, locking Windows now re-locks the budget too.** Leaving your desk and hitting Win+L (or letting the machine lock itself) clears the decrypted data and your password out of memory, exactly as if you'd navigated away and come back, so getting back in means entering your password again. Same idea as a password manager re-locking its vault along with the machine. On unlock the taskbar flashes so you're not left wondering why the numbers went away. Noticing the lock at all takes a Windows-level hook, so it's worth stating plainly: the app listens for session lock and unlock notifications on its own window, and that is all it watches for. If you're on the auth-once-per-session mode instead, nothing here changes for you.
 
 **App Lock is a door, not a safe.** The lock screen keeps casual snoops out of the *UI*. It does not encrypt anything, and it doesn't throttle guesses. If someone has access to your Windows account, they can read the data files directly regardless. This just prevents Grandma from easily getting in and running a backup without your knowledge or adding "made popsicles" to your time tracker entries.
 
@@ -231,7 +272,7 @@ A few things worth knowing before use:
 
 **The webview can display images from anywhere on disk.** Image CCR previews the images *you* select, which can live on any drive, so Tauri's asset protocol scope is intentionally broad. It's read-only display access and no image data ever leaves your machine.
 
-Found something wrong in the code? Want a new tool / UX experience? Got an idea for a rad theme or sound pack? Open an issue - thankfully GitHub has that built in, I didn't wanna have to train carrier pidgeons.
+Found something wrong in the code? Want a new tool / UX experience? Got an idea for a rad theme or sound pack? Open an issue - thankfully GitHub has that built in, I didn't wanna have to train carrier pigeons.
 
 ---
 

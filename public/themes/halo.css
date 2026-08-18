@@ -218,7 +218,8 @@ input:focus {
 .budget-annual-stats-title-panel { border-left: 4px solid var(--color-btn); box-shadow: 0 0 16px color-mix(in srgb, var(--color-btn) 20%, transparent); }
 .budget-annual-stats-title { color: var(--color-accent); text-shadow: 0 0 12px color-mix(in srgb, var(--color-btn) 50%, transparent); }
 
-.budget-summary-tab.active {
+.budget-summary-tab.active,
+.setup-tab.active {
   color: var(--color-btn-text);
   background: var(--color-accent-totals);
   border-bottom-color: var(--color-accent-totals);
@@ -252,6 +253,14 @@ input:focus {
   color: var(--color-btn-text);
   border-color: var(--color-accent-totals);
   box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent-totals) 45%, transparent);
+}
+/* Split from the view-mode rule above so it does NOT restate box-shadow: the
+   picker pills are ordinary buttons and should carry this theme's standard
+   `button` glow, not the view-mode toggle's bespoke one. */
+.theme-picker-tab.active {
+  background: var(--color-accent-totals);
+  color: var(--color-btn-text);
+  border-color: var(--color-accent-totals);
 }
 .budget-stats-section-heading { color: var(--color-text-muted); }
 

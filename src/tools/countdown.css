@@ -232,6 +232,14 @@
   transition: height 0.25s linear;
 }
 
+/* While the first grains are still falling, the length is driven frame by
+   frame from elapsed time, so the transition above has to be out of the way:
+   a repaint every TICK_MS would keep retargeting it and stretch the drop into
+   a slow creep. See HG_FALL_MS in countdown.ts. */
+.cd-hg-stream-clip.cd-hg-dropping {
+  transition: none;
+}
+
 @keyframes cd-hg-fall {
   from { transform: translateY(0); }
   to   { transform: translateY(6px); }

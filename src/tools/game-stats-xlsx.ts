@@ -22,9 +22,11 @@
    sheet-shape rules and game-stats.ts for the import flow around them.
 ============================================================================= */
 
-/** A sheet reduced to text. `rows[r][c]` is 0-indexed and dense, short rows
- *  and skipped cells are padded with "" so callers can index by column
- *  without bounds-checking every access. */
+/** A sheet reduced to text. `rows[r][c]` is 0-indexed, and gaps WITHIN a row
+ *  are padded with "" so a cell's column index always matches its position.
+ *  Nothing is padded at the end, though: a row stops at its last populated
+ *  cell, and a row absent from the file entirely is []. Read cells as
+ *  `(row[c] ?? "")` rather than assuming every row reaches every column. */
 export type SheetData = { name: string; rows: string[][] };
 
 /** Signals a file that isn't readable as a workbook at all (as opposed to one
