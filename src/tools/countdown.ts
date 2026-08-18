@@ -231,6 +231,11 @@ let ringProgress: SVGRectElement;
 let hourglassSvg: SVGSVGElement;
 let hgTopSand: SVGRectElement;
 let hgBottomSand: SVGRectElement;
+let hgTopClipPath: SVGPathElement;
+let hgBottomClipPath: SVGPathElement;
+let hgFramePath: SVGPathElement;
+let hgStream: SVGGElement;
+let hgStreamRect: SVGRectElement;
 
 let soundSelect: HTMLSelectElement;
 let soundRepeatsInput: HTMLInputElement;
@@ -815,9 +820,111 @@ function layoutRing(): void {
   ringProgress.style.strokeDasharray = String(ringLength);
 }
 
+/* ── Hourglass ─────────────────────────────────────────────────────────────── */
+
+/* The glass is drawn from one profile function and the sand level is solved
+   against that same function, so the outline you see and the fill inside it
+   can't drift apart. Everything below is in the SVG's own 40x80 viewBox. */
+
+const HG_CX = 20; // centre line
+const HG_RIM_HALF_W = 14; // half-width where a bulb meets its cap
+const HG_BULB_H = 31; // neck-to-rim height of one bulb
+const HG_TOP_NECK_Y = 38;
+const HG_BOTTOM_NECK_Y = 42;
+
+/** Half-width of a bulb as a fraction of HG_RIM_HALF_W. `t` runs 0 at the neck
+ *  to 1 at the rim. The rational S-curve holds a narrow throat, flares out
+ *  quickly, then flattens to a near-cylindrical rim, which is the silhouette a
+ *  real hourglass has. It also matters for the sand: in a cone the level races
+ *  at the wide end and crawls at the point, whereas here it moves at close to a
+ *  steady rate through the tall middle stretch where the eye is watching it. */
+const HG_NECK_W = 0.12;
+const HG_FLARE = 0.18;
+function hgHalfWidth(t: number): number {
+  const s = (t * t) / (t * t + HG_FLARE * (1 - t) * (1 - t));
+  return HG_NECK_W + (1 - HG_NECK_W) * s;
+}
+
+/** Cumulative bulb area from the neck up, sampled once at module load. Index
+ *  `i` holds the area below `i / HG_SAMPLES` of the neck-to-rim height. */
+const HG_SAMPLES = 512;
+const hgCumulativeArea: number[] = (() => {
+  const cum = [0];
+  for (let i = 1; i <= HG_SAMPLES; i++) {
+    const lo = hgHalfWidth((i - 1) / HG_SAMPLES);
+    const hi = hgHalfWidth(i / HG_SAMPLES);
+    cum.push(cum[i - 1] + ((lo + hi) / 2) * (1 / HG_SAMPLES));
+  }
+  return cum;
+})();
+
+/** Inverse of the area curve: how tall a column of sand standing on the neck
+ *  has to be to hold `fraction` of one bulb. Sand transfers at a constant rate
+ *  by volume, not by level, so this is what keeps the figure honest, the level
+ *  has to move faster where the glass is narrow and slower where it's wide. */
+export function hgHeightForArea(fraction: number): number {
+  const target = Math.min(1, Math.max(0, fraction)) * hgCumulativeArea[HG_SAMPLES];
+  let lo = 0;
+  let hi = HG_SAMPLES;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (hgCumulativeArea[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo === 0) return 0;
+  // Interpolate within the straddling slice, otherwise the level visibly steps
+  // between samples on a long timer.
+  const span = hgCumulativeArea[lo] - hgCumulativeArea[lo - 1];
+  const p = span > 0 ? (target - hgCumulativeArea[lo - 1]) / span : 0;
+  return ((lo - 1 + p) / HG_SAMPLES) * HG_BULB_H;
+}
+
+/** Traces one bulb: down one side from rim to neck, across, back up the other.
+ *  `dir` is -1 for the top bulb, whose rim sits above its neck, +1 for the
+ *  bottom. Straight segments are fine at this sample count, the figure renders
+ *  around 60px wide and each step is well under a pixel. */
+function hgBulbPath(neckY: number, dir: -1 | 1): string {
+  const steps = 48;
+  const left: string[] = [];
+  const right: string[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const y = (neckY + dir * t * HG_BULB_H).toFixed(2);
+    const w = HG_RIM_HALF_W * hgHalfWidth(t);
+    left.push(`${(HG_CX - w).toFixed(2)},${y}`);
+    right.push(`${(HG_CX + w).toFixed(2)},${y}`);
+  }
+  left.reverse();
+  return `M${left.join("L")}L${right.join("L")}Z`;
+}
+
+/** Paints the outline and the two clip shapes. Called once from init: the
+ *  figure lives in a fixed viewBox, so unlike the ring it owes nothing to the
+ *  element's pixel size. */
+function layoutHourglass(): void {
+  const top = hgBulbPath(HG_TOP_NECK_Y, -1);
+  const bottom = hgBulbPath(HG_BOTTOM_NECK_Y, 1);
+  hgTopClipPath.setAttribute("d", top);
+  hgBottomClipPath.setAttribute("d", bottom);
+
+  // The bulbs stop short of each other, so the frame carries the throat that
+  // joins them.
+  const throat = (HG_RIM_HALF_W * HG_NECK_W).toFixed(2);
+  const left = (HG_CX - Number(throat)).toFixed(2);
+  const right = (HG_CX + Number(throat)).toFixed(2);
+  hgFramePath.setAttribute(
+    "d",
+    `${top}${bottom}` +
+      `M${left},${HG_TOP_NECK_Y}L${left},${HG_BOTTOM_NECK_Y}` +
+      `M${right},${HG_TOP_NECK_Y}L${right},${HG_BOTTOM_NECK_Y}`,
+  );
+}
+
 /** Paints whichever progress figure is selected. `fraction` is time REMAINING,
- *  1 → 0, so every figure empties as the clock runs down. */
-function renderProgress(fraction: number): void {
+ *  1 → 0, so every figure empties as the clock runs down. `flowing` is whether
+ *  the clock is actually moving right now, which only the hourglass cares
+ *  about: sand shouldn't pour while the timer sits paused or finished. */
+function renderProgress(fraction: number, flowing = false): void {
   const style = cdSettings.progressStyle;
   const f = Math.min(1, Math.max(0, fraction));
 
@@ -831,14 +938,25 @@ function renderProgress(fraction: number): void {
     if (ringLength === 0) layoutRing();
     ringProgress.style.strokeDashoffset = String(ringLength * (1 - f));
   } else if (style === "hourglass") {
-    // Top bulb spans y 7..38, bottom 42..73, 31 units each. Sand height is
-    // linear in time rather than in area: the bulbs are triangles, so true
-    // volume would drain non-linearly and read as a broken clock.
-    const H = 31;
-    hgTopSand.setAttribute("y", String(38 - H * f));
-    hgTopSand.setAttribute("height", String(H * f));
-    hgBottomSand.setAttribute("y", String(73 - H * (1 - f)));
-    hgBottomSand.setAttribute("height", String(H * (1 - f)));
+    // Sand moves at a constant rate by area, so the level is the inverse of the
+    // bulb's area curve rather than a straight multiple of `f`. Both bulbs are
+    // the same shape, which is what makes one number do for both: the column
+    // already drained off the top is exactly as tall as the gap still unfilled
+    // at the bottom, so the two always read as halves of the same whole.
+    const level = hgHeightForArea(f);
+    hgTopSand.setAttribute("y", String(HG_TOP_NECK_Y - level));
+    hgTopSand.setAttribute("height", String(level));
+    hgBottomSand.setAttribute("y", String(HG_BOTTOM_NECK_Y + level));
+    hgBottomSand.setAttribute("height", String(HG_BULB_H - level));
+
+    // The stream runs from the throat to whatever the pile below has reached,
+    // so it starts out long and shortens as the bottom fills. Grains keep
+    // falling at a fixed rate the whole time; it's the drop that gets shorter,
+    // which is the same thing the real object does.
+    hgStream.style.display = flowing ? "" : "none";
+    if (flowing) {
+      hgStreamRect.setAttribute("height", String(HG_BOTTOM_NECK_Y + level - HG_TOP_NECK_Y));
+    }
   }
 }
 
@@ -907,7 +1025,7 @@ function render(): void {
       : `End at ${formatWallClock(nextClockBoundary(session!.endsAt, step))}`;
   });
 
-  renderProgress(remaining / spanMs(session));
+  renderProgress(remaining / spanMs(session), !paused && remaining > 0);
 }
 
 /** The quick-pick buttons under the memo field, rebuilt from saved presets. */
@@ -1351,6 +1469,12 @@ export function initCountdown(): void {
   hourglassSvg = document.getElementById("cd-hourglass") as unknown as SVGSVGElement;
   hgTopSand = document.getElementById("cd-hg-top-sand") as unknown as SVGRectElement;
   hgBottomSand = document.getElementById("cd-hg-bottom-sand") as unknown as SVGRectElement;
+  hgTopClipPath = document.getElementById("cd-hg-top-clip-path") as unknown as SVGPathElement;
+  hgBottomClipPath = document.getElementById("cd-hg-bottom-clip-path") as unknown as SVGPathElement;
+  hgFramePath = document.getElementById("cd-hg-frame") as unknown as SVGPathElement;
+  hgStream = document.getElementById("cd-hg-stream") as unknown as SVGGElement;
+  hgStreamRect = document.getElementById("cd-hg-stream-rect") as unknown as SVGRectElement;
+  layoutHourglass();
 
   soundSelect = document.getElementById("cd-sound") as HTMLSelectElement;
   soundRepeatsInput = document.getElementById("cd-sound-repeats") as HTMLInputElement;

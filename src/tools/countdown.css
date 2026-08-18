@@ -214,6 +214,37 @@
   transition: y 0.25s linear, height 0.25s linear;
 }
 
+/* The grain column scrolls by exactly one tile spacing and loops, so the seam
+   lands on itself and the stream reads as continuous. Nothing here depends on
+   how long the stream is, the clip rect handles that. */
+.cd-hg-stream {
+  animation: cd-hg-fall 0.55s linear infinite;
+}
+
+.cd-hg-grain {
+  fill: var(--color-accent);
+}
+
+/* Eased on the same curve as the sand itself, otherwise the stream's landing
+   point snaps to the new level a quarter second before the pile rises to meet
+   it, and the grains briefly stop short of the surface. */
+.cd-hg-stream-clip {
+  transition: height 0.25s linear;
+}
+
+@keyframes cd-hg-fall {
+  from { transform: translateY(0); }
+  to   { transform: translateY(6px); }
+}
+
+/* Left in place but frozen: a static dotted line still reads as "sand is in
+   the neck", which is the information the stream carries. */
+@media (prefers-reduced-motion: reduce) {
+  .cd-hg-stream {
+    animation: none;
+  }
+}
+
 /* ── Setup ─────────────────────────────────────────────────────────────────── */
 
 .cd-unit {

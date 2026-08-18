@@ -228,15 +228,21 @@
         <li class="nav-item" data-section="utility" data-tool="countdown" title="Countdown Timer">
           <span class="nav-icon">
             <!-- Hourglass, mostly unspent: the top bulb is still well filled and
-                 only a small mound has gathered in the bottom one. -->
+                 only a small mound has gathered in the bottom one. The bulb
+                 curve is sampled from the same profile the live figure uses
+                 (hgHalfWidth in countdown.ts), so icon and tool match. -->
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
               stroke-linejoin="round">
               <line x1="6" y1="3" x2="18" y2="3" />
               <line x1="6" y1="21" x2="18" y2="21" />
-              <path d="M7 3 L12 12 L7 21" />
-              <path d="M17 3 L12 12 L17 21" />
-              <path d="M8.1 5 L15.9 5 L12 12 Z" fill="currentColor" stroke="none" />
-              <path d="M7.8 20.5 L16.2 20.5 L12 17.2 Z" fill="currentColor" stroke="none" />
+              <path
+                d="M7,4C7.01,4.25 7,5 7.05,5.5C7.11,6 7.13,6.5 7.33,7C7.53,7.5 7.78,8 8.27,8.5C8.76,9 9.75,9.5 10.27,10C10.79,10.5 11.21,11.25 11.4,11.5L11.4,12.5C11.21,12.75 10.79,13.5 10.27,14C9.75,14.5 8.76,15 8.27,15.5C7.78,16 7.53,16.5 7.33,17C7.13,17.5 7.11,18 7.05,18.5C7,19 7.01,19.75 7,20" />
+              <path
+                d="M17,4C16.99,4.25 17.01,5 16.95,5.5C16.9,6 16.87,6.5 16.67,7C16.47,7.5 16.22,8 15.73,8.5C15.24,9 14.25,9.5 13.73,10C13.21,10.5 12.79,11.25 12.6,11.5L12.6,12.5C12.79,12.75 13.21,13.5 13.73,14C14.25,14.5 15.24,15 15.73,15.5C16.22,16 16.47,16.5 16.67,17C16.87,17.5 16.9,18 16.95,18.5C17.01,19 16.99,19.75 17,20" />
+              <path
+                d="M7.05,5.51C7.08,5.71 7.12,6.31 7.24,6.71C7.36,7.11 7.48,7.5 7.77,7.9C8.06,8.3 8.5,8.7 8.98,9.1C9.46,9.5 10.26,9.9 10.66,10.3C11.06,10.7 11.28,11.3 11.4,11.5L12.6,11.5C12.72,11.3 12.94,10.7 13.34,10.3C13.74,9.9 14.54,9.5 15.02,9.1C15.5,8.7 15.94,8.3 16.23,7.9C16.52,7.5 16.64,7.11 16.76,6.71C16.88,6.31 16.92,5.71 16.95,5.51Z"
+                fill="currentColor" stroke="none" />
+              <path d="M7,20L7.05,18.5L16.95,18.5L17,20Z" fill="currentColor" stroke="none" />
             </svg>
           </span>
           <span class="nav-label">Countdown Timer</span>
@@ -474,15 +480,21 @@
           <div class="tool-card" data-section="utility" data-tool="countdown">
             <div class="tool-card-icon">
               <!-- Hourglass, mostly unspent: the top bulb is still well filled and
-                   only a small mound has gathered in the bottom one. -->
+                   only a small mound has gathered in the bottom one. The bulb
+                   curve is sampled from the same profile the live figure uses
+                   (hgHalfWidth in countdown.ts), so icon and tool match. -->
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                 stroke-linejoin="round">
                 <line x1="6" y1="3" x2="18" y2="3" />
                 <line x1="6" y1="21" x2="18" y2="21" />
-                <path d="M7 3 L12 12 L7 21" />
-                <path d="M17 3 L12 12 L17 21" />
-                <path d="M8.1 5 L15.9 5 L12 12 Z" fill="currentColor" stroke="none" />
-                <path d="M7.8 20.5 L16.2 20.5 L12 17.2 Z" fill="currentColor" stroke="none" />
+                <path
+                  d="M7,4C7.01,4.25 7,5 7.05,5.5C7.11,6 7.13,6.5 7.33,7C7.53,7.5 7.78,8 8.27,8.5C8.76,9 9.75,9.5 10.27,10C10.79,10.5 11.21,11.25 11.4,11.5L11.4,12.5C11.21,12.75 10.79,13.5 10.27,14C9.75,14.5 8.76,15 8.27,15.5C7.78,16 7.53,16.5 7.33,17C7.13,17.5 7.11,18 7.05,18.5C7,19 7.01,19.75 7,20" />
+                <path
+                  d="M17,4C16.99,4.25 17.01,5 16.95,5.5C16.9,6 16.87,6.5 16.67,7C16.47,7.5 16.22,8 15.73,8.5C15.24,9 14.25,9.5 13.73,10C13.21,10.5 12.79,11.25 12.6,11.5L12.6,12.5C12.79,12.75 13.21,13.5 13.73,14C14.25,14.5 15.24,15 15.73,15.5C16.22,16 16.47,16.5 16.67,17C16.87,17.5 16.9,18 16.95,18.5C17.01,19 16.99,19.75 17,20" />
+                <path
+                  d="M7.05,5.51C7.08,5.71 7.12,6.31 7.24,6.71C7.36,7.11 7.48,7.5 7.77,7.9C8.06,8.3 8.5,8.7 8.98,9.1C9.46,9.5 10.26,9.9 10.66,10.3C11.06,10.7 11.28,11.3 11.4,11.5L12.6,11.5C12.72,11.3 12.94,10.7 13.34,10.3C13.74,9.9 14.54,9.5 15.02,9.1C15.5,8.7 15.94,8.3 16.23,7.9C16.52,7.5 16.64,7.11 16.76,6.71C16.88,6.31 16.92,5.71 16.95,5.51Z"
+                  fill="currentColor" stroke="none" />
+                <path d="M7,20L7.05,18.5L16.95,18.5L17,20Z" fill="currentColor" stroke="none" />
               </svg>
             </div>
             <div class="tool-card-name">Countdown Timer</div>
@@ -977,22 +989,49 @@
 
                 <!-- Hourglass progress figure, sits beside the clock. Sand
                      drains from the top bulb into the bottom one. -->
+                <!-- The bulb outlines and the clip shapes that bound the sand are
+                     traced in JS from a single profile curve (see layoutHourglass
+                     in countdown.ts), so the glass and the fill level inside it
+                     can't fall out of step. Only the caps are static. -->
                 <svg id="cd-hourglass" class="cd-hourglass" viewBox="0 0 40 80" aria-hidden="true"
                   style="display:none;">
                   <defs>
                     <clipPath id="cd-hg-top-clip">
-                      <polygon points="6,7 34,7 20,38" />
+                      <path id="cd-hg-top-clip-path" />
                     </clipPath>
                     <clipPath id="cd-hg-bottom-clip">
-                      <polygon points="20,42 34,73 6,73" />
+                      <path id="cd-hg-bottom-clip-path" />
+                    </clipPath>
+                    <!-- Trims the falling stream at the surface of the pile
+                         below it, which is why the grains land instead of
+                         sinking through. Resized on every paint. -->
+                    <clipPath id="cd-hg-stream-clip">
+                      <rect id="cd-hg-stream-rect" class="cd-hg-stream-clip" x="17" width="6" y="38"
+                        height="0" />
                     </clipPath>
                   </defs>
                   <rect id="cd-hg-top-sand" class="cd-hg-sand" x="0" width="40" y="7" height="31"
                     clip-path="url(#cd-hg-top-clip)" />
                   <rect id="cd-hg-bottom-sand" class="cd-hg-sand" x="0" width="40" y="73" height="0"
                     clip-path="url(#cd-hg-bottom-clip)" />
-                  <polygon class="cd-hg-frame" points="6,7 34,7 20,38" />
-                  <polygon class="cd-hg-frame" points="20,42 34,73 6,73" />
+                  <!-- Grains are tiled every 6 units and the whole group scrolls
+                       down by exactly 6, so the stream is seamless at any length
+                       and stays the same density whether the pile below is deep
+                       or shallow. Two grains sit above the throat purely to feed
+                       the top of the loop. -->
+                  <g id="cd-hg-stream" class="cd-hg-stream" clip-path="url(#cd-hg-stream-clip)"
+                    style="display:none;">
+                    <circle class="cd-hg-grain" cx="20" cy="26" r="0.55" />
+                    <circle class="cd-hg-grain" cx="19.7" cy="32" r="0.5" />
+                    <circle class="cd-hg-grain" cx="20.3" cy="38" r="0.6" />
+                    <circle class="cd-hg-grain" cx="19.85" cy="44" r="0.5" />
+                    <circle class="cd-hg-grain" cx="20.2" cy="50" r="0.6" />
+                    <circle class="cd-hg-grain" cx="19.75" cy="56" r="0.55" />
+                    <circle class="cd-hg-grain" cx="20.25" cy="62" r="0.5" />
+                    <circle class="cd-hg-grain" cx="20" cy="68" r="0.6" />
+                    <circle class="cd-hg-grain" cx="19.8" cy="74" r="0.55" />
+                  </g>
+                  <path id="cd-hg-frame" class="cd-hg-frame" />
                   <line class="cd-hg-frame" x1="4" y1="6" x2="36" y2="6" />
                   <line class="cd-hg-frame" x1="4" y1="74" x2="36" y2="74" />
                 </svg>
