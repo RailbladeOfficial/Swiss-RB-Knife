@@ -3172,7 +3172,7 @@
             <div class="theme-picker-section-divider">Cycle Settings</div>
             <div class="settings-row">
               <span>Change:</span>
-              <select id="cycleTriggerSelect">
+              <select id="cycleTriggerSelect" class="settings-select">
                 <option value="onStartup">On Startup</option>
                 <option value="time">After Time Passes</option>
                 <option value="everything">On Interaction</option>
@@ -3194,7 +3194,7 @@
               <span>Every:</span>
               <div class="cycle-interval-inputs">
                 <input type="number" id="cycleIntervalAmount" min="1" max="999" />
-                <select id="cycleIntervalUnit">
+                <select id="cycleIntervalUnit" class="settings-select">
                   <option value="seconds">Seconds</option>
                   <option value="minutes">Minutes</option>
                   <option value="hours">Hours</option>
@@ -3214,11 +3214,11 @@
                   Day Theme:
                   <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="The theme shown between the two times below. Defaults to Light.">&#8505;</button>
                 </span>
-                <select id="cycleDayThemeSelect"></select>
+                <select id="cycleDayThemeSelect" class="settings-select"></select>
               </div>
               <div class="settings-row">
                 <span>Night Theme:</span>
-                <select id="cycleNightThemeSelect"></select>
+                <select id="cycleNightThemeSelect" class="settings-select"></select>
               </div>
               <div class="settings-row">
                 <span class="theme-picker-label-with-info">
@@ -3955,7 +3955,7 @@
               </div>
               <div class="settings-row">
                 <span>Period Length:</span>
-                <select id="payPeriodLength">
+                <select id="payPeriodLength" class="settings-select">
                   <option value="7">7 days</option>
                   <option value="14" selected>14 days</option>
                 </select>

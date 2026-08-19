@@ -1919,9 +1919,15 @@ button:hover {
   gap: 6px;
 }
 
+/* The number half of the "Every:" pair. Its select half is .settings-select at
+   0.8rem, and the two sit side by side in one control group, so this matches
+   that size and padding rather than inheriting the 1rem every bare input gets.
+   A group that disagrees with itself reads worse than either size does. */
 #cycleIntervalAmount {
   width: 52px;
   text-align: center;
+  font-size: 0.8rem;
+  padding: 4px 6px;
 }
 
 /* Day/Night window. The two <input type="time"> controls reuse
@@ -1936,11 +1942,15 @@ button:hover {
    AM/PM segment and its clock glyph, at whatever the current Font Scale makes
    those. Stating one only invites clipping. flex-shrink: 0 is the part that
    matters, .cycle-interval-inputs is a flexbox and would otherwise squeeze
-   both fields below that intrinsic width. */
+   both fields below that intrinsic width. Size and padding match
+   .settings-select, same reasoning as #cycleIntervalAmount above: these sit in
+   a pane whose every other control is the compact size. */
 #cycleDayStart,
 #cycleDayEnd {
   flex-shrink: 0;
   text-align: center;
+  font-size: 0.8rem;
+  padding: 4px 6px;
 }
 
 /* The surrounding .theme-picker-random-settings puts a 10px gap between its
@@ -1952,8 +1962,9 @@ button:hover {
   gap: 10px;
 }
 
-/* The two theme dropdowns sit in ordinary .settings-row pairs, so they only
-   need a shared cap to stop a long custom theme name stretching the pane. */
+/* The two theme dropdowns are .settings-select like every other settings-row
+   dropdown, so all they need here is a shared cap to stop a long custom theme
+   name stretching the pane. */
 #cycleDayThemeSelect,
 #cycleNightThemeSelect {
   max-width: 190px;
