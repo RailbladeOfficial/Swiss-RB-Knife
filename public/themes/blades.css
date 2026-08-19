@@ -1,0 +1,825 @@
+/* =============================================================================
+   BLADES
+   -----------------------------------------------------------------------------
+   The late-2000s Xbox 360 blade dashboard. Content sits on big glossy cards:
+   a radial wash that is brightest up and to the left, a hard specular band
+   across the top half, and a white hairline rim. The sidebar is the silver
+   stack of blade edges those cards slide out from, so the app reads as one
+   blade pulled forward over the others.
+
+   PER-TOOL COLOUR
+   Every tool owns one of the five blades off the dashboard: Marketplace red,
+   profile orange, Games green, Media blue, System purple. They are handed out
+   by walking the Classic tool order (ALL_TOOLS in shell.ts) and cycling
+   through the five, so Budget is red, Time Tracker orange, Auto-Backup green,
+   and round again.
+
+   Each blade is eight custom properties: --bl-1…--bl-4 are the card's radial
+   stops (light to dark), --bl-deep is the header band, --bl-rail the fill and
+   edge colour, --bl-ink the near-black used for text, --bl-tint the near-white
+   used for entry fields. :root holds the green as the default, and each tool
+   re-declares all eight on FOUR selectors at once: its tool view, its sidebar
+   row, its Home card, and any modal open while it is the active tool.
+
+   That last one is why shell.ts stamps `data-active-tool` on <body>. Modals
+   are rendered at body level, outside the tool's own subtree, so nothing in
+   the DOM otherwise connects the Budget's modals to the Budget.
+
+   REMAPPING THE SHARED TOKENS
+   The tool stylesheets are written against the shared palette (--color-panel,
+   --color-accent, --color-bg…), not against --bl-*. Rather than restate a
+   rule per tool per component, the blade scopes re-point those tokens at
+   their own --bl-* values, so Countdown's giant digits, Days Between's
+   headline, Budget's ledger rows and every Game Stats surface follow their
+   blade with no tool-specific CSS at all. --color-bg is remapped only inside
+   the blade scopes, never at :root, because at :root it is the silver the
+   whole app sits on.
+
+   Home cards rest in silver, not in their own colour: hovering one pulls that
+   blade forward into full colour, which is the whole gesture the dashboard was
+   built around, and it only reads as a gesture if the resting state is neutral.
+
+   Text is a neutral near-black, because it now has to sit on five hues, and
+   the blade families are kept light enough that it stays legible on all of
+   them. White is used ONLY on the deep band and on rail-filled controls,
+   never on a panel: a light card wants dark text.
+
+   Gloss is layered in the `background` shorthand rather than on pseudo-
+   elements, so it clips to each surface's own rounded corners for free and
+   nothing needs a positioning context it did not previously have.
+============================================================================= */
+
+:root {
+  --color-bg:                  #cfd6db;
+  --color-panel:               #97d661;
+  --color-input-bg:            #f3fbe9;
+  --color-border:              #9aa4ac;
+  --color-border-dashed:       #3f7714;
+  --color-text:                #1d1d1d;
+  --color-text-muted:          #454545;
+  --color-hover:               #b8e78a;
+
+  --color-btn:                 #1f3d08;
+  --color-accent:              #1f3d08;
+  --color-btn-hover:           #3f7714;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #8f2419;
+  --color-danger-subtle:       rgba(143, 36, 25, 0.12);
+  --color-success:             #1f5c14;
+
+  /* The four panel rails. Steps of whichever blade they are read on, not four
+     fixed blade colours: four hues inside one tool is exactly the thing that
+     stops a tool reading as "the red one". White / deep / rail / ink are far
+     enough apart to tell the panels apart within a single hue.
+     --color-accent-view is the only one never used as text (it is a rail and
+     a changelog fallback), which is why it can afford to be the white. */
+  --color-accent-input:        var(--bl-deep);
+  --color-accent-view:         #ffffff;
+  --color-accent-totals:       var(--bl-rail);
+  --color-accent-entries:      var(--bl-ink);
+
+  --color-toggle-off:          #a8b2b9;
+  --color-toggle-on:           #3f7714;
+
+  /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (red) / tool heading (purple) */
+  --color-changelog-features:     #0d3d59;
+  --color-changelog-improvements: #1f3d08;
+  --color-changelog-bugfixes:     #5c1109;
+  --color-changelog-tool:         #2e2352;
+
+  --color-toast-success-bg:    #e2f4d3;
+  --color-toast-success-border:#3f7714;
+  --color-toast-success-text:  #1c3d08;
+  --color-toast-error-bg:      #f9ded8;
+  --color-toast-error-border:  #8f2419;
+  --color-toast-error-text:    #4a120c;
+
+  /* ── Budget chart palette ── The five blades first, then teal / gold / slate */
+  --color-chart-1:             #3f7714;
+  --color-chart-2:             #1f6389;
+  --color-chart-3:             #b06f14;
+  --color-chart-4:             #6d5aa8;
+  --color-chart-5:             #b04a34;
+  --color-chart-6:             #16857a;
+  --color-chart-7:             #8a6f00;
+  --color-chart-8:             #4a5f6b;
+
+  /* ── Default blade: Games green. Anything outside a blade scope (Home's
+     header, the sidebar, a modal opened from Home) resolves to this. ── */
+  --bl-1:    #e0f8c6;
+  --bl-2:    #b8e78a;
+  --bl-3:    #97d661;
+  --bl-4:    #86cc4b;
+  --bl-deep: #4f8f1c;
+  --bl-rail: #3f7714;
+  --bl-ink:  #1f3d08;
+  --bl-tint: #f3fbe9;
+}
+
+/* =============================================================================
+   BLADE ASSIGNMENT
+   -----------------------------------------------------------------------------
+   Classic tool order, cycling red → orange → green → blue → purple. Each block
+   claims the tool's view, its sidebar row, its Home card and its modals
+   together, so all four resolve the same blade.
+============================================================================= */
+
+/* 1. Budget Tracker, Marketplace red */
+#finance-tool-budget,
+.nav-item[data-section="finance"][data-tool="budget"],
+.tool-card[data-section="finance"][data-tool="budget"],
+body[data-active-tool="finance/budget"] .modal-backdrop {
+  --bl-1:    #fbe3db;
+  --bl-2:    #f2b5a6;
+  --bl-3:    #e59480;
+  --bl-4:    #d97e68;
+  --bl-deep: #b04a34;
+  --bl-rail: #8f3826;
+  --bl-ink:  #5c1109;
+  --bl-tint: #fdf1ee;
+}
+
+/* 2. Time Tracker, profile orange */
+#utility-tool-time-tracker,
+.nav-item[data-section="utility"][data-tool="time-tracker"],
+.tool-card[data-section="utility"][data-tool="time-tracker"],
+body[data-active-tool="utility/time-tracker"] .modal-backdrop {
+  --bl-1:    #fdedcf;
+  --bl-2:    #f7cf8c;
+  --bl-3:    #edb45f;
+  --bl-4:    #e3a343;
+  --bl-deep: #b06f14;
+  --bl-rail: #8f5809;
+  --bl-ink:  #4a2c00;
+  --bl-tint: #fdf6e8;
+}
+
+/* 3. Auto-Backup, Games green */
+#files-tool-auto-backup,
+.nav-item[data-section="files"][data-tool="auto-backup"],
+.tool-card[data-section="files"][data-tool="auto-backup"],
+body[data-active-tool="files/auto-backup"] .modal-backdrop {
+  --bl-1:    #e0f8c6;
+  --bl-2:    #b8e78a;
+  --bl-3:    #97d661;
+  --bl-4:    #86cc4b;
+  --bl-deep: #4f8f1c;
+  --bl-rail: #3f7714;
+  --bl-ink:  #1f3d08;
+  --bl-tint: #f3fbe9;
+}
+
+/* 4. Countdown Timer, Media blue */
+#utility-tool-countdown,
+.nav-item[data-section="utility"][data-tool="countdown"],
+.tool-card[data-section="utility"][data-tool="countdown"],
+body[data-active-tool="utility/countdown"] .modal-backdrop {
+  --bl-1:    #dbf0fa;
+  --bl-2:    #a6dbf1;
+  --bl-3:    #7cc6e6;
+  --bl-4:    #63b8de;
+  --bl-deep: #2f7fa8;
+  --bl-rail: #1f6389;
+  --bl-ink:  #0d3d59;
+  --bl-tint: #eff8fd;
+}
+
+/* 5. Game Stats, System purple */
+#games-tool-game-stats,
+.nav-item[data-section="games"][data-tool="game-stats"],
+.tool-card[data-section="games"][data-tool="game-stats"],
+body[data-active-tool="games/game-stats"] .modal-backdrop {
+  --bl-1:    #ebe3fb;
+  --bl-2:    #cfc0f2;
+  --bl-3:    #b7a3e6;
+  --bl-4:    #a893dd;
+  --bl-deep: #6d5aa8;
+  --bl-rail: #574689;
+  --bl-ink:  #2e2352;
+  --bl-tint: #f5f1fd;
+}
+
+/* 6. Image CCR, back to Marketplace red */
+#media-tool-image-ccr,
+.nav-item[data-section="media"][data-tool="image-ccr"],
+.tool-card[data-section="media"][data-tool="image-ccr"],
+body[data-active-tool="media/image-ccr"] .modal-backdrop {
+  --bl-1:    #fbe3db;
+  --bl-2:    #f2b5a6;
+  --bl-3:    #e59480;
+  --bl-4:    #d97e68;
+  --bl-deep: #b04a34;
+  --bl-rail: #8f3826;
+  --bl-ink:  #5c1109;
+  --bl-tint: #fdf1ee;
+}
+
+/* 7. Days Between Dates, profile orange */
+#utility-tool-days-between,
+.nav-item[data-section="utility"][data-tool="days-between"],
+.tool-card[data-section="utility"][data-tool="days-between"],
+body[data-active-tool="utility/days-between"] .modal-backdrop {
+  --bl-1:    #fdedcf;
+  --bl-2:    #f7cf8c;
+  --bl-3:    #edb45f;
+  --bl-4:    #e3a343;
+  --bl-deep: #b06f14;
+  --bl-rail: #8f5809;
+  --bl-ink:  #4a2c00;
+  --bl-tint: #fdf6e8;
+}
+
+/* 8. TTS Repeater, Games green */
+#utility-tool-tts-repeater,
+.nav-item[data-section="utility"][data-tool="tts-repeater"],
+.tool-card[data-section="utility"][data-tool="tts-repeater"],
+body[data-active-tool="utility/tts-repeater"] .modal-backdrop {
+  --bl-1:    #e0f8c6;
+  --bl-2:    #b8e78a;
+  --bl-3:    #97d661;
+  --bl-4:    #86cc4b;
+  --bl-deep: #4f8f1c;
+  --bl-rail: #3f7714;
+  --bl-ink:  #1f3d08;
+  --bl-tint: #f3fbe9;
+}
+
+/* 9. Dummy File Generator, Media blue */
+#files-tool-dummy-file-generator,
+.nav-item[data-section="files"][data-tool="dummy-file-generator"],
+.tool-card[data-section="files"][data-tool="dummy-file-generator"],
+body[data-active-tool="files/dummy-file-generator"] .modal-backdrop {
+  --bl-1:    #dbf0fa;
+  --bl-2:    #a6dbf1;
+  --bl-3:    #7cc6e6;
+  --bl-4:    #63b8de;
+  --bl-deep: #2f7fa8;
+  --bl-rail: #1f6389;
+  --bl-ink:  #0d3d59;
+  --bl-tint: #eff8fd;
+}
+
+/* =============================================================================
+   SHARED TOKENS → BLADE
+   -----------------------------------------------------------------------------
+   Everything the tool stylesheets read by its shared name, re-pointed at the
+   blade of whatever scope it is being read in. One rule, so a token only ever
+   has to be mapped once no matter how many tools exist.
+
+   Note this deliberately does NOT include the sidebar rows or Home cards:
+   those live on the silver and are painted directly from --bl-* further down,
+   so remapping the shared tokens there would recolour the blade stack itself.
+============================================================================= */
+
+#finance-tool-budget,
+#utility-tool-time-tracker,
+#files-tool-auto-backup,
+#utility-tool-countdown,
+#games-tool-game-stats,
+#media-tool-image-ccr,
+#utility-tool-days-between,
+#utility-tool-tts-repeater,
+#files-tool-dummy-file-generator,
+body[data-active-tool] .modal-backdrop {
+  /* Sub-surfaces inside a panel: Budget's ledger and setup rows, Time
+     Tracker's totals block and entry rows, Game Stats' tiles and chips. */
+  --color-bg:        var(--bl-1);
+  --color-panel:     var(--bl-3);
+  --color-hover:     var(--bl-2);
+  --color-input-bg:  var(--bl-tint);
+  /* Read as TEXT in several tools (Countdown's digits, Days Between's
+     headline, TTS's live status, Image CCR's read-outs) as well as for fills,
+     so both land on the near-black step rather than on the rail: the rail is
+     only reliably legible when something white sits on top of it. */
+  --color-btn:       var(--bl-ink);
+  --color-accent:    var(--bl-ink);
+  --color-btn-hover: var(--bl-rail);
+  --color-toggle-on: var(--bl-rail);
+  /* Silver hairlines vanish on a coloured card. */
+  --color-border:    rgba(0, 0, 0, 0.22);
+  /* Game Stats' empty-state outlines. Green dashes inside the purple tool
+     were one of the more obvious leaks. */
+  --color-border-dashed: var(--bl-rail);
+}
+
+/* ── The brushed-metal surround the blades sit in ── */
+body {
+  background:
+    linear-gradient(180deg, #e4e9ec 0%, #cfd6db 40%, #b6bfc6 100%);
+}
+
+/* ── The blade stack. Alternating light and shadowed vertical bands are the
+   curved edges of the cards behind the one in front. ── */
+#sidebar {
+  background:
+    linear-gradient(90deg,
+      #fdfefe 0%,
+      #eef1f3 12%,
+      #ccd4da 26%,
+      #a9b3bb 40%,
+      #e8ecef 52%,
+      #c2cad1 66%,
+      #9ea8b0 82%,
+      #e2e7ea 94%,
+      #b9c2c9 100%);
+  border-right: 1px solid #8e979f;
+  box-shadow: inset -3px 0 6px rgba(20, 40, 12, 0.12);
+}
+
+#titleBar {
+  background: linear-gradient(180deg, #fbfcfd 0%, #dde3e7 55%, #c3ccd2 100%);
+  border-bottom: 1px solid #9aa4ac;
+}
+
+/* Every tool's icon wears its own blade even at rest, so the collapsed
+   sidebar is a legible column of colours rather than nine grey glyphs. */
+.nav-item[data-tool] .nav-icon {
+  color: var(--bl-rail);
+}
+
+.nav-item:hover {
+  background: linear-gradient(90deg, var(--bl-1) 0%, rgba(255, 255, 255, 0) 100%);
+  color: #1d1d1d;
+}
+
+/* The blade you have pulled forward: a glossy tab in the tool's own colour. */
+.nav-item.active,
+.nav-item.active:hover {
+  background: linear-gradient(90deg, var(--bl-2) 0%, var(--bl-4) 55%, var(--bl-deep) 100%);
+  color: #ffffff;
+  border-left-color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+}
+
+.nav-item.active .nav-icon,
+.nav-item.active:hover .nav-icon {
+  color: #ffffff;
+}
+
+/* =============================================================================
+   THE GLOSSY CARD
+   -----------------------------------------------------------------------------
+   Layer 1 is the specular sheen: bright at the top, cut off hard at 47% the
+   way a moulded plastic highlight is, then a faint darkening toward the
+   bottom. Layer 2 is the blade itself, lit from the upper left.
+============================================================================= */
+
+.panel {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.12) 46%,
+      rgba(255, 255, 255, 0) 47%,
+      rgba(0, 0, 0, 0.06) 100%),
+    radial-gradient(130% 105% at 26% 16%,
+      var(--bl-1) 0%,
+      var(--bl-2) 38%,
+      var(--bl-3) 74%,
+      var(--bl-4) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 16px rgba(30, 40, 50, 0.22);
+}
+
+/* Home cards rest in silver: the stack of edges, before any one blade is
+   pulled out. */
+.tool-card {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.3) 46%,
+      rgba(255, 255, 255, 0) 47%,
+      rgba(30, 40, 50, 0.06) 100%),
+    linear-gradient(180deg, #f8fafb 0%, #e1e7eb 55%, #c6ced4 100%);
+  border: 1px solid #ffffff;
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 6px 16px rgba(30, 40, 50, 0.18);
+}
+
+/* …and hovering one pulls that blade forward, in its own colour. */
+.tool-card:hover {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0.16) 46%,
+      rgba(255, 255, 255, 0) 47%,
+      rgba(0, 0, 0, 0.05) 100%),
+    radial-gradient(130% 105% at 26% 16%,
+      var(--bl-1) 0%,
+      var(--bl-2) 38%,
+      var(--bl-3) 74%,
+      var(--bl-4) 100%);
+  border-color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 22px rgba(30, 40, 50, 0.3);
+}
+
+.tool-card-icon {
+  color: var(--bl-rail);
+}
+
+.tool-card:hover .tool-card-icon {
+  color: var(--bl-ink);
+}
+
+.tool-card-name {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* The base 0.6 opacity is tuned for dark themes; on these light cards it
+   drops the description into the gradient. Lifted just enough to stay
+   quieter than the card name without going grey. */
+.tool-card-desc {
+  opacity: 0.8;
+}
+
+/* ── The four accent rails read as text too ──
+   --color-accent-totals and --color-accent-entries are rails on the Time
+   Tracker panels but plain text in Auto-Backup and Game Stats. The four rails
+   need four visibly different steps, which means two of them land mid-range,
+   and mid-range on a light card is fine for a 5px bar and not fine for 16px
+   type. The rails keep their spread; the text sites are named here and take
+   the ink. */
+.ab-summary-value,
+.ab-disclaimer-title,
+.ab-bar-value,
+.ab-stat-value,
+.gs-tile.gs-tile-alert .gs-tile-value {
+  color: var(--bl-ink);
+}
+
+/* ── Time Tracker panels. Widened from the shell's 4px; the colours come
+   from --color-accent-* above, so they are steps of this tool's own blade. ── */
+.input-panel    { border-left: 5px solid var(--color-accent-input); }
+.controls-panel { border-left: 5px solid var(--color-accent-view); }
+.totals-panel   { border-left: 5px solid var(--color-accent-totals); }
+.entries-panel  { border-left: 5px solid var(--color-accent-entries); }
+
+/* ── Tool / section header, the top lip of the card, in the deep step of the
+   tool's blade so white reads on it ── */
+.tool-view-header,
+.section-header {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(255, 255, 255, 0.1) 48%,
+      rgba(255, 255, 255, 0.01) 49%,
+      rgba(0, 0, 0, 0.08) 100%),
+    linear-gradient(90deg, var(--bl-4) 0%, var(--bl-deep) 70%, var(--bl-rail) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-bottom-color: rgba(255, 255, 255, 0.4);
+  border-radius: 14px 14px 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.tool-view-title,
+.section-title {
+  color: #ffffff;
+  opacity: 1;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Everything else that rides the deep band: the back arrow and the two
+   update notices, which take --color-btn (now the near-black ink) by default
+   and would sink into it. */
+.tool-back-btn,
+.section-back-btn,
+.tool-header-notice,
+.home-update-notice,
+.home-update-notice a {
+  color: #ffffff;
+}
+
+.home-update-notice a:hover {
+  color: var(--bl-1);
+}
+
+/* ── Modal, solid: a card pulled to the centre of the screen. Modals take the
+   blade of whichever tool is open, via body[data-active-tool] above, and fall
+   back to the default green on Home. ── */
+body.solid-modals .modal {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0.14) 44%,
+      rgba(255, 255, 255, 0) 45%,
+      rgba(0, 0, 0, 0.06) 100%),
+    radial-gradient(120% 100% at 24% 12%,
+      var(--bl-1) 0%,
+      var(--bl-2) 40%,
+      var(--bl-3) 76%,
+      var(--bl-4) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 18px 44px rgba(12, 20, 28, 0.45);
+}
+
+/* ── Modal, translucent: the same card, letting the silver read through ── */
+body:not(.solid-modals) .modal {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0.1) 44%,
+      rgba(255, 255, 255, 0) 45%,
+      rgba(0, 0, 0, 0.05) 100%),
+    radial-gradient(120% 100% at 24% 12%,
+      var(--bl-1) 0%,
+      var(--bl-2) 40%,
+      var(--bl-3) 76%,
+      var(--bl-4) 100%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 18px 44px rgba(12, 20, 28, 0.4);
+}
+
+/* ── Buttons, moulded silver pills; the primary one is moulded in whichever
+   blade it happens to be standing on ── */
+button {
+  background: linear-gradient(180deg, #ffffff 0%, #eaeef1 48%, #d2dade 49%, #bcc6cd 100%);
+  color: #1d1d1d;
+  border: 1px solid #939ea6;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(30, 40, 50, 0.2);
+}
+
+button:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8fa 48%, #dfe7eb 49%, #c9d3d9 100%);
+  color: #1d1d1d;
+  border-color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(30, 40, 50, 0.28);
+}
+
+/* Ghost buttons: icon-only and link-style controls that already clear their
+   background and border in the shell/tool CSS. They never reset box-shadow
+   though, so the moulded pill above would leave each one casting a drop
+   shadow with no pill under it. Everything here is a bare class, so it
+   outranks `button` regardless of order. */
+.titlebar-btn,
+.modal-close-btn,
+.nav-back-btn,
+.tool-back-btn,
+.section-back-btn,
+.dashboard-tool-btn,
+.changelog-toggle-btn,
+.sidebar-edit-visibility-btn,
+.theme-tile-icon-btn,
+.lock-show-btn,
+.lock-cred-link,
+.gs-segment-btn,
+.gs-player-remove-btn {
+  border: none;
+  box-shadow: none;
+}
+
+/* The underline/pill tab strips are <button>s that clear their own border but
+   not box-shadow (.setup-tab is the one that does, and says so in its own
+   comment). Without this they would carry the pill treatment above with no
+   pill under it. Border is left alone here: .budget-summary-tab's 2px
+   transparent bottom edge is what its active underline colours in. */
+.budget-summary-tab,
+.theme-picker-tab {
+  box-shadow: none;
+}
+
+.primary-btn {
+  background: linear-gradient(180deg, var(--bl-2) 0%, var(--bl-3) 48%, var(--bl-4) 49%, var(--bl-deep) 100%);
+  border-color: rgba(255, 255, 255, 0.8);
+  color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+}
+
+.primary-btn:hover {
+  background: linear-gradient(180deg, var(--bl-1) 0%, var(--bl-2) 48%, var(--bl-3) 49%, var(--bl-4) 100%);
+  border-color: #ffffff;
+  color: var(--bl-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 8px rgba(30, 40, 50, 0.35);
+}
+
+.danger-btn {
+  background: linear-gradient(180deg, #ffffff 0%, #f6e3e1 48%, #eccdc9 49%, #dcb5b0 100%);
+  border: 1px solid #8f2419;
+  border-radius: 999px;
+  color: #6e1a11;
+}
+
+.danger-btn:hover {
+  background: linear-gradient(180deg, #b03422 0%, #8f2419 55%, #6e1a11 100%);
+  color: #ffffff;
+}
+
+/* ── Inputs, the light entry fields the dashboard used ── */
+input,
+select,
+textarea {
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.16);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #ffffff;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.13), 0 0 0 2px rgba(255, 255, 255, 0.65);
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  border-left: 5px solid var(--bl-rail);
+}
+
+#media-tool-image-ccr .result-panel {
+  border-left: 5px solid #ffffff;
+}
+
+/* ── Drop zone ── */
+.drop-zone {
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+}
+
+/* ── Tab buttons, silver pills; the active one is the lit blade ── */
+.tab-btn {
+  color: #2f2f2f;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.tab-btn:hover {
+  color: #1d1d1d;
+  background: rgba(255, 255, 255, 0.6);
+  border-color: #ffffff;
+  box-shadow: none;
+}
+
+.tab-btn.active {
+  color: #ffffff;
+  background: linear-gradient(180deg, var(--bl-deep) 0%, var(--bl-rail) 100%);
+  border-color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: linear-gradient(180deg, #ffffff 0%, #e6ebee 49%, #ccd5da 100%);
+  color: #454545;
+  border-color: #9aa4ac;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: #1d1d1d;
+  border-color: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #f2f6f8 49%, #dae2e6 100%);
+  box-shadow: none;
+}
+
+.dir-btn.active, .prv-btn.active {
+  color: #ffffff;
+  background: linear-gradient(180deg, var(--bl-deep) 0%, var(--bl-rail) 100%);
+  border-color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ── Anchor badge ── */
+.anchor-badge {
+  background: linear-gradient(180deg, var(--bl-deep) 0%, var(--bl-rail) 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+/* ── Preview cards ── */
+.preview-card:hover       { border-color: #ffffff; }
+.preview-card.anchor-card { border-color: #ffffff; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6); }
+.preview-card.drag-target { border-color: var(--bl-ink); }
+
+/* ── Slider, a chrome bead. The read-outs sit ON the card, so they take the
+   ink, not the white the header band uses. ── */
+.img-slider::-webkit-slider-thumb {
+  background: linear-gradient(180deg, #ffffff 0%, #e2e8eb 49%, #b7c1c8 100%);
+  border-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(30, 40, 50, 0.4);
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: linear-gradient(180deg, var(--bl-2) 0%, var(--bl-4) 49%, var(--bl-deep) 100%);
+}
+
+.slider-val   { color: var(--bl-ink); }
+.estimate-val { color: var(--bl-ink); }
+
+.size-estimate {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.result-preview-wrap {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Budget Tracker ──
+   The four accent panels keep the tool's own blade (inherited from
+   #finance-tool-budget) and are told apart by their rails, which come from
+   --color-accent-* above. No background overrides here on purpose: setting
+   one would break the tool out of its colour. */
+
+.budget-annual-stats-title-panel {
+  border-left: 5px solid var(--bl-rail);
+}
+.budget-annual-stats-title {
+  color: var(--bl-ink);
+  font-weight: 700;
+}
+
+/* Summary tabs. .budget-summary-tab is a <button>, so this theme's global
+   silver-pill `button` rule above otherwise wins and the active tab looks
+   like every other pill; restated here as the lit blade. */
+.budget-summary-tab,
+.setup-tab { color: #2f2f2f; }
+.budget-summary-tab:hover,
+.setup-tab:hover { color: #1d1d1d; }
+.budget-summary-tab.active,
+.setup-tab.active {
+  color: #ffffff;
+  background: linear-gradient(180deg, var(--bl-deep) 0%, var(--bl-rail) 100%);
+  border-color: #ffffff;
+  border-bottom-color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+}
+
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
+  background: linear-gradient(180deg, var(--bl-deep) 0%, var(--bl-rail) 100%);
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+/* Semantic, and dark: these are text and hairline borders on a light card. */
+.budget-stats-count-good    { color: #1f5c14; border-color: #1f5c14; }
+.budget-stats-count-late    { color: #7a4a00; border-color: #7a4a00; }
+.budget-stats-count-overdue { color: #8f2419; border-color: #8f2419; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(255, 255, 255, 0.6);
+  color: #2f2f2f;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: #ffffff;
+  color: #1d1d1d;
+}
+
+.budget-stats-section-heading { color: #2f2f2f; font-weight: 700; }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Pointed at the blade vars, so the tool
+   paints itself from #games-tool-game-stats' own purple.
+
+   The accent split matters here: --gs-accent is used both as a fill (the
+   active segment, with --color-btn-text white on top) and as borders and low
+   percentage washes, so it takes the rail. --gs-accent-soft is used purely as
+   TEXT on the card (tile values, section titles, card labels), so it takes the
+   near-black ink. Swapping the two is what made this tool unreadable.
+
+   The tile and chip surfaces still come from the shared --color-bg, which the
+   blade scope above has already re-pointed at --bl-1, so they wash light over
+   the card without needing a hook of their own. */
+:root {
+  --gs-accent:      var(--bl-rail);
+  --gs-accent-soft: var(--bl-ink);
+  --gs-win:         #1f5c14;
+  --gs-loss:        #8f2419;
+  --gs-surface:     rgba(255, 255, 255, 0.4);
+  --gs-header-bg:   rgba(255, 255, 255, 0.5);
+  --gs-grid-line:   rgba(0, 0, 0, 0.2);
+  --gs-zebra:       rgba(0, 0, 0, 0.05);
+}

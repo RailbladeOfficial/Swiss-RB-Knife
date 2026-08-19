@@ -725,6 +725,18 @@ function switchSection(sectionKey: string, toolKey?: string): void {
   }
   _activeViewKey = nextViewKey;
 
+  // Mirrored onto <body> so CSS outside the tool view can key off which tool
+  // is open. Modals live at body level, not inside the tool's own subtree, so
+  // a theme that colours per tool (Blades) has no other way to reach them.
+  // Same "section/tool" key ALL_TOOLS uses; absent entirely on Home and on a
+  // category landing, which is what makes `body[data-active-tool]` mean "a
+  // tool is open" rather than "a tool was last open".
+  if (toolKey) {
+    document.body.dataset.activeTool = `${sectionKey}/${toolKey}`;
+  } else {
+    delete document.body.dataset.activeTool;
+  }
+
   navItems.forEach((item) => {
     const matchesSection = item.dataset.section === sectionKey;
     const matchesTool = item.dataset.tool
@@ -1904,6 +1916,7 @@ export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: s
       { id: "matte", label: "Matte" },
       { id: "midnight", label: "Midnight" },
       { id: "terminal", label: "Terminal" },
+      { id: "shadow", label: "Shadow" },
     ],
   },
   {
@@ -1926,6 +1939,11 @@ export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: s
       { id: "neon", label: "Neon" },
       { id: "retro-electric", label: "Retro-Electric" },
       { id: "halo", label: "Halo" },
+      { id: "cartoon", label: "Cartoon" },
+      { id: "lava", label: "Lava" },
+      { id: "windowed", label: "Windowed" },
+      { id: "blades", label: "Blades" },
+      { id: "amuzed", label: "Amuzed" },
     ],
   },
 ];

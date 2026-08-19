@@ -2931,16 +2931,19 @@
               <option value="music">Music</option>
               <option value="finance">Finance</option>
             </optgroup>
+            <!-- Classic order, i.e. ALL_TOOLS' own order in shell.ts. Kept in
+                 sync with it by hand: refreshStartupSelectOptions() only
+                 toggles these options' visibility, it never reorders them. -->
             <optgroup label="Specific Tool">
               <option value="finance:budget">Budget Tracker</option>
               <option value="utility:time-tracker">Time Tracker</option>
               <option value="files:auto-backup">Auto-Backup</option>
-              <option value="media:image-ccr">Image CCR</option>
-              <option value="files:dummy-file-generator">Dummy File Generator</option>
-              <option value="games:game-stats">Game Stats</option>
-              <option value="utility:tts-repeater">TTS Repeater</option>
               <option value="utility:countdown">Countdown Timer</option>
+              <option value="games:game-stats">Game Stats</option>
+              <option value="media:image-ccr">Image CCR</option>
               <option value="utility:days-between">Days Between Dates</option>
+              <option value="utility:tts-repeater">TTS Repeater</option>
+              <option value="files:dummy-file-generator">Dummy File Generator</option>
             </optgroup>
           </select>
         </div>
@@ -3021,6 +3024,7 @@
             <option value="matte">Matte</option>
             <option value="midnight">Midnight</option>
             <option value="terminal">Terminal</option>
+            <option value="shadow">Shadow</option>
           </optgroup>
           <optgroup label="Holiday">
             <option value="valentine">Valentine</option>
@@ -3037,6 +3041,11 @@
             <option value="neon">Neon</option>
             <option value="retro-electric">Retro-Electric</option>
             <option value="halo">Halo</option>
+            <option value="cartoon">Cartoon</option>
+            <option value="lava">Lava</option>
+            <option value="windowed">Windowed</option>
+            <option value="blades">Blades</option>
+            <option value="amuzed">Amuzed</option>
             <option value="random">Random</option>
             <option value="custom">Custom</option>
           </optgroup>
@@ -5822,6 +5831,12 @@
                 <option value="knowledge">Knowledge</option>
                 <option value="neon">Neon</option>
                 <option value="retro-electric">Retro-Electric</option>
+                <option value="cartoon">Cartoon</option>
+                <option value="lava">Lava</option>
+                <option value="shadow">Shadow</option>
+                <option value="windowed">Windowed</option>
+                <option value="blades">Blades</option>
+                <option value="amuzed">Amuzed</option>
               </optgroup>
               <optgroup id="teBaseCustomGroup" label="Custom Themes" style="display:none;"></optgroup>
             </select>

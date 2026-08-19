@@ -1,0 +1,406 @@
+/* =============================================================================
+   CARTOON
+   -----------------------------------------------------------------------------
+   Saturated primaries on cream paper, every surface outlined in thick ink and
+   dropped on a hard offset shadow. Deliberately zero gradients and zero glows:
+   the whole point is that nothing has depth beyond the one flat shadow, so it
+   reads as a 2-D drawing rather than a lit 3-D UI. The ink colour (#171717) is
+   restated literally throughout rather than going through --color-border,
+   because several shell rules use --color-border at 1px widths where the 3px
+   outline would be wrong.
+============================================================================= */
+
+:root {
+  --color-bg:                  #ffefc9;
+  --color-panel:               #ffffff;
+  --color-input-bg:            #fffaf0;
+  --color-border:              #171717;
+  --color-border-dashed:       #171717;
+  --color-text:                #171717;
+  --color-text-muted:          #6f665c;
+  --color-hover:               #ffd93d;
+
+  --color-btn:                 #1c6df0;
+  --color-accent:              #e5162c;
+  --color-btn-hover:           #0d54c4;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #e5162c;
+  --color-danger-subtle:       rgba(229, 22, 44, 0.15);
+  --color-success:             #00b74a;
+
+  --color-accent-input:        #1c6df0;
+  --color-accent-view:         #00b74a;
+  --color-accent-totals:       #ffb300;
+  --color-accent-entries:      #e5162c;
+
+  --color-toggle-off:          #b9b2a8;
+  --color-toggle-on:           #1c6df0;
+
+  /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (red) / tool heading (grape) */
+  --color-changelog-features:     #1c6df0;
+  --color-changelog-improvements: #00b74a;
+  --color-changelog-bugfixes:     #e5162c;
+  --color-changelog-tool:         #8b2ff0;
+
+  --color-toast-success-bg:    #c8f7d8;
+  --color-toast-success-border:#00b74a;
+  --color-toast-success-text:  #06401d;
+  --color-toast-error-bg:      #ffd6da;
+  --color-toast-error-border:  #e5162c;
+  --color-toast-error-text:    #5c0511;
+
+  /* ── Budget chart palette ── Blue / green / yellow / red / grape / cyan / orange / pink, straight poster primaries */
+  --color-chart-1:             #1c6df0;
+  --color-chart-2:             #00b74a;
+  --color-chart-3:             #ffb300;
+  --color-chart-4:             #e5162c;
+  --color-chart-5:             #8b2ff0;
+  --color-chart-6:             #00cfd1;
+  --color-chart-7:             #ff7a00;
+  --color-chart-8:             #ff2fa0;
+}
+
+/* ── The ink outline + hard shadow, applied everywhere a surface exists ──
+   Grouped rather than repeated per component so the "one ink weight, one
+   shadow offset" rule is visibly a single decision. */
+.panel,
+.tool-card,
+.size-estimate,
+.result-preview-wrap {
+  border: 3px solid #171717;
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 #171717;
+}
+
+/* Cards lift on hover instead of glowing: the shadow grows, nothing blurs. */
+.tool-card:hover {
+  background: #ffd93d;
+  border-color: #171717;
+  box-shadow: 6px 6px 0 #171717;
+}
+
+.tool-card-icon {
+  color: #1c6df0;
+}
+
+/* ── Time Tracker panels, one flat primary each ── */
+.input-panel    { background: #cfe2ff; border-left: 8px solid #1c6df0; }
+.controls-panel { background: #c8f7d8; border-left: 8px solid #00b74a; }
+.totals-panel   { background: #ffeeb8; border-left: 8px solid #ffb300; }
+.entries-panel  { background: #ffd6da; border-left: 8px solid #e5162c; }
+
+/* ── Tool / section header, a flat yellow title band ── */
+.tool-view-header,
+.section-header {
+  background: #ffd93d;
+  border: 3px solid #171717;
+  border-radius: 10px 10px 0 0;
+  box-shadow: 4px 4px 0 #171717;
+}
+
+.tool-view-title,
+.section-title {
+  color: #e5162c;
+  opacity: 1;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* The header back-arrow rides the yellow title band, where the muted body
+   colour washes out. Ink, like the rest of the drawing. */
+.tool-back-btn,
+.section-back-btn {
+  color: #171717;
+}
+
+/* ── Modal, solid: flat white sheet on ink ── */
+body.solid-modals .modal {
+  background: #ffffff;
+  border: 3px solid #171717;
+  border-radius: 12px;
+  box-shadow: 8px 8px 0 #171717;
+}
+
+/* ── Modal, translucent: still flat, just letting the cream through. No blur,
+   frosted glass is exactly the depth cue this theme is avoiding. ── */
+body:not(.solid-modals) .modal {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 3px solid #171717;
+  border-radius: 12px;
+  box-shadow: 8px 8px 0 #171717;
+}
+
+/* ── Buttons, ink-outlined chips that physically press down on hover: the
+   shadow shrinks and the button moves into it. ── */
+button {
+  border: 3px solid #171717;
+  border-radius: 8px;
+  font-weight: 700;
+  box-shadow: 3px 3px 0 #171717;
+}
+
+button:hover {
+  box-shadow: 1px 1px 0 #171717;
+}
+
+/* Ghost buttons: icon-only and link-style controls that already clear their
+   background and border in the shell/tool CSS. They never reset box-shadow
+   though, so the bare `button` rule above would leave each one wearing a hard
+   black offset shadow with nothing casting it. Everything here is a bare
+   class, so it outranks `button` regardless of order. */
+.titlebar-btn,
+.modal-close-btn,
+.nav-back-btn,
+.tool-back-btn,
+.section-back-btn,
+.dashboard-tool-btn,
+.changelog-toggle-btn,
+.sidebar-edit-visibility-btn,
+.theme-tile-icon-btn,
+.lock-show-btn,
+.lock-cred-link,
+.gs-segment-btn,
+.gs-player-remove-btn {
+  border: none;
+  box-shadow: none;
+}
+
+.primary-btn {
+  background: #1c6df0;
+  border-color: #171717;
+  color: #ffffff;
+}
+
+.primary-btn:hover {
+  background: #0d54c4;
+  border-color: #171717;
+  color: #ffffff;
+  box-shadow: 1px 1px 0 #171717;
+}
+
+.danger-btn {
+  background: #e5162c;
+  border: 3px solid #171717;
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 3px 3px 0 #171717;
+}
+
+.danger-btn:hover {
+  background: #b8101f;
+  color: #ffffff;
+  box-shadow: 1px 1px 0 #171717;
+}
+
+/* The underline/pill tab strips are <button>s that clear their own border but
+   not box-shadow (.setup-tab is the one that does, and says so in its own
+   comment). Without this they would carry the button treatment above with no
+   button under it. Border is left alone here: .budget-summary-tab's 2px
+   transparent bottom edge is what its active underline colours in. */
+.budget-summary-tab,
+.theme-picker-tab {
+  box-shadow: none;
+}
+
+/* ── Inputs, same ink weight so a field reads as a drawn box ── */
+input,
+select,
+textarea {
+  border: 3px solid #171717;
+  border-radius: 8px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #1c6df0;
+}
+
+/* ── Sidebar, ink rule down the edge, yellow highlight on the active row ── */
+#sidebar {
+  border-right: 3px solid #171717;
+}
+
+.nav-item.active {
+  background: #ffd93d;
+  color: #171717;
+  border-left-color: #e5162c;
+  font-weight: 700;
+}
+
+#titleBar {
+  border-bottom: 3px solid #171717;
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  background: #cfe2ff;
+  border-left: 8px solid #1c6df0;
+}
+
+#media-tool-image-ccr .result-panel {
+  background: #c8f7d8;
+  border-left: 8px solid #00b74a;
+}
+
+/* ── Drop zone ── */
+.drop-zone {
+  border: 3px dashed #171717;
+  background: #fffaf0;
+}
+
+/* ── Tab buttons, flat chips; the active one is a solid red tab ── */
+.tab-btn {
+  color: #6f665c;
+  background: #fffaf0;
+  border: 3px solid #171717;
+  box-shadow: 3px 3px 0 #171717;
+}
+
+.tab-btn:hover {
+  color: #171717;
+  background: #ffd93d;
+  border-color: #171717;
+  box-shadow: 1px 1px 0 #171717;
+}
+
+.tab-btn.active {
+  color: #ffffff;
+  background: #e5162c;
+  border-color: #171717;
+  box-shadow: 1px 1px 0 #171717;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #fffaf0;
+  color: #6f665c;
+  border: 3px solid #171717;
+  box-shadow: 2px 2px 0 #171717;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: #171717;
+  background: #ffd93d;
+  border-color: #171717;
+  box-shadow: 1px 1px 0 #171717;
+}
+
+.dir-btn.active, .prv-btn.active {
+  color: #ffffff;
+  background: #1c6df0;
+  border-color: #171717;
+  box-shadow: 1px 1px 0 #171717;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge {
+  background: #ffb300;
+  color: #171717;
+  border: 2px solid #171717;
+}
+
+/* ── Preview cards ── */
+.preview-card:hover       { border-color: #1c6df0; }
+.preview-card.anchor-card { border-color: #ffb300; box-shadow: 4px 4px 0 #171717; }
+.preview-card.drag-target { border-color: #00b74a; }
+
+/* ── Slider, an ink-outlined knob ── */
+.img-slider::-webkit-slider-thumb {
+  background: #e5162c;
+  border: 3px solid #171717;
+  box-shadow: none;
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: #1c6df0;
+}
+
+.slider-val   { color: #1c6df0; font-weight: 700; }
+.estimate-val { color: #e5162c; font-weight: 700; }
+
+.size-estimate {
+  background: #ffeeb8;
+}
+
+.result-preview-wrap {
+  border-color: #171717;
+}
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #e5162c; }
+
+/* ── Budget Tracker ── */
+
+#finance-tool-budget .panel-accent-input   { background: #cfe2ff; }
+#finance-tool-budget .panel-accent-view    { background: #c8f7d8; }
+#finance-tool-budget .panel-accent-totals  { background: #ffeeb8; }
+#finance-tool-budget .panel-accent-entries { background: #ffd6da; }
+
+.budget-annual-stats-title-panel {
+  background: #ffd93d;
+  border-left: 8px solid #e5162c;
+}
+.budget-annual-stats-title { color: #e5162c; font-weight: 800; }
+
+/* Summary tabs, solid red when active to match .tab-btn.active */
+.budget-summary-tab.active,
+.setup-tab.active {
+  color: #ffffff;
+  background: #e5162c;
+  border-bottom-color: #171717;
+}
+
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
+  background: #1c6df0;
+  color: #ffffff;
+  border-color: #171717;
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #00b74a; border-color: #00b74a; }
+.budget-stats-count-late    { color: #ff7a00; border-color: #ff7a00; }
+.budget-stats-count-overdue { color: #e5162c; border-color: #e5162c; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: #171717;
+  color: #6f665c;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: #ffd93d;
+  border-color: #171717;
+  color: #171717;
+}
+
+.budget-stats-section-heading { color: #6f665c; font-weight: 700; }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      #1c6df0;
+  --gs-accent-soft: #e5162c;
+  --gs-win:         #00b74a;
+  --gs-loss:        #e5162c;
+  --gs-surface:     #cfe2ff;
+  --gs-header-bg:   #ffd93d;
+  --gs-grid-line:   #171717;
+  --gs-zebra:       rgba(23, 23, 23, 0.05);
+}

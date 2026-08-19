@@ -1,0 +1,511 @@
+/* =============================================================================
+   WINDOWED
+   -----------------------------------------------------------------------------
+   Windows 2000. The #3a6ea5 desktop blue behind everything, #d4d0c8 grey
+   chrome on top of it, square corners, and the four-tone raised bevel (white /
+   light grey / grey / near-black) that every 9x-era control was built from.
+   Title bars take the navy-to-pale-blue gradient; Tahoma carries the whole
+   thing.
+
+   The desktop blue is background ONLY. Every surface that holds content
+   (panels, cards, dialogs, entry fields) stays light, the way a 9x window
+   does, so --color-text can be flat black everywhere. The one deliberate
+   deviation from period-accurate is the bevel: box-shadow insets carry the
+   inner two tones instead of a 4px double border, so control heights match
+   every other theme.
+
+   NOTE ON --color-bg
+   The desktop colour is painted on `body` directly rather than through
+   --color-bg, because the shell reuses --color-bg for every RECESSED surface
+   inside a panel, not just for the window behind everything: Time Tracker's
+   totals block and entry rows, Budget's ledger and setup rows, Game Stats'
+   tiles, chips and sticky history headers. Setting it to the true desktop
+   blue painted all of those in the same colour as the background they sit on,
+   which is exactly the contrast a 9x list view was built to have. So
+   --color-bg keeps the lighter blue and only the two things that really are
+   "the desktop", body and the lock screen, take #3a6ea5.
+
+   Icons are inline SVG strokes, so nothing can literally pixelate them.
+   `shape-rendering: crispEdges` turns off antialiasing instead, which
+   stair-steps every diagonal and reads as the low-res icon art of the era.
+============================================================================= */
+
+:root {
+  /* The lighter blue, i.e. every recessed row/tile inside a panel. See the
+     "NOTE ON --color-bg" in the header: the true desktop blue is on `body`. */
+  --color-bg:                  #8fb3d4;
+  --color-panel:               #d4d0c8;
+  --color-input-bg:            #ffffff;
+  --color-border:              #808080;
+  --color-border-dashed:       #404040;
+  --color-text:                #000000;
+  --color-text-muted:          #4d4d4d;
+  --color-hover:               #c6c2ba;
+
+  --color-btn:                 #0a246a;
+  --color-accent:              #0a246a;
+  --color-btn-hover:           #1a3a8a;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #a00000;
+  --color-danger-subtle:       rgba(160, 0, 0, 0.12);
+  --color-success:             #008000;
+
+  --color-accent-input:        #0a246a;
+  --color-accent-view:         #008080;
+  /* Darker than the VGA #808000: this one is read as text (Auto-Backup's
+     summary values, Game Stats' live-tile value) on pale surfaces, where
+     true olive sits near 2:1. */
+  --color-accent-totals:       #5c5c00;
+  --color-accent-entries:      #800000;
+
+  --color-toggle-off:          #9d9992;
+  --color-toggle-on:           #0a246a;
+
+  /* ── Changelog accents ── Features (navy) / Improvements (green) / Bugfixes (maroon) / tool heading (purple) */
+  --color-changelog-features:     #0a246a;
+  --color-changelog-improvements: #008000;
+  --color-changelog-bugfixes:     #a00000;
+  --color-changelog-tool:         #800080;
+
+  --color-toast-success-bg:    #dfeddf;
+  --color-toast-success-border:#008000;
+  --color-toast-success-text:  #003300;
+  --color-toast-error-bg:      #f0dede;
+  --color-toast-error-border:  #a00000;
+  --color-toast-error-text:    #400000;
+
+  /* ── Budget chart palette ── The 16-colour VGA workhorses: navy / teal / maroon / olive / purple / green / steel / sienna */
+  --color-chart-1:             #000080;
+  --color-chart-2:             #008080;
+  --color-chart-3:             #800000;
+  --color-chart-4:             #808000;
+  --color-chart-5:             #800080;
+  --color-chart-6:             #008000;
+  --color-chart-7:             #4a6f9c;
+  --color-chart-8:             #a0522d;
+}
+
+/* ── The desktop itself. The only two surfaces that are genuinely "behind
+   every window", so the only two that get the real #3a6ea5. ── */
+body {
+  background: #3a6ea5;
+}
+
+#lockScreen {
+  background: #3a6ea5;
+}
+
+/* ── The era's typeface, and square corners on everything ── */
+body {
+  font-family: Tahoma, "MS Sans Serif", Geneva, Verdana, sans-serif;
+}
+
+button {
+  font-family: inherit;
+}
+
+.panel,
+.tool-card,
+.modal,
+.tool-view-header,
+.section-header,
+button,
+.danger-btn,
+input,
+select,
+textarea,
+.drop-zone,
+.size-estimate,
+.result-preview-wrap,
+.preview-card,
+.anchor-badge,
+.tab-btn,
+.dir-btn,
+.prv-btn {
+  border-radius: 0;
+}
+
+/* ── The raised bevel. Outer border carries the extreme tones, the two inset
+   shadows carry the inner pair, giving the full 9x four-step edge in 2px. ── */
+.panel,
+.tool-card,
+.size-estimate,
+.result-preview-wrap,
+button,
+.danger-btn,
+.tab-btn,
+.dir-btn,
+.prv-btn {
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  box-shadow:
+    inset 1px 1px 0 #dfdfdf,
+    inset -1px -1px 0 #808080;
+}
+
+/* ── The sunken bevel, for anything you type into ── */
+input,
+select,
+textarea,
+.drop-zone {
+  border: 2px solid;
+  border-color: #808080 #ffffff #ffffff #808080;
+  box-shadow: inset 1px 1px 0 #404040;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 1px dotted #000000;
+  outline-offset: -3px;
+}
+
+/* ── Buttons, grey face, black label, and a genuine press on :active ── */
+button {
+  background: #d4d0c8;
+  color: #000000;
+}
+
+button:hover {
+  background: #dedad2;
+  color: #000000;
+}
+
+button:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #dfdfdf;
+}
+
+/* Ghost buttons: icon-only and link-style controls that already clear their
+   background and border in the shell/tool CSS. They never reset box-shadow
+   though, so the bevel above would leave each one framed by a raised edge
+   with no face inside it. Everything here is a bare class, so it outranks
+   `button` regardless of order. */
+.titlebar-btn,
+.modal-close-btn,
+.nav-back-btn,
+.tool-back-btn,
+.section-back-btn,
+.dashboard-tool-btn,
+.changelog-toggle-btn,
+.sidebar-edit-visibility-btn,
+.theme-tile-icon-btn,
+.lock-show-btn,
+.lock-cred-link,
+.gs-segment-btn,
+.gs-player-remove-btn {
+  border: none;
+  box-shadow: none;
+}
+
+.primary-btn {
+  background: #d4d0c8;
+  color: #000000;
+  font-weight: 700;
+}
+
+.primary-btn:hover {
+  background: #dedad2;
+  color: #000000;
+}
+
+.danger-btn {
+  background: #d4d0c8;
+  color: #a00000;
+  font-weight: 700;
+}
+
+.danger-btn:hover {
+  background: #e8d8d8;
+  color: #a00000;
+}
+
+/* The underline/pill tab strips are <button>s that clear their own border but
+   not box-shadow (.setup-tab is the one that does, and says so in its own
+   comment). Without this they would carry the button treatment above with no
+   button under it. Border is left alone here: .budget-summary-tab's 2px
+   transparent bottom edge is what its active underline colours in. */
+.budget-summary-tab,
+.theme-picker-tab {
+  box-shadow: none;
+}
+
+/* ── Icons: antialiasing off, so every diagonal stair-steps ── */
+.nav-icon svg,
+.tool-card-icon svg,
+.sidebar-edit-icon svg,
+.theme-tile-preview-icon svg {
+  shape-rendering: crispEdges;
+}
+
+/* ── Title bar and sidebar, the grey chrome ── */
+#titleBar {
+  background: #d4d0c8;
+  border-bottom: 2px solid;
+  border-color: transparent #404040 #808080 transparent;
+  box-shadow: inset 0 1px 0 #dfdfdf;
+}
+
+#sidebar {
+  background: #d4d0c8;
+  border-right: 2px solid;
+  border-color: transparent #404040 transparent transparent;
+  box-shadow: inset -1px 0 0 #808080;
+}
+
+/* Selected menu row: navy fill, white label, exactly like a 9x menu
+   highlight. Set explicitly because --color-hover is grey and the base rule
+   would leave black text on it. */
+.nav-item.active,
+.nav-item.active:hover {
+  background: #0a246a;
+  color: #ffffff;
+  border-left-color: #0a246a;
+}
+
+.nav-item:hover {
+  background: #c6c2ba;
+  color: #000000;
+}
+
+.tool-card:hover {
+  background: #dedad2;
+  border-color: #ffffff #404040 #404040 #ffffff;
+}
+
+.tool-card-icon {
+  color: #0a246a;
+}
+
+/* ── Time Tracker panels, flat grey with a single VGA rail each ── */
+.input-panel    { border-left: 4px solid #000080; }
+.controls-panel { border-left: 4px solid #008080; }
+.totals-panel   { border-left: 4px solid #808000; }
+.entries-panel  { border-left: 4px solid #800000; }
+
+/* ── Tool / section header, the active-window title bar ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, #0a246a 0%, #a6caf0 100%);
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  box-shadow: inset 1px 1px 0 #dfdfdf;
+}
+
+.tool-view-title,
+.section-title {
+  color: #ffffff;
+  opacity: 1;
+  font-weight: 700;
+}
+
+/* The header back-arrow rides the navy title bar, where the muted body colour
+   disappears. White, like the title beside it. */
+.tool-back-btn,
+.section-back-btn {
+  color: #ffffff;
+}
+
+/* ── Modal, solid: a dialog box. Same chrome, heavier drop shadow ── */
+body.solid-modals .modal {
+  background: #d4d0c8;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  box-shadow:
+    inset 1px 1px 0 #dfdfdf,
+    inset -1px -1px 0 #808080,
+    4px 4px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Modal, translucent: the era had no compositor, so this stays an opaque
+   dialog and only lightens. Blurring it would be the one anachronism the
+   theme cannot absorb. ── */
+body:not(.solid-modals) .modal {
+  background: #dedad2;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  box-shadow:
+    inset 1px 1px 0 #ffffff,
+    inset -1px -1px 0 #808080,
+    4px 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Image CCR panels ── */
+#media-tool-image-ccr .panel {
+  border-left: 4px solid #000080;
+}
+
+#media-tool-image-ccr .result-panel {
+  border-left: 4px solid #008080;
+}
+
+/* ── Drop zone ── */
+.drop-zone {
+  background: #ffffff;
+}
+
+/* ── Tab buttons, notebook tabs: the active one merges into the page ── */
+.tab-btn {
+  background: #c6c2ba;
+  color: #4d4d4d;
+}
+
+.tab-btn:hover {
+  background: #d4d0c8;
+  color: #000000;
+}
+
+.tab-btn.active {
+  background: #d4d0c8;
+  color: #000000;
+  font-weight: 700;
+  border-color: #ffffff #404040 transparent #ffffff;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #d4d0c8;
+  color: #4d4d4d;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  background: #dedad2;
+  color: #000000;
+}
+
+.dir-btn.active, .prv-btn.active {
+  background: #c6c2ba;
+  color: #000000;
+  font-weight: 700;
+  border-color: #404040 #ffffff #ffffff #404040;
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #dfdfdf;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge {
+  background: #0a246a;
+  color: #ffffff;
+}
+
+/* ── Preview cards ── */
+.preview-card:hover       { border-color: #0a246a; }
+.preview-card.anchor-card { border-color: #808000; }
+.preview-card.drag-target { border-color: #008080; }
+
+/* ── Slider, a grey grip ── */
+.img-slider::-webkit-slider-thumb {
+  background: #d4d0c8;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  border-radius: 0;
+  box-shadow: inset 1px 1px 0 #dfdfdf;
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: #dedad2;
+}
+
+.slider-val   { color: #000080; font-weight: 700; }
+.estimate-val { color: #008080; font-weight: 700; }
+
+.size-estimate {
+  background: #d4d0c8;
+}
+
+.result-preview-wrap {
+  border-color: #808080 #ffffff #ffffff #808080;
+}
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #800080; }
+
+/* ── Budget Tracker ── */
+
+#finance-tool-budget .panel-accent-input   { background: #d4d0c8; }
+#finance-tool-budget .panel-accent-view    { background: #d4d0c8; }
+#finance-tool-budget .panel-accent-totals  { background: #d4d0c8; }
+#finance-tool-budget .panel-accent-entries { background: #d4d0c8; }
+
+.budget-annual-stats-title-panel {
+  background: #d4d0c8;
+  border-left: 4px solid #000080;
+}
+.budget-annual-stats-title { color: #000080; font-weight: 700; }
+
+/* Summary tabs. .budget-summary-tab is a <button>, so this theme's global
+   `button { background/color }` rule above otherwise flattens the active
+   state; restated here as a pressed-in tab. */
+.budget-summary-tab,
+.setup-tab { color: #4d4d4d; background: #c6c2ba; }
+.budget-summary-tab:hover,
+.setup-tab:hover { color: #000000; background: #d4d0c8; }
+.budget-summary-tab.active,
+.setup-tab.active {
+  color: #000000;
+  background: #d4d0c8;
+  font-weight: 700;
+  border-bottom-color: #0a246a;
+}
+
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
+  background: #0a246a;
+  color: #ffffff;
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #008000; border-color: #008000; }
+.budget-stats-count-late    { color: #808000; border-color: #808000; }
+.budget-stats-count-overdue { color: #a00000; border-color: #a00000; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  color: #4d4d4d;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: #dedad2;
+  color: #000000;
+}
+
+.budget-stats-section-heading { color: #4d4d4d; font-weight: 700; }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component.
+
+   --gs-accent-soft is used as TEXT throughout the tool (tile values, section
+   titles, card labels). The teal it used to hold sat at about 3:1 on the grey
+   chrome; navy, the same colour the fills use, is the readable answer and
+   costs nothing since the two are never adjacent. --gs-win is likewise a
+   darker green than the VGA #008000 for the same reason: it is read as text
+   far more often than as a fill. */
+:root {
+  --gs-accent:      #000080;
+  --gs-accent-soft: #000080;
+  --gs-win:         #004d00;
+  --gs-loss:        #a00000;
+  --gs-surface:     #c6c2ba;
+  --gs-header-bg:   #bdb9b1;
+  --gs-grid-line:   #808080;
+  --gs-zebra:       rgba(0, 0, 0, 0.05);
+  --gs-radius:      0px;
+  --gs-radius-sm:   0px;
+}
