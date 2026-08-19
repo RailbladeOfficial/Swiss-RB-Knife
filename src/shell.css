@@ -1924,6 +1924,41 @@ button:hover {
   text-align: center;
 }
 
+/* Day/Night window. The two <input type="time"> controls reuse
+   .cycle-interval-inputs for their row, so only the word between them and the
+   pickers' own width need saying here. */
+.cycle-time-sep {
+  font-size: 0.75rem;
+  opacity: 0.55;
+}
+
+/* No width: a native time input already sizes itself to hold its text, the
+   AM/PM segment and its clock glyph, at whatever the current Font Scale makes
+   those. Stating one only invites clipping. flex-shrink: 0 is the part that
+   matters, .cycle-interval-inputs is a flexbox and would otherwise squeeze
+   both fields below that intrinsic width. */
+#cycleDayStart,
+#cycleDayEnd {
+  flex-shrink: 0;
+  text-align: center;
+}
+
+/* The surrounding .theme-picker-random-settings puts a 10px gap between its
+   own children, and this wrapper is a single one of them, so its contents
+   need that rhythm restated or the rows inside sit flush against each other. */
+#cycleDayNightRows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The two theme dropdowns sit in ordinary .settings-row pairs, so they only
+   need a shared cap to stop a long custom theme name stretching the pane. */
+#cycleDayThemeSelect,
+#cycleNightThemeSelect {
+  max-width: 190px;
+}
+
 .theme-picker-section-divider {
   font-size: 0.7rem;
   font-weight: 600;

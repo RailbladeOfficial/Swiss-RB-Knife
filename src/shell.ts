@@ -70,6 +70,7 @@ import {
 import {
   advanceCycleNow,
   getActiveHolidayOverrideThemeId,
+  getDayNightStatus,
   getHolidayOverrideEndDate,
 } from "./cycle-theme";
 import {
@@ -192,8 +193,15 @@ type ShellSettings = {
    *  Regenerative mode does, "time" advances on a fixed interval instead of
    *  user interaction (see cycleIntervalAmount/cycleIntervalUnit); "onStartup"
    *  advances exactly once per session, the moment the app finishes loading
-   *  settings, and never again on its own after that. */
-  cycleTrigger: "onStartup" | "time" | "everything" | "click";
+   *  settings, and never again on its own after that.
+   *
+   *  "dayNight" is the odd one out: it doesn't advance a pointer through the
+   *  pool at all, it alternates between exactly two themes on a clock window
+   *  (see the four cycleDay/cycleNight fields below). Order, Include Custom and
+   *  Restrict to Holiday Season have nothing to act on in that mode and are
+   *  hidden while it's selected; Holiday Overrides still apply, since that's
+   *  a force-switch checked ahead of every other rule. */
+  cycleTrigger: "onStartup" | "time" | "everything" | "click" | "dayNight";
   cycleIntervalAmount: number;
   cycleIntervalUnit: "seconds" | "minutes" | "hours" | "days";
   /** Off by default: whether saved Custom Themes are included in the cycle
@@ -219,6 +227,19 @@ type ShellSettings = {
   /** Epoch ms of the last cycle advance. The anchor the "time" trigger
    *  counts from, persisted so the countdown survives an app restart. */
   cycleLastAdvance: number;
+  /** Day/Night mode (the "dayNight" trigger): the two themes it alternates
+   *  between. Either may be a built-in theme id or a saved custom theme's id;
+   *  one that no longer resolves falls back at paint time rather than pointing
+   *  themeLink at a missing file. */
+  cycleDayThemeId: string;
+  cycleNightThemeId: string;
+  /** The clock window that counts as "day", as "HH:MM" 24-hour local strings
+   *  (the format <input type="time"> reads and writes, so the controls need no
+   *  conversion). The window is allowed to wrap midnight: a start of 20:00 with
+   *  an end of 06:00 is a perfectly good overnight "day". Start equal to end
+   *  means the day theme runs the whole 24 hours. */
+  cycleDayStart: string;
+  cycleDayEnd: string;
   /** On by default: master switch for every theme's canvas animation (snow,
    *  lightning, fireworks, …). Off suppresses all of them and hides the
    *  per-theme opt-outs below, which only make sense while this is on. */
@@ -440,6 +461,42 @@ function clampCycleIntervalAmount(
   return Math.max(unit === "seconds" ? 10 : 1, amount);
 }
 
+/** Whether a persisted value is a usable "HH:MM" 24-hour clock time, the format
+ *  <input type="time"> reads and writes. Guards the Day/Night window fields at
+ *  load, so a hand-edited settings file can't feed NaN into the schedule. */
+export function isClockTime(value: unknown): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+/** Shortest span the Day/Night window may leave on either side of itself.
+ *
+ *  Equal times had to go: they describe no switch at all, which is the one
+ *  thing this mode exists to do. A floor rather than a bare inequality because
+ *  a one-minute night is the same non-answer wearing a hat. Half an hour is
+ *  deliberately mild, though: a whole hour would rule out a legitimately short
+ *  themed window (an evening theme from 20:00 to 20:45, say) to prevent
+ *  nothing, since the boundary timer schedules to the exact edge and hits
+ *  short windows precisely. One constant, easy to move if it ever chafes. */
+const MIN_DAY_NIGHT_SPAN_MINUTES = 30;
+
+const MINUTES_PER_DAY = 24 * 60;
+
+function clockToMinutes(value: string): number {
+  const [h, m] = value.split(":");
+  return Number(h) * 60 + Number(m);
+}
+
+/** Whether a start/end pair leaves at least MIN_DAY_NIGHT_SPAN_MINUTES of BOTH
+ *  day and night. Measured around the clock rather than as end-minus-start,
+ *  because the window is allowed to wrap midnight: 07:00-06:40 is a 23h40m day
+ *  and a 20-minute night, and it's the night that's too short there. */
+export function isValidDayNightWindow(start: string, end: string): boolean {
+  if (!isClockTime(start) || !isClockTime(end)) return false;
+  const day = (clockToMinutes(end) - clockToMinutes(start) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+  const night = MINUTES_PER_DAY - day;
+  return day >= MIN_DAY_NIGHT_SPAN_MINUTES && night >= MIN_DAY_NIGHT_SPAN_MINUTES;
+}
+
 const DEFAULT_SETTINGS: ShellSettings = {
   fontScale: 0,
   hour12: false,
@@ -459,6 +516,10 @@ const DEFAULT_SETTINGS: ShellSettings = {
   cycleHolidayFullSeason: false,
   cycleCurrentThemeId: "",
   cycleLastAdvance: 0,
+  cycleDayThemeId: "light",
+  cycleNightThemeId: "dark",
+  cycleDayStart: "07:00",
+  cycleDayEnd: "19:00",
   themeAnimations: true,
   themeAnimationsOff: [],
   appLock: false,
@@ -590,6 +651,16 @@ const cycleTriggerSelect = document.getElementById("cycleTriggerSelect") as HTML
 const cycleIntervalRow = document.getElementById("cycleIntervalRow")!;
 const cycleIntervalAmountInput = document.getElementById("cycleIntervalAmount") as HTMLInputElement;
 const cycleIntervalUnitSelect = document.getElementById("cycleIntervalUnit") as HTMLSelectElement;
+const cycleOrderRow = document.getElementById("cycleOrderRow")!;
+const cycleDayNightRows = document.getElementById("cycleDayNightRows")!;
+const cycleDayThemeSelect = document.getElementById("cycleDayThemeSelect") as HTMLSelectElement;
+const cycleNightThemeSelect = document.getElementById("cycleNightThemeSelect") as HTMLSelectElement;
+const cycleDayStartInput = document.getElementById("cycleDayStart") as HTMLInputElement;
+const cycleDayEndInput = document.getElementById("cycleDayEnd") as HTMLInputElement;
+const cycleDayNightNote = document.getElementById("cycleDayNightNote")!;
+const cycleIncludeCustomRow = document.getElementById("cycleIncludeCustomRow")!;
+const cycleSeasonOnlyRow = document.getElementById("cycleSeasonOnlyRow")!;
+const cycleNowRow = document.getElementById("cycleNowRow")!;
 const cycleIncludeCustomToggle = document.getElementById("cycleIncludeCustomToggle") as HTMLInputElement;
 const cycleIncludeCustomLabel = document.getElementById("cycleIncludeCustomLabel")!;
 const cycleHolidayOverrideToggle = document.getElementById("cycleHolidayOverrideToggle") as HTMLInputElement;
@@ -1282,6 +1353,9 @@ export function applySettings(): void {
     : "Chaotic";
 
   // Same story for the Cycle tab's settings panel.
+  populateDayNightThemeSelects();
+  cycleDayStartInput.value = settings.cycleDayStart;
+  cycleDayEndInput.value = settings.cycleDayEnd;
   cycleOrderToggle.checked = settings.cycleOrder === "random";
   cycleOrderLabel.textContent = settings.cycleOrder === "random" ? "Random" : "Sequential";
   cycleTriggerSelect.value = settings.cycleTrigger;
@@ -1402,7 +1476,8 @@ async function loadSettings(): Promise<void> {
         merged.cycleTrigger === "onStartup" ||
         merged.cycleTrigger === "time" ||
         merged.cycleTrigger === "everything" ||
-        merged.cycleTrigger === "click"
+        merged.cycleTrigger === "click" ||
+        merged.cycleTrigger === "dayNight"
           ? merged.cycleTrigger
           : DEFAULT_SETTINGS.cycleTrigger,
       cycleIntervalAmount: clampCycleIntervalAmount(
@@ -1452,6 +1527,24 @@ async function loadSettings(): Promise<void> {
         typeof merged.cycleLastAdvance === "number"
           ? merged.cycleLastAdvance
           : DEFAULT_SETTINGS.cycleLastAdvance,
+      // Theme ids aren't validated here on purpose: custom themes load after
+      // settings do, so a legitimate custom id would look unknown at this
+      // point. resolveDayNightThemeId() in cycle-theme.ts does the check at
+      // paint time instead, when the full list actually exists.
+      cycleDayThemeId:
+        typeof merged.cycleDayThemeId === "string" && merged.cycleDayThemeId
+          ? merged.cycleDayThemeId
+          : DEFAULT_SETTINGS.cycleDayThemeId,
+      cycleNightThemeId:
+        typeof merged.cycleNightThemeId === "string" && merged.cycleNightThemeId
+          ? merged.cycleNightThemeId
+          : DEFAULT_SETTINGS.cycleNightThemeId,
+      cycleDayStart: isClockTime(merged.cycleDayStart)
+        ? merged.cycleDayStart
+        : DEFAULT_SETTINGS.cycleDayStart,
+      cycleDayEnd: isClockTime(merged.cycleDayEnd)
+        ? merged.cycleDayEnd
+        : DEFAULT_SETTINGS.cycleDayEnd,
       themeAnimations:
         typeof merged.themeAnimations === "boolean"
           ? merged.themeAnimations
@@ -1500,6 +1593,13 @@ async function loadSettings(): Promise<void> {
     };
   } catch {
     settings = { ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() };
+  }
+  // Checked as a pair, which the per-field coercion above structurally can't
+  // do. Both edges revert together: keeping one half of a window the schedule
+  // rejects would just produce a different wrong window.
+  if (!isValidDayNightWindow(settings.cycleDayStart, settings.cycleDayEnd)) {
+    settings.cycleDayStart = DEFAULT_SETTINGS.cycleDayStart;
+    settings.cycleDayEnd = DEFAULT_SETTINGS.cycleDayEnd;
   }
   // Note: applySettings() is deferred to after loadCustomThemes() in init()
   // so that custom theme application has the themes array available.
@@ -2216,10 +2316,101 @@ function tabForCurrentTheme(): ThemePickerTab {
  *  shared window-widener for both, so either one turning it on is enough to
  *  make it relevant). Called from applySettings() (so it stays correct even
  *  while the pane isn't open) and whenever the picker renders the Cycle tab. */
+/** Fills the two Day/Night theme dropdowns from the same THEME_GROUPS source
+ *  the picker itself uses, plus saved custom themes when there are any, so a
+ *  new built-in theme shows up here without a second list to maintain.
+ *  Rebuilt (rather than built once) because the custom-theme list changes at
+ *  runtime; each call re-selects the stored value afterwards. */
+const CYCLE_TAB_LABELS: Record<string, string> = {
+  main: "Main",
+  holiday: "Holiday",
+  special: "Special",
+};
+
+function populateDayNightThemeSelects(): void {
+  for (const select of [cycleDayThemeSelect, cycleNightThemeSelect]) {
+    select.innerHTML = "";
+    for (const group of THEME_GROUPS) {
+      const optgroup = document.createElement("optgroup");
+      optgroup.label = CYCLE_TAB_LABELS[group.tab] ?? group.tab;
+      for (const theme of group.themes) {
+        const opt = document.createElement("option");
+        opt.value = theme.id;
+        opt.textContent = theme.label;
+        optgroup.appendChild(opt);
+      }
+      select.appendChild(optgroup);
+    }
+    if (customThemes.length > 0) {
+      const optgroup = document.createElement("optgroup");
+      optgroup.label = "Custom";
+      for (const theme of customThemes) {
+        const opt = document.createElement("option");
+        opt.value = theme.id;
+        opt.textContent = theme.name;
+        optgroup.appendChild(opt);
+      }
+      select.appendChild(optgroup);
+    }
+  }
+  cycleDayThemeSelect.value = settings.cycleDayThemeId;
+  cycleNightThemeSelect.value = settings.cycleNightThemeId;
+}
+
+/** One line under the Day/Night controls saying which side of the window is
+ *  live and when it flips, so the schedule is legible without waiting for it.
+ *  Refreshed from the same "themechange" listener the Holiday note uses, which
+ *  the boundary timer fires on every real switch. */
+function refreshCycleDayNightNote(): void {
+  const status = getDayNightStatus();
+  if (!status) {
+    cycleDayNightNote.style.display = "none";
+    return;
+  }
+  cycleDayNightNote.style.display = "";
+  const side = status.daytime ? "Day" : "Night";
+  const label = themeLabelForId(status.themeId);
+  cycleDayNightNote.textContent = status.nextSwitch
+    ? `${side} right now, showing ${label}. Switches at ${formatClock(status.nextSwitch)}.`
+    : `${side} all day, showing ${label}.`;
+}
+
+/** The note's clock. Honours the app's own Time Format setting rather than the
+ *  OS locale, same idiom as the title-bar clock, so the switch time is written
+ *  the way the rest of the app writes times. */
+function formatClock(at: Date): string {
+  return at.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: settings.hour12,
+  });
+}
+
+/** Display name for a built-in or custom theme id, for the note above. */
+function themeLabelForId(themeId: string): string {
+  for (const group of THEME_GROUPS) {
+    const hit = group.themes.find((t) => t.id === themeId);
+    if (hit) return hit.label;
+  }
+  return customThemes.find((t) => t.id === themeId)?.name ?? themeId;
+}
+
 function syncCycleSettingsVisibility(): void {
+  const dayNight = settings.cycleTrigger === "dayNight";
   cycleIntervalRow.style.display = settings.cycleTrigger === "time" ? "" : "none";
+  cycleDayNightRows.style.display = dayNight ? "" : "none";
+  // Day/Night never builds a pool, so everything that only shapes one goes
+  // away rather than sitting there doing nothing. Holiday Overrides stay: that
+  // is a force-switch checked ahead of the mode, so it still applies.
+  cycleOrderRow.style.display = dayNight ? "none" : "";
+  cycleIncludeCustomRow.style.display = dayNight ? "none" : "";
+  cycleSeasonOnlyRow.style.display = dayNight ? "none" : "";
+  cycleNowRow.style.display = dayNight ? "none" : "";
   cycleHolidayFullSeasonRow.style.display =
-    settings.cycleHolidayOverride || settings.cycleHolidaySeasonOnly ? "" : "none";
+    settings.cycleHolidayOverride || (settings.cycleHolidaySeasonOnly && !dayNight)
+      ? ""
+      : "none";
+  refreshCycleDayNightNote();
 }
 
 /** Explains, right where the Holiday Override toggles live, why the theme is
@@ -2648,6 +2839,61 @@ cycleIntervalUnitSelect.addEventListener("change", () => {
   saveSettings();
 });
 
+cycleDayThemeSelect.addEventListener("change", () => {
+  settings.cycleDayThemeId = cycleDayThemeSelect.value;
+  applyTheme("cycle");
+  saveSettings();
+  refreshCycleDayNightNote();
+});
+
+cycleNightThemeSelect.addEventListener("change", () => {
+  settings.cycleNightThemeId = cycleNightThemeSelect.value;
+  applyTheme("cycle");
+  saveSettings();
+  refreshCycleDayNightNote();
+});
+
+/* Both time inputs go through the same handler. "change" rather than "input"
+   so a half-typed hour never briefly becomes the schedule.
+
+   Two ways an edit is refused, and both put back the field that was just
+   edited rather than blanking the pair: a value that isn't a time at all (the
+   picker can be cleared), and a pair that leaves too little day or night (see
+   isValidDayNightWindow). Only the edited edge moves back, so the other one
+   stays where it was deliberately put. */
+function commitDayNightWindow(edited: HTMLInputElement): void {
+  const stored = edited === cycleDayStartInput ? settings.cycleDayStart : settings.cycleDayEnd;
+
+  if (!isClockTime(edited.value)) {
+    edited.value = stored;
+    return;
+  }
+
+  const start = cycleDayStartInput.value;
+  const end = cycleDayEndInput.value;
+  if (!isValidDayNightWindow(start, end)) {
+    edited.value = stored;
+    flash(
+      `Day and night each need at least ${MIN_DAY_NIGHT_SPAN_MINUTES} minutes`,
+      "error",
+    );
+    return;
+  }
+
+  settings.cycleDayStart = start;
+  settings.cycleDayEnd = end;
+  applyTheme("cycle");
+  saveSettings();
+  refreshCycleDayNightNote();
+}
+
+cycleDayStartInput.addEventListener("change", () =>
+  commitDayNightWindow(cycleDayStartInput),
+);
+cycleDayEndInput.addEventListener("change", () =>
+  commitDayNightWindow(cycleDayEndInput),
+);
+
 cycleIncludeCustomToggle.addEventListener("change", () => {
   settings.cycleIncludeCustom = cycleIncludeCustomToggle.checked;
   cycleIncludeCustomLabel.textContent = settings.cycleIncludeCustom ? "On" : "Off";
@@ -2683,6 +2929,7 @@ cycleHolidayFullSeasonToggle.addEventListener("change", () => {
 // recheck) so the note listens on "themechange" itself rather than being
 // called from each individual handler.
 window.addEventListener("themechange", refreshCycleHolidayNote);
+window.addEventListener("themechange", refreshCycleDayNightNote);
 
 cycleNowBtn.addEventListener("click", () => advanceCycleNow());
 
