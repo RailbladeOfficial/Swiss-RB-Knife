@@ -10,10 +10,11 @@
      • z-index stacking by depth (so a modal opened over another sits above it)
      • header-region drag (grab the top chrome strip to move its modal) + reset-on-close
      • automatic scroll reset of the inner .modal-body on open and after close
+     • tab strips, via ModalTabs (see below) passed as the `tabs` option
 
    Content and per-modal wiring stay in the owning file (shell.ts / a tool .ts);
    this primitive only handles the chrome and behaviour. Per-modal hooks:
-     onOpen(): runs after the modal is displayed (load content, reset tabs…)
+     onOpen(): runs after the modal is displayed (load content…)
      onClosed(): runs after the close transition finishes & display:none is set
                   (collapse resets, extra scroll resets, etc.)
 
@@ -26,6 +27,13 @@ export interface ModalOptions {
   closeOnBackdrop?: boolean;
   /** Close when Escape is pressed while this modal is the top-most. Default true. */
   closeOnEsc?: boolean;
+  /**
+   * This modal's tab strip, if it has one. Handing it over means the primitive
+   * owns the whole tab lifecycle: it re-activates the current tab on open,
+   * queues pane scroll resets on close, and returns to the first tab on a real
+   * close so the next fresh open starts there. See ModalTabs.
+   */
+  tabs?: ModalTabsController;
   /** Runs after the modal is shown (content load, tab reset, etc.). */
   onOpen?: () => void;
   /** Runs after the close transition completes and display is set to none. */
@@ -38,6 +46,149 @@ export interface ModalOptions {
    * that should replace a parent rather than layer on top of it.
    */
   replaceModal?: Modal;
+}
+
+/* -----------------------------------------------------------------------------
+   ModalTabs
+   ---------------------------------------------------------------------------
+   The one way to do tabs inside a modal. Pair it with the .modal-tabs /
+   .modal-tab / .modal-tab-pane markup documented in modal.css and a tabbed
+   modal needs no switching code of its own:
+
+     const tabs = new ModalTabs({
+       scope: "#budgetSetupModal",     // which modal's tabs these are
+       key: "budgetTab",               // dataset key on each .modal-tab button
+       panes: { sources: "budgetTabSources", bills: "budgetTabBills" },
+     });
+     new Modal(backdrop, { tabs, onOpen: () => renderLists() });
+
+   Scoping matters: .modal-tab is shared app-wide, so an unscoped query would
+   toggle every modal's tabs at once.
+
+   Which tab you land on:
+     • Opening the modal fresh starts on the FIRST tab in `panes` (or whatever
+       `defaultTab` returns, for a modal with a smarter idea of "first").
+     • Leaving for a child modal and coming back keeps the tab you were on.
+   Both fall out of one rule, that a real close forgets the current tab, while
+   the two ways a modal steps aside for a child do not: `replaceModal` (which
+   never fires the parent's close path) and close({ handoff: true }).
+
+   Pane scroll position is reset on close too, but applied lazily: scrollTop on
+   a display:none element is a no-op, so each pane is flagged here and reset at
+   the moment it is next made visible.
+----------------------------------------------------------------------------- */
+
+/** The slice of ModalTabs that Modal itself drives. Kept generic-free so a
+ *  Modal can hold a ModalTabs of any tab-id union without the option type
+ *  having to name it. */
+export interface ModalTabsController {
+  restore(): void;
+  reset(): void;
+}
+
+export interface ModalTabsOptions<T extends string> {
+  /** Selector for the modal panel that owns these tabs, e.g. "#settingsModal". */
+  scope: string;
+  /** camelCase dataset key on each .modal-tab button, e.g. "budgetTab". */
+  key: string;
+  /**
+   * Tab id → pane element id. Insertion order matters: the first tab is where
+   * a fresh open lands unless defaultTab says otherwise. Several tabs MAY name
+   * the same pane (the theme picker's Main/Holiday/Special/Custom all render
+   * into one grid); the pane then shows for any of them.
+   */
+  panes: Record<T, string>;
+  /**
+   * Where a FRESH open lands, if not simply the first tab. Evaluated at open
+   * time, so it can read current app state. The theme picker uses it to open
+   * on whichever tab houses the theme in use.
+   */
+  defaultTab?: () => T;
+  /** Runs after a tab is activated, for panes that need rendering on show. */
+  onActivate?: (tab: T) => void;
+}
+
+export class ModalTabs<T extends string> implements ModalTabsController {
+  private opts: ModalTabsOptions<T>;
+  private readonly first: T;
+  /** null means "next open is a fresh one", see reset(). */
+  private current: T | null = null;
+  private pendingScrollReset = new Set<string>();
+
+  constructor(opts: ModalTabsOptions<T>) {
+    this.opts = opts;
+    this.first = Object.keys(opts.panes)[0] as T;
+
+    this.buttons().forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset[opts.key] as T | undefined;
+        if (tab) this.activate(tab);
+      });
+    });
+  }
+
+  private buttons(): HTMLButtonElement[] {
+    return Array.from(
+      document.querySelectorAll<HTMLButtonElement>(`${this.opts.scope} .modal-tab`),
+    );
+  }
+
+  /** The tab that would show right now: the one in use, or the fresh-open default. */
+  get active(): T {
+    return this.current ?? this.opts.defaultTab?.() ?? this.first;
+  }
+
+  /** Selects a tab: marks its button and shows its pane, hiding the others. */
+  activate(tab: T): void {
+    this.current = tab;
+
+    this.buttons().forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset[this.opts.key] === tab);
+    });
+
+    // Keyed by pane id, not tab id, so panes shared by several tabs resolve
+    // once and don't fight each other over display.
+    const activePane = this.opts.panes[tab];
+    for (const id of new Set(Object.values(this.opts.panes) as string[])) {
+      const pane = document.getElementById(id);
+      if (!pane) continue;
+      const isActive = id === activePane;
+      pane.style.display = isActive ? "" : "none";
+      // Earliest point a queued scroll reset can actually take effect.
+      if (isActive && this.pendingScrollReset.has(id)) {
+        pane.scrollTop = 0;
+        this.pendingScrollReset.delete(id);
+      }
+    }
+
+    this.opts.onActivate?.(tab);
+  }
+
+  /**
+   * Chooses the tab the NEXT open lands on, without touching the DOM.
+   *
+   * For callers that pick a tab and then open the modal (a deep link into one
+   * tab, a child modal handing back to a specific tab). Going through activate()
+   * there would render the tab twice, once for the caller and once for the
+   * open, which matters when onActivate does real work.
+   */
+  select(tab: T): void {
+    this.current = tab;
+  }
+
+  /** Shows the tab in use, or the fresh-open default. What Modal runs on open. */
+  restore(): void {
+    this.activate(this.active);
+  }
+
+  /** Marks the next open as fresh and queues every pane for a scroll reset.
+   *  What Modal runs on a real close, so reopening starts from the top. */
+  reset(): void {
+    this.current = null;
+    Object.values(this.opts.panes).forEach((id) =>
+      this.pendingScrollReset.add(id as string),
+    );
+  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -261,10 +412,21 @@ export class Modal {
     });
 
     syncBodyClass();
+    // Before onOpen, so a per-tab render hook sees the right tab selected.
+    this.opts.tabs?.restore();
     this.opts.onOpen?.();
   }
 
-  close(): void {
+  /**
+   * Closes the modal.
+   *
+   * `handoff: true` means "another modal is taking over and will hand control
+   * back here" (the Settings → Choose Theme → back flow, and friends). It skips
+   * the tab reset so returning lands on the tab you left from, exactly as
+   * `replaceModal` does for modals wired that way. Use it whenever a close is
+   * immediately followed by opening a child modal with a back arrow.
+   */
+  close(opts: { handoff?: boolean } = {}): void {
     if (!this.isOpen) return;
 
     const i = openStack.indexOf(this);
@@ -273,6 +435,8 @@ export class Modal {
     this.backdrop.classList.remove("open");
     // Deactivate the shared overlay when the last modal closes
     syncOverlay();
+
+    if (!opts.handoff) this.opts.tabs?.reset();
 
     window.setTimeout(() => {
       if (this.isOpen) return;

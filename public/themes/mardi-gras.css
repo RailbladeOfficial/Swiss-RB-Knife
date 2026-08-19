@@ -224,7 +224,7 @@ body.solid-modals .modal {
 /* Summary tab active, gold, now with a filled tint + glow so it clearly
    stands out from the muted-gold inactive tabs. */
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #ffd700;
   background: rgba(255, 215, 0, 0.12);
   border-bottom-color: #ffd700;
@@ -256,8 +256,7 @@ body.solid-modals .modal {
 }
 
 /* View-mode active button, gold */
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #ffd700;
   color: #0f0520;
   border-color: #ffd700;

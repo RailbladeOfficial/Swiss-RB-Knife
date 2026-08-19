@@ -31,7 +31,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { devError, flash, setSubNavHandler, shortPath } from "../shell";
-import { Modal } from "../modal";
+import { Modal, ModalTabs } from "../modal";
 import {
   buildFixedRounds,
   reconcileOvertimeRounds,
@@ -382,37 +382,22 @@ function renderProfilesList(): void {
 ============================================================================= */
 
 type GsSetupTab = "profiles" | "tables" | "preferences";
-let gsActiveSetupTab: GsSetupTab = "profiles";
 let gsSetupModal: Modal | null = null;
-const _gsSetupPanesToReset = new Set<string>();
 
-function activateGsSetupTab(tab: GsSetupTab): void {
-  gsActiveSetupTab = tab;
-  document
-    .querySelectorAll<HTMLButtonElement>("#gsSettingsModal .setup-tab")
-    .forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.gsTab === tab);
-    });
-
-  const paneIds: Record<GsSetupTab, string> = {
+/** Setup's tab strip, on the shared ModalTabs controller (modal.ts). It owns
+ *  tab state, pane visibility and pane scroll resets. */
+const gsSetupTabs = new ModalTabs<GsSetupTab>({
+  scope: "#gsSettingsModal",
+  key: "gsTab",
+  panes: {
     profiles: "gsTabProfiles",
     tables: "gsTabTables",
     preferences: "gsTabPreferences",
-  };
-
-  for (const [key, id] of Object.entries(paneIds)) {
-    const pane = document.getElementById(id)!;
-    const isActive = key === tab;
-    pane.style.display = isActive ? "" : "none";
-    if (isActive && _gsSetupPanesToReset.has(id)) {
-      pane.scrollTop = 0;
-      _gsSetupPanesToReset.delete(id);
-    }
-  }
-}
+  },
+});
 
 function openGsSetupOnTab(tab?: GsSetupTab): void {
-  if (tab) gsActiveSetupTab = tab;
+  if (tab) gsSetupTabs.select(tab);
   getGsSetupModal().open();
 }
 
@@ -420,27 +405,18 @@ function getGsSetupModal(): Modal {
   if (!gsSetupModal) {
     gsSetupModal = new Modal(document.getElementById("gsSettingsBackdrop")!, {
       closeOnEsc: true,
+      tabs: gsSetupTabs,
       onOpen: () => {
-        activateGsSetupTab(gsActiveSetupTab);
         renderProfilesList();
         renderTablesList();
         applyGsPreferenceLabels();
       },
       onClosed: () => {
-        _gsSetupPanesToReset.add("gsTabProfiles");
-        _gsSetupPanesToReset.add("gsTabTables");
-        _gsSetupPanesToReset.add("gsTabPreferences");
         // Adding/retiring a profile changes Home's Players tile, and Setup is
         // usually opened from Home, repaint so it isn't left stale.
         if (currentGsView === "home") renderHomeDashboard();
       },
     });
-
-    document
-      .querySelectorAll<HTMLButtonElement>("#gsSettingsModal .setup-tab")
-      .forEach((btn) => {
-        btn.addEventListener("click", () => activateGsSetupTab(btn.dataset.gsTab as GsSetupTab));
-      });
 
     document.getElementById("gsSettingsClose")!.addEventListener("click", () => gsSetupModal!.close());
   }
@@ -481,7 +457,7 @@ function getProfileAddModal(): Modal {
 }
 
 function openProfileAdd(): void {
-  getGsSetupModal().close();
+  getGsSetupModal().close({ handoff: true });
   (document.getElementById("gsProfileAddName") as HTMLInputElement).value = "";
   getProfileAddModal().open();
 }
@@ -549,7 +525,7 @@ function getProfileEditModal(): Modal {
 
 function openProfileEdit(item: Profile): void {
   gsProfileEditItem = item;
-  getGsSetupModal().close();
+  getGsSetupModal().close({ handoff: true });
   getProfileEditModal(); // ensure wired
   (document.getElementById("gsProfileEditName") as HTMLInputElement).value = item.name;
   setGsContextLines(document.getElementById("gsProfileEditContext")!, [
@@ -766,7 +742,7 @@ function getTableEditModal(): Modal {
 
 function openTableEdit(table: GameTable): void {
   gsTableEditKey = table.key;
-  getGsSetupModal().close();
+  getGsSetupModal().close({ handoff: true });
   getTableEditModal();
   (document.getElementById("gsTableEditName") as HTMLInputElement).value = table.name;
   renderSeatList(table.playerIds);
@@ -1137,7 +1113,7 @@ function getGsImportModal(): Modal {
 }
 
 function openGsImportModal(): void {
-  getGsSetupModal().close();
+  getGsSetupModal().close({ handoff: true });
   resetGsImportModalState();
   getGsImportModal().open();
 }

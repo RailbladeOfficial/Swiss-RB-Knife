@@ -267,7 +267,7 @@ appLockToggle.addEventListener("change", async () => {
   if (appLockToggle.checked) {
     // Turning ON: open set-credential flow first; only enable if saved
     appLockToggle.checked = false; // revert visually until credential is saved
-    settingsModal.close();
+    settingsModal.close({ handoff: true });
     const saved = await openSetLockModal("enable");
     if (!saved) {
       // User cancelled, leave lock off
@@ -294,7 +294,7 @@ appLockToggle.addEventListener("change", async () => {
 });
 
 lockChangeBtn.addEventListener("click", async () => {
-  settingsModal.close();
+  settingsModal.close({ handoff: true });
   await openSetLockModal("change");
   settingsModal.open();
 });

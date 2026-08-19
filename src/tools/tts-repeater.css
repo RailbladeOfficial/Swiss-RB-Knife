@@ -63,6 +63,25 @@
   gap: 10px;
 }
 
+/* Full-width form controls in this tool, all of which need border-box.
+
+   Nothing in this codebase sets box-sizing globally, so these render at the
+   default content-box, where `width: 100%` means 100% for the CONTENT alone and
+   the control's padding and border are added ON TOP. shell.css gives every
+   input/select/textarea `padding: 6px 8px; border: 1px`, so each of these was
+   sitting 18px wider than the panel holding it (10px for .tts-slider-entry,
+   which sets its own tighter padding). Wide windows had enough slack to hide
+   most of it; narrow ones did not, and the message box spilled past its panel.
+
+   Scoped to this tool on purpose. Switching box-sizing app-wide would re-read
+   the padding of every fixed-width element in it. */
+#tts-message,
+#tts-voice,
+.tts-slider-entry,
+.tts-slider-grid input[type="range"] {
+  box-sizing: border-box;
+}
+
 /* ── Message ───────────────────────────────────────────────────────────────── */
 
 #tts-message {

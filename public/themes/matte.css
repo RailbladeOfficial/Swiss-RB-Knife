@@ -184,7 +184,7 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title { color: #3498db; }
 
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #3498db;
   background: rgba(52, 152, 219, 0.14);
   border-bottom-color: #3498db;
@@ -192,8 +192,7 @@ body:not(.solid-modals) .modal {
 
 /* View-mode toggle active, flat solid blue (matte deliberately avoids glows).
    Was missing entirely; every other theme styles this. */
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #3498db;
   color: #ffffff;
   border-color: #3498db;

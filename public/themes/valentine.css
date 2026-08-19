@@ -234,7 +234,7 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title { color: #c9184a; }
 
 .budget-summary-tab.active,
-.setup-tab.active { color: #c9184a; background: rgba(201, 24, 74, 0.1); border-bottom-color: #c9184a; }
+.modal-tab.active { color: #c9184a; background: rgba(201, 24, 74, 0.1); border-bottom-color: #c9184a; }
 
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }
@@ -257,8 +257,7 @@ body:not(.solid-modals) .modal {
   color: #c9184a;
 }
 
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #e0294b;
   color: #ffffff;
   border-color: #e0294b;

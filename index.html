@@ -2873,181 +2873,232 @@
           </svg>
         </button>
       </div>
-      <div class="settings-section">
+      <div class="modal-body setup-body">
 
-        <div class="settings-row">
-          <span>Font Scale:</span>
-          <input type="number" id="fontScaleValue" min="-10" max="10" value="0" />
+        <!-- .modal-tab is the app-wide modal tab, defined once in shell.css and
+             shared with the Budget / Time Tracker / Game Stats / Theme Editor
+             setup modals. Tab switching is scoped to #settingsModal in shell.ts
+             so the shared class name never cross-wires these tabs to theirs. -->
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-settings-tab="display">Display</button>
+          <button class="modal-tab" data-settings-tab="audio">Audio</button>
+          <button class="modal-tab" data-settings-tab="preferences">Preferences</button>
         </div>
 
-        <div class="settings-row">
-          <span>Date Format:</span>
-          <div class="toggle-with-label">
-            <span id="dateFormatLabel">YYYY-MM-DD</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="dateFormatToggle" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
+        <!-- DISPLAY -->
+        <div id="settingsTabDisplay" class="modal-tab-pane">
+          <div class="setup-preferences-list">
 
-        <div class="settings-row">
-          <span>Time Format:</span>
-          <div class="toggle-with-label">
-            <span id="timeFormatLabel">24-hour</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="timeFormatToggle" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <div class="settings-row">
-          <span>Solid Modals:</span>
-          <div class="toggle-with-label">
-            <span id="solidModalsLabel">Off</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="solidModalsToggle" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <div class="settings-row">
-          <span>On Startup:</span>
-          <select id="startupSelect" class="settings-select">
-            <optgroup label="Main">
-              <option value="lastView">Last View (default)</option>
-              <option value="lastTool">Last Tool</option>
-              <!-- Hidden, categories retired, may come back later. -->
-              <option value="lastCategory" style="display:none;">Last Category</option>
-              <option value="home">Home</option>
-            </optgroup>
-            <!-- Hidden, categories retired, may come back later. -->
-            <optgroup label="Specific Category" style="display:none;">
-              <option value="utility">Utility</option>
-              <option value="files">Files</option>
-              <option value="media">Media</option>
-              <option value="music">Music</option>
-              <option value="finance">Finance</option>
-            </optgroup>
-            <optgroup label="Specific Tool">
-              <option value="finance:budget">Budget Tracker</option>
-              <option value="utility:time-tracker">Time Tracker</option>
-              <option value="files:auto-backup">Auto-Backup</option>
-              <option value="media:image-ccr">Image CCR</option>
-              <option value="files:dummy-file-generator">Dummy File Generator</option>
-              <option value="games:game-stats">Game Stats</option>
-              <option value="utility:tts-repeater">TTS Repeater</option>
-              <option value="utility:countdown">Countdown Timer</option>
-              <option value="utility:days-between">Days Between Dates</option>
-            </optgroup>
-          </select>
-        </div>
-
-        <div class="settings-row">
-          <span>App Lock:</span>
-          <div class="toggle-with-label">
-            <span id="appLockLabel">Off</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="appLockToggle" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <div id="lockSubsettings" class="subsettings" style="max-height: 0;">
-          <div class="settings-row">
-            <span>Credential:</span>
-            <div class="lock-cred-actions">
-              <button id="lockChangeBtn" class="lock-cred-link change">Change</button>
-              <button id="lockRemoveBtn" class="lock-cred-link danger">Remove</button>
+            <div class="settings-row">
+              <span>Font Scale:</span>
+              <input type="number" id="fontScaleValue" min="-10" max="10" value="0" />
             </div>
-          </div>
-        </div>
 
-        <div class="settings-row">
-          <span>New Version Notification:</span>
-          <div class="toggle-with-label">
-            <span id="newVersionLabel">Disabled</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="newVersionToggle" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Collapsed to zero height while version notifications are off. The
-             mode only means anything when there's something to announce. -->
-        <div id="newVersionSubsettings" class="subsettings" style="max-height: 0;">
-          <div class="settings-row">
-            <span>Mode:</span>
-            <div class="toggle-with-label">
-              <span id="newVersionModeLabel">Gentle</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="newVersionModeToggle" />
-                <span class="toggle-slider"></span>
-              </label>
+            <div class="settings-row">
+              <span>Date Format:</span>
+              <div class="toggle-with-label">
+                <span id="dateFormatLabel">YYYY-MM-DD</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="dateFormatToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
             </div>
+
+            <div class="settings-row">
+              <span>Time Format:</span>
+              <div class="toggle-with-label">
+                <span id="timeFormatLabel">24-hour</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="timeFormatToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span>Solid Modals:</span>
+              <div class="toggle-with-label">
+                <span id="solidModalsLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="solidModalsToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>Theme:</span>
+                <span id="themeCurrentBadge" class="settings-status-badge"></span>
+              </div>
+              <button id="themeEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
+            <!-- Hidden data holder, kept as the single source of truth for the
+                 active theme id/optgroup grouping (theme-editor.ts still reads/
+                 writes it directly), it's just no longer rendered as a dropdown. -->
+            <select id="themeSelect" style="display:none;">
+              <optgroup label="Main">
+                <option value="default">Default</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="matte">Matte</option>
+                <option value="midnight">Midnight</option>
+                <option value="terminal">Terminal</option>
+              </optgroup>
+              <optgroup label="Holiday">
+                <option value="valentine">Valentine</option>
+                <option value="mardi-gras">Mardi Gras</option>
+                <option value="rainbow">Rainbow</option>
+                <option value="patriot">Patriot</option>
+                <option value="halloween">Halloween</option>
+                <option value="thanksgiving">Thanksgiving</option>
+                <option value="christmas">Christmas</option>
+              </optgroup>
+              <optgroup label="Special">
+                <option value="cake">Cake</option>
+                <option value="knowledge">Knowledge</option>
+                <option value="neon">Neon</option>
+                <option value="retro-electric">Retro-Electric</option>
+                <option value="halo">Halo</option>
+                <option value="random">Random</option>
+                <option value="custom">Custom</option>
+              </optgroup>
+            </select>
+
           </div>
-          <p id="newVersionModeHint" class="subhint">Gentle announces a new version with a toast. Aggressive
-            opens a modal on startup with a shortcut to the release page.</p>
         </div>
 
-        <div class="settings-row">
-          <div class="settings-label-col">
-            <span>Sidebar:</span>
-            <span id="sidebarHiddenBadge" class="settings-status-badge" style="display:none;"></span>
+        <!-- AUDIO -->
+        <div id="settingsTabAudio" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <!-- Toast volume. 0 dB is the volume the app has always played at, so
+                 an untouched install sounds exactly as it did before this existed.
+                 The slider runs to -26, one step past the quietest real level, and
+                 that bottom notch is Muted rather than a level. Releasing the
+                 slider plays a preview so it can be judged by ear; double-clicking
+                 the read-out types an exact value. -->
+            <div class="sound-volume-row">
+              <div class="sound-volume-label">
+                <span>Notification Volume</span>
+                <span id="soundVolumeValue" class="sound-volume-value"
+                  title="Double-click to type an exact value">Default</span>
+              </div>
+              <div class="sound-volume-slider-row">
+                <span class="sound-volume-end">Muted</span>
+                <input type="range" id="soundVolumeSlider" min="-26" max="5" step="1" value="0" />
+                <span class="sound-volume-end">+5 dB</span>
+              </div>
+              <button id="soundVolumeReset" class="sound-volume-reset">Reset to Default</button>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>Notification Sound:</span>
+                <span id="soundPackCurrentBadge" class="settings-status-badge"></span>
+              </div>
+              <button id="soundPackEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
           </div>
-          <button id="sidebarEditBtn" class="settings-action-btn">Customize</button>
         </div>
 
-        <div class="settings-row">
-          <div class="settings-label-col">
-            <span>Theme:</span>
-            <span id="themeCurrentBadge" class="settings-status-badge"></span>
-          </div>
-          <button id="themeEditBtn" class="settings-action-btn">Customize</button>
-        </div>
+        <!-- PREFERENCES -->
+        <div id="settingsTabPreferences" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
 
-        <!-- Hidden data holder, kept as the single source of truth for the
-             active theme id/optgroup grouping (theme-editor.ts still reads/
-             writes it directly), it's just no longer rendered as a dropdown. -->
-        <select id="themeSelect" style="display:none;">
-          <optgroup label="Main">
-            <option value="default">Default</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="matte">Matte</option>
-            <option value="midnight">Midnight</option>
-            <option value="terminal">Terminal</option>
-          </optgroup>
-          <optgroup label="Holiday">
-            <option value="valentine">Valentine</option>
-            <option value="mardi-gras">Mardi Gras</option>
-            <option value="rainbow">Rainbow</option>
-            <option value="patriot">Patriot</option>
-            <option value="halloween">Halloween</option>
-            <option value="thanksgiving">Thanksgiving</option>
-            <option value="christmas">Christmas</option>
-          </optgroup>
-          <optgroup label="Special">
-            <option value="cake">Cake</option>
-            <option value="knowledge">Knowledge</option>
-            <option value="neon">Neon</option>
-            <option value="retro-electric">Retro-Electric</option>
-            <option value="halo">Halo</option>
-            <option value="random">Random</option>
-            <option value="custom">Custom</option>
-          </optgroup>
-        </select>
+            <div class="settings-row">
+              <span>On Startup:</span>
+              <select id="startupSelect" class="settings-select">
+                <optgroup label="Main">
+                  <option value="lastView">Last View (default)</option>
+                  <option value="lastTool">Last Tool</option>
+                  <!-- Hidden, categories retired, may come back later. -->
+                  <option value="lastCategory" style="display:none;">Last Category</option>
+                  <option value="home">Home</option>
+                </optgroup>
+                <!-- Hidden, categories retired, may come back later. -->
+                <optgroup label="Specific Category" style="display:none;">
+                  <option value="utility">Utility</option>
+                  <option value="files">Files</option>
+                  <option value="media">Media</option>
+                  <option value="music">Music</option>
+                  <option value="finance">Finance</option>
+                </optgroup>
+                <optgroup label="Specific Tool">
+                  <option value="finance:budget">Budget Tracker</option>
+                  <option value="utility:time-tracker">Time Tracker</option>
+                  <option value="files:auto-backup">Auto-Backup</option>
+                  <option value="media:image-ccr">Image CCR</option>
+                  <option value="files:dummy-file-generator">Dummy File Generator</option>
+                  <option value="games:game-stats">Game Stats</option>
+                  <option value="utility:tts-repeater">TTS Repeater</option>
+                  <option value="utility:countdown">Countdown Timer</option>
+                  <option value="utility:days-between">Days Between Dates</option>
+                </optgroup>
+              </select>
+            </div>
 
-        <div class="settings-row">
-          <div class="settings-label-col">
-            <span>Sound Pack:</span>
-            <span id="soundPackCurrentBadge" class="settings-status-badge"></span>
+            <div class="settings-row">
+              <span>New Version Notification:</span>
+              <div class="toggle-with-label">
+                <span id="newVersionLabel">Disabled</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="newVersionToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Collapsed to zero height while version notifications are off. The
+                 mode only means anything when there's something to announce. -->
+            <div id="newVersionSubsettings" class="subsettings" style="max-height: 0;">
+              <div class="settings-row">
+                <span>Mode:</span>
+                <div class="toggle-with-label">
+                  <span id="newVersionModeLabel">Gentle</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="newVersionModeToggle" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <p id="newVersionModeHint" class="subhint">Gentle announces a new version with a toast. Aggressive
+                opens a modal on startup with a shortcut to the release page.</p>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>Sidebar:</span>
+                <span id="sidebarHiddenBadge" class="settings-status-badge" style="display:none;"></span>
+              </div>
+              <button id="sidebarEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
+            <div class="settings-row">
+              <span>App Lock:</span>
+              <div class="toggle-with-label">
+                <span id="appLockLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="appLockToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div id="lockSubsettings" class="subsettings" style="max-height: 0;">
+              <div class="settings-row">
+                <span>Credential:</span>
+                <div class="lock-cred-actions">
+                  <button id="lockChangeBtn" class="lock-cred-link change">Change</button>
+                  <button id="lockRemoveBtn" class="lock-cred-link danger">Remove</button>
+                </div>
+              </div>
+            </div>
+
           </div>
-          <button id="soundPackEditBtn" class="settings-action-btn">Customize</button>
         </div>
 
       </div>
@@ -3115,14 +3166,16 @@
         </button>
       </div>
       <div class="modal-body theme-picker-body" style="text-align:left;">
-        <div class="theme-picker-tabs">
-          <button class="theme-picker-tab active" data-theme-tab="main">Main</button>
-          <button class="theme-picker-tab" data-theme-tab="holiday">Holiday</button>
-          <button class="theme-picker-tab" data-theme-tab="special">Special</button>
-          <button class="theme-picker-tab" data-theme-tab="cycle">Cycle</button>
-          <button class="theme-picker-tab" data-theme-tab="random">Random</button>
-          <button class="theme-picker-tab" data-theme-tab="custom">Custom</button>
-          <button class="theme-picker-tab" data-theme-tab="preferences">Preferences</button>
+        <!-- .modal-tabs / .modal-tab: the app-wide modal tab strip (modal.css),
+             same as every Setup modal. Driven by ModalTabs in shell.ts. -->
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-theme-tab="main">Main</button>
+          <button class="modal-tab" data-theme-tab="holiday">Holiday</button>
+          <button class="modal-tab" data-theme-tab="special">Special</button>
+          <button class="modal-tab" data-theme-tab="cycle">Cycle</button>
+          <button class="modal-tab" data-theme-tab="random">Random</button>
+          <button class="modal-tab" data-theme-tab="custom">Custom</button>
+          <button class="modal-tab" data-theme-tab="preferences">Preferences</button>
         </div>
         <div id="themePickerGrid" class="theme-picker-grid"></div>
 
@@ -3297,7 +3350,7 @@
         <button id="soundPackPickerBack" class="nav-back-btn modal-header-left" title="Back to Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
-        <span>Choose Sound Pack</span>
+        <span>Choose Notification Sound Pack</span>
         <button id="soundPackPickerClose" class="modal-close-btn modal-header-right" title="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
@@ -3305,26 +3358,6 @@
       <div class="modal-body" style="text-align:left;">
         <p class="sidebar-edit-hint">Click a pack to select it. Use the speaker icons to preview its success/error sounds.</p>
         <div id="soundPackPickerGrid" class="sound-pack-grid"></div>
-
-        <!-- Toast volume. 0 dB is the volume the app has always played at, so
-             an untouched install sounds exactly as it did before this existed.
-             The slider runs to -26, one step past the quietest real level, and
-             that bottom notch is Muted rather than a level. Releasing the
-             slider plays a preview so it can be judged by ear; double-clicking
-             the read-out types an exact value. -->
-        <div class="sound-volume-row">
-          <div class="sound-volume-label">
-            <span>Notification Volume</span>
-            <span id="soundVolumeValue" class="sound-volume-value"
-              title="Double-click to type an exact value">Default</span>
-          </div>
-          <div class="sound-volume-slider-row">
-            <span class="sound-volume-end">Muted</span>
-            <input type="range" id="soundVolumeSlider" min="-26" max="5" step="1" value="0" />
-            <span class="sound-volume-end">+5 dB</span>
-          </div>
-          <button id="soundVolumeReset" class="sound-volume-reset">Reset to Default</button>
-        </div>
       </div>
     </div>
   </div>
@@ -3527,15 +3560,15 @@
           </svg>
         </button>
       </div>
-      <!-- .setup-tab is the app-wide modal tab, defined once in shell.css and
-           used by every Setup/Settings modal. It draws its colours from theme
+      <!-- .modal-tabs / .modal-tab: the app-wide modal tab strip (modal.css),
+           same as every Setup/Settings modal. It draws its colours from theme
            variables, so it follows built-in AND custom themes with nothing
-           restated per theme. The strip keeps .licensing-tabs purely for its
-           own padding; the JS hook is data-tab, scoped to this container. -->
-      <div class="licensing-tabs">
-        <button class="setup-tab active" data-tab="license">Licensing</button>
-        <button class="setup-tab" data-tab="attribution">Attributions</button>
-        <button class="setup-tab" data-tab="thirdparty">Third-Party</button>
+           restated per theme. .licensing-tabs rides along purely for this
+           strip's own padding. Driven by ModalTabs in docs.ts. -->
+      <div class="modal-tabs licensing-tabs">
+        <button class="modal-tab active" data-tab="license">Licensing</button>
+        <button class="modal-tab" data-tab="attribution">Attributions</button>
+        <button class="modal-tab" data-tab="thirdparty">Third-Party</button>
       </div>
       <div id="licensingBody" class="modal-body changelog-body">
         <p class="changelog-loading">Loading...</p>
@@ -3861,26 +3894,26 @@
       </div>
       <div class="modal-body setup-body">
 
-        <div class="setup-tabs">
-          <button class="setup-tab active" data-tt-tab="projects">Projects</button>
-          <button class="setup-tab" data-tt-tab="activities">Activities</button>
-          <button class="setup-tab" data-tt-tab="preferences">Preferences</button>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-tt-tab="projects">Projects</button>
+          <button class="modal-tab" data-tt-tab="activities">Activities</button>
+          <button class="modal-tab" data-tt-tab="preferences">Preferences</button>
         </div>
 
         <!-- PROJECTS -->
-        <div id="ttTabProjects" class="setup-tab-pane">
+        <div id="ttTabProjects" class="modal-tab-pane">
           <button id="ttProjectNewBtn" class="setup-new-btn">+ New Project</button>
           <div id="ttProjectsList" class="setup-list"></div>
         </div>
 
         <!-- ACTIVITIES -->
-        <div id="ttTabActivities" class="setup-tab-pane" style="display:none;">
+        <div id="ttTabActivities" class="modal-tab-pane" style="display:none;">
           <button id="ttActivityNewBtn" class="setup-new-btn">+ New Activity</button>
           <div id="ttActivitiesList" class="setup-list"></div>
         </div>
 
         <!-- PREFERENCES -->
-        <div id="ttTabPreferences" class="setup-tab-pane" style="display:none;">
+        <div id="ttTabPreferences" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
 
             <div class="settings-row">
@@ -4517,40 +4550,40 @@
       </div>
       <div class="modal-body setup-body">
 
-        <div class="setup-tabs">
-          <button class="setup-tab active" data-budget-tab="sources">Income Sources</button>
-          <button class="setup-tab" data-budget-tab="bills">Recurring Bills</button>
-          <button class="setup-tab" data-budget-tab="categories">Expense Categories</button>
-          <button class="setup-tab" data-budget-tab="expenseSources">Expense Sources</button>
-          <button class="setup-tab" data-budget-tab="preferences">Preferences</button>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-budget-tab="sources">Income Sources</button>
+          <button class="modal-tab" data-budget-tab="bills">Recurring Bills</button>
+          <button class="modal-tab" data-budget-tab="categories">Expense Categories</button>
+          <button class="modal-tab" data-budget-tab="expenseSources">Expense Sources</button>
+          <button class="modal-tab" data-budget-tab="preferences">Preferences</button>
         </div>
 
         <!-- INCOME SOURCES -->
-        <div id="budgetTabSources" class="setup-tab-pane">
+        <div id="budgetTabSources" class="modal-tab-pane">
           <button id="budgetSourceNewBtn" class="setup-new-btn">+ New Income Source</button>
           <div id="budgetSourcesList" class="setup-list"></div>
         </div>
 
         <!-- RECURRING BILLS -->
-        <div id="budgetTabBills" class="setup-tab-pane" style="display:none;">
+        <div id="budgetTabBills" class="modal-tab-pane" style="display:none;">
           <button id="budgetBillNewBtn" class="setup-new-btn">+ New Recurring Bill</button>
           <div id="budgetBillsList" class="budget-setup-bill-list"></div>
         </div>
 
         <!-- CATEGORIES -->
-        <div id="budgetTabCategories" class="setup-tab-pane" style="display:none;">
+        <div id="budgetTabCategories" class="modal-tab-pane" style="display:none;">
           <button id="budgetCategoryNewBtn" class="setup-new-btn">+ New Expense Category</button>
           <div id="budgetCategoriesList" class="setup-list"></div>
         </div>
 
         <!-- EXPENSE SOURCES -->
-        <div id="budgetTabExpenseSources" class="setup-tab-pane" style="display:none;">
+        <div id="budgetTabExpenseSources" class="modal-tab-pane" style="display:none;">
           <button id="budgetExpenseSourceNewBtn" class="setup-new-btn">+ New Expense Source</button>
           <div id="budgetExpenseSourcesList" class="setup-list"></div>
         </div>
 
         <!-- BUDGET SETTINGS -->
-        <div id="budgetTabPreferences" class="setup-tab-pane" style="display:none;">
+        <div id="budgetTabPreferences" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
             <div class="settings-row">
               <span>Quick Delete Entries</span>
@@ -5829,9 +5862,9 @@
         </div>
 
         <!-- Tab bar -->
-        <div class="setup-tabs">
-          <button class="setup-tab active" data-te-tab="general">General</button>
-          <button class="setup-tab" data-te-tab="advanced">Advanced</button>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-te-tab="general">General</button>
+          <button class="modal-tab" data-te-tab="advanced">Advanced</button>
         </div>
 
         <!-- GENERAL TAB, color swatches -->
@@ -6316,21 +6349,21 @@
       </div>
       <div class="modal-body setup-body">
 
-        <div class="setup-tabs">
-          <button class="setup-tab active" data-gs-tab="profiles">Profiles</button>
-          <button class="setup-tab" data-gs-tab="tables">Tables</button>
-          <button class="setup-tab" data-gs-tab="preferences">Preferences</button>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-gs-tab="profiles">Profiles</button>
+          <button class="modal-tab" data-gs-tab="tables">Tables</button>
+          <button class="modal-tab" data-gs-tab="preferences">Preferences</button>
         </div>
 
         <!-- PROFILES -->
-        <div id="gsTabProfiles" class="setup-tab-pane">
+        <div id="gsTabProfiles" class="modal-tab-pane">
           <button id="gsProfileNewBtn" class="setup-new-btn">+ New Profile</button>
           <div id="gsProfilesList" class="setup-list"></div>
         </div>
 
         <!-- TABLES, appear on their own the first time a roster is played,
              so there's no "+ New Table" button; only naming is manual. -->
-        <div id="gsTabTables" class="setup-tab-pane" style="display:none;">
+        <div id="gsTabTables" class="modal-tab-pane" style="display:none;">
           <p class="gs-preference-hint gs-tables-intro">
             A table is one exact group playing one game. Game numbers count within a table,
             so each group keeps its own sequence. Tables appear here once they've played a game.
@@ -6339,7 +6372,7 @@
         </div>
 
         <!-- PREFERENCES -->
-        <div id="gsTabPreferences" class="setup-tab-pane" style="display:none;">
+        <div id="gsTabPreferences" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
 
             <div class="settings-row">

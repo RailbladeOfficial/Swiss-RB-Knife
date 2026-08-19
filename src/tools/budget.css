@@ -883,10 +883,11 @@ span.entry-col-category:not(.entry-field) {
 /* =============================================================================
    SETUP MODAL: budget-specific bits
    -----------------------------------------------------------------------------
-   The shared tabbed list-editor chrome (.setup-body, .setup-tabs, .setup-tab,
-   .setup-tab-pane, .setup-list, .setup-item*, .setup-new-btn, .setup-form,
-   .setup-field, .setup-actions) now lives in shell.css and is used directly by
-   the Budget Setup modal markup. Only genuinely budget-specific rules remain
+   The shared list-editor chrome (.setup-body, .setup-list, .setup-item*,
+   .setup-new-btn, .setup-form, .setup-field, .setup-actions) now lives in
+   shell.css, and the tab strip it sits above (.modal-tabs / .modal-tab /
+   .modal-tab-pane) in modal.css. Both are used directly by the Budget Setup
+   modal markup. Only genuinely budget-specific rules remain
    here: modal sizing, the summary-panel tab strip, and form-field quirks tied
    to the bill recurrence editor.
 ============================================================================= */
@@ -914,7 +915,7 @@ span.entry-col-category:not(.entry-field) {
 }
 
 /* Summary panel's own tab strip, a different UI region from the Setup modal,
-   so it keeps its own rule rather than sharing .setup-tab. Same underline
+   so it keeps its own rule rather than sharing .modal-tab. Same underline
    idiom, different sizing (equal-width, centered, smaller). */
 .budget-summary-tab {
   background: transparent;
@@ -943,7 +944,7 @@ span.entry-col-category:not(.entry-field) {
   color: var(--color-btn);
   border-bottom-color: var(--color-btn);
   /* Themes override this with their own hex; the mix is what a Custom theme
-     falls back to. See .setup-tab.active in shell.css. */
+     falls back to. See .modal-tab.active in modal.css. */
   background: color-mix(in srgb, var(--color-btn) 12%, transparent);
 }
 

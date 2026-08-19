@@ -240,28 +240,20 @@
   flex-direction: column;
 }
 
-/* The tab buttons also carry .budget-summary-tab (see index.html for why).
-   That shared class is what themes actually style, and it supplies flex:1 and
-   centred text so the tabs fill this strip evenly. No width here needed for
-   that: .licensing-modal is a column flexbox with the default align-items:
-   stretch, which already sizes this row to the modal's full content width,
-   correctly accounting for this rule's own padding. An explicit width: 100%
-   was tried here before and is deliberately NOT present. Nothing in this
-   codebase sets box-sizing: border-box, so with the default content-box, a
-   literal 100% width gets this row's 16px+16px padding added on TOP of that
-   100%, overflowing 32px past the modal's right edge (the tabs render
-   right-shifted / cut off, since the box stays pinned at the left and only
-   the right side spills over). Stretch alone doesn't have this bug. It sizes
-   to the content width directly, padding included.
-   The buttons inside are .setup-tab (shell.css), the same tab every Setup and
-   Settings modal uses, so this rule only owns the strip's padding and the
-   shared border it sits on. */
+/* Rides on .modal-tabs / .modal-tab (modal.css) like every other tabbed modal,
+   so all this owns is the horizontal inset that lines the strip up with the
+   licensing body's own padding.
+
+   No width here, and that is deliberate: .licensing-modal is a column flexbox
+   with the default align-items: stretch, which already sizes this row to the
+   modal's full content width, this rule's own padding included. An explicit
+   width: 100% was tried before and must not come back. Nothing in this codebase
+   sets box-sizing: border-box, so under the default content-box a literal 100%
+   gets the 16px+16px padding added on TOP of it, overflowing 32px past the
+   modal's right edge (the box stays pinned left and only the right side spills,
+   so the tabs read as right-shifted / cut off). Stretch has no such bug. */
 .licensing-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--color-border);
   padding: 0 16px;
-  gap: 2px;
-  flex-shrink: 0;
 }
 
 .full-license-btn {

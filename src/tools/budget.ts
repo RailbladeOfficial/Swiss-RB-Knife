@@ -35,7 +35,7 @@ import {
   normalizeMonthDays,
   parseMonthDaysInput,
 } from "../reminder-schedule";
-import { Modal } from "../modal";
+import { Modal, ModalTabs } from "../modal";
 
 /* =============================================================================
    TYPES
@@ -1745,7 +1745,7 @@ function buildTotalRow(label: string, value: number): HTMLElement {
    class used to be borrowed by the Licensing modal for its theme styling,
    and this query reached across and marked those tabs active too (while
    blanking every pane here, since they carry no data-summary-tab). The
-   Licensing modal now uses shell.css's .setup-tab like every other modal, so
+   Licensing modal now uses modal.css's .modal-tab like every other modal, so
    nothing shares this class today; the scope stays because a presentational
    class is never a safe thing to query globally. */
 function activateSummaryTab(tab: SummaryTab): void {
@@ -4232,7 +4232,7 @@ function getSourceAddModal(): Modal {
 }
 
 function openSourceAdd(): void {
-  getSetupModal().close();
+  getSetupModal().close({ handoff: true });
   const nameInput = document.getElementById("budgetSourceAddName") as HTMLInputElement;
   const expectToggle = document.getElementById("budgetSourceAddExpectToggle") as HTMLInputElement;
   const expectLabel = document.getElementById("budgetSourceAddExpectLabel")!;
@@ -4316,7 +4316,7 @@ function getSourceEditModal(): Modal {
 
 function openSourceEdit(item: SimpleEntity): void {
   _sourceEditItem = item;
-  getSetupModal().close();
+  getSetupModal().close({ handoff: true });
   getSourceEditModal(); // ensure wired
   (document.getElementById("budgetSourceEditName") as HTMLInputElement).value = item.name;
   const expectToggle = document.getElementById("budgetSourceEditExpectToggle") as HTMLInputElement;
@@ -4407,7 +4407,7 @@ function getCategoryAddModal(): Modal {
 }
 
 function openCategoryAdd(): void {
-  getSetupModal().close();
+  getSetupModal().close({ handoff: true });
   const nameInput     = document.getElementById("budgetCategoryAddName") as HTMLInputElement;
   const excludeToggle = document.getElementById("budgetCategoryAddExclude") as HTMLInputElement;
   const excludeLabel  = document.getElementById("budgetCategoryAddExcludeLabel")!;
@@ -4509,7 +4509,7 @@ function getCategoryEditModal(): Modal {
 
 function openCategoryEdit(item: SimpleEntity): void {
   _categoryEditItem = item;
-  getSetupModal().close();
+  getSetupModal().close({ handoff: true });
   getCategoryEditModal(); // ensure wired
   (document.getElementById("budgetCategoryEditName") as HTMLInputElement).value = item.name;
   const excludeToggle = document.getElementById("budgetCategoryEditExclude") as HTMLInputElement;
@@ -4607,7 +4607,7 @@ function getExpSourceAddModal(): Modal {
 }
 
 function openExpSourceAdd(): void {
-  getSetupModal().close();
+  getSetupModal().close({ handoff: true });
   const nameInput     = document.getElementById("budgetExpSourceAddName") as HTMLInputElement;
   const excludeToggle = document.getElementById("budgetExpSourceAddExclude") as HTMLInputElement;
   const excludeLabel  = document.getElementById("budgetExpSourceAddExcludeLabel")!;
@@ -4709,7 +4709,7 @@ function getExpSourceEditModal(): Modal {
 
 function openExpSourceEdit(item: SimpleEntity): void {
   _expSourceEditItem = item;
-  getSetupModal().close();
+  getSetupModal().close({ handoff: true });
   getExpSourceEditModal(); // ensure wired
   (document.getElementById("budgetExpSourceEditName") as HTMLInputElement).value = item.name;
   const excludeToggle = document.getElementById("budgetExpSourceEditExclude") as HTMLInputElement;
@@ -4846,7 +4846,10 @@ function getBillEditModal(): Modal {
 
 function returnToSetupFromBillEdit(): void {
   getBillEditModal().close();
-  openSetupModalOnTab(); // restores whichever tab was active when Setup was last open
+  // Names the tab, like every other editor's back path. The handoff close in
+  // openBillEditor() would restore it anyway, but stating it keeps this from
+  // depending on that at a distance.
+  openSetupModalOnTab("bills");
 }
 
 /** Opens the Bill Editor for `bill`, or blank fields if `bill` is null (new). */
@@ -4880,7 +4883,7 @@ function openBillEditor(bill: RecurringBill | null): void {
     billSaveBtn.textContent = "Add";
   }
 
-  getSetupModal().close();
+  getSetupModal().close({ handoff: true });
   getBillEditModal().open();
 }
 
@@ -5178,36 +5181,19 @@ const SETUP_TABS = [
 ] as const;
 type SetupTab = (typeof SETUP_TABS)[number];
 
-let activeSetupTab: SetupTab = "sources";
-
-function activateSetupTab(tab: SetupTab): void {
-  activeSetupTab = tab;
-  document
-    .querySelectorAll<HTMLButtonElement>("#budgetSetupModal .setup-tab")
-    .forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.budgetTab === tab);
-    });
-
-  const paneIds: Record<SetupTab, string> = {
+/** Setup's tab strip, on the shared ModalTabs controller (modal.ts). It owns
+ *  tab state, pane visibility and pane scroll resets. */
+const setupTabs = new ModalTabs<SetupTab>({
+  scope: "#budgetSetupModal",
+  key: "budgetTab",
+  panes: {
     sources:        "budgetTabSources",
     bills:          "budgetTabBills",
     categories:     "budgetTabCategories",
     expenseSources: "budgetTabExpenseSources",
-    preferences:       "budgetTabPreferences",
-  };
-
-  for (const [key, id] of Object.entries(paneIds)) {
-    const pane = document.getElementById(id)!;
-    const isActive = key === tab;
-    pane.style.display = isActive ? "" : "none";
-    // Reset scroll the moment a pane becomes visible. scrollTop on a
-    // display:none element is a no-op, so this is the earliest reliable point.
-    if (isActive && _setupPanesToReset.has(id)) {
-      pane.scrollTop = 0;
-      _setupPanesToReset.delete(id);
-    }
-  }
-}
+    preferences:    "budgetTabPreferences",
+  },
+});
 
 function applyBudgetSettings(): void {
   budgetQuickDeleteToggle.checked = appSettings.quickDelete;
@@ -5243,50 +5229,27 @@ function applyBudgetReminderSettings(): void {
 }
 
 function openSetupModalOnTab(tab?: SetupTab): void {
-  if (tab) activeSetupTab = tab;
-  // onOpen always calls activateSetupTab(activeSetupTab) so passing it here
-  // ensures it sticks even before the first-open path runs
+  // Selecting before opening beats letting the modal restore its own tab, so
+  // a deep link lands where it asked even on the very first open.
+  if (tab) setupTabs.select(tab);
   getSetupModal().open();
 }
 
 let setupModal: Modal | null = null;
-// Tracks which tab panes need their scroll reset on next activation.
-// Populated on full modal close; cleared per-pane as each one is made visible.
-const _setupPanesToReset = new Set<string>();
 
 function getSetupModal(): Modal {
   if (!setupModal) {
     setupModal = new Modal(document.getElementById("budgetSetupBackdrop")!, {
       closeOnEsc: true,
+      tabs: setupTabs,
       onOpen: () => {
-        // Scroll reset is handled inside activateSetupTab() as each pane is
-        // made visible. The only point where scrollTop assignment is reliable.
-        activateSetupTab(activeSetupTab);
         renderSimpleList("sources");
         renderBillsList();
         renderSimpleList("categories");
         renderSimpleList("expenseSources");
         applyBudgetSettings();
       },
-      onClosed: () => {
-        // Queue all tab panes for scroll reset. Each pane is reset the moment
-        // it becomes visible again (in activateSetupTab), because scrollTop on
-        // a display:none element is a no-op.
-        _setupPanesToReset.add("budgetTabSources");
-        _setupPanesToReset.add("budgetTabBills");
-        _setupPanesToReset.add("budgetTabCategories");
-        _setupPanesToReset.add("budgetTabExpenseSources");
-        _setupPanesToReset.add("budgetTabPreferences");
-      },
     });
-
-    document
-      .querySelectorAll<HTMLButtonElement>("#budgetSetupModal .setup-tab")
-      .forEach((btn) => {
-        btn.addEventListener("click", () =>
-          activateSetupTab(btn.dataset.budgetTab as SetupTab),
-        );
-      });
 
     document
       .getElementById("budgetSetupClose")!
@@ -5714,10 +5677,10 @@ async function _continueInit(): Promise<void> {
     -------------------------------------------------------------------------- */
 
     document.getElementById("budgetSetupBtn")!.addEventListener("click", () => {
-      // Fresh open from the main view always starts on Income Sources,
-      // only intra-modal transitions (bill editor, delete confirm) restore
-      // the previously active tab via openSetupModalOnTab().
-      activeSetupTab = "sources";
+      // No tab to pick: ModalTabs forgets the selected tab on a real close, so
+      // a fresh open from the main view lands on Income Sources on its own.
+      // Intra-modal transitions (bill editor, delete confirm) never close the
+      // modal for real, so they come back to the tab they left.
       getSetupModal().open();
     });
 

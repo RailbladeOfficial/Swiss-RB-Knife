@@ -33,7 +33,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
-import { Modal, setGlobalModalOpenHook } from "./modal";
+import { Modal, ModalTabs, setGlobalModalOpenHook } from "./modal";
 import { initTimeTracker } from "./tools/time-tracker";
 import { initImageCCR } from "./tools/image-ccr";
 import { initFileGen } from "./tools/file-gen";
@@ -574,11 +574,8 @@ const themePickerBackdrop = document.getElementById("themePickerBackdrop")!;
 const themePickerBack = document.getElementById("themePickerBack")!;
 const themePickerClose = document.getElementById("themePickerClose")!;
 const themePickerGrid = document.getElementById("themePickerGrid")!;
-const themePickerRandomPane = document.getElementById("themePickerRandomPane")!;
 const themePickerRandomTileWrap = document.getElementById("themePickerRandomTileWrap")!;
-const themePickerCyclePane = document.getElementById("themePickerCyclePane")!;
 const themePickerCycleTileWrap = document.getElementById("themePickerCycleTileWrap")!;
-const themePickerPreferencesPane = document.getElementById("themePickerPreferencesPane")!;
 const themeAnimationsToggle = document.getElementById("themeAnimationsToggle") as HTMLInputElement;
 const themeAnimationsLabel = document.getElementById("themeAnimationsLabel")!;
 const themeAnimationsPerTheme = document.getElementById("themeAnimationsPerTheme")!;
@@ -1269,9 +1266,9 @@ export function applySettings(): void {
   refreshThemeCurrentBadge();
 
   // The Random tab's settings panel (visibility + enabled/greyed state) is
-  // managed by renderThemePickerTab(), not here, just keep the control
-  // values themselves in sync so they're correct whenever that panel is
-  // shown/enabled.
+  // managed by renderThemePickerTab() as that tab is shown, not here, just
+  // keep the control values themselves in sync so they're correct whenever
+  // that panel is shown/enabled.
   randomModeToggle.checked = settings.randomPersistent;
   randomModeLabel.textContent = settings.randomPersistent
     ? "Persistent"
@@ -1814,7 +1811,7 @@ const sidebarEditModal = new Modal(sidebarEditBackdrop, {
 });
 
 sidebarEditBtn.addEventListener("click", () => {
-  settingsModal.close();
+  settingsModal.close({ handoff: true });
   sidebarEditModal.open();
 });
 
@@ -2195,8 +2192,6 @@ function buildNewCustomThemeTile(): HTMLElement {
   return tile;
 }
 
-let themePickerActiveTab: ThemePickerTab = "main";
-
 /** Which tab houses the currently active theme, main/holiday/special for a
  *  built-in theme, "random" or "custom" for those (regardless, for custom,
  *  of which saved one). */
@@ -2329,25 +2324,16 @@ themeAnimationsToggle.addEventListener("change", () => {
   refreshSeasonalEffect();
 });
 
+/** Fills in whichever tab was just selected. Registered as the theme picker's
+ *  ModalTabs onActivate hook, so showing/hiding the panes and marking the tab
+ *  button are already done by the time this runs, leaving only the content. */
 function renderThemePickerTab(tab: ThemePickerTab): void {
-  themePickerActiveTab = tab;
-  document.querySelectorAll<HTMLElement>(".theme-picker-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.themeTab === tab);
-  });
-
-  themePickerGrid.style.display = "none";
-  themePickerRandomPane.style.display = "none";
-  themePickerCyclePane.style.display = "none";
-  themePickerPreferencesPane.style.display = "none";
-
   if (tab === "preferences") {
-    themePickerPreferencesPane.style.display = "";
     renderThemePreferences();
     return;
   }
 
   if (tab === "random") {
-    themePickerRandomPane.style.display = "";
     themePickerRandomTileWrap.innerHTML = "";
     themePickerRandomTileWrap.appendChild(buildRandomTile());
     // Settings are visible either way, but only interactive once Random is
@@ -2357,7 +2343,6 @@ function renderThemePickerTab(tab: ThemePickerTab): void {
   }
 
   if (tab === "cycle") {
-    themePickerCyclePane.style.display = "";
     themePickerCycleTileWrap.innerHTML = "";
     themePickerCycleTileWrap.appendChild(buildCycleTile());
     // Same "visible but inert until actually active" treatment as Random.
@@ -2367,7 +2352,6 @@ function renderThemePickerTab(tab: ThemePickerTab): void {
     return;
   }
 
-  themePickerGrid.style.display = "";
   themePickerGrid.innerHTML = "";
 
   if (tab === "custom") {
@@ -2415,10 +2399,6 @@ window.addEventListener("resize", () => {
   }
 });
 
-document.querySelectorAll<HTMLElement>(".theme-picker-tab").forEach((btn) => {
-  btn.addEventListener("click", () => renderThemePickerTab(btn.dataset.themeTab as ThemePickerTab));
-});
-
 /** Selects a built-in theme or "random"/"custom" by id. Same logic the old
  *  themeSelect "change" handler used to run. Re-renders the picker's active
  *  tab afterward so the active-tile highlight tracks the new selection
@@ -2434,7 +2414,7 @@ function selectTheme(themeId: string): void {
   themeSelect.value = themeId;
   applySettings();
   saveSettings();
-  renderThemePickerTab(themePickerActiveTab);
+  themePickerTabs.restore();
 }
 
 /** Selects a specific saved custom theme by id, then applies it via
@@ -2444,13 +2424,28 @@ function selectCustomTheme(customId: string): void {
   selectTheme("custom");
 }
 
-// Set just before calling themePickerModal.open() to force a specific tab on
-// the next open, bypassing tabForCurrentTheme(). Consumed (and cleared) by
-// onOpen below. Needed because tabForCurrentTheme() tracks settings.theme,
-// which the Create/Edit/Delete Custom Theme flows don't necessarily change
-// (e.g. editing or deleting a custom theme that isn't the active one), so
-// it alone can't be trusted to land back on the Custom tab for those flows.
-let themePickerForceTab: ThemePickerTab | null = null;
+/* The picker's tab strip, on the shared ModalTabs controller (modal.ts) like
+   every other tabbed modal. Two things here are specific to this modal:
+
+   • Main/Holiday/Special/Custom all render into the one #themePickerGrid, so
+     they share a pane entry. Cycle, Random and Preferences have their own.
+   • A fresh open lands on the tab housing the theme in use, not on Main, via
+     defaultTab. Returning from a child modal still keeps the tab you left. */
+const themePickerTabs = new ModalTabs<ThemePickerTab>({
+  scope: "#themePickerBackdrop",
+  key: "themeTab",
+  panes: {
+    main: "themePickerGrid",
+    holiday: "themePickerGrid",
+    special: "themePickerGrid",
+    cycle: "themePickerCyclePane",
+    random: "themePickerRandomPane",
+    custom: "themePickerGrid",
+    preferences: "themePickerPreferencesPane",
+  },
+  defaultTab: () => tabForCurrentTheme(),
+  onActivate: (tab) => renderThemePickerTab(tab),
+});
 
 // Replaces (rather than stacks on) the General Settings modal, same pattern
 // as the Edit Sidebar modal above. Exported: theme-editor.ts's Create/Edit
@@ -2458,26 +2453,21 @@ let themePickerForceTab: ThemePickerTab | null = null;
 // only ever reached from this modal.
 export const themePickerModal = new Modal(themePickerBackdrop, {
   closeOnEsc: true,
-  // Lands on the tab that houses whatever theme is currently active by
-  // default, unless a specific tab was requested (see themePickerForceTab).
-  onOpen: () => {
-    const tab = themePickerForceTab ?? tabForCurrentTheme();
-    themePickerForceTab = null;
-    renderThemePickerTab(tab);
-  },
+  tabs: themePickerTabs,
 });
 
-/** Reopens Choose Theme forced to the Custom tab. Exported for theme-editor.ts
- *  to call when returning from Create/Edit/Delete Custom Theme, see
- *  themePickerForceTab's doc comment for why tabForCurrentTheme() alone
- *  isn't reliable for those flows. */
+/** Reopens Choose Theme on the Custom tab. Exported for theme-editor.ts to call
+ *  when returning from Create/Edit/Delete Custom Theme. Selecting the tab before
+ *  opening beats letting defaultTab decide, because tabForCurrentTheme() tracks
+ *  settings.theme, which those flows don't necessarily change (e.g. editing or
+ *  deleting a custom theme that isn't the active one). */
 export function reopenThemePickerOnCustomTab(): void {
-  themePickerForceTab = "custom";
+  themePickerTabs.select("custom");
   themePickerModal.open();
 }
 
 themeEditBtn.addEventListener("click", () => {
-  settingsModal.close();
+  settingsModal.close({ handoff: true });
   themePickerModal.open();
 });
 
@@ -2492,7 +2482,24 @@ themePickerClose.addEventListener("click", () => themePickerModal.close());
    SETTINGS MODAL
 ============================================================================= */
 
+type SettingsTab = "display" | "audio" | "preferences";
+
+/* Declaration order is tab order: Display is what a fresh open lands on. The
+   Customize buttons (Sidebar / Theme / Notification Sound) and the App Lock and
+   new-version flows all leave and come back, so they close with
+   { handoff: true } to keep the tab they left from. */
+const settingsTabs = new ModalTabs<SettingsTab>({
+  scope: "#settingsModal",
+  key: "settingsTab",
+  panes: {
+    display: "settingsTabDisplay",
+    audio: "settingsTabAudio",
+    preferences: "settingsTabPreferences",
+  },
+});
+
 export const settingsModal = new Modal(settingsBackdrop, {
+  tabs: settingsTabs,
   onOpen: () => applySettings(),
 });
 
@@ -2588,7 +2595,7 @@ saveRandomBtn.addEventListener("click", async () => {
   // The Random settings panel (and this button) stays visible regardless of
   // which tab is open, if that happens to be Custom, refresh it so the new
   // tile shows up immediately instead of only on the next tab switch.
-  if (themePickerActiveTab === "custom") renderThemePickerTab("custom");
+  if (themePickerTabs.active === "custom") themePickerTabs.activate("custom");
   flash(`Saved palette as "${name}"`, "success");
 });
 
@@ -2905,7 +2912,7 @@ const soundPackPickerModal = new Modal(soundPackPickerBackdrop, {
 });
 
 soundPackEditBtn.addEventListener("click", () => {
-  settingsModal.close();
+  settingsModal.close({ handoff: true });
   soundPackPickerModal.open();
 });
 
@@ -2917,10 +2924,12 @@ soundPackPickerBack.addEventListener("click", () => {
 soundPackPickerClose.addEventListener("click", () => soundPackPickerModal.close());
 
 /* ── Notification volume ──────────────────────────────────────────────────
-   Lives in the sound pack modal because it's the same decision: what the
-   toast cues sound like. Persisting is debounced off the "change" event
-   rather than "input", so dragging across the range writes settings once at
-   the end instead of thirty times on the way. */
+   Lives on the Audio tab of General Settings, above Notification Sound: same
+   subject, but it applies to whichever pack is selected rather than being
+   part of picking one. Wired up here, next to the pack picker it shares a tab
+   with, rather than up in the settings-modal section. Persisting is debounced
+   off the "change" event rather than "input", so dragging across the range
+   writes settings once at the end instead of thirty times on the way. */
 
 const soundVolumeSlider = document.getElementById(
   "soundVolumeSlider",

@@ -257,3 +257,139 @@ body:not(.solid-modals) .modal {
   background: var(--color-hover);
   color: var(--color-text);
 }
+
+/* =============================================================================
+   MODAL TABS: the app-wide tab strip
+   -----------------------------------------------------------------------------
+   THE way to build tabs inside a modal. Every tabbed modal uses these three
+   classes and drives them through ModalTabs in modal.ts, so a new tabbed modal
+   is markup plus one controller, with no per-modal CSS or switching code:
+
+     .modal-tabs      the strip, one per modal
+     .modal-tab       a <button> in the strip, carrying its tab id in a
+                      data- attribute and .active when selected
+     .modal-tab-pane  the panel a tab reveals, one per tab
+
+   These started life as .setup-tab*, named for the Setup modals they were built
+   for. They are named for the modal primitive now that every tabbed modal in the
+   app uses them. The 18 built-in themes each hand-write a .modal-tab.active
+   override (see below), so a future rename has to sweep public/themes too.
+
+   Tab switching is scoped per modal (ModalTabs takes a `scope` selector) so the
+   shared class names never cross-wire one modal's tabs to another's.
+============================================================================= */
+
+/* Grid, not flex, and that is the whole trick.
+   `grid-auto-flow: column` means the tabs are one row, always, with no second
+   row possible. `grid-auto-columns: 1fr` makes every column the SAME width,
+   whatever its own label needs, so the strip is even rather than ragged.
+
+   The useful part is what that does to the strip's intrinsic width. An all-1fr
+   grid resolves its min-content size to (widest column's min-content) x (column
+   count), i.e. exactly "every tab as wide as the longest label". The modal rule
+   below reads that number back out and grows itself to fit. Nothing here is
+   hard-coded, so it stays correct as labels and Font Scale change. */
+.modal-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border-bottom: 1px solid var(--color-border);
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* A tabbed modal is never narrower than its own tab strip. Its designed width
+   (500px base, 720px for Setup modals, 1000px for the theme picker) stays the
+   starting point; min-content only raises it when the tabs need more, which is
+   what stops long labels from spilling past the right-hand edge.
+
+   min-content here resolves to the widest thing the modal has to show without
+   breaking, and .modal-tabs above is built so that thing is the tab strip. The
+   panes can't out-vote it: their content is prose and controls that wrap or
+   scroll, so their own min-content is a single word wide.
+
+   :has() needs Chromium 105+, which the Tauri webview is well past. */
+.modal:has(.modal-tabs) {
+  min-width: min-content;
+}
+
+/* Most strips sit inside the modal's scrolling body rather than directly in the
+   panel (Licensing is the exception). A scroll container's AUTOMATIC minimum is
+   zero, so state the minimum explicitly here instead of trusting the default to
+   carry the strip's width up to the rule above. */
+.modal-body:has(> .modal-tabs) {
+  min-width: min-content;
+}
+
+.modal-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  /* Own box-shadow explicitly: .modal-tab is a <button>, and some themes give
+     bare buttons a resting glow via a broad `button {}` rule. Declaring it here
+     keeps the flat underline-tab look self-contained so no theme's button glow
+     bleeds onto it. */
+  box-shadow: none;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color var(--hover-transition), border-color var(--hover-transition);
+  margin-bottom: -1px;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  letter-spacing: 0.05em;
+  /* nowrap is load-bearing, not cosmetic. It keeps a long label (e.g. "EXPENSE
+     CATEGORIES") on one line, which makes the tab's min-content width equal to
+     the label's full width, which is the number .modal-tabs multiplies up and
+     the modal then sizes itself to. Allow wrapping and min-content collapses to
+     the longest WORD, so the strip would under-report and the labels would go
+     back to painting outside their tabs.
+
+     No flex sizing and no min-width here: the tabs are grid items now, and the
+     1fr columns already make them equal and wide enough. */
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Below roughly the width Budget's five tabs need to sit on one line each
+   (~1230px of strip, which only clears 92vw once the window is ~1340px), stop
+   insisting on one line and let a label break instead, the way the Budget
+   summary panel's own tabs already do.
+
+   This does more than re-flow text: with wrapping allowed, a tab's min-content
+   drops to its longest WORD, so the strip asks for far less and the min-content
+   rule above lets Budget Setup settle back near its designed 720px rather than
+   forcing a modal wider than the screen. Tabs stay equal width (still 1fr) and
+   still on one row, they just get taller.
+
+   Single-word labels have nothing to break on, so every other modal's strip is
+   unaffected by this. In practice it is Budget's rule. */
+@media (max-width: 1400px) {
+  .modal-tab {
+    white-space: normal;
+  }
+}
+
+.modal-tab:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+/* The tinted fill is derived from the theme's own accent, so a Custom theme
+   (which has no file of its own to add a rule to) still gets the same
+   treatment the 18 built-ins hand-write. Deliberately NOT !important: every
+   built-in theme overrides these to its own hex, and themeLink loads after
+   this stylesheet, so equal specificity lets the theme win. The class
+   selectors already outrank any theme's bare `button` rule. */
+.modal-tab.active {
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
+}
+
+.modal-tab-pane {
+  min-height: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}

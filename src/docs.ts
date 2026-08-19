@@ -18,7 +18,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Modal } from "./modal";
+import { Modal, ModalTabs } from "./modal";
 import {
   settings,
   flash,
@@ -485,7 +485,7 @@ newVersionToggle.addEventListener("change", async () => {
     // Turning ON: revert visually until confirmed, then gate on the modal.
     // The setting stays off unless the user proceeds through it.
     newVersionToggle.checked = false;
-    settingsModal.close();
+    settingsModal.close({ handoff: true });
     const proceed = await openUpdateEnableModal();
     if (!proceed) {
       settingsModal.open(); // left off
@@ -729,15 +729,28 @@ async function loadChangelog(): Promise<void> {
    LICENSING & ATTRIBUTIONS MODAL
 ============================================================================= */
 
-const licensingModal = new Modal(licensingBackdrop);
+/* This modal's tabs don't swap panes: all three load into the one #licensingBody,
+   so they share a pane entry and the body simply stays put. Everything else is
+   the standard controller, including landing on Licensing after a real close. */
+const licensingTabs = new ModalTabs<string>({
+  scope: "#licensingBackdrop",
+  key: "tab",
+  panes: {
+    license: "licensingBody",
+    attribution: "licensingBody",
+    thirdparty: "licensingBody",
+  },
+  onActivate: (tab) => {
+    activeTab = tab;
+    void loadLicensingTab(tab);
+  },
+});
+
+const licensingModal = new Modal(licensingBackdrop, { tabs: licensingTabs });
 
 function openLicensing(tab = "license"): void {
-  activeTab = tab;
-  document.querySelectorAll<HTMLElement>(".licensing-tabs .setup-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.tab === tab);
-  });
+  licensingTabs.select(tab);
   licensingModal.open();
-  loadLicensingTab(tab);
 }
 
 function closeLicensing(): void {
@@ -822,20 +835,6 @@ document.getElementById("readmeBody")!.addEventListener("click", (e) => {
   closeReadme();
   if (doc === "LICENSE") fullLicenseReturn = () => openReadme();
   INTERNAL_DOC_LINKS[doc]();
-});
-
-// Tab switching. Every query here is scoped to this strip on purpose:
-// .setup-tab is the shared app-wide modal tab, so an unscoped selector would
-// reach into every Setup/Settings modal's tabs as well.
-document.querySelectorAll<HTMLElement>(".licensing-tabs .setup-tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const tab = btn.dataset.tab!;
-    activeTab = tab;
-    document.querySelectorAll<HTMLElement>(".licensing-tabs .setup-tab").forEach((b) => {
-      b.classList.toggle("active", b.dataset.tab === tab);
-    });
-    loadLicensingTab(tab);
-  });
 });
 
 async function loadLicensingTab(tab: string): Promise<void> {

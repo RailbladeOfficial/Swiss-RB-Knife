@@ -225,7 +225,7 @@ body:not(.solid-modals) .modal {
 
 /* Summary tab active, amber */
 .budget-summary-tab.active,
-.setup-tab.active { color: #ffc40d; background: rgba(255, 196, 13, 0.12); border-bottom-color: #ffc40d; }
+.modal-tab.active { color: #ffc40d; background: rgba(255, 196, 13, 0.12); border-bottom-color: #ffc40d; }
 
 /* Stats table values */
 .budget-stats-table td.pos { color: #00FF00; }
@@ -252,8 +252,7 @@ body:not(.solid-modals) .modal {
 }
 
 /* View-mode active button, amber */
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #ffc40d;
   color: #0d1a10;
   border-color: #ffc40d;

@@ -24,7 +24,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { flash, devError, shortPath } from "../shell";
-import { Modal } from "../modal";
+import { Modal, ModalTabs } from "../modal";
 
 /* =============================================================================
    TYPES
@@ -2145,41 +2145,26 @@ function renderProjectsList(): void {
 ============================================================================= */
 
 type TTSetupTab = "projects" | "activities" | "preferences";
-let ttActiveSetupTab: TTSetupTab = "projects";
 let ttSetupModal: Modal | null = null;
-const _ttSetupPanesToReset = new Set<string>();
 
 // Set by initTimeTracker so module-level code (activity rename/delete, which
 // mutate entries) can re-render the ledger without threading DOM refs out here.
 let renderCurrentView: () => void = () => {};
 
-function activateTTSetupTab(tab: TTSetupTab): void {
-  ttActiveSetupTab = tab;
-  document
-    .querySelectorAll<HTMLButtonElement>("#ttSettingsModal .setup-tab")
-    .forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.ttTab === tab);
-    });
-
-  const paneIds: Record<TTSetupTab, string> = {
+/** Setup's tab strip, on the shared ModalTabs controller (modal.ts). It owns
+ *  tab state, pane visibility and pane scroll resets. */
+const ttSetupTabs = new ModalTabs<TTSetupTab>({
+  scope: "#ttSettingsModal",
+  key: "ttTab",
+  panes: {
     projects: "ttTabProjects",
     activities: "ttTabActivities",
     preferences: "ttTabPreferences",
-  };
-
-  for (const [key, id] of Object.entries(paneIds)) {
-    const pane = document.getElementById(id)!;
-    const isActive = key === tab;
-    pane.style.display = isActive ? "" : "none";
-    if (isActive && _ttSetupPanesToReset.has(id)) {
-      pane.scrollTop = 0;
-      _ttSetupPanesToReset.delete(id);
-    }
-  }
-}
+  },
+});
 
 function openTTSetupOnTab(tab?: TTSetupTab): void {
-  if (tab) ttActiveSetupTab = tab;
+  if (tab) ttSetupTabs.select(tab);
   getTTSetupModal().open();
 }
 
@@ -2187,26 +2172,13 @@ function getTTSetupModal(): Modal {
   if (!ttSetupModal) {
     ttSetupModal = new Modal(document.getElementById("ttSettingsBackdrop")!, {
       closeOnEsc: true,
+      tabs: ttSetupTabs,
       onOpen: () => {
-        activateTTSetupTab(ttActiveSetupTab);
         renderActivitiesList();
         renderProjectsList();
         applyTTSettings();
       },
-      onClosed: () => {
-        _ttSetupPanesToReset.add("ttTabProjects");
-        _ttSetupPanesToReset.add("ttTabActivities");
-        _ttSetupPanesToReset.add("ttTabPreferences");
-      },
     });
-
-    document
-      .querySelectorAll<HTMLButtonElement>("#ttSettingsModal .setup-tab")
-      .forEach((btn) => {
-        btn.addEventListener("click", () =>
-          activateTTSetupTab(btn.dataset.ttTab as TTSetupTab),
-        );
-      });
 
     document.getElementById("ttSettingsClose")!.addEventListener("click", () => ttSetupModal!.close());
   }
@@ -2250,7 +2222,7 @@ function getActivityAddModal(): Modal {
 }
 
 function openActivityAdd(): void {
-  getTTSetupModal().close();
+  getTTSetupModal().close({ handoff: true });
   (document.getElementById("ttActivityAddName") as HTMLInputElement).value = "";
   getActivityAddModal().open();
 }
@@ -2336,7 +2308,7 @@ function getActivityEditModal(): Modal {
 
 function openActivityEdit(item: Activity): void {
   ttActivityEditItem = item;
-  getTTSetupModal().close();
+  getTTSetupModal().close({ handoff: true });
   getActivityEditModal(); // ensure wired
   (document.getElementById("ttActivityEditName") as HTMLInputElement).value = item.name;
   setContextLines(document.getElementById("ttActivityEditContext")!, [
@@ -2389,7 +2361,7 @@ function getProjectAddModal(): Modal {
 }
 
 function openProjectAdd(): void {
-  getTTSetupModal().close();
+  getTTSetupModal().close({ handoff: true });
   (document.getElementById("ttProjectAddName") as HTMLInputElement).value = "";
   (document.getElementById("ttProjectAddNumber") as HTMLInputElement).value = String(nextProjectNumber());
   getProjectAddModal().open();
@@ -2462,7 +2434,7 @@ function getProjectEditModal(): Modal {
 
 function openProjectEdit(item: Project): void {
   ttProjectEditItem = item;
-  getTTSetupModal().close();
+  getTTSetupModal().close({ handoff: true });
   getProjectEditModal(); // ensure wired
   (document.getElementById("ttProjectEditName") as HTMLInputElement).value = item.name;
   (document.getElementById("ttProjectEditNumber") as HTMLInputElement).value = String(item.projectNumber);
@@ -2744,7 +2716,7 @@ function getCsvImportModal(): Modal {
 }
 
 function openCsvImportModal(): void {
-  getTTSetupModal().close();
+  getTTSetupModal().close({ handoff: true });
   resetCsvImportModalState();
   getCsvImportModal().open();
 }

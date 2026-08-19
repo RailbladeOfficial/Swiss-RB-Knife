@@ -401,11 +401,11 @@ input:range .img-slider {
    glow and all) the way Neon does it (Neon's button rule only sets box-shadow,
    so it never had this fight). */
 .budget-summary-tab,
-.setup-tab { color: #00dfff; }
+.modal-tab { color: #00dfff; }
 .budget-summary-tab:hover,
-.setup-tab:hover { color: #e8f4ff; }
+.modal-tab:hover { color: #e8f4ff; }
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #ee2dff;
   background: rgba(238, 45, 255, 0.18);
   border-color: #ee2dff;
@@ -419,14 +419,6 @@ input:range .img-slider {
   color: #04121c;
   border-color: #00dfff;
   box-shadow: 0 0 12px rgba(0, 223, 255, 0.4);
-}
-/* Split from the view-mode rule above so it does NOT restate box-shadow: the
-   picker pills are ordinary buttons and should carry this theme's standard
-   `button` glow, not the view-mode toggle's bespoke one. */
-.theme-picker-tab.active {
-  background: #00dfff;
-  color: #04121c;
-  border-color: #00dfff;
 }
 
 .budget-stats-table td.pos { color: #00FF00; }

@@ -238,7 +238,7 @@ body.solid-modals .modal {
 
 /* Summary tab active */
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #ff6600;
   background: rgba(255, 102, 0, 0.12);
   border-bottom-color: #ff6600;
@@ -270,8 +270,7 @@ body.solid-modals .modal {
 }
 
 /* View-mode active button, orange */
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #ff6600;
   color: #000000;
   border-color: #ff6600;

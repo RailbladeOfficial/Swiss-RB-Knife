@@ -201,7 +201,7 @@ body:not(.solid-modals) .modal {
 .budget-annual-stats-title { color: #e5e7eb; }
 
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #e5e7eb;
   background: rgba(0, 0, 255, 0.15);
   border-bottom-color: #0000ff;
@@ -228,8 +228,7 @@ body:not(.solid-modals) .modal {
   color: #e5e7eb;
 }
 
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #0000ff;
   color: #ffffff;
   border-color: #0000ff;

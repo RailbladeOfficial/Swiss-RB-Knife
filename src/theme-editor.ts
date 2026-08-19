@@ -15,7 +15,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { Modal } from "./modal";
+import { Modal, ModalTabs } from "./modal";
 import {
   settings,
   flash,
@@ -578,6 +578,17 @@ function teSyncAdvAndPreview(): void {
   teLivePreview();
 }
 
+/** The editor's tab strip, on the shared ModalTabs controller (modal.ts).
+ *  Declared above the modal because it is passed into its options. */
+const teTabs = new ModalTabs<"general" | "advanced">({
+  scope: "#themeEditorModal",
+  key: "teTab",
+  panes: {
+    general: "teTabGeneral",
+    advanced: "teTabAdvanced",
+  },
+});
+
 // Theme editor Modal instance, declared before openThemeEditor so the function
 // body can safely reference it (called only from event listeners, but tsc checks
 // the declaration order for const references inside closures).
@@ -588,6 +599,7 @@ let _teSaveCompleted = false;
 const themeEditorModal = new Modal(themeEditorBackdrop, {
   closeOnEsc: true,
   closeOnBackdrop: false,
+  tabs: teTabs,
   onOpen: () => {
     // modal.ts resets .modal-body scrollTop, but the actual scrollable elements
     // here are the tab panes (.te-groups). Reset them explicitly.
@@ -614,8 +626,8 @@ export function openThemeEditor(mode: "create" | "edit", id?: string): void {
   _teEditId = id ?? null;
   _tePrevTheme = settings.theme;
 
-  // Always open on the General tab
-  teActivateTab("general");
+  // Always open on the General tab, whatever was left selected last time.
+  teTabs.select("general");
 
   if (mode === "create") {
     themeEditorTitle.textContent = "Create Custom Theme";
@@ -875,26 +887,6 @@ document.querySelectorAll<HTMLElement>(".te-label-text").forEach((text) => {
     }
     teVarTooltip.classList.remove("visible");
     teVarTooltip.style.display = "none";
-  });
-});
-
-// Theme editor tab switching. Scoped to #themeEditorModal because .setup-tab
-// is now shared across Budget/Time Tracker/Theme Editor, an unscoped query
-// would toggle every tool's tabs at once.
-function teActivateTab(tab: "general" | "advanced"): void {
-  document.querySelectorAll<HTMLElement>("#themeEditorModal .setup-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.teTab === tab);
-  });
-  const general = document.getElementById("teTabGeneral")!;
-  const advanced = document.getElementById("teTabAdvanced")!;
-  general.style.display = tab === "general" ? "" : "none";
-  advanced.style.display = tab === "advanced" ? "" : "none";
-}
-
-document.querySelectorAll<HTMLElement>("#themeEditorModal .setup-tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const tab = btn.dataset.teTab as "general" | "advanced";
-    if (tab) teActivateTab(tab);
   });
 });
 
