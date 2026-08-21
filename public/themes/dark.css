@@ -50,11 +50,11 @@
   --color-chart-8:             #34d399;
 }
 
-/* ── Time Tracker panels, desaturated accent borders ── */
-.input-panel    { border-left: 4px solid #6366f1; }
-.controls-panel { border-left: 4px solid #0d9488; }
-.totals-panel   { border-left: 4px solid #78716c; }
-.entries-panel  { border-left: 4px solid #b91c1c; }
+/* ── Panel accent slots, desaturated accent borders ── */
+.panel-accent-input    { border-left: 4px solid #6366f1; }
+.panel-accent-view     { border-left: 4px solid #0d9488; }
+.panel-accent-totals   { border-left: 4px solid #78716c; }
+.panel-accent-entries  { border-left: 4px solid #b91c1c; }
 
 /* ── Tool / section header, very subtle, near-black ── */
 .tool-view-header,
@@ -97,15 +97,6 @@ body:not(.solid-modals) .modal {
   border-color: #6b7280;
 }
 
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 3px solid #6366f1;
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 3px solid #0d9488;
-}
-
 /* ── Tab buttons ── */
 .tab-btn {
   color: var(--color-text-muted);
@@ -142,7 +133,6 @@ body:not(.solid-modals) .modal {
 .preview-card.anchor-card { border-color: #6366f1; }
 .preview-card.drag-target  { border-color: #0d9488; }
 
-
 /* ── Attention-signal accents ──
    This theme's --color-btn is a neutral grey (its buttons are deliberately
    understated), but an update/reminder signal needs to actually catch the eye,
@@ -164,6 +154,53 @@ body:not(.solid-modals) .modal {
 .home-update-notice a:hover { color: #a5b4fc; }
 .modal-body a { color: #818cf8; }
 .modal-body a:hover { color: #a5b4fc; }
+
+/* ── Image CCR controls ──
+   Filled in so this theme covers the same surface set as the other 23. The
+   base rules in image-ccr.css put the solid accent behind .dir-btn and invert
+   .anchor-badge, which reads as "already selected" on every control; these
+   restate them as the quiet outlined chips the rest of the themes use. ── */
+.dir-btn, .prv-btn {
+  background: #1c1c1c;
+  color: #6b7280;
+  border-color: #2a2a2a;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: #d1d5db;
+  border-color: #404040;
+  background: #2a2a2a;
+}
+
+.drop-zone {
+  border-color: #3a3a3a;
+}
+
+.anchor-badge {
+  background: #6366f1;
+  color: #e5e7eb;
+}
+
+.preview-card:hover {
+  border-color: #404040;
+}
+
+.img-slider::-webkit-slider-thumb {
+  background: #6366f1;
+  border-color: #0a0a0a;
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: #818cf8;
+}
+
+.result-preview-wrap {
+  border-color: #2a2a2a;
+}
+
+.budget-stats-section-heading {
+  color: #6b7280;
+}
 
 /* ── Budget Tracker ── */
 

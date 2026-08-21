@@ -502,19 +502,47 @@
   }
 }
 
-/* Card-level feedback applies to all four tiles, including the split one. */
+/* Card-level feedback, identical on all four tiles including the split one:
+   border, lift, glow, and a 16% accent wash across the whole card.
+
+   Two things have to be said explicitly here, both because the three whole
+   tiles are <button> elements and the split tile is a <div>:
+
+   1. background-COLOR is re-asserted. shell.css's `button:hover` sets the
+      solid accent fill, and at (0,1,1) it outranks `.gs-action-card`'s own
+      (0,1,0) background. So on hover these three flipped their base colour to
+      a solid slab of --color-btn-hover and the wash landed on top of THAT,
+      while the <div> split tile, which `button:hover` can't reach, washed
+      correctly over --color-panel. That mismatch was the whole bug: it never
+      had anything to do with the wash itself.
+
+   2. The wash is MIXED INTO that colour rather than layered over it, and it
+      is set with the `background` SHORTHAND. Both halves of that matter:
+
+      - Mixed, not layered: a 16% overlay and a 16% color-mix give the same
+        pixels (0.16*accent + 0.84*panel), but an overlay has to live in
+        background-image, which is not interpolable, so it snaps in while
+        every other hover in the app cross-fades. A plain <color> animates.
+      - Shorthand, not background-color: the longhand leaves background-image
+        alone, and Blades and Shadow both give `button:hover` a gradient. At
+        (0,1,1) that gradient loses background-COLOR to this rule but still
+        owns background-IMAGE, so it painted straight over the mix and, being
+        a gradient, snapped. The shorthand resets the image in the same
+        declaration. .gs-split-half:hover has always used the shorthand,
+        which is exactly why the split tile stayed correct in those two
+        themes while these three did not. */
 .gs-action-card:hover {
   border-color: var(--gs-accent);
   border-left-color: var(--gs-accent);
   box-shadow: 0 4px 18px color-mix(in srgb, var(--gs-accent) 18%, transparent);
   transform: translateY(-2px);
+  background: color-mix(in srgb, var(--gs-accent) 16%, var(--color-panel));
 }
 
-/* The accent wash is the same one each half of the split tile uses, so all
-   four destinations highlight identically. Excluded on the split card itself:
-   there the wash belongs to whichever half is hovered, not the whole tile. */
+/* Only a whole card recolours its own label. On the split card that belongs
+   to the hovered half, which sets it itself, so pointing at either half
+   doesn't light up both titles. */
 .gs-action-card:not(.gs-split-card):hover {
-  background: color-mix(in srgb, var(--gs-accent) 16%, transparent);
   color: var(--gs-accent-soft);
 }
 
@@ -603,6 +631,9 @@
   justify-content: flex-end;
 }
 
+/* A second step on top of the card-wide wash the parent already took, so the
+   split card lights up exactly like the other three AND still shows which of
+   its two halves the pointer is on. */
 .gs-split-half:hover {
   background: color-mix(in srgb, var(--gs-accent) 16%, transparent);
   color: var(--gs-accent-soft);
@@ -906,6 +937,7 @@
   cursor: pointer;
   padding: 2px 7px;
   border-radius: var(--gs-radius-sm);
+  transition: background var(--hover-transition);
 }
 
 .gs-game-carousel-label:hover {
@@ -1112,6 +1144,7 @@
   padding: 5px 8px;
   text-align: center;
   border-bottom: 1px solid var(--gs-grid-line);
+  transition: background var(--hover-transition);
 }
 
 /* Sticky headers must be fully opaque or the rows scroll visibly through
@@ -1162,6 +1195,7 @@
   font-weight: 600;
   text-align: left !important;
   white-space: nowrap;
+  transition: background var(--hover-transition);
 }
 
 .gs-round-grid tbody tr:nth-child(even) .gs-round-label-cell,
@@ -1197,6 +1231,13 @@
   border-radius: 4px;
   box-sizing: border-box;
   font-variant-numeric: tabular-nums;
+  /* The score cells are the one input the shell's `input` rule leaves
+     un-transitioned, so the hover outline and the focus ring both
+     snapped in. */
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition),
+    box-shadow var(--hover-transition);
 }
 
 .gs-round-grid input[type="number"]:hover:not(:disabled) {
@@ -1476,6 +1517,7 @@
   padding: 5px 10px;
   text-align: center;
   border-bottom: 1px solid var(--gs-grid-line);
+  transition: background var(--hover-transition);
 }
 
 .gs-stats-table thead th {
@@ -1511,6 +1553,7 @@
   color: var(--color-text-muted);
   font-size: 0.76rem;
   white-space: nowrap;
+  transition: background var(--hover-transition);
 }
 
 /* Same scoping as the round grid, only the rowspan'd corner pins left. */
@@ -1800,6 +1843,7 @@
    the label and value together are what names the record. */
 .gs-record-row-detail {
   cursor: pointer;
+  transition: background var(--hover-transition);
 }
 
 .gs-record-row-detail:hover {
@@ -2000,6 +2044,9 @@
   cursor: pointer;
   border-radius: var(--gs-radius-sm);
   padding: 2px 6px;
+  transition:
+    background var(--hover-transition),
+    color var(--hover-transition);
 }
 
 .gs-pager-label:hover {
@@ -2019,6 +2066,7 @@
    gesture that opened this modal in the first place. */
 .gs-stat-detail-row-link {
   cursor: pointer;
+  transition: background var(--hover-transition);
 }
 
 .gs-stat-detail-row-link:hover {

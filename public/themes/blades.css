@@ -68,16 +68,16 @@
   --color-danger-subtle:       rgba(143, 36, 25, 0.12);
   --color-success:             #1f5c14;
 
-  /* The four panel rails. Steps of whichever blade they are read on, not four
-     fixed blade colours: four hues inside one tool is exactly the thing that
-     stops a tool reading as "the red one". White / deep / rail / ink are far
-     enough apart to tell the panels apart within a single hue.
+  /* The four panel rails, default (green) values. The blade scope below
+     re-points them at its own steps; these literals are what anything outside
+     a tool view resolves to. They MUST stay literal here, see the warning on
+     that rule about where var() gets substituted.
      --color-accent-view is the only one never used as text (it is a rail and
      a changelog fallback), which is why it can afford to be the white. */
-  --color-accent-input:        var(--bl-deep);
+  --color-accent-input:        #4f8f1c;
   --color-accent-view:         #ffffff;
-  --color-accent-totals:       var(--bl-rail);
-  --color-accent-entries:      var(--bl-ink);
+  --color-accent-totals:       #3f7714;
+  --color-accent-entries:      #1f3d08;
 
   --color-toggle-off:          #a8b2b9;
   --color-toggle-on:           #3f7714;
@@ -270,6 +270,14 @@ body[data-active-tool="files/dummy-file-generator"] .modal-backdrop {
    Note this deliberately does NOT include the sidebar rows or Home cards:
    those live on the silver and are painted directly from --bl-* further down,
    so remapping the shared tokens there would recolour the blade stack itself.
+
+   EVERY token whose value mentions --bl-* has to be declared HERE, not on
+   :root. A custom property's var() references are substituted at computed-
+   value time on the element the property is DECLARED on, and the substituted
+   result is what inherits. So `:root { --gs-accent: var(--bl-rail) }` reads
+   :root's own --bl-rail (green) and hands that green to the whole document;
+   a descendant re-declaring --bl-rail never gets a second look. Declared on
+   these scopes instead, each one substitutes against its own blade.
 ============================================================================= */
 
 #finance-tool-budget,
@@ -298,9 +306,79 @@ body[data-active-tool] .modal-backdrop {
   --color-toggle-on: var(--bl-rail);
   /* Silver hairlines vanish on a coloured card. */
   --color-border:    rgba(0, 0, 0, 0.22);
+
+  /* The four panel rails, as steps of THIS blade rather than four fixed
+     hues: four colours inside one tool is the thing that stops a tool
+     reading as "the red one". White / deep / rail / ink are far enough
+     apart to tell four panels apart within a single hue. */
+  --color-accent-input:   var(--bl-deep);
+  --color-accent-totals:  var(--bl-rail);
+  --color-accent-entries: var(--bl-ink);
+
+  /* Game Stats' hooks. --gs-accent is used both as a fill (the active
+     segment, with white --color-btn-text on top) and as borders and low
+     percentage washes, so it takes the rail. --gs-accent-soft is used purely
+     as TEXT on the card (tile values, section titles, card labels), so it
+     takes the near-black ink. Swapping the two is what made this tool
+     unreadable. The tile and chip surfaces need no hook of their own: they
+     come from --color-bg, re-pointed at --bl-1 just above. */
+  --gs-accent:      var(--bl-rail);
+  --gs-accent-soft: var(--bl-ink);
   /* Game Stats' empty-state outlines. Green dashes inside the purple tool
      were one of the more obvious leaks. */
   --color-border-dashed: var(--bl-rail);
+}
+
+/* =============================================================================
+   NO EASING
+   -----------------------------------------------------------------------------
+   The blade dashboard moved by sliding whole panels, never by cross-fading
+   colour. A row was lit or it wasn't, and it changed on the frame the
+   selection did. Easing every hover into place reads as a modern web UI
+   wearing the blades as a skin, so this theme snaps instead.
+
+   Two variables carry 79 of the app's 105 transitions, so zeroing them does
+   most of the work in two lines. The rules below are the ones that hardcode
+   their own duration and so can't be reached that way, plus three that mix the
+   variable with a literal `transform` the variable doesn't cover.
+
+   DELIBERATELY LEFT RUNNING, these are not state changes:
+     - progress fills (.ab-file-bar-fill, .budget-expect-bar-fill, .cd-bar) and
+       the Countdown ring/hourglass, which retarget every ~250ms. Snapping them
+       would make a running timer visibly step instead of sweep.
+     - .changelog-version-content's max-height, which docs.ts measures and then
+       clears on `transitionend`. With no transition that event never fires and
+       the accordion stays pinned to a stale pixel height.
+     - #lockScreen's fade-out, which lockscreen.ts tears down on a 300ms timer.
+       Removing the fade would leave the screen sitting there, fully opaque,
+       for those 300ms before vanishing.
+============================================================================= */
+
+:root {
+  --hover-transition: 0s;
+  --sidebar-transition: 0s;
+}
+
+#modalOverlay,
+.modal-backdrop,
+.modal,
+.subsettings,
+.toggle-slider,
+.toggle-slider::before,
+.lock-dot,
+.theme-picker-info-tooltip,
+.te-var-tooltip,
+.ab-info-tooltip,
+.drop-zone,
+.preview-card,
+.img-slider::-webkit-slider-thumb,
+#durationPreview,
+#tts-display-exit,
+.changelog-toggle-btn,
+.changelog-toggle-btn svg,
+.sound-pack-preview-btn,
+.gs-action-card {
+  transition: none;
 }
 
 /* ── The brushed-metal surround the blades sit in ── */
@@ -456,10 +534,10 @@ body {
 
 /* ── Time Tracker panels. Widened from the shell's 4px; the colours come
    from --color-accent-* above, so they are steps of this tool's own blade. ── */
-.input-panel    { border-left: 5px solid var(--color-accent-input); }
-.controls-panel { border-left: 5px solid var(--color-accent-view); }
-.totals-panel   { border-left: 5px solid var(--color-accent-totals); }
-.entries-panel  { border-left: 5px solid var(--color-accent-entries); }
+.panel-accent-input    { border-left: 5px solid var(--color-accent-input); }
+.panel-accent-view     { border-left: 5px solid var(--color-accent-view); }
+.panel-accent-totals   { border-left: 5px solid var(--color-accent-totals); }
+.panel-accent-entries  { border-left: 5px solid var(--color-accent-entries); }
 
 /* ── Tool / section header, the top lip of the card, in the deep step of the
    tool's blade so white reads on it ── */
@@ -638,15 +716,6 @@ textarea:focus {
   box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.13), 0 0 0 2px rgba(255, 255, 255, 0.65);
 }
 
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 5px solid var(--bl-rail);
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 5px solid #ffffff;
-}
-
 /* ── Drop zone ── */
 .drop-zone {
   border-color: rgba(255, 255, 255, 0.85);
@@ -804,18 +873,12 @@ textarea:focus {
    table, history cards, chart tooltip). Pointed at the blade vars, so the tool
    paints itself from #games-tool-game-stats' own purple.
 
-   The accent split matters here: --gs-accent is used both as a fill (the
-   active segment, with --color-btn-text white on top) and as borders and low
-   percentage washes, so it takes the rail. --gs-accent-soft is used purely as
-   TEXT on the card (tile values, section titles, card labels), so it takes the
-   near-black ink. Swapping the two is what made this tool unreadable.
-
-   The tile and chip surfaces still come from the shared --color-bg, which the
-   blade scope above has already re-pointed at --bl-1, so they wash light over
-   the card without needing a hook of their own. */
+   --gs-accent and --gs-accent-soft are NOT here: they are blade-relative, so
+   they are declared in the blade scope instead. These are the hue-independent
+   ones plus the default green for anything outside a tool view. */
 :root {
-  --gs-accent:      var(--bl-rail);
-  --gs-accent-soft: var(--bl-ink);
+  --gs-accent:      #3f7714;
+  --gs-accent-soft: #1f3d08;
   --gs-win:         #1f5c14;
   --gs-loss:        #8f2419;
   --gs-surface:     rgba(255, 255, 255, 0.4);

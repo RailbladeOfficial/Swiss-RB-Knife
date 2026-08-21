@@ -49,11 +49,11 @@
   --color-chart-8:             #16a34a;
 }
 
-/* ── Time Tracker panels, clean left-border accents on white ── */
-.input-panel    { border-left: 4px solid #3b82f6; }
-.controls-panel { border-left: 4px solid #059669; }
-.totals-panel   { border-left: 4px solid #d97706; }
-.entries-panel  { border-left: 4px solid #dc2626; }
+/* ── Panel accent slots, clean left-border accents on white ── */
+.panel-accent-input    { border-left: 4px solid #3b82f6; }
+.panel-accent-view     { border-left: 4px solid #059669; }
+.panel-accent-totals   { border-left: 4px solid #d97706; }
+.panel-accent-entries  { border-left: 4px solid #dc2626; }
 
 /* ── Panel base, white cards with a soft shadow instead of glow ── */
 .panel {
@@ -115,15 +115,6 @@ body:not(.solid-modals) .modal {
   -webkit-backdrop-filter: blur(24px);
   border-color: rgba(203, 213, 225, 0.7);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 3px solid rgba(59, 130, 246, 0.5);
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 3px solid rgba(5, 150, 105, 0.5);
 }
 
 /* ── Drop zone ── */
@@ -193,6 +184,23 @@ body:not(.solid-modals) .modal {
 .preview-card.anchor-card { border-color: #2563eb; box-shadow: 0 0 8px rgba(59, 130, 246, 0.2); }
 .preview-card.drag-target  { border-color: #059669; }
 
+/* ── Slider thumb + result frame ──
+   The base thumb is --color-btn-text (white here) ringed in --color-bg, which
+   on a light theme is a white dot on a near-white track. Solid accent instead,
+   matching how every other theme handles it. ── */
+.img-slider::-webkit-slider-thumb {
+  background: #3b82f6;
+  border-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: #2563eb;
+}
+
+.result-preview-wrap {
+  border-color: #cbd5e1;
+}
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent

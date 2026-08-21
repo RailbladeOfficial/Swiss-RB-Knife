@@ -51,26 +51,26 @@
   --color-chart-8:             #cc7000;
 }
 
-/* ── Time Tracker panels, gold / green / purple / gold ── */
-.input-panel {
+/* ── Panel accent slots, gold / green / purple / gold ── */
+.panel-accent-input {
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%);
   border-left: 4px solid #ffd700;
   border-color: rgba(255, 215, 0, 0.35);
   box-shadow: 0 0 16px rgba(255, 215, 0, 0.1);
 }
-.controls-panel {
+.panel-accent-view {
   background: linear-gradient(135deg, rgba(0, 165, 80, 0.07) 0%, #0f0520 100%);
   border-left: 4px solid #00a550;
   border-color: rgba(0, 165, 80, 0.35);
   box-shadow: 0 0 16px rgba(0, 165, 80, 0.1);
 }
-.totals-panel {
+.panel-accent-totals {
   background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, #0f0520 100%);
   border-left: 4px solid #7b2fbe;
   border-color: rgba(123, 47, 190, 0.4);
   box-shadow: 0 0 16px rgba(123, 47, 190, 0.12);
 }
-.entries-panel {
+.panel-accent-entries {
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%);
   border-left: 4px solid #ffd700;
   border-color: rgba(255, 215, 0, 0.35);
@@ -118,19 +118,6 @@ body.solid-modals .modal {
   border-color: #00a550;
   box-shadow: 0 0 14px rgba(0, 165, 80, 0.25);
   color: #00a550;
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, #0f0520 100%);
-  border-color: rgba(255, 215, 0, 0.3);
-  box-shadow: 0 0 14px rgba(255, 215, 0, 0.08);
-}
-#media-tool-image-ccr .result-panel {
-  background: linear-gradient(135deg, rgba(123, 47, 190, 0.08) 0%, #0f0520 100%);
-  border-color: rgba(123, 47, 190, 0.4);
-  border-left-color: #7b2fbe;
-  box-shadow: 0 0 14px rgba(123, 47, 190, 0.1);
 }
 
 /* ── Drop zone ── */
@@ -194,7 +181,6 @@ body.solid-modals .modal {
 .slider-val   { color: #ffd700; }
 .estimate-val { color: #ffd700; }
 .result-preview-wrap { border-color: rgba(123, 47, 190, 0.3); }
-
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent

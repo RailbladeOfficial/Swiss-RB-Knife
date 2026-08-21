@@ -50,20 +50,20 @@
   --color-chart-8:             #8b5a2e;
 }
 
-/* ── Time Tracker panels, orange / deep-red / bright-orange / cranberry ── */
-.input-panel {
+/* ── Panel accent slots, orange / deep-red / bright-orange / cranberry ── */
+.panel-accent-input {
   background: linear-gradient(135deg, rgba(224, 85, 26, 0.1) 0%, #201007 100%);
   border-left: 4px solid #e8631f;
 }
-.controls-panel {
+.panel-accent-view {
   background: linear-gradient(135deg, rgba(194, 42, 30, 0.09) 0%, #200a07 100%);
   border-left: 4px solid #c22a1e;
 }
-.totals-panel {
+.panel-accent-totals {
   background: linear-gradient(135deg, rgba(255, 122, 46, 0.09) 0%, #221208 100%);
   border-left: 4px solid #ff8a3f;
 }
-.entries-panel {
+.panel-accent-entries {
   background: linear-gradient(135deg, rgba(138, 40, 70, 0.08) 0%, #1e0d10 100%);
   border-left: 4px solid #8a2846;
 }
@@ -109,19 +109,6 @@ body.solid-modals .modal {
   border-color: #e8631f;
   box-shadow: 0 0 16px rgba(224, 85, 26, 0.35);
   color: #ff8a3f;
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  background: linear-gradient(135deg, rgba(224, 85, 26, 0.08) 0%, #201007 100%);
-  border-color: rgba(224, 85, 26, 0.4);
-  box-shadow: 0 0 16px rgba(224, 85, 26, 0.1);
-}
-#media-tool-image-ccr .result-panel {
-  background: linear-gradient(135deg, rgba(194, 42, 30, 0.08) 0%, #200a07 100%);
-  border-color: rgba(194, 42, 30, 0.4);
-  border-left-color: rgba(194, 42, 30, 0.4);
-  box-shadow: 0 0 16px rgba(194, 42, 30, 0.1);
 }
 
 /* ── Drop zone ── */
@@ -185,7 +172,6 @@ body.solid-modals .modal {
 .slider-val   { color: #ff8a3f; }
 .estimate-val { color: #ff8a3f; }
 .result-preview-wrap { border-color: rgba(194, 42, 30, 0.35); }
-
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent

@@ -55,20 +55,20 @@
    instead of looping fixed keyframes, and bolts are longer/thinner with a
    proper white-purple lightning color. */
 
-/* ── Time Tracker panels, orange / purple / yellow / red ── */
-.input-panel    {
+/* ── Panel accent slots, orange / purple / yellow / red ── */
+.panel-accent-input {
   background: linear-gradient(135deg, rgba(255, 102, 0, 0.07) 0%, #0f0800 100%);
   border-left: 4px solid #ff6600;
 }
-.controls-panel {
+.panel-accent-view {
   background: linear-gradient(135deg, rgba(147, 112, 219, 0.07) 0%, #0d0015 100%);
   border-left: 4px solid #9370db;
 }
-.totals-panel {
+.panel-accent-totals {
   background: linear-gradient(135deg, rgba(255, 204, 0, 0.07) 0%, #0f0d00 100%);
   border-left: 4px solid #ffcc00;
 }
-.entries-panel {
+.panel-accent-entries {
   background: linear-gradient(135deg, rgba(204, 0, 0, 0.07) 0%, #150000 100%);
   border-left: 4px solid #cc0000;
 }
@@ -115,20 +115,6 @@ body.solid-modals .modal {
   border-color: #ff6600;
   box-shadow: 0 0 16px rgba(255, 102, 0, 0.3);
   color: #ff6600;
-}
-
-/* ── Image CCR panels, orange glow ── */
-#media-tool-image-ccr .panel {
-  background: linear-gradient(135deg, rgba(255, 102, 0, 0.06) 0%, #0f0800 100%);
-  border-color: rgba(255, 102, 0, 0.35);
-  box-shadow: 0 0 16px rgba(255, 102, 0, 0.1);
-}
-
-#media-tool-image-ccr .result-panel {
-  background: linear-gradient(135deg, rgba(147, 112, 219, 0.07) 0%, #0d0015 100%);
-  border-color: rgba(147, 112, 219, 0.4);
-  border-left-color: rgba(147, 112, 219, 0.4);
-  box-shadow: 0 0 16px rgba(147, 112, 219, 0.1);
 }
 
 /* ── Drop zone ── */
@@ -210,7 +196,6 @@ body.solid-modals .modal {
 .result-preview-wrap {
   border-color: rgba(147, 112, 219, 0.3);
 }
-
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent

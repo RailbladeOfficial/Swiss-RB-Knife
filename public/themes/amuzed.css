@@ -178,11 +178,11 @@ textarea,
   border-bottom: 1px solid #1c1c1c;
 }
 
-/* ── Time Tracker panels, flat black with a single saturated rail ── */
-.input-panel    { background: #0b0b0b; border-left: 3px solid #8fce2a; border-color: #262626; }
-.controls-panel { background: #0b0b0b; border-left: 3px solid #ff0090; border-color: #262626; }
-.totals-panel   { background: #0b0b0b; border-left: 3px solid #00c2ff; border-color: #262626; }
-.entries-panel  { background: #0b0b0b; border-left: 3px solid #ffd400; border-color: #262626; }
+/* ── Panel accent slots, flat black with a single saturated rail ── */
+.panel-accent-input    { background: #0b0b0b; border-left: 3px solid #8fce2a; border-color: #262626; }
+.panel-accent-view     { background: #0b0b0b; border-left: 3px solid #ff0090; border-color: #262626; }
+.panel-accent-totals   { background: #0b0b0b; border-left: 3px solid #00c2ff; border-color: #262626; }
+.panel-accent-entries  { background: #0b0b0b; border-left: 3px solid #ffd400; border-color: #262626; }
 
 /* ── Tool / section header: the bar, with the title riding it ── */
 .tool-view-header,
@@ -282,15 +282,6 @@ textarea:focus {
   outline: none;
   border-color: #ff0090;
   box-shadow: none;
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 3px solid #ff0090;
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 3px solid #8fce2a;
 }
 
 /* ── Drop zone ── */

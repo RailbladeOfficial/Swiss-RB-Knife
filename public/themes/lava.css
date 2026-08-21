@@ -215,11 +215,11 @@ body:not(.theme-animations-off) #sidebar {
   }
 }
 
-/* ── Time Tracker panels, molten left rails ── */
-.input-panel    { border-left: 4px solid #ff5a1f; border-color: rgba(255, 90, 31, 0.35); }
-.controls-panel { border-left: 4px solid #ffb020; border-color: rgba(255, 176, 32, 0.32); }
-.totals-panel   { border-left: 4px solid #e0219b; border-color: rgba(224, 33, 155, 0.32); }
-.entries-panel  { border-left: 4px solid #ff2e63; border-color: rgba(255, 46, 99, 0.32); }
+/* ── Panel accent slots, molten left rails ── */
+.panel-accent-input    { border-left: 4px solid #ff5a1f; border-color: rgba(255, 90, 31, 0.35); }
+.panel-accent-view     { border-left: 4px solid #ffb020; border-color: rgba(255, 176, 32, 0.32); }
+.panel-accent-totals   { border-left: 4px solid #e0219b; border-color: rgba(224, 33, 155, 0.32); }
+.panel-accent-entries  { border-left: 4px solid #ff2e63; border-color: rgba(255, 46, 99, 0.32); }
 
 /* ── Tool / section header, a heat gradient with an ember glow ── */
 .tool-view-header,
@@ -278,15 +278,6 @@ input:focus {
   outline: none;
   border-color: rgba(255, 106, 26, 0.7);
   box-shadow: 0 0 10px rgba(255, 106, 26, 0.28);
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 3px solid rgba(255, 90, 31, 0.55);
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 3px solid rgba(255, 176, 32, 0.55);
 }
 
 /* ── Drop zone ── */

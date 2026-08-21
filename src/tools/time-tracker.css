@@ -58,27 +58,20 @@
 }
 
 /* =============================================================================
-   PANEL ACCENT BORDERS
-   These use the shared .panel base from shell.css and add the left-border
-   accent colour that's specific to each time tracker panel.
+   PANEL LAYOUT
+   -----------------------------------------------------------------------------
+   The accent colours these panels used to declare for themselves now come
+   from the shared .panel-accent-* classes in shell.css, which every tool
+   uses. What's left here is only the layout each panel needs; the tt- prefix
+   keeps it off the panels in other tools that share the same accent slot.
 ============================================================================= */
 
-.input-panel {
-  border-left: 4px solid var(--color-accent-input);
-}
-
-.totals-panel {
-  border-left: 4px solid var(--color-accent-totals);
-}
-
-.entries-panel {
-  border-left: 4px solid var(--color-accent-entries);
+.tt-entries-panel {
   display: flex;
   flex-direction: column;
 }
 
-.controls-panel {
-  border-left: 4px solid var(--color-accent-view);
+.tt-controls-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -174,12 +167,12 @@
    -----------------------------------------------------------------------------
    The form flows top-to-bottom as a single logical sequence: what/when (date +
    activity) → time range → notes → smart entry shortcut → submit actions.
-   Each row is spaced with a consistent gap on .input-panel itself rather than
-   per-row margins, so the rhythm stays even regardless of which rows are
+   Each row is spaced with a consistent gap on .tt-input-panel itself rather
+   than per-row margins, so the rhythm stays even regardless of which rows are
    present.
 ============================================================================= */
 
-.input-panel {
+.tt-input-panel {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -450,6 +443,7 @@
   padding: 2px 4px;
   border-radius: 4px;
   opacity: 0.85;
+  transition: background var(--hover-transition);
 }
 
 .entry-col-project:hover {
@@ -472,6 +466,7 @@
   padding: 2px 4px;
   border-radius: 4px;
   align-self: flex-start;
+  transition: background var(--hover-transition);
 }
 
 .entry-col-activity:hover {
@@ -486,6 +481,7 @@
   padding: 2px 4px;
   border-radius: 4px;
   white-space: nowrap;
+  transition: background var(--hover-transition);
 }
 
 /* End time carrying a "(+1d)" / "(+2d)" span indicator needs more room than
@@ -520,6 +516,7 @@
   padding: 2px 4px;
   border-radius: 4px;
   align-self: flex-start;
+  transition: background var(--hover-transition);
 }
 
 .entry-col-notes:hover {
@@ -579,6 +576,7 @@
   cursor: default;
   box-sizing: border-box;
   min-width: 120px;
+  transition: background var(--hover-transition);
 }
 
 .tt-date-edit-time-value:hover {

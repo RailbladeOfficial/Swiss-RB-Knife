@@ -201,12 +201,14 @@
 }
 
 /* =============================================================================
-   RESULT PANEL  (magenta/view accent, mirrors entries-panel pattern)
+   RESULT PANEL
+   -----------------------------------------------------------------------------
+   The accent border is gone from here: the result panels carry
+   .panel-accent-entries in the markup now, along with the rest of the tool's
+   panels (step 1 = input, step 2 = view, step 3 = totals, result = entries),
+   so a theme paints them through the shared slots like every other tool. The
+   class is kept as a marker, it's what the rest of this section hangs off.
 ============================================================================= */
-
-.result-panel {
-  border-left: 4px solid var(--color-accent-view);
-}
 
 .result-preview-wrap {
   border-radius: 6px;

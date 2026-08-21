@@ -86,6 +86,59 @@
   --color-chart-8:             #a0522d;
 }
 
+/* =============================================================================
+   NO EASING
+   -----------------------------------------------------------------------------
+   Windows 2000 had no compositor and no easing anywhere in the shell: a
+   menu highlighted the instant the pointer crossed it, a dialog was simply
+   there on the next frame, a checkbox was checked or it wasn't. Fading
+   between those states is the single most anachronistic thing this theme
+   could do, so it does none of it.
+
+   Two variables carry 79 of the app's 105 transitions, so zeroing them does
+   most of the work in two lines. The rules below are the ones that hardcode
+   their own duration and so can't be reached that way, plus three that mix the
+   variable with a literal `transform` the variable doesn't cover.
+
+   DELIBERATELY LEFT RUNNING, these are not state changes:
+     - progress fills (.ab-file-bar-fill, .budget-expect-bar-fill, .cd-bar) and
+       the Countdown ring/hourglass, which retarget every ~250ms. Snapping them
+       would make a running timer visibly step instead of sweep.
+     - .changelog-version-content's max-height, which docs.ts measures and then
+       clears on `transitionend`. With no transition that event never fires and
+       the accordion stays pinned to a stale pixel height.
+     - #lockScreen's fade-out, which lockscreen.ts tears down on a 300ms timer.
+       Removing the fade would leave the screen sitting there, fully opaque,
+       for those 300ms before vanishing.
+============================================================================= */
+
+:root {
+  --hover-transition: 0s;
+  --sidebar-transition: 0s;
+}
+
+#modalOverlay,
+.modal-backdrop,
+.modal,
+.subsettings,
+.toggle-slider,
+.toggle-slider::before,
+.lock-dot,
+.theme-picker-info-tooltip,
+.te-var-tooltip,
+.ab-info-tooltip,
+.drop-zone,
+.preview-card,
+.img-slider::-webkit-slider-thumb,
+#durationPreview,
+#tts-display-exit,
+.changelog-toggle-btn,
+.changelog-toggle-btn svg,
+.sound-pack-preview-btn,
+.gs-action-card {
+  transition: none;
+}
+
 /* ── The desktop itself. The only two surfaces that are genuinely "behind
    every window", so the only two that get the real #3a6ea5. ── */
 body {
@@ -280,11 +333,11 @@ button:active {
   color: #0a246a;
 }
 
-/* ── Time Tracker panels, flat grey with a single VGA rail each ── */
-.input-panel    { border-left: 4px solid #000080; }
-.controls-panel { border-left: 4px solid #008080; }
-.totals-panel   { border-left: 4px solid #808000; }
-.entries-panel  { border-left: 4px solid #800000; }
+/* ── Panel accent slots, flat grey with a single VGA rail each ── */
+.panel-accent-input    { border-left: 4px solid #000080; }
+.panel-accent-view     { border-left: 4px solid #008080; }
+.panel-accent-totals   { border-left: 4px solid #808000; }
+.panel-accent-entries  { border-left: 4px solid #800000; }
 
 /* ── Tool / section header, the active-window title bar ── */
 .tool-view-header,
@@ -333,15 +386,6 @@ body:not(.solid-modals) .modal {
     inset 1px 1px 0 #ffffff,
     inset -1px -1px 0 #808080,
     4px 4px 10px rgba(0, 0, 0, 0.3);
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 4px solid #000080;
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 4px solid #008080;
 }
 
 /* ── Drop zone ── */

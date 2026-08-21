@@ -73,12 +73,12 @@
     0 10px 26px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Time Tracker panels, purple / red / purple / red, with the silver and
+/* ── Panel accent slots, purple / red / purple / red, with the silver and
    grey left to the borders so the duotone stays the loud part ── */
-.input-panel    { border-left: 4px solid #7b2ff7; border-color: rgba(123, 47, 247, 0.32); }
-.controls-panel { border-left: 4px solid #d62246; border-color: rgba(214, 34, 70, 0.3); }
-.totals-panel   { border-left: 4px solid #7b2ff7; border-color: rgba(123, 47, 247, 0.32); }
-.entries-panel  { border-left: 4px solid #d62246; border-color: rgba(214, 34, 70, 0.3); }
+.panel-accent-input    { border-left: 4px solid #7b2ff7; border-color: rgba(123, 47, 247, 0.32); }
+.panel-accent-view     { border-left: 4px solid #d62246; border-color: rgba(214, 34, 70, 0.3); }
+.panel-accent-totals   { border-left: 4px solid #7b2ff7; border-color: rgba(123, 47, 247, 0.32); }
+.panel-accent-entries  { border-left: 4px solid #d62246; border-color: rgba(214, 34, 70, 0.3); }
 
 /* ── Tool / section header, violet fading into black, silver title ── */
 .tool-view-header,
@@ -193,15 +193,6 @@ input:focus {
 .tool-card-icon {
   color: #a855f7;
   filter: drop-shadow(0 0 8px rgba(123, 47, 247, 0.45));
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 3px solid rgba(123, 47, 247, 0.55);
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 3px solid rgba(214, 34, 70, 0.6);
 }
 
 /* ── Drop zone ── */

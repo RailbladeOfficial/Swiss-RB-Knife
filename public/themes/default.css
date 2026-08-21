@@ -49,11 +49,11 @@
   --color-chart-8:             #34d399;
 }
 
-/* ── Time Tracker panels, accent borders drive off the panel-accent vars ── */
-.input-panel   { border-left: 4px solid var(--color-accent-input); }
-.controls-panel { border-left: 4px solid var(--color-accent-view); }
-.totals-panel  { border-left: 4px solid var(--color-accent-totals); }
-.entries-panel { border-left: 4px solid var(--color-accent-entries); }
+/* ── Panel accent slots, accent borders drive off the panel-accent vars ── */
+.panel-accent-input    { border-left: 4px solid var(--color-accent-input); }
+.panel-accent-view     { border-left: 4px solid var(--color-accent-view); }
+.panel-accent-totals   { border-left: 4px solid var(--color-accent-totals); }
+.panel-accent-entries  { border-left: 4px solid var(--color-accent-entries); }
 
 /* ── Tool / section header ── */
 .tool-view-header,
@@ -96,15 +96,6 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 0 12px color-mix(in srgb, var(--color-btn) 30%, transparent);
 }
 
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 3px solid color-mix(in srgb, var(--color-btn) 40%, transparent);
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 3px solid color-mix(in srgb, var(--color-accent-view) 50%, transparent);
-}
-
 /* ── Tab buttons ── */
 .tab-btn {
   color: var(--color-text-muted);
@@ -141,6 +132,52 @@ body:not(.solid-modals) .modal {
 .preview-card.anchor-card { border-color: var(--color-btn); }
 .preview-card.drag-target  { border-color: var(--color-accent-view); }
 
+/* ── Image CCR controls ──
+   Filled in so this theme covers the same surface set as the other 23. The
+   base rules in image-ccr.css put the solid accent behind .dir-btn and invert
+   .anchor-badge, which reads as "already selected" on every control; these
+   restate them as the quiet outlined chips the rest of the themes use. ── */
+.dir-btn, .prv-btn {
+  background: var(--color-input-bg);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-btn) 50%, transparent);
+  background: color-mix(in srgb, var(--color-btn) 10%, transparent);
+}
+
+.drop-zone {
+  border-color: var(--color-border-dashed);
+}
+
+.anchor-badge {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+}
+
+.preview-card:hover {
+  border-color: color-mix(in srgb, var(--color-btn) 60%, transparent);
+}
+
+.img-slider::-webkit-slider-thumb {
+  background: var(--color-btn);
+  border-color: var(--color-bg);
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: var(--color-btn-hover);
+}
+
+.result-preview-wrap {
+  border-color: color-mix(in srgb, var(--color-btn) 30%, transparent);
+}
+
+.budget-stats-section-heading {
+  color: var(--color-text-muted);
+}
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent

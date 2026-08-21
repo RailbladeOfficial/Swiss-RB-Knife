@@ -48,11 +48,11 @@
   --color-chart-8:             #f39c12;
 }
 
-/* ── Time Tracker panels, flat, no gradients, accent left borders ── */
-.input-panel   { border-left: 4px solid #3498db; }
-.controls-panel { border-left: 4px solid #2ecc71; }
-.totals-panel  { border-left: 4px solid #f0a500; }
-.entries-panel { border-left: 4px solid #ff44ff; }
+/* ── Panel accent slots, flat, no gradients, accent left borders ── */
+.panel-accent-input    { border-left: 4px solid #3498db; }
+.panel-accent-view     { border-left: 4px solid #2ecc71; }
+.panel-accent-totals   { border-left: 4px solid #f0a500; }
+.panel-accent-entries  { border-left: 4px solid #ff44ff; }
 
 /* ── Tool / section header, flat blue-grey, no glow ── */
 .tool-view-header,
@@ -94,14 +94,6 @@ body:not(.solid-modals) .modal {
   border-color: #2980b9;
   box-shadow: none;
   color: #ffffff;
-}
-
-/* ── Image CCR panels, flat with left border accent ── */
-#media-tool-image-ccr .panel {
-  border-left: 3px solid #3498db;
-}
-#media-tool-image-ccr .result-panel {
-  border-left: 3px solid #ff44ff;
 }
 
 /* ── Drop zone ── */
@@ -165,7 +157,6 @@ body:not(.solid-modals) .modal {
 .slider-val   { color: #3498db; }
 .estimate-val { color: #3498db; }
 .result-preview-wrap { border-color: rgba(255, 68, 255, 0.25); }
-
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
