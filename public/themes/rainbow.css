@@ -63,23 +63,23 @@ body {
   background-attachment: fixed;
 }
 
-/* ── Time Tracker panels ── */
-.input-panel {
+/* ── Panel accent slots ── */
+.panel-accent-input {
   background: #ffe0e0;
   border-color: #ff4444;
   border-left: 4px solid #ff2200;
 }
-.controls-panel {
+.panel-accent-view {
   background: #fffacc;
   border-color: #ddcc00;
   border-left: 4px solid #00bb00;
 }
-.totals-panel {
+.panel-accent-totals {
   background: #e0ffe0;
   border-color: #44cc44;
   border-left: 4px solid #ffaa00;
 }
-.entries-panel {
+.panel-accent-entries {
   background: #eeddff;
   border-color: #aa55ff;
   border-left: 4px solid #6600cc;
@@ -112,10 +112,10 @@ body {
 
 /* Generic, unaccented tool panels (Auto-Backup, Dummy File Generator, etc.)
    default to near-white via --color-panel. The :not() chain here bumps
-   specificity above the plain .panel/.input-panel/etc selectors so this wins
+   specificity above the plain .panel/.panel-accent-input/etc selectors so this wins
    regardless of source order, without touching panels that already carry
    their own rainbow accent color. */
-.panel:not(.input-panel):not(.controls-panel):not(.totals-panel):not(.entries-panel):not(.result-panel) {
+.panel:not(.panel-accent-input):not(.panel-accent-view):not(.panel-accent-totals):not(.panel-accent-entries):not(.result-panel) {
   background: linear-gradient(
     45deg,
     #ffe0e0 0%,
@@ -191,19 +191,6 @@ button:hover {
 
 /* ── Inputs ── */
 input { background: rgba(255, 255, 255, 0.8); border-color: #ccaaff; }
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  background: #f0e8ff;
-  border-color: #cc88ff;
-  border-left: 3px solid #6600cc;
-}
-#media-tool-image-ccr .result-panel {
-  background: #e8fff0;
-  border-color: #88cc88;
-  border-left: 3px solid #00bb00;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-}
 
 /* ── Drop zone ── */
 .drop-zone { border-color: #cc88ff; }
@@ -321,7 +308,6 @@ input { background: rgba(255, 255, 255, 0.8); border-color: #ccaaff; }
 .estimate-val { color: #6600cc; }
 .size-estimate { background: rgba(255,255,255,0.7); border-color: #ccaaff; }
 .result-preview-wrap { border-color: #cc88ff; }
-
 
 /* ── Sidebar & title bar, trans-flag colors: light blue bg, pink text, white icons ── */
 #titleBar,

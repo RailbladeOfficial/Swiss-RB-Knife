@@ -64,23 +64,23 @@ body::after {
   z-index: 9998;
 }
 
-/* ── Time Tracker panels ── */
-.input-panel {
+/* ── Panel accent slots ── */
+.panel-accent-input {
   border-left: 4px solid #00ffff;
   border-color: #00ffff88;
   box-shadow: 0 0 18px #00ffff55, inset 0 0 8px #00ffff11;
 }
-.controls-panel {
+.panel-accent-view {
   border-left: 4px solid #39ff14;
   border-color: #39ff1488;
   box-shadow: 0 0 18px #39ff1455, inset 0 0 8px #39ff1411;
 }
-.totals-panel {
+.panel-accent-totals {
   border-left: 4px solid #ff8800;
   border-color: #ff880088;
   box-shadow: 0 0 18px #ff880055, inset 0 0 8px #ff880011;
 }
-.entries-panel {
+.panel-accent-entries {
   border-left: 4px solid #ff00ff;
   border-color: #ff00ff88;
   box-shadow: 0 0 18px #ff00ff55, inset 0 0 8px #ff00ff11;
@@ -153,17 +153,6 @@ body.solid-modals .modal {
   color: #ff00ff;
 }
 
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-color: #00ffff55;
-  box-shadow: 0 0 16px #00ffff33;
-}
-#media-tool-image-ccr .result-panel {
-  border-color: #39ff1455;
-  border-left-color: #39ff14;
-  box-shadow: 0 0 16px #39ff1433;
-}
-
 /* ── Drop zone ── */
 .drop-zone { border-color: #ff00ff88; }
 
@@ -226,7 +215,6 @@ body.solid-modals .modal {
 .slider-val   { color: #00ffff; text-shadow: 0 0 10px #00ffff88; }
 .estimate-val { color: #00ffff; }
 .result-preview-wrap { border-color: #39ff1455; }
-
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent

@@ -57,20 +57,20 @@ body {
   background: linear-gradient(160deg, #ffd6e3 0%, #ffc7db 40%, #ffb4cd 70%, #ff9ebd 100%) fixed;
 }
 
-/* ── Time Tracker panels, pale rose cards, alternating panel/input-bg tones ── */
-.input-panel {
+/* ── Panel accent slots, pale rose cards, alternating panel/input-bg tones ── */
+.panel-accent-input {
   background: #fff5f8;
   border-left: 4px solid #e0294b;
 }
-.controls-panel {
+.panel-accent-view {
   background: #ffedf3;
   border-left: 4px solid #ff2d78;
 }
-.totals-panel {
+.panel-accent-totals {
   background: #fff5f8;
   border-left: 4px solid #c9184a;
 }
-.entries-panel {
+.panel-accent-entries {
   background: #ffedf3;
   border-left: 4px solid #ff6f9c;
 }
@@ -140,17 +140,6 @@ body:not(.solid-modals) .modal {
   color: #ffffff;
 }
 
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  background: #fff5f8;
-  border-color: rgba(224, 41, 75, 0.25);
-}
-#media-tool-image-ccr .result-panel {
-  background: #ffedf3;
-  border-color: rgba(255, 45, 120, 0.3);
-  border-left-color: #ff2d78;
-}
-
 /* ── Drop zone ── */
 .drop-zone { border-color: rgba(224, 41, 75, 0.4); }
 
@@ -212,7 +201,6 @@ body:not(.solid-modals) .modal {
 .slider-val   { color: #c9184a; }
 .estimate-val { color: #ff2d78; }
 .result-preview-wrap { border-color: rgba(255, 45, 120, 0.25); }
-
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent

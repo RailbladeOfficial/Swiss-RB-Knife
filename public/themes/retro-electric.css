@@ -63,29 +63,29 @@
   box-shadow: 0 0 18px rgba(0, 207, 255, 0.12), inset 0 0 10px rgba(0, 207, 255, 0.04);
 }
 
-/* 1, input-panel: cyan */
-.input-panel {
+/* 1, panel-accent-input: cyan */
+.panel-accent-input {
   background: linear-gradient(135deg, rgba(0, 207, 255, 0.07) 0%, #001a28 100%);
   border-color: rgba(0, 207, 255, 0.45);
   box-shadow: 0 0 22px rgba(0, 207, 255, 0.18), inset 0 0 12px rgba(0, 207, 255, 0.06);
 }
 
-/* 2, controls-panel: magenta */
-.controls-panel {
+/* 2, panel-accent-view: magenta */
+.panel-accent-view {
   background: linear-gradient(135deg, rgba(232, 121, 249, 0.07) 0%, #1a0025 100%);
   border-color: rgba(238, 45, 255, 0.45);
   box-shadow: 0 0 22px rgba(238, 45, 255, 0.15), inset 0 0 12px rgba(238, 45, 255, 0.05);
 }
 
-/* 3, totals-panel: cyan */
-.totals-panel {
+/* 3, panel-accent-totals: cyan */
+.panel-accent-totals {
   background: linear-gradient(135deg, rgba(0, 207, 255, 0.07) 0%, #001a28 100%);
   border-color: rgba(0, 207, 255, 0.45);
   box-shadow: 0 0 22px rgba(0, 207, 255, 0.18), inset 0 0 12px rgba(0, 207, 255, 0.06);
 }
 
-/* 4, entries-panel: magenta */
-.entries-panel {
+/* 4, panel-accent-entries: magenta */
+.panel-accent-entries {
   background: linear-gradient(135deg, rgba(232, 121, 249, 0.07) 0%, #1a0025 100%);
   border-color: rgba(238, 45, 255, 0.45);
   box-shadow: 0 0 22px rgba(238, 45, 255, 0.15), inset 0 0 12px rgba(238, 45, 255, 0.05);
@@ -240,21 +240,6 @@ input:focus {
   box-shadow: none;
 }
 
-/* Panels used as Image CCR sections, cyan glow */
-#media-tool-image-ccr .panel {
-  background: linear-gradient(135deg, rgba(0, 207, 255, 0.07) 0%, #001a28 100%);
-  border-color: rgba(0, 207, 255, 0.45);
-  box-shadow: 0 0 18px rgba(0, 207, 255, 0.12), inset 0 0 10px rgba(0, 207, 255, 0.04);
-}
-
-/* Result panel, magenta like the standalone .result-section */
-#media-tool-image-ccr .result-panel {
-  background: linear-gradient(135deg, rgba(232, 121, 249, 0.07) 0%, #1a0025 100%);
-  border-color: rgba(238, 45, 255, 0.45);
-  border-left-color: rgba(238, 45, 255, 0.45);
-  box-shadow: 0 0 18px rgba(238, 45, 255, 0.12), inset 0 0 10px rgba(238, 45, 255, 0.04);
-}
-
 /* Drop zone, dashed cyan border */
 .drop-zone {
   border-color: rgba(0, 207, 255, 0.35);
@@ -362,7 +347,6 @@ input:range .img-slider {
   color: #00dfff;
   text-shadow: 0 0 18px rgba(0, 207, 255, 0.5);
 }
-
 
 /* ── Budget Tracker ── */
 

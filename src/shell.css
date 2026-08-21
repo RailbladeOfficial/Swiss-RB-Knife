@@ -19,7 +19,16 @@
   --titlebar-height: 36px;
 
   /* Universal hover transition, applies to all buttons, links, and
-     interactive elements. Set once here; never override in themes. */
+     interactive elements. Set once here so every hover in the app eases at the
+     same rate; a component should reference this rather than picking its own
+     duration.
+
+     A theme may override it, but only to express something about the theme
+     itself, not to retune one control: Windowed and Blades set it to 0s
+     because instant state changes are the point of both (see the "NO EASING"
+     block in each). Anything between 0 and this default would just be that
+     theme disagreeing with the app's timing, which is not a decision a theme
+     gets to make. */
   --hover-transition: 0.5s ease;
 }
 
@@ -413,8 +422,28 @@ body {
     border-color var(--hover-transition);
 }
 
-/* Each section can assign its own accent colour to child panels via a
-   modifier class, keeping the pattern from the time tracker. */
+/* =============================================================================
+   PANEL ACCENT SLOTS
+   -----------------------------------------------------------------------------
+   Four modifier classes a tool puts on a .panel to claim one of the theme's
+   four accent colours. This is the ONLY hook themes have for distinguishing
+   one panel from another, so a tool that doesn't use them renders as a wall of
+   identical --color-panel rectangles no matter which theme is on: the accents
+   are where a theme puts its gradients, glows, bevels and rails.
+
+   Every theme styles these four selectors directly, and Budget additionally
+   refines them under #finance-tool-budget. The names come from the Time
+   Tracker they started in (type here / control the view / read a total / read
+   a list); past that they are just four slots, and a tool with four panels
+   should walk them in DOM order rather than agonise over the labels.
+
+   Used by every tool with panels except Game Stats, which sits it out on
+   purpose: it already carries a full per-theme treatment of its own through
+   the --gs-* rail system in game-stats.css, and a second accent border would
+   fight it. Image CCR maps the slots onto its numbered steps (1 = input,
+   2 = view, 3 = totals, result = entries), so the progression reads the same
+   in all three of its tabs.
+============================================================================= */
 .panel-accent-input {
   border-left: 4px solid var(--color-accent-input);
 }
@@ -1025,6 +1054,7 @@ button:hover {
   cursor: default;
   padding: 2px 4px;
   border-radius: 4px;
+  transition: background var(--hover-transition);
 }
 
 .entry-field:hover {

@@ -66,11 +66,11 @@
   --color-chart-8:             #6b441e;
 }
 
-/* ── Time Tracker panels, accent borders drive off the panel-accent vars, glow added ── */
-.input-panel    { border-left: 4px solid var(--color-accent-input); box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-input) 12%, transparent); }
-.controls-panel { border-left: 4px solid var(--color-accent-view);  box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-view) 12%, transparent); }
-.totals-panel   { border-left: 4px solid var(--color-accent-totals);box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-totals) 12%, transparent); }
-.entries-panel  { border-left: 4px solid var(--color-accent-entries);box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-entries) 12%, transparent); }
+/* ── Panel accent slots, accent borders drive off the panel-accent vars, glow added ── */
+.panel-accent-input    { border-left: 4px solid var(--color-accent-input); box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-input) 12%, transparent); }
+.panel-accent-view     { border-left: 4px solid var(--color-accent-view);  box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-view) 12%, transparent); }
+.panel-accent-totals   { border-left: 4px solid var(--color-accent-totals);box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-totals) 12%, transparent); }
+.panel-accent-entries  { border-left: 4px solid var(--color-accent-entries);box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent-entries) 12%, transparent); }
 
 /* ── Tool / section header ── */
 .tool-view-header,
@@ -129,17 +129,6 @@ input:focus {
   outline: none;
   border-color: var(--color-btn);
   box-shadow: 0 0 10px color-mix(in srgb, var(--color-btn) 40%, transparent);
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  border-left: 3px solid color-mix(in srgb, var(--color-btn) 40%, transparent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--color-btn) 8%, transparent);
-}
-
-#media-tool-image-ccr .result-panel {
-  border-left: 3px solid color-mix(in srgb, var(--color-accent-view) 50%, transparent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--color-accent-view) 8%, transparent);
 }
 
 /* ── Drop zone ── */

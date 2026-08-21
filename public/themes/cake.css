@@ -51,22 +51,22 @@
 }
 
 /* ── Panels, sky blue / orange alternating on gunmetal ── */
-.input-panel {
+.panel-accent-input {
   background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%);
   border-left: 4px solid #ffa500;
   border-color: rgba(255, 165, 0, 0.35);
 }
-.controls-panel {
+.panel-accent-view {
   background: linear-gradient(135deg, rgba(54, 192, 241, 0.1) 0%, #484848 100%);
   border-left: 4px solid #36c0f1;
   border-color: rgba(54, 192, 241, 0.3);
 }
-.totals-panel {
+.panel-accent-totals {
   background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%);
   border-left: 4px solid #ffa500;
   border-color: rgba(255, 165, 0, 0.35);
 }
-.entries-panel {
+.panel-accent-entries {
   background: linear-gradient(135deg, rgba(54, 192, 241, 0.1) 0%, #484848 100%);
   border-left: 4px solid #36c0f1;
   border-color: rgba(54, 192, 241, 0.3);
@@ -125,17 +125,6 @@ body:not(.solid-modals) .modal {
   border-color: #e09000;
   box-shadow: 0 0 14px rgba(255, 165, 0, 0.4);
   color: #ffffff;
-}
-
-/* ── Image CCR panels ── */
-#media-tool-image-ccr .panel {
-  background: linear-gradient(135deg, rgba(54, 192, 241, 0.08) 0%, #484848 100%);
-  border-color: rgba(54, 192, 241, 0.25);
-}
-#media-tool-image-ccr .result-panel {
-  background: linear-gradient(135deg, rgba(255, 165, 0, 0.1) 0%, #484848 100%);
-  border-color: rgba(255, 165, 0, 0.35);
-  border-left-color: #ffa500;
 }
 
 /* ── Drop zone ── */
@@ -201,7 +190,6 @@ body:not(.solid-modals) .modal {
 .slider-val   { color: #ffa500; }
 .estimate-val { color: #36c0f1; }
 .result-preview-wrap { border-color: rgba(54, 192, 241, 0.3); }
-
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent

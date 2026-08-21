@@ -1,0 +1,437 @@
+/* =============================================================================
+   LAVA
+   -----------------------------------------------------------------------------
+   A lava lamp: molten blobs rise, stall, and sink behind the app while the
+   whole wax colour drifts slowly through the warm end of the spectrum.
+
+   Done in pure CSS rather than through the seasonal canvas in theme-core.ts,
+   because the blobs belong INSIDE surfaces (panels, cards, the sidebar), not
+   on a single full-window overlay above them. Each blob is one radial-gradient
+   background layer and the motion is an animation on `background-position`,
+   which lets a handful of layers drift independently while staying clipped to
+   whatever element they are painted on. Only the backdrop layer carries the
+   hue-rotate that cycles the wax colour; putting a filter on .panel would make
+   it a containing block for any position:fixed descendant a tool renders, so
+   panels get motion but keep the fixed palette.
+
+   Every animation here is gated on `body:not(.theme-animations-off)`. That
+   class is maintained by theme-core.ts from the same Theme Animations
+   preferences that arm the canvas effects, so switching Lava's animation off
+   leaves a static, still-molten theme rather than a half-disabled one.
+============================================================================= */
+
+:root {
+  --color-bg:                  #140406;
+  --color-panel:               #1e0709;
+  --color-input-bg:            #290b0d;
+  --color-border:              #4a1512;
+  --color-border-dashed:       #ff6b1a;
+  --color-text:                #ffe8d6;
+  --color-text-muted:          #c08a72;
+  --color-hover:               #3a0f10;
+
+  --color-btn:                 #ff5a1f;
+  --color-accent:              #ffb020;
+  --color-btn-hover:           #ff7a3d;
+  --color-btn-text:            #1a0503;
+
+  --color-danger:              #ff2e63;
+  --color-danger-subtle:       rgba(255, 46, 99, 0.14);
+  --color-success:             #f6c445;
+
+  --color-accent-input:        #ff5a1f;
+  --color-accent-view:         #ffb020;
+  --color-accent-totals:       #e0219b;
+  --color-accent-entries:      #ff2e63;
+
+  --color-toggle-off:          #4a1512;
+  --color-toggle-on:           #ff5a1f;
+
+  /* ── Changelog accents ── Features (orange) / Improvements (gold) / Bugfixes (crimson) / tool heading (violet) */
+  --color-changelog-features:     #ff5a1f;
+  --color-changelog-improvements: #f6c445;
+  --color-changelog-bugfixes:     #ff2e63;
+  --color-changelog-tool:         #b060ff;
+
+  --color-toast-success-bg:    #3a2405;
+  --color-toast-success-border:#f6c445;
+  --color-toast-success-text:  #ffeec2;
+  --color-toast-error-bg:      #3a0713;
+  --color-toast-error-border:  #ff2e63;
+  --color-toast-error-text:    #ffd2de;
+
+  /* ── Budget chart palette ── Orange / gold / crimson / magenta / violet / lemon / deep-red / coral, the wax spectrum */
+  --color-chart-1:             #ff5a1f;
+  --color-chart-2:             #ffb020;
+  --color-chart-3:             #ff2e63;
+  --color-chart-4:             #e0219b;
+  --color-chart-5:             #b060ff;
+  --color-chart-6:             #fde047;
+  --color-chart-7:             #b91c1c;
+  --color-chart-8:             #ff8a5b;
+}
+
+/* =============================================================================
+   THE LAMP
+   -----------------------------------------------------------------------------
+   One fixed layer behind all app content. #appBody and #mainContent are both
+   transparent, so a negative z-index child of <body> sits above the body's own
+   --color-bg fill and below everything drawn in the tool views.
+============================================================================= */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 106, 26, 0.55) 0%, rgba(255, 106, 26, 0.22) 42%, rgba(255, 106, 26, 0) 70%),
+    radial-gradient(circle at 50% 50%, rgba(255, 46, 99, 0.45) 0%, rgba(255, 46, 99, 0.18) 42%, rgba(255, 46, 99, 0) 70%),
+    radial-gradient(circle at 50% 50%, rgba(255, 176, 32, 0.42) 0%, rgba(255, 176, 32, 0.16) 42%, rgba(255, 176, 32, 0) 70%),
+    radial-gradient(circle at 50% 50%, rgba(176, 96, 255, 0.32) 0%, rgba(176, 96, 255, 0.12) 42%, rgba(176, 96, 255, 0) 70%),
+    radial-gradient(circle at 50% 50%, rgba(255, 90, 31, 0.38) 0%, rgba(255, 90, 31, 0.15) 42%, rgba(255, 90, 31, 0) 70%);
+  background-size:
+    78vmin 88vmin,
+    56vmin 68vmin,
+    46vmin 56vmin,
+    64vmin 60vmin,
+    38vmin 48vmin;
+  background-position:
+    12% 115%,
+    68% -20%,
+    38% 55%,
+    88% 100%,
+    52% -12%;
+  /* Sits under the wax colour cycle below; declared here so the layer still
+     reads as molten when animations are switched off. */
+  filter: saturate(1.15);
+}
+
+/* The rise-and-sink. ease-in-out is doing real work: it is what gives each
+   blob the slow stall at the top and bottom of its travel that a real lamp
+   has, instead of a constant-speed elevator. */
+@keyframes lava-lamp-drift {
+  0%,
+  100% { background-position: 12% 115%, 68% -20%, 38% 55%,  88% 100%, 52% -12%; }
+  25%  { background-position: 18% 58%,  62% 40%,  44% 8%,   80% 48%,  46% 45%; }
+  50%  { background-position: 10% -18%, 72% 96%,  34% 105%, 90% -8%,  56% 102%; }
+  75%  { background-position: 20% 46%,  64% 22%,  40% 52%,  82% 56%,  44% 40%; }
+}
+
+/* Wax colour cycle. Held to the warm arc, backwards into magenta and forwards
+   into gold, so the lamp never drifts to a colour the fixed palette (buttons,
+   text, borders) would clash with. */
+@keyframes lava-lamp-hue {
+  0%,
+  100% { filter: hue-rotate(0deg)   saturate(1.15); }
+  33%  { filter: hue-rotate(-42deg) saturate(1.3); }
+  66%  { filter: hue-rotate(30deg)  saturate(1.2); }
+}
+
+body:not(.theme-animations-off)::before {
+  animation:
+    lava-lamp-drift 54s ease-in-out infinite,
+    lava-lamp-hue 71s ease-in-out infinite;
+}
+
+/* Blobs inside surfaces. Painted over --color-panel rather than replacing it,
+   so a panel still has its own solid floor if a gradient layer fails. */
+.panel,
+.tool-card {
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 106, 26, 0.20) 0%, rgba(255, 106, 26, 0.07) 45%, rgba(255, 106, 26, 0) 72%),
+    radial-gradient(circle at 50% 50%, rgba(255, 46, 99, 0.16) 0%, rgba(255, 46, 99, 0.06) 45%, rgba(255, 46, 99, 0) 72%),
+    radial-gradient(circle at 50% 50%, rgba(255, 176, 32, 0.15) 0%, rgba(255, 176, 32, 0.05) 45%, rgba(255, 176, 32, 0) 72%),
+    radial-gradient(circle at 50% 50%, rgba(176, 96, 255, 0.14) 0%, rgba(176, 96, 255, 0.05) 45%, rgba(176, 96, 255, 0) 72%);
+  background-size: 240px 260px, 180px 210px, 150px 170px, 200px 190px;
+  background-position: 15% 120%, 70% -25%, 45% 60%, 88% 105%;
+}
+
+@keyframes lava-surface-drift {
+  0%,
+  100% { background-position: 15% 120%, 70% -25%, 45% 60%,  88% 105%; }
+  25%  { background-position: 22% 60%,  64% 38%,  38% 6%,   80% 52%; }
+  50%  { background-position: 12% -20%, 74% 96%,  50% 110%, 90% 2%; }
+  75%  { background-position: 25% 44%,  66% 18%,  41% 54%,  83% 60%; }
+}
+
+/* landing.css's `.tool-card:hover { background: var(--color-hover) }` is a
+   shorthand, so it resets background-image to none and would blink the blobs
+   out of a hovered card. Restated at matching specificity (later in the
+   cascade, so it wins) with the colour split off as background-color. */
+.tool-card:hover {
+  background-color: var(--color-hover);
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 106, 26, 0.20) 0%, rgba(255, 106, 26, 0.07) 45%, rgba(255, 106, 26, 0) 72%),
+    radial-gradient(circle at 50% 50%, rgba(255, 46, 99, 0.16) 0%, rgba(255, 46, 99, 0.06) 45%, rgba(255, 46, 99, 0) 72%),
+    radial-gradient(circle at 50% 50%, rgba(255, 176, 32, 0.15) 0%, rgba(255, 176, 32, 0.05) 45%, rgba(255, 176, 32, 0) 72%),
+    radial-gradient(circle at 50% 50%, rgba(176, 96, 255, 0.14) 0%, rgba(176, 96, 255, 0.05) 45%, rgba(176, 96, 255, 0) 72%);
+}
+
+body:not(.theme-animations-off) .panel,
+body:not(.theme-animations-off) .tool-card {
+  animation: lava-surface-drift 47s ease-in-out infinite;
+}
+
+/* The sidebar is the one column-shaped surface in the app, so it gets the
+   tallest, slowest blobs. It also has its own opaque background from the
+   shell, so the layers go on top of --color-panel the same way panels do. */
+#sidebar {
+  background-repeat: no-repeat;
+  background-color: var(--color-panel);
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 106, 26, 0.28) 0%, rgba(255, 106, 26, 0.10) 45%, rgba(255, 106, 26, 0) 72%),
+    radial-gradient(circle at 50% 50%, rgba(255, 46, 99, 0.22) 0%, rgba(255, 46, 99, 0.08) 45%, rgba(255, 46, 99, 0) 72%),
+    radial-gradient(circle at 50% 50%, rgba(255, 176, 32, 0.20) 0%, rgba(255, 176, 32, 0.07) 45%, rgba(255, 176, 32, 0) 72%);
+  background-size: 130px 150px, 100px 130px, 90px 110px;
+  background-position: 40% 118%, 60% -18%, 50% 55%;
+  border-right-color: #4a1512;
+}
+
+@keyframes lava-sidebar-drift {
+  0%,
+  100% { background-position: 40% 118%, 60% -18%, 50% 55%; }
+  25%  { background-position: 55% 62%,  45% 42%,  60% 4%; }
+  50%  { background-position: 35% -16%, 62% 96%,  42% 108%; }
+  75%  { background-position: 58% 48%,  40% 20%,  55% 50%; }
+}
+
+body:not(.theme-animations-off) #sidebar {
+  animation: lava-sidebar-drift 63s ease-in-out infinite;
+}
+
+/* Reduced motion: keep the lamp, lose the movement. The blobs stay exactly
+   where their 0% keyframe put them. */
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body:not(.theme-animations-off)::before,
+  body:not(.theme-animations-off) .panel,
+  body:not(.theme-animations-off) .tool-card,
+  body:not(.theme-animations-off) #sidebar {
+    animation: none;
+  }
+}
+
+/* ── Panel accent slots, molten left rails ── */
+.panel-accent-input    { border-left: 4px solid #ff5a1f; border-color: rgba(255, 90, 31, 0.35); }
+.panel-accent-view     { border-left: 4px solid #ffb020; border-color: rgba(255, 176, 32, 0.32); }
+.panel-accent-totals   { border-left: 4px solid #e0219b; border-color: rgba(224, 33, 155, 0.32); }
+.panel-accent-entries  { border-left: 4px solid #ff2e63; border-color: rgba(255, 46, 99, 0.32); }
+
+/* ── Tool / section header, a heat gradient with an ember glow ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, rgba(255, 90, 31, 0.20), rgba(224, 33, 155, 0.10) 60%, rgba(255, 176, 32, 0.06));
+  border-bottom-color: rgba(255, 90, 31, 0.4);
+  box-shadow: 0 0 22px rgba(255, 90, 31, 0.12);
+}
+
+.tool-view-title,
+.section-title {
+  color: #ffb020;
+  opacity: 1;
+  text-shadow: 0 0 16px rgba(255, 106, 26, 0.55);
+}
+
+/* ── Modal, solid: cooled wax with an ember rim ── */
+body.solid-modals .modal {
+  background: linear-gradient(160deg, #2c0a0c 0%, #1a0507 100%);
+  border-color: rgba(255, 90, 31, 0.4);
+  box-shadow: 0 0 34px rgba(255, 90, 31, 0.18), 0 24px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Modal, translucent: the lamp glows through ── */
+body:not(.solid-modals) .modal {
+  background: linear-gradient(160deg, rgba(255, 90, 31, 0.10) 0%, rgba(26, 5, 7, 0.6) 100%);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border-color: rgba(255, 90, 31, 0.32);
+  box-shadow: 0 0 34px rgba(255, 90, 31, 0.16), 0 24px 48px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Buttons, hot metal ── */
+.primary-btn {
+  background: linear-gradient(180deg, #ff7a3d 0%, #ff5a1f 100%);
+  border-color: rgba(255, 176, 32, 0.6);
+  color: #1a0503;
+}
+
+.primary-btn:hover {
+  background: linear-gradient(180deg, #ffa055 0%, #ff6f30 100%);
+  border-color: #ffb020;
+  box-shadow: 0 0 18px rgba(255, 106, 26, 0.45);
+  color: #1a0503;
+}
+
+.danger-btn {
+  border-color: #ff2e63;
+}
+
+.danger-btn:hover {
+  box-shadow: 0 0 14px rgba(255, 46, 99, 0.3);
+}
+
+input:focus {
+  outline: none;
+  border-color: rgba(255, 106, 26, 0.7);
+  box-shadow: 0 0 10px rgba(255, 106, 26, 0.28);
+}
+
+/* ── Drop zone ── */
+.drop-zone {
+  border-color: rgba(255, 106, 26, 0.45);
+}
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: #c08a72;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tab-btn:hover {
+  color: #ffb020;
+  border-color: rgba(255, 176, 32, 0.35);
+  background: rgba(255, 176, 32, 0.08);
+  box-shadow: none;
+}
+
+.tab-btn.active {
+  color: #ff8a5b;
+  border-color: rgba(255, 90, 31, 0.5);
+  background: rgba(255, 90, 31, 0.14);
+  box-shadow: none;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #290b0d;
+  color: #c08a72;
+  border-color: rgba(255, 90, 31, 0.22);
+  box-shadow: none;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: #ffe8d6;
+  border-color: rgba(255, 90, 31, 0.45);
+  background: #3a0f10;
+  box-shadow: none;
+}
+
+.dir-btn.active, .prv-btn.active {
+  color: #1a0503;
+  background: #ff5a1f;
+  border-color: #ff5a1f;
+  box-shadow: 0 0 12px rgba(255, 106, 26, 0.35);
+}
+
+/* ── Anchor badge ── */
+.anchor-badge {
+  background: #ffb020;
+  color: #1a0503;
+}
+
+/* ── Preview cards ── */
+.preview-card:hover       { border-color: rgba(255, 106, 26, 0.6); }
+.preview-card.anchor-card { border-color: #ff5a1f; box-shadow: 0 0 14px rgba(255, 106, 26, 0.35); }
+.preview-card.drag-target { border-color: #ffb020; }
+
+/* ── Slider, a molten bead ── */
+.img-slider::-webkit-slider-thumb {
+  background: radial-gradient(circle at 35% 30%, #ffd08a 0%, #ff5a1f 65%, #b91c1c 100%);
+  border-color: #1a0503;
+  box-shadow: 0 0 10px rgba(255, 106, 26, 0.6);
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: radial-gradient(circle at 35% 30%, #ffe3b0 0%, #ff7a3d 65%, #e0219b 100%);
+}
+
+.slider-val   { color: #ffb020; }
+.estimate-val { color: #ff8a5b; }
+
+.result-preview-wrap {
+  border-color: rgba(255, 90, 31, 0.3);
+}
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #ffb020; }
+
+/* ── Budget Tracker ── */
+
+/* Colour only, never the `background` shorthand: these are .panel elements and
+   the shorthand would wipe the blob layers back off them. */
+#finance-tool-budget .panel-accent-input   { background-color: #2a0a0b; }
+#finance-tool-budget .panel-accent-view    { background-color: #2a1206; }
+#finance-tool-budget .panel-accent-totals  { background-color: #26071a; }
+#finance-tool-budget .panel-accent-entries { background-color: #2a0710; }
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #ff5a1f;
+  background-color: #2a0a0b;
+  box-shadow: 0 0 18px rgba(255, 90, 31, 0.12);
+}
+.budget-annual-stats-title {
+  color: #ffb020;
+  text-shadow: 0 0 12px rgba(255, 106, 26, 0.5);
+}
+
+.budget-summary-tab.active,
+.setup-tab.active {
+  color: #ff8a5b;
+  background: rgba(255, 90, 31, 0.15);
+  border-bottom-color: #ff5a1f;
+}
+
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
+  background: #ff5a1f;
+  color: #1a0503;
+  border-color: #ff5a1f;
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #f6c445; border-color: #f6c445; }
+.budget-stats-count-late    { color: #ff8a5b; border-color: #ff8a5b; }
+.budget-stats-count-overdue { color: #ff2e63; border-color: #ff2e63; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(255, 90, 31, 0.32);
+  color: #c08a72;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(255, 90, 31, 0.1);
+  border-color: #ff5a1f;
+  color: #ffb020;
+}
+
+.budget-stats-section-heading { color: #c08a72; }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      #ff5a1f;
+  --gs-accent-soft: #ffb020;
+  --gs-win:         #f6c445;
+  --gs-loss:        #ff2e63;
+  --gs-surface:     rgba(255, 90, 31, 0.09);
+  --gs-header-bg:   rgba(255, 90, 31, 0.14);
+  --gs-grid-line:   rgba(255, 106, 26, 0.22);
+  --gs-zebra:       rgba(255, 232, 214, 0.035);
+}

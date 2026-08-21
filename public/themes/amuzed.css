@@ -1,0 +1,445 @@
+/* =============================================================================
+   AMUZED
+   -----------------------------------------------------------------------------
+   Flat black, thin type, and two colours doing very different jobs.
+
+   Magenta is the interface: every control that can be pressed, focused,
+   dragged onto, or is currently on wears it, so the hot pink off the wordmark
+   is what the app actually looks like rather than one accent hiding in a
+   corner.
+
+   Lime is reserved for the selection bar, the one full-bleed horizontal band
+   that is near-black at both ends and blows out in the middle, with a fine
+   diagonal hatch over it and a lit hairline top and bottom. It carries a
+   magenta leading edge so the two colours meet where the eye lands. Only
+   "this one is selected" gets that band (the active nav row, the active tab,
+   a hovered card, a view header), so it never competes with the magenta for
+   meaning.
+
+   Everything else is deliberately unstyled: no gradients on panels, no glow,
+   no shadow, 2px corners. The colour is the whole design, so any surface that
+   competes with it gets flattened out of the way.
+============================================================================= */
+
+:root {
+  --color-bg:                  #000000;
+  --color-panel:               #0b0b0b;
+  --color-input-bg:            #151515;
+  --color-border:              #262626;
+  --color-border-dashed:       #8fce2a;
+  --color-text:                #f2f2f2;
+  --color-text-muted:          #6f6f6f;
+  --color-hover:               #171717;
+
+  /* --color-btn is the app-wide "this is interactive" colour: tool-card
+     icons, the active nav rail, focus rings, the About pulse, filled active
+     states. Magenta here is what puts the wordmark's pink on nearly every
+     screen. Lime takes --color-accent, which is the quieter of the two
+     (titles, read-outs), and is separately hardcoded into the selection bar
+     below. */
+  --color-btn:                 #ff0090;
+  --color-accent:              #8fce2a;
+  --color-btn-hover:           #ff3faa;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #ff0055;
+  --color-danger-subtle:       rgba(255, 0, 85, 0.14);
+  --color-success:             #8fce2a;
+
+  --color-accent-input:        #ff0090;
+  --color-accent-view:         #8fce2a;
+  --color-accent-totals:       #00c2ff;
+  --color-accent-entries:      #ffd400;
+
+  --color-toggle-off:          #2a2a2a;
+  --color-toggle-on:           #ff0090;
+
+  /* ── Changelog accents ── Features (magenta) / Improvements (lime) / Bugfixes (red) / tool heading (cyan) */
+  --color-changelog-features:     #ff0090;
+  --color-changelog-improvements: #8fce2a;
+  --color-changelog-bugfixes:     #ff0055;
+  --color-changelog-tool:         #00c2ff;
+
+  --color-toast-success-bg:    #10200a;
+  --color-toast-success-border:#8fce2a;
+  --color-toast-success-text:  #dff5bd;
+  --color-toast-error-bg:      #26000f;
+  --color-toast-error-border:  #ff0090;
+  --color-toast-error-text:    #ffd0e8;
+
+  /* ── Budget chart palette ── Magenta / lime / cyan / yellow / orange / violet / mint / white, full-saturation on black */
+  --color-chart-1:             #ff0090;
+  --color-chart-2:             #8fce2a;
+  --color-chart-3:             #00c2ff;
+  --color-chart-4:             #ffd400;
+  --color-chart-5:             #ff5a00;
+  --color-chart-6:             #a35bff;
+  --color-chart-7:             #00e5a0;
+  --color-chart-8:             #ffffff;
+}
+
+/* ── Flatten everything: no rounding to speak of, no shadow, no gradient ── */
+.panel,
+.tool-card,
+.modal,
+button,
+.danger-btn,
+input,
+select,
+textarea,
+.drop-zone,
+.size-estimate,
+.result-preview-wrap,
+.preview-card,
+.tab-btn,
+.dir-btn,
+.prv-btn,
+.anchor-badge {
+  border-radius: 2px;
+}
+
+.panel {
+  background: #0b0b0b;
+  border-color: #262626;
+  box-shadow: none;
+}
+
+/* =============================================================================
+   THE SELECTION BAR
+   -----------------------------------------------------------------------------
+   Layer 1 is the diagonal hatch, layer 2 is the band itself. The band's stops
+   are asymmetric on purpose: the blow-out sits left of centre, the way a
+   light source raking across the row would put it, rather than in a tidy
+   symmetric bloom.
+============================================================================= */
+
+.nav-item.active,
+.nav-item.active:hover,
+.tool-card:hover,
+.tool-view-header,
+.section-header,
+.tab-btn.active,
+.dir-btn.active,
+.prv-btn.active,
+.budget-summary-tab.active,
+.setup-tab.active,
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
+  background-image:
+    repeating-linear-gradient(135deg,
+      rgba(0, 0, 0, 0.18) 0px,
+      rgba(0, 0, 0, 0.18) 3px,
+      rgba(0, 0, 0, 0) 3px,
+      rgba(0, 0, 0, 0) 6px),
+    linear-gradient(90deg,
+      #050d00 0%,
+      #2f6a08 16%,
+      #7cc020 40%,
+      #9ede35 54%,
+      #63a516 72%,
+      #1c3f05 90%,
+      #050d00 100%);
+  background-color: #050d00;
+  color: #ffffff;
+  /* Lit hairlines top and bottom, then the magenta cap the band runs out of
+     on its left edge. Inset shadows rather than a border, so a selected row
+     is exactly as tall as an unselected one. */
+  box-shadow:
+    inset 0 1px 0 rgba(174, 236, 106, 0.55),
+    inset 0 -1px 0 rgba(174, 236, 106, 0.3),
+    inset 3px 0 0 #ff0090;
+}
+
+.nav-item.active,
+.nav-item.active:hover {
+  border-left-color: transparent;
+}
+
+.tool-card:hover {
+  border-color: #ff0090;
+}
+
+.tool-card-icon {
+  color: #ff0090;
+}
+
+.tool-card:hover .tool-card-icon {
+  color: #ffffff;
+}
+
+/* ── Sidebar, a black column with one hairline separating it ── */
+#sidebar {
+  background: #000000;
+  border-right: 1px solid #1c1c1c;
+}
+
+#titleBar {
+  background: #000000;
+  border-bottom: 1px solid #1c1c1c;
+}
+
+/* ── Panel accent slots, flat black with a single saturated rail ── */
+.panel-accent-input    { background: #0b0b0b; border-left: 3px solid #8fce2a; border-color: #262626; }
+.panel-accent-view     { background: #0b0b0b; border-left: 3px solid #ff0090; border-color: #262626; }
+.panel-accent-totals   { background: #0b0b0b; border-left: 3px solid #00c2ff; border-color: #262626; }
+.panel-accent-entries  { background: #0b0b0b; border-left: 3px solid #ffd400; border-color: #262626; }
+
+/* ── Tool / section header: the bar, with the title riding it ── */
+.tool-view-header,
+.section-header {
+  border: none;
+  border-radius: 0;
+}
+
+.tool-view-title,
+.section-title {
+  color: #ffffff;
+  opacity: 1;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* The header back-arrow rides the selection bar, where the muted body colour
+   disappears. White, like the title beside it. */
+.tool-back-btn,
+.section-back-btn {
+  color: #ffffff;
+}
+
+/* ── Modal, solid: a plain black sheet, one hairline rule ── */
+body.solid-modals .modal {
+  background: #0b0b0b;
+  border-color: #2e2e2e;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
+}
+
+/* ── Modal, translucent: still flat, the black just thins out ── */
+body:not(.solid-modals) .modal {
+  background: rgba(11, 11, 11, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: #2e2e2e;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Buttons, hairline outlines that fill lime when they matter ── */
+button {
+  background: transparent;
+  color: #f2f2f2;
+  border: 1px solid #333333;
+  box-shadow: none;
+}
+
+button:hover {
+  background: transparent;
+  color: #ff0090;
+  border-color: #ff0090;
+  box-shadow: none;
+}
+
+.primary-btn {
+  background: #ff0090;
+  border-color: #ff0090;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.primary-btn:hover {
+  background: #ff3faa;
+  border-color: #ff3faa;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.danger-btn {
+  background: transparent;
+  color: #ff0055;
+  border: 1px solid #ff0055;
+}
+
+.danger-btn:hover {
+  background: rgba(255, 0, 85, 0.14);
+  color: #ff0055;
+  box-shadow: none;
+}
+
+.modal-cancel-btn {
+  background: transparent;
+  color: #6f6f6f;
+  border: 1px solid #2e2e2e;
+}
+
+.modal-cancel-btn:hover {
+  background: transparent;
+  color: #f2f2f2;
+  border-color: #555555;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #ff0090;
+  box-shadow: none;
+}
+
+/* ── Drop zone ── */
+.drop-zone {
+  border-color: #ff0090;
+  background: transparent;
+}
+
+/* ── Tab buttons. The active one takes the bar (declared above), so these
+   only need the resting and hover states. ── */
+.tab-btn {
+  color: #6f6f6f;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.tab-btn:hover {
+  color: #f2f2f2;
+  background: transparent;
+  border-color: #333333;
+  box-shadow: none;
+}
+
+.tab-btn.active {
+  border-color: transparent;
+  font-weight: 400;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: transparent;
+  color: #6f6f6f;
+  border-color: #333333;
+  box-shadow: none;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: #f2f2f2;
+  border-color: #ff0090;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dir-btn.active, .prv-btn.active {
+  border-color: transparent;
+}
+
+/* ── Anchor badge ── */
+.anchor-badge {
+  background: #ff0090;
+  color: #ffffff;
+}
+
+/* ── Preview cards ── */
+.preview-card:hover       { border-color: #ff0090; }
+.preview-card.anchor-card { border-color: #ff3faa; box-shadow: none; }
+.preview-card.drag-target { border-color: #00c2ff; }
+
+/* ── Slider, a flat lime block ── */
+.img-slider::-webkit-slider-thumb {
+  background: #ff0090;
+  border-color: #000000;
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: #ff3faa;
+}
+
+.slider-val   { color: #ff0090; }
+.estimate-val { color: #8fce2a; }
+
+.size-estimate {
+  background: #0b0b0b;
+  border-color: #262626;
+}
+
+.result-preview-wrap {
+  border-color: #262626;
+}
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #8fce2a; }
+
+/* ── Budget Tracker ── */
+
+#finance-tool-budget .panel-accent-input   { background: #0b0b0b; }
+#finance-tool-budget .panel-accent-view    { background: #0b0b0b; }
+#finance-tool-budget .panel-accent-totals  { background: #0b0b0b; }
+#finance-tool-budget .panel-accent-entries { background: #0b0b0b; }
+
+.budget-annual-stats-title-panel {
+  background: #0b0b0b;
+  border-left: 3px solid #ff0090;
+}
+.budget-annual-stats-title { color: #ff0090; font-weight: 400; letter-spacing: 0.03em; }
+
+/* Summary tabs. .budget-summary-tab is a <button>, so this theme's global
+   outlined `button` rule above would otherwise beat the bar on the active
+   one; the border is cleared here and the bar itself is declared with the
+   rest of the selection group at the top of the file. */
+.budget-summary-tab,
+.setup-tab { color: #6f6f6f; border-color: transparent; }
+.budget-summary-tab:hover,
+.setup-tab:hover { color: #f2f2f2; border-color: transparent; }
+.budget-summary-tab.active,
+.setup-tab.active {
+  border-color: transparent;
+  border-bottom-color: #ff0090;
+}
+
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
+  border-color: transparent;
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #8fce2a; border-color: #8fce2a; }
+.budget-stats-count-late    { color: #ffd400; border-color: #ffd400; }
+.budget-stats-count-overdue { color: #ff0055; border-color: #ff0055; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: #333333;
+  color: #6f6f6f;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: transparent;
+  border-color: #ff0090;
+  color: #ff0090;
+}
+
+.budget-stats-section-heading { color: #6f6f6f; }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      #ff0090;
+  --gs-accent-soft: #8fce2a;
+  --gs-win:         #8fce2a;
+  --gs-loss:        #ff0055;
+  --gs-surface:     #0b0b0b;
+  --gs-header-bg:   #141414;
+  --gs-grid-line:   #262626;
+  --gs-zebra:       rgba(242, 242, 242, 0.03);
+  --gs-radius:      2px;
+  --gs-radius-sm:   2px;
+}

@@ -1,0 +1,366 @@
+/* =============================================================================
+   SHADOW
+   -----------------------------------------------------------------------------
+   Purple, red, black, silver, grey, and nothing else. Near-black surfaces with
+   a violet cast, brushed-silver text, and the red carried right through the
+   interface rather than parked on the danger button: it takes every second
+   panel rail, the active sidebar row's edge, card and tab hovers, and the
+   tail of the header gradient, so purple and red read as a duotone the way
+   the silver and grey read as the ground between them.
+
+   Note --color-success is violet, not green: a green would be the only hue in
+   the app outside the stated palette. Success and error stay legible apart
+   because error is the red, at full strength against the violet.
+============================================================================= */
+
+:root {
+  --color-bg:                  #08080a;
+  --color-panel:               #121016;
+  --color-input-bg:            #1a1720;
+  --color-border:              #2b2733;
+  --color-border-dashed:       #7b2ff7;
+  --color-text:                #d7d4dd;
+  --color-text-muted:          #8a8595;
+  --color-hover:               #221d2b;
+
+  --color-btn:                 #7b2ff7;
+  --color-accent:              #c9c4d4;
+  --color-btn-hover:           #6a1fe0;
+  --color-btn-text:            #ffffff;
+
+  --color-danger:              #d62246;
+  --color-danger-subtle:       rgba(214, 34, 70, 0.14);
+  --color-success:             #a855f7;
+
+  --color-accent-input:        #7b2ff7;
+  --color-accent-view:         #d62246;
+  --color-accent-totals:       #b3aec0;
+  --color-accent-entries:      #55505f;
+
+  --color-toggle-off:          #35303f;
+  --color-toggle-on:           #7b2ff7;
+
+  /* ── Changelog accents ── Features (purple) / Improvements (silver) / Bugfixes (red) / tool heading (light violet) */
+  --color-changelog-features:     #7b2ff7;
+  --color-changelog-improvements: #b3aec0;
+  --color-changelog-bugfixes:     #d62246;
+  --color-changelog-tool:         #c084fc;
+
+  --color-toast-success-bg:    #1b0f2e;
+  --color-toast-success-border:#a855f7;
+  --color-toast-success-text:  #e5d9ff;
+  --color-toast-error-bg:      #2a0a12;
+  --color-toast-error-border:  #d62246;
+  --color-toast-error-text:    #ffd4dc;
+
+  /* ── Budget chart palette ── Purple / red / silver / deep-red / light-violet / rose / deep-purple / pale-grey */
+  --color-chart-1:             #7b2ff7;
+  --color-chart-2:             #d62246;
+  --color-chart-3:             #c9c4d4;
+  --color-chart-4:             #a01c37;
+  --color-chart-5:             #a855f7;
+  --color-chart-6:             #f43f5e;
+  --color-chart-7:             #4c1d95;
+  --color-chart-8:             #9ca3af;
+}
+
+/* ── Panels, black glass with a silver top edge and a violet under-bloom ── */
+.panel {
+  background: linear-gradient(180deg, #171420 0%, #100e15 100%);
+  border-color: #2b2733;
+  box-shadow:
+    inset 0 1px 0 rgba(201, 196, 212, 0.09),
+    0 10px 26px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Panel accent slots, purple / red / purple / red, with the silver and
+   grey left to the borders so the duotone stays the loud part ── */
+.panel-accent-input    { border-left: 4px solid #7b2ff7; border-color: rgba(123, 47, 247, 0.32); }
+.panel-accent-view     { border-left: 4px solid #d62246; border-color: rgba(214, 34, 70, 0.3); }
+.panel-accent-totals   { border-left: 4px solid #7b2ff7; border-color: rgba(123, 47, 247, 0.32); }
+.panel-accent-entries  { border-left: 4px solid #d62246; border-color: rgba(214, 34, 70, 0.3); }
+
+/* ── Tool / section header, violet fading into black, silver title ── */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(90deg, rgba(123, 47, 247, 0.24) 0%, rgba(214, 34, 70, 0.16) 55%, rgba(18, 16, 22, 0.9) 100%);
+  border-bottom-color: rgba(214, 34, 70, 0.45);
+  box-shadow: 0 0 24px rgba(123, 47, 247, 0.1);
+}
+
+.tool-view-title,
+.section-title {
+  color: #d7d4dd;
+  opacity: 1;
+  letter-spacing: 0.04em;
+  /* Violet bloom close in, red further out: silver text lit from both ends
+     of the duotone. */
+  text-shadow: 0 0 10px rgba(123, 47, 247, 0.6), 0 0 22px rgba(214, 34, 70, 0.45);
+}
+
+/* ── Modal, solid: obsidian slab ── */
+body.solid-modals .modal {
+  background: linear-gradient(160deg, #1a1622 0%, #0b0a0e 100%);
+  border-color: rgba(123, 47, 247, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(201, 196, 212, 0.1),
+    0 0 36px rgba(123, 47, 247, 0.15),
+    0 26px 52px rgba(0, 0, 0, 0.75);
+}
+
+/* ── Modal, translucent: smoked violet glass ── */
+body:not(.solid-modals) .modal {
+  background: linear-gradient(160deg, rgba(123, 47, 247, 0.10) 0%, rgba(11, 10, 14, 0.6) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-color: rgba(123, 47, 247, 0.28);
+  box-shadow: 0 0 36px rgba(123, 47, 247, 0.14), 0 26px 52px rgba(0, 0, 0, 0.75);
+}
+
+/* ── Buttons, brushed graphite with a silver rim; violet on hover ── */
+button {
+  background: linear-gradient(180deg, #262231 0%, #17141d 100%);
+  color: #d7d4dd;
+  border: 1px solid #3a3446;
+}
+
+button:hover {
+  background: linear-gradient(180deg, #34293f 0%, #1d1826 100%);
+  border-color: #7b2ff7;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(123, 47, 247, 0.35);
+}
+
+.primary-btn {
+  background: linear-gradient(180deg, #8b3dff 0%, #6a1fe0 100%);
+  border-color: #7b2ff7;
+  color: #ffffff;
+}
+
+.primary-btn:hover {
+  background: linear-gradient(180deg, #9b55ff 0%, #7628f0 100%);
+  border-color: #a855f7;
+  box-shadow: 0 0 20px rgba(123, 47, 247, 0.5);
+  color: #ffffff;
+}
+
+.danger-btn {
+  background: transparent;
+  color: #d62246;
+  border-color: rgba(214, 34, 70, 0.55);
+}
+
+.danger-btn:hover {
+  background: rgba(214, 34, 70, 0.14);
+  border-color: #d62246;
+  box-shadow: 0 0 16px rgba(214, 34, 70, 0.3);
+}
+
+/* The quiet half of a two-button modal, grey ghost so the violet confirm
+   button beside it clearly reads as the primary action. */
+.modal-cancel-btn {
+  background: transparent;
+  color: #8a8595;
+  border: 1px solid #35303f;
+  box-shadow: none;
+}
+
+.modal-cancel-btn:hover {
+  background: rgba(138, 133, 149, 0.12);
+  color: #d7d4dd;
+  border-color: #55505f;
+  box-shadow: none;
+}
+
+input:focus {
+  outline: none;
+  border-color: rgba(123, 47, 247, 0.7);
+  box-shadow: 0 0 12px rgba(123, 47, 247, 0.3);
+}
+
+/* ── Sidebar and cards ── */
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(123, 47, 247, 0.28) 0%, rgba(214, 34, 70, 0.12) 60%, transparent 92%);
+  color: #ffffff;
+  border-left-color: #d62246;
+}
+
+.tool-card:hover {
+  border-color: #d62246;
+  box-shadow: 0 0 18px rgba(214, 34, 70, 0.3);
+}
+
+.tool-card-icon {
+  color: #a855f7;
+  filter: drop-shadow(0 0 8px rgba(123, 47, 247, 0.45));
+}
+
+/* ── Drop zone ── */
+.drop-zone {
+  border-color: rgba(123, 47, 247, 0.4);
+}
+
+/* ── Tab buttons ── */
+.tab-btn {
+  color: #8a8595;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tab-btn:hover {
+  color: #f0dbe0;
+  border-color: rgba(214, 34, 70, 0.5);
+  background: rgba(214, 34, 70, 0.1);
+  box-shadow: none;
+}
+
+.tab-btn.active {
+  color: #ffffff;
+  border-color: rgba(123, 47, 247, 0.6);
+  background: rgba(123, 47, 247, 0.16);
+  box-shadow: none;
+}
+
+/* ── Dir buttons ── */
+.dir-btn, .prv-btn {
+  background: #1a1720;
+  color: #8a8595;
+  border-color: #35303f;
+  box-shadow: none;
+}
+
+.dir-btn:hover, .prv-btn:hover {
+  color: #d7d4dd;
+  border-color: #55505f;
+  background: #221d2b;
+  box-shadow: none;
+}
+
+.dir-btn.active, .prv-btn.active {
+  color: #ffffff;
+  background: #7b2ff7;
+  border-color: #7b2ff7;
+  box-shadow: 0 0 14px rgba(123, 47, 247, 0.4);
+}
+
+/* ── Anchor badge ── */
+.anchor-badge {
+  background: #d62246;
+  color: #ffffff;
+}
+
+/* ── Preview cards ── */
+.preview-card:hover       { border-color: rgba(123, 47, 247, 0.6); }
+.preview-card.anchor-card { border-color: #7b2ff7; box-shadow: 0 0 14px rgba(123, 47, 247, 0.35); }
+.preview-card.drag-target { border-color: #d62246; }
+
+/* ── Slider, a chrome bead ── */
+.img-slider::-webkit-slider-thumb {
+  background: linear-gradient(180deg, #e6e3ec 0%, #8f8a9c 100%);
+  border-color: #08080a;
+  box-shadow: 0 0 8px rgba(201, 196, 212, 0.4);
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: linear-gradient(180deg, #b98cff 0%, #7b2ff7 100%);
+  box-shadow: 0 0 12px rgba(123, 47, 247, 0.6);
+}
+
+.slider-val   { color: #e8556f; }
+.estimate-val { color: #a855f7; }
+
+.size-estimate {
+  background: #1a1720;
+  border-color: #2b2733;
+}
+
+.result-preview-wrap {
+  border-color: rgba(123, 47, 247, 0.28);
+}
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover colour so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: #c084fc; }
+
+/* ── Budget Tracker ── */
+
+#finance-tool-budget .panel-accent-input   { background: linear-gradient(135deg, rgba(123, 47, 247, 0.12) 0%, #121016 100%); }
+#finance-tool-budget .panel-accent-view    { background: linear-gradient(135deg, rgba(214, 34, 70, 0.12) 0%, #121016 100%); }
+#finance-tool-budget .panel-accent-totals  { background: linear-gradient(135deg, rgba(179, 174, 192, 0.08) 0%, #121016 100%); }
+#finance-tool-budget .panel-accent-entries { background: linear-gradient(135deg, rgba(85, 80, 95, 0.18) 0%, #121016 100%); }
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #7b2ff7;
+  background: linear-gradient(135deg, rgba(123, 47, 247, 0.1) 0%, #121016 100%);
+  box-shadow: 0 0 18px rgba(123, 47, 247, 0.14);
+}
+.budget-annual-stats-title {
+  color: #c9c4d4;
+  text-shadow: 0 0 12px rgba(123, 47, 247, 0.5);
+}
+
+/* Summary tabs. .budget-summary-tab is a <button>, so this theme's global
+   `button { background/color/border }` rule above otherwise wins over the base
+   active rule and leaves the active tab looking identical to its neighbours.
+   Restated here so the fill, border and glow all land. */
+.budget-summary-tab,
+.setup-tab { color: #8a8595; }
+.budget-summary-tab:hover,
+.setup-tab:hover { color: #d7d4dd; }
+.budget-summary-tab.active,
+.setup-tab.active {
+  color: #ffffff;
+  background: rgba(123, 47, 247, 0.2);
+  border-color: transparent;
+  border-bottom-color: #7b2ff7;
+  box-shadow: 0 0 14px rgba(123, 47, 247, 0.3);
+}
+
+.budget-view-mode-btn.active,
+.theme-picker-tab.active {
+  background: #7b2ff7;
+  color: #ffffff;
+  border-color: #7b2ff7;
+}
+
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #a855f7; border-color: #a855f7; }
+.budget-stats-count-late    { color: #e8556f; border-color: #e8556f; }
+.budget-stats-count-overdue { color: #d62246; border-color: #d62246; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: #35303f;
+  color: #8a8595;
+}
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(123, 47, 247, 0.12);
+  border-color: #7b2ff7;
+  color: #c9c4d4;
+}
+
+.budget-stats-section-heading { color: #8a8595; }
+
+/* ── Game Stats ──
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component. */
+:root {
+  --gs-accent:      #7b2ff7;
+  --gs-accent-soft: #d62246;
+  --gs-win:         #a855f7;
+  --gs-loss:        #d62246;
+  --gs-surface:     rgba(123, 47, 247, 0.09);
+  --gs-header-bg:   rgba(123, 47, 247, 0.14);
+  --gs-grid-line:   rgba(201, 196, 212, 0.14);
+  --gs-zebra:       rgba(215, 212, 221, 0.035);
+}

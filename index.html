@@ -680,7 +680,7 @@
             <button id="ttSetupBtn" class="tool-view-header-action" title="Time Tracker setup: projects, activities, preferences">Setup</button>
           </div>
 
-          <div class="panel input-panel">
+          <div class="panel panel-accent-input tt-input-panel">
             <div class="tt-form-row">
               <div class="tt-field tt-field-project">
                 <label class="tt-field-label" for="project">Project</label>
@@ -742,7 +742,7 @@
             <datalist id="ttProjectList"></datalist>
           </div>
 
-          <div class="panel controls-panel">
+          <div class="panel panel-accent-view tt-controls-panel">
             <div class="controls-date-range">
               <span class="controls-label">View:</span>
               <div class="date-nav-group">
@@ -777,7 +777,7 @@
             </div>
           </div>
 
-          <div class="panel totals-panel">
+          <div class="panel panel-accent-totals">
             <div class="totals-columns">
               <div class="totals-col">
                 <div class="totals">
@@ -792,7 +792,7 @@
             </div>
           </div>
 
-          <div class="panel entries-panel">
+          <div class="panel panel-accent-entries tt-entries-panel">
             <div class="entries-header-row">
               <span id="entriesHeader">Entries</span>
             </div>
@@ -827,7 +827,7 @@
           <div id="tts-repeater-body" class="tts-body">
 
             <!-- Message -->
-            <div class="panel tts-locked-panel">
+            <div class="panel panel-accent-input tts-locked-panel">
               <div class="tts-field">
                 <div class="tts-label-row">
                   <label class="tts-label" for="tts-message">Message</label>
@@ -838,7 +838,7 @@
             </div>
 
             <!-- Interval + repeat -->
-            <div class="panel tts-locked-panel">
+            <div class="panel panel-accent-view tts-locked-panel">
               <div class="tts-timing-row">
 
                 <div class="tts-field">
@@ -884,7 +884,7 @@
             </div>
 
             <!-- Voice -->
-            <div class="panel tts-locked-panel">
+            <div class="panel panel-accent-totals tts-locked-panel">
               <div class="tts-voice-row">
 
                 <div class="tts-voice-col">
@@ -942,7 +942,7 @@
             <!-- Start / stop + live status. Reset lives here (pushed to the far
                  right, away from Start) now that the header slot it used to
                  occupy belongs to Setup. -->
-            <div class="panel">
+            <div class="panel panel-accent-entries">
               <div class="tts-actions">
                 <button id="tts-start-btn">Start</button>
                 <button id="tts-display-btn" style="display:none;"
@@ -984,7 +984,7 @@
             <!-- The clock, always visible: previews the pending duration while
                  idle, counts down while running. Double-click it to type a
                  duration. There are no separate h/m/s fields. -->
-            <div class="panel cd-clock-panel">
+            <div class="panel panel-accent-totals cd-clock-panel">
               <div class="cd-clock-row">
 
                 <!-- Hourglass progress figure, sits beside the clock. Sand
@@ -1096,7 +1096,7 @@
             </div>
 
             <!-- Setup, hidden while a countdown is live. -->
-            <div id="cd-setup-panel" class="panel">
+            <div id="cd-setup-panel" class="panel panel-accent-input">
               <div class="cd-field cd-memo-field">
                 <label class="cd-label" for="cd-memo">Memo / Activity</label>
                 <input id="cd-memo" type="text" placeholder="What's this timer for?" autocomplete="off"
@@ -1107,7 +1107,7 @@
             </div>
 
             <!-- History -->
-            <div class="panel">
+            <div class="panel panel-accent-entries">
               <div class="cd-log-header">
                 <span class="cd-label">History</span>
                 <button id="cd-clear-log-btn" class="modal-cancel-btn">Clear History</button>
@@ -1140,7 +1140,7 @@
 
           <div class="dbd-body">
 
-            <div class="panel">
+            <div class="panel panel-accent-input">
               <!-- Each date owns its own nudge row directly beneath it, so
                    there's never a question of which field a button moves. The
                    two rows are identical apart from data-target. -->
@@ -1200,12 +1200,12 @@
               </div>
             </div>
 
-            <div class="panel dbd-headline-panel">
+            <div class="panel panel-accent-totals dbd-headline-panel">
               <div id="dbd-headline" class="dbd-headline">—</div>
               <span id="dbd-headline-sub" class="dbd-headline-sub"></span>
             </div>
 
-            <div class="panel">
+            <div class="panel panel-accent-entries">
               <div id="dbd-breakdown" class="dbd-breakdown"></div>
             </div>
 
@@ -1280,7 +1280,7 @@
           <div class="dfg-body">
 
             <!-- Options panel: Output Directory + Organize mode -->
-            <div class="panel">
+            <div class="panel panel-accent-input">
               <div class="dfg-options-row">
 
                 <div class="dfg-field dfg-field--output">
@@ -1309,7 +1309,7 @@
             </div>
 
             <!-- Batch entries panel -->
-            <div class="panel dfg-batch-panel">
+            <div class="panel panel-accent-entries dfg-batch-panel">
               <div class="dfg-batch-top-row">
                 <button id="dfg-add-entry-btn" class="modal-cancel-btn dfg-add-btn" title="Add another type">+ Add
                   Type</button>
@@ -1318,7 +1318,7 @@
             </div>
 
             <!-- Actions -->
-            <div class="panel">
+            <div class="panel panel-accent-view">
               <div class="dfg-actions">
                 <button id="dfg-generate-btn" class="dfg-generate-btn">Generate Files</button>
               </div>
@@ -1528,7 +1528,7 @@
           </div><!-- /summary panel -->
 
           <!-- ── ACTION ROW ── -->
-          <div class="panel">
+          <div class="panel panel-accent-view">
             <div class="ab-action-row">
               <button id="ab-run-btn" class="ab-run-btn">
                 <span id="ab-run-spinner" class="ab-btn-spinner" style="display:none;"></span>
@@ -1688,7 +1688,7 @@
           <div class="tab-panel active" id="tab-combine">
 
             <!-- File select -->
-            <div class="panel">
+            <div class="panel panel-accent-input">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">1 · Select Images</h2>
                 <span class="item-badge" id="combine-count">0 images</span>
@@ -1704,7 +1704,7 @@
             </div>
 
             <!-- Preview strip -->
-            <div class="panel is-disabled" id="combine-preview-section">
+            <div class="panel panel-accent-view is-disabled" id="combine-preview-section">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">2 · Preview &amp; Order</h2>
                 <div class="panel-header-right">
@@ -1719,7 +1719,7 @@
             </div>
 
             <!-- Options + run -->
-            <div class="panel is-disabled" id="combine-options-section">
+            <div class="panel panel-accent-totals is-disabled" id="combine-options-section">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">3 · Options &amp; Output</h2>
                 <span class="panel-lock-hint" id="combine-options-lock">Select at least 2 images</span>
@@ -1830,7 +1830,7 @@
             </div>
 
             <!-- Result -->
-            <div class="panel result-panel" id="combine-result-section" style="display:none">
+            <div class="panel panel-accent-entries result-panel" id="combine-result-section" style="display:none">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">Result</h2>
                 <button id="combine-result-open">Open in Explorer</button>
@@ -1849,7 +1849,7 @@
           <div class="tab-panel" id="tab-compress">
 
             <!-- File select -->
-            <div class="panel">
+            <div class="panel panel-accent-input">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">1 · Select Image</h2>
               </div>
@@ -1873,7 +1873,7 @@
             </div>
 
             <!-- Slider -->
-            <div class="panel is-disabled" id="compress-options-section">
+            <div class="panel panel-accent-view is-disabled" id="compress-options-section">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">2 · Compression</h2>
                 <span class="panel-lock-hint" id="compress-options-lock">Select an image first</span>
@@ -1924,7 +1924,7 @@
             </div>
 
             <!-- Result -->
-            <div class="panel result-panel" id="compress-result-section" style="display:none">
+            <div class="panel panel-accent-entries result-panel" id="compress-result-section" style="display:none">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">Result</h2>
                 <button id="compress-result-open">Open in Explorer</button>
@@ -1943,7 +1943,7 @@
           <div class="tab-panel" id="tab-resize">
 
             <!-- Step 1: Select source (folder OR individual files) -->
-            <div class="panel">
+            <div class="panel panel-accent-input">
               <div class="tool-panel-header">
                 <h2 class="tool-panel-title">1 · Select Source</h2>
               </div>
@@ -1994,7 +1994,7 @@
             </div>
 
             <!-- Step 2: Options -->
-            <div class="panel is-disabled" id="resize-options-section">
+            <div class="panel panel-accent-view is-disabled" id="resize-options-section">
               <div class="tool-panel-header">
                 <div class="resize-options-header-group">
                   <h2 class="tool-panel-title">2 · Resize &amp; Canvas Options</h2>
@@ -2282,7 +2282,7 @@
           </div>
 
           <!-- View range navigation: [Snap to: Today] [←] [June 2026] [→] -->
-          <div class="panel controls-panel budget-range-nav">
+          <div class="panel panel-accent-view budget-range-nav">
             <div class="budget-range-nav-snap">
               <span class="budget-range-snap-label">Snap to:</span>
               <button id="budgetSnapBtn" class="budget-month-nav-btn budget-snap-btn" title="Jump to current period">This Month</button>
@@ -2946,6 +2946,7 @@
                 <option value="matte">Matte</option>
                 <option value="midnight">Midnight</option>
                 <option value="terminal">Terminal</option>
+                <option value="shadow">Shadow</option>
               </optgroup>
               <optgroup label="Holiday">
                 <option value="valentine">Valentine</option>
@@ -2962,6 +2963,11 @@
                 <option value="neon">Neon</option>
                 <option value="retro-electric">Retro-Electric</option>
                 <option value="halo">Halo</option>
+                <option value="cartoon">Cartoon</option>
+                <option value="lava">Lava</option>
+                <option value="windowed">Windowed</option>
+                <option value="blades">Blades</option>
+                <option value="amuzed">Amuzed</option>
                 <option value="random">Random</option>
                 <option value="custom">Custom</option>
               </optgroup>
@@ -3027,16 +3033,19 @@
                   <option value="music">Music</option>
                   <option value="finance">Finance</option>
                 </optgroup>
+                <!-- Classic order, i.e. ALL_TOOLS' own order in shell.ts. Kept in
+                     sync with it by hand: refreshStartupSelectOptions() only
+                     toggles these options' visibility, it never reorders them. -->
                 <optgroup label="Specific Tool">
                   <option value="finance:budget">Budget Tracker</option>
                   <option value="utility:time-tracker">Time Tracker</option>
                   <option value="files:auto-backup">Auto-Backup</option>
-                  <option value="media:image-ccr">Image CCR</option>
-                  <option value="files:dummy-file-generator">Dummy File Generator</option>
-                  <option value="games:game-stats">Game Stats</option>
-                  <option value="utility:tts-repeater">TTS Repeater</option>
                   <option value="utility:countdown">Countdown Timer</option>
+                  <option value="games:game-stats">Game Stats</option>
+                  <option value="media:image-ccr">Image CCR</option>
                   <option value="utility:days-between">Days Between Dates</option>
+                  <option value="utility:tts-repeater">TTS Repeater</option>
+                  <option value="files:dummy-file-generator">Dummy File Generator</option>
                 </optgroup>
               </select>
             </div>
@@ -5887,6 +5896,12 @@
                 <option value="knowledge">Knowledge</option>
                 <option value="neon">Neon</option>
                 <option value="retro-electric">Retro-Electric</option>
+                <option value="cartoon">Cartoon</option>
+                <option value="lava">Lava</option>
+                <option value="shadow">Shadow</option>
+                <option value="windowed">Windowed</option>
+                <option value="blades">Blades</option>
+                <option value="amuzed">Amuzed</option>
               </optgroup>
               <optgroup id="teBaseCustomGroup" label="Custom Themes" style="display:none;"></optgroup>
             </select>

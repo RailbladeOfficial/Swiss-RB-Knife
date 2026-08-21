@@ -454,12 +454,17 @@ function stopSeasonalEffect(): void {
   seasonalActiveTheme = null;
 }
 
-/** Every theme that has a canvas effect, with a short description of what it
+/** Every theme that has an effect, with a short description of what it
  *  actually does. Single source of truth: applySeasonalEffect() dispatches on
  *  these ids, and the Theme Picker's Preferences tab builds its per-theme
  *  toggle list straight from this array, so adding an effect below is all it
  *  takes for it to appear (and be switchable) in the UI. Ordered to match the
- *  Holiday tab's own order, with the one Special-tab effect (Halo) last. */
+ *  Holiday tab's own order, with the Special-tab effects last.
+ *
+ *  Lava is the one entry with no canvas branch below: its blobs are CSS
+ *  keyframes living in themes/lava.css, gated on the body class that
+ *  applyThemeAnimationClass() maintains. It's listed here so it shares one
+ *  toggle list with the canvas effects rather than growing a second one. */
 export const ANIMATED_THEMES: { id: string; label: string; effect: string }[] = [
   { id: "valentine", label: "Valentine", effect: "Floating hearts" },
   { id: "mardi-gras", label: "Mardi Gras", effect: "Falling bead strands" },
@@ -469,7 +474,23 @@ export const ANIMATED_THEMES: { id: string; label: string; effect: string }[] = 
   { id: "thanksgiving", label: "Thanksgiving", effect: "Blowing leaves" },
   { id: "christmas", label: "Christmas", effect: "Falling snow" },
   { id: "halo", label: "Halo", effect: "Cursor glow swirl" },
+  { id: "lava", label: "Lava", effect: "Drifting lava blobs" },
 ];
+
+/** Set on <body> whenever the active theme's animation is switched off.
+ *  Themes whose effect is CSS rather than canvas gate their keyframes on
+ *  `body:not(.theme-animations-off)`, which is the only way an animation that
+ *  lives in a stylesheet can answer to the same preferences as the canvas
+ *  effects (there is no loop to stop). Harmless on every other theme, none of
+ *  them reference the class. */
+const ANIMATIONS_OFF_CLASS = "theme-animations-off";
+
+function applyThemeAnimationClass(themeName: string): void {
+  document.body.classList.toggle(
+    ANIMATIONS_OFF_CLASS,
+    !isThemeAnimationEnabled(themeName),
+  );
+}
 
 /** Whether the given theme's canvas effect is allowed to run: the master
  *  "Theme Animations" switch, then that theme's own opt-out. Themes with no
@@ -485,6 +506,9 @@ export function isThemeAnimationEnabled(themeId: string): boolean {
  *  effect is already active. Called on startup, on every "themechange", and
  *  whenever an animation toggle changes (which re-dispatches "themechange"). */
 function applySeasonalEffect(themeName: string): void {
+  // Runs on every pass, including the disabled one below, so a CSS-animated
+  // theme starts and stops on the same signal the canvas effects do.
+  applyThemeAnimationClass(themeName);
   // Checked before the already-active early-return below, so turning an
   // animation off tears down a running effect instead of leaving it up.
   if (!isThemeAnimationEnabled(themeName)) {
