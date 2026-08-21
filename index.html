@@ -3224,6 +3224,16 @@
           <div id="cycleSubsettings" class="theme-picker-random-settings">
             <div class="theme-picker-section-divider">Cycle Settings</div>
             <div class="settings-row">
+              <span>Change:</span>
+              <select id="cycleTriggerSelect" class="settings-select">
+                <option value="onStartup">On Startup</option>
+                <option value="time">After Time Passes</option>
+                <option value="everything">On Interaction</option>
+                <option value="click">On Click</option>
+                <option value="dayNight">By Time of Day</option>
+              </select>
+            </div>
+            <div id="cycleOrderRow" class="settings-row">
               <span>Order:</span>
               <div class="toggle-with-label">
                 <span id="cycleOrderLabel">Sequential</span>
@@ -3233,20 +3243,11 @@
                 </label>
               </div>
             </div>
-            <div class="settings-row">
-              <span>Change:</span>
-              <select id="cycleTriggerSelect">
-                <option value="onStartup">On Startup</option>
-                <option value="time">After Time Passes</option>
-                <option value="everything">On Interaction</option>
-                <option value="click">On Click</option>
-              </select>
-            </div>
             <div id="cycleIntervalRow" class="settings-row" style="display:none;">
               <span>Every:</span>
               <div class="cycle-interval-inputs">
                 <input type="number" id="cycleIntervalAmount" min="1" max="999" />
-                <select id="cycleIntervalUnit">
+                <select id="cycleIntervalUnit" class="settings-select">
                   <option value="seconds">Seconds</option>
                   <option value="minutes">Minutes</option>
                   <option value="hours">Hours</option>
@@ -3254,7 +3255,38 @@
                 </select>
               </div>
             </div>
-            <div class="settings-row">
+            <!-- "By Time of Day" block. Hidden for every other Change mode,
+                 and while it IS the mode, the pool-shaping rows below (Order,
+                 Include Custom Themes, Restrict to Holiday Season) are hidden
+                 instead, since Day/Night never builds a pool for them to act
+                 on. The two selects are filled from THEME_GROUPS (plus saved
+                 custom themes) by populateDayNightThemeSelects() in shell.ts. -->
+            <div id="cycleDayNightRows" style="display:none;">
+              <div class="settings-row">
+                <span class="theme-picker-label-with-info">
+                  Day Theme:
+                  <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="The theme shown between the two times below. Defaults to Light.">&#8505;</button>
+                </span>
+                <select id="cycleDayThemeSelect" class="settings-select"></select>
+              </div>
+              <div class="settings-row">
+                <span>Night Theme:</span>
+                <select id="cycleNightThemeSelect" class="settings-select"></select>
+              </div>
+              <div class="settings-row">
+                <span class="theme-picker-label-with-info">
+                  Day Runs:
+                  <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="The window the Day Theme covers; the Night Theme covers the rest. The window may run past midnight (e.g. 20:00 to 06:00). Setting both to the same time keeps the Day Theme on all day.">&#8505;</button>
+                </span>
+                <div class="cycle-interval-inputs">
+                  <input type="time" id="cycleDayStart" />
+                  <span class="cycle-time-sep">to</span>
+                  <input type="time" id="cycleDayEnd" />
+                </div>
+              </div>
+              <p id="cycleDayNightNote" class="theme-picker-holiday-note"></p>
+            </div>
+            <div id="cycleIncludeCustomRow" class="settings-row">
               <span>Include Custom Themes:</span>
               <div class="toggle-with-label">
                 <span id="cycleIncludeCustomLabel">Off</span>
@@ -3277,7 +3309,7 @@
                 </label>
               </div>
             </div>
-            <div class="settings-row">
+            <div id="cycleSeasonOnlyRow" class="settings-row">
               <span class="theme-picker-label-with-info">
                 Restrict to Holiday Season:
                 <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Keeps Holiday themes out of the normal cycle rotation except during their own window (their exact date, or their full season if that's on below). Independent of Holiday Overrides above, so this works whether or not that's on.">ℹ</button>
@@ -3304,7 +3336,7 @@
               </div>
             </div>
             <p id="cycleHolidayActiveNote" class="theme-picker-holiday-note" style="display:none;"></p>
-            <div class="random-roll-actions">
+            <div id="cycleNowRow" class="random-roll-actions">
               <button id="cycleNowBtn" title="Advance to the next theme in the cycle now">Cycle Now</button>
             </div>
             <p class="theme-picker-random-hint">Select the Cycle tile to enable these settings.</p>
@@ -3956,7 +3988,7 @@
               </div>
               <div class="settings-row">
                 <span>Period Length:</span>
-                <select id="payPeriodLength">
+                <select id="payPeriodLength" class="settings-select">
                   <option value="7">7 days</option>
                   <option value="14" selected>14 days</option>
                 </select>

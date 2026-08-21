@@ -1,12 +1,26 @@
 /* =============================================================================
    CYCLE THEME: "Cycle" theme mode: sequential/random rotation through the
-   built-in (and optionally custom) themes, plus real-world Holiday Overrides.
+   built-in (and optionally custom) themes, a two-theme Day/Night schedule,
+   plus real-world Holiday Overrides.
    -----------------------------------------------------------------------------
    Owns everything about Cycle mode: which theme is currently showing
    (settings.cycleCurrentThemeId), advancing that pointer (click/everything/
    time triggers), applying whatever it resolves to (a built-in theme name or
    a saved custom theme id) directly onto :root/themeLink, and the Holiday
    Override date math.
+
+   Two shapes of Cycle live here, and they meet only in
+   resolveActiveCycleThemeId():
+
+     POOL modes ("click" / "everything" / "time" / "onStartup") walk a pointer
+       through a set of themes. Order, Include Custom Themes and Restrict to
+       Holiday Season all shape that pool.
+     DAY/NIGHT mode ("dayNight") ignores the pool entirely and picks between
+       exactly two configured themes based on the wall clock. Nothing advances;
+       the answer is a pure function of the current time, so there is no pointer
+       to persist and no catch-up to do after the app has been closed.
+
+   Holiday Overrides sit above both: a live override wins outright either way.
 
    Split out the same way random-theme.ts is split out of shell.ts: this file
    is one more node in the existing theme-core.ts <-> theme-editor.ts <->
@@ -162,6 +176,111 @@ export function getHolidayOverrideEndDate(themeId: string, now: Date = new Date(
 }
 
 /* -----------------------------------------------------------------------------
+   Day/Night schedule
+   -----------------------------------------------------------------------------
+   Two themes, one clock window. Everything below is derived from the current
+   time rather than stored, which is what keeps this mode honest across app
+   restarts, suspends and clock changes: there is no "where was I" to get
+   stale, only "what time is it now".
+
+   The window may wrap midnight. A day of 20:00-06:00 is legitimate (someone
+   who wants the bright theme overnight), so every comparison here works on
+   minutes-since-local-midnight with an explicit wrapped branch rather than
+   assuming start < end.
+----------------------------------------------------------------------------- */
+
+const MINUTES_PER_DAY = 24 * 60;
+
+/* Mirrors DEFAULT_SETTINGS.cycleDayStart/cycleDayEnd in shell.ts. Only reached
+   if a persisted value is malformed, which loadSettings() already coerces away.
+   This is the belt to that pair of braces. */
+const FALLBACK_DAY_START_MIN = 7 * 60;
+const FALLBACK_DAY_END_MIN = 19 * 60;
+
+/** "HH:MM" to minutes since local midnight, or null if it isn't that shape. */
+function parseClockMinutes(value: string): number | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+function dayStartMinutes(): number {
+  return parseClockMinutes(settings.cycleDayStart) ?? FALLBACK_DAY_START_MIN;
+}
+
+function dayEndMinutes(): number {
+  return parseClockMinutes(settings.cycleDayEnd) ?? FALLBACK_DAY_END_MIN;
+}
+
+/** Whether `now` falls inside the configured day window.
+ *
+ *  Start === end can no longer be entered (shell.ts's isValidDayNightWindow
+ *  rejects it, and any stored pair breaking that rule is reset at load), so the
+ *  equal branch is only a guard against a degenerate value reaching here by
+ *  some other route. It reads as "day, all day", the least surprising answer
+ *  for a window with no night in it. */
+export function isDaytimeNow(now: Date = new Date()): boolean {
+  const start = dayStartMinutes();
+  const end = dayEndMinutes();
+  if (start === end) return true;
+  const mins = now.getHours() * 60 + now.getMinutes();
+  return start < end ? mins >= start && mins < end : mins >= start || mins < end;
+}
+
+/** Whether `themeId` still names something paintable: a built-in theme or a
+ *  saved custom one. */
+function themeIdExists(themeId: string): boolean {
+  if (!themeId) return false;
+  if (THEME_GROUPS.some((g) => g.themes.some((t) => t.id === themeId))) return true;
+  return customThemes.some((t) => t.id === themeId);
+}
+
+/** Whichever of the two Day/Night themes the clock currently calls for. Falls
+ *  back to Light/Dark if the configured id has gone (a custom theme deleted
+ *  since it was picked), so a missing theme degrades to the default pairing
+ *  instead of pointing themeLink at a stylesheet that isn't there. */
+function resolveDayNightThemeId(now: Date = new Date()): string {
+  const daytime = isDaytimeNow(now);
+  const wanted = daytime ? settings.cycleDayThemeId : settings.cycleNightThemeId;
+  if (themeIdExists(wanted)) return wanted;
+  return daytime ? "light" : "dark";
+}
+
+/** When the schedule next flips, i.e. the next occurrence of either edge of the
+ *  window. Null while the window covers the whole day, since nothing flips.
+ *  Exported for the Cycle pane's "showing X until Y" note. */
+export function getNextDayNightSwitch(now: Date = new Date()): Date | null {
+  const start = dayStartMinutes();
+  const end = dayEndMinutes();
+  if (start === end) return null;
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const until = (edge: number): number => {
+    const delta = edge - mins;
+    return delta > 0 ? delta : delta + MINUTES_PER_DAY;
+  };
+  const next = Math.min(until(start), until(end));
+  const at = new Date(now);
+  at.setSeconds(0, 0);
+  at.setMinutes(at.getMinutes() + next);
+  return at;
+}
+
+/** What the Cycle pane needs to describe the current state in one line: which
+ *  side of the window we're on, the theme id that side resolves to, and when
+ *  it changes. Null unless Day/Night is the active mode. */
+export function getDayNightStatus(): {
+  daytime: boolean;
+  themeId: string;
+  nextSwitch: Date | null;
+} | null {
+  if (settings.theme !== "cycle" || settings.cycleTrigger !== "dayNight") return null;
+  return {
+    daytime: isDaytimeNow(),
+    themeId: resolveDayNightThemeId(),
+    nextSwitch: getNextDayNightSwitch(),
+  };
+}
+
+/* -----------------------------------------------------------------------------
    Cycle pool + pointer advancement
 ----------------------------------------------------------------------------- */
 
@@ -188,14 +307,16 @@ function buildCyclePool(): string[] {
 }
 
 /** What Cycle mode should be showing right now: a live Holiday Override wins
- *  outright regardless of pool membership; otherwise the persisted pool
- *  pointer, falling back to the pool's first entry if that pointer no longer
- *  exists (pool composition changed, or its custom theme got deleted). */
+ *  outright regardless of mode; then Day/Night, if that's the selected mode,
+ *  answers straight from the clock; otherwise the persisted pool pointer,
+ *  falling back to the pool's first entry if that pointer no longer exists
+ *  (pool composition changed, or its custom theme got deleted). */
 function resolveActiveCycleThemeId(): string {
   if (settings.cycleHolidayOverride) {
     const holidayId = getActiveHolidayThemeId();
     if (holidayId) return holidayId;
   }
+  if (settings.cycleTrigger === "dayNight") return resolveDayNightThemeId();
   const pool = buildCyclePool();
   if (settings.cycleCurrentThemeId && pool.includes(settings.cycleCurrentThemeId)) {
     return settings.cycleCurrentThemeId;
@@ -277,10 +398,13 @@ function advanceCyclePointer(): void {
   applyResolvedCycleTheme(true);
 }
 
-/** "Cycle Now" button, always allowed while Cycle is the active theme,
- *  regardless of the configured trigger mode. */
+/** "Cycle Now" button, allowed while Cycle is the active theme regardless of
+ *  which pool trigger is configured. Day/Night is the exception: there is no
+ *  pointer to advance there, only a clock to read, so the button is hidden in
+ *  that mode and this guards the path anyway. */
 export function advanceCycleNow(): void {
   if (settings.theme !== "cycle") return;
+  if (settings.cycleTrigger === "dayNight") return;
   advanceCyclePointer();
 }
 
@@ -334,6 +458,46 @@ function rescheduleCycleTimer(): void {
 }
 
 /* -----------------------------------------------------------------------------
+   Day/Night boundary timer. The counterpart to the interval timer above, but
+   it schedules toward a wall-clock edge rather than a duration, and re-resolves
+   rather than advancing anything.
+
+   The wait is capped well below a full window so the mode self-corrects instead
+   of trusting one long timeout: a laptop suspended across sunset, or a system
+   clock that jumps, is caught at the next tick rather than staying on the wrong
+   theme until the following edge. Re-resolving is free when nothing changed,
+   applyResolvedCycleTheme() no-ops unless the answer actually differs.
+----------------------------------------------------------------------------- */
+
+const DAY_NIGHT_MAX_WAIT_MS = 5 * 60 * 1000;
+
+let _dayNightTimerHandle: number | null = null;
+
+function clearDayNightTimer(): void {
+  if (_dayNightTimerHandle !== null) {
+    window.clearTimeout(_dayNightTimerHandle);
+    _dayNightTimerHandle = null;
+  }
+}
+
+function rescheduleDayNightTimer(): void {
+  clearDayNightTimer();
+  if (settings.theme !== "cycle" || settings.cycleTrigger !== "dayNight") return;
+
+  const now = new Date();
+  const next = getNextDayNightSwitch(now);
+  // No switch scheduled (a 24-hour window) still polls, so editing the window
+  // while the app is open starts flipping again without needing a re-arm.
+  const untilEdge = next ? next.getTime() - now.getTime() : DAY_NIGHT_MAX_WAIT_MS;
+  const wait = Math.max(1000, Math.min(untilEdge, DAY_NIGHT_MAX_WAIT_MS));
+
+  _dayNightTimerHandle = window.setTimeout(() => {
+    applyResolvedCycleTheme();
+    rescheduleDayNightTimer();
+  }, wait);
+}
+
+/* -----------------------------------------------------------------------------
    Holiday-boundary recheck, a periodic re-resolve so a Holiday Override
    engages/disengages at the right moment even if the app is left open across
    a date boundary (e.g. open at 11:50pm Dec 23rd, still open past midnight).
@@ -380,6 +544,7 @@ export function activateCycleTheme(): void {
     applyResolvedCycleTheme(true);
   }
   rescheduleCycleTimer();
+  rescheduleDayNightTimer();
   ensureHolidayCheckInterval();
 }
 
