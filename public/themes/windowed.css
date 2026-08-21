@@ -15,15 +15,24 @@
    every other theme.
 
    NOTE ON --color-bg
-   The desktop colour is painted on `body` directly rather than through
-   --color-bg, because the shell reuses --color-bg for every RECESSED surface
-   inside a panel, not just for the window behind everything: Time Tracker's
-   totals block and entry rows, Budget's ledger and setup rows, Game Stats'
-   tiles, chips and sticky history headers. Setting it to the true desktop
-   blue painted all of those in the same colour as the background they sit on,
-   which is exactly the contrast a 9x list view was built to have. So
-   --color-bg keeps the lighter blue and only the two things that really are
-   "the desktop", body and the lock screen, take #3a6ea5.
+   Three colours do the work of one token here, so read this before changing
+   any of them.
+
+   The desktop colour is painted on `body` and #lockScreen directly rather
+   than through --color-bg, because the shell reuses --color-bg for every
+   RECESSED surface inside a panel, not just for the window behind everything:
+   Time Tracker's totals block and entry rows, Budget's ledger and setup rows,
+   Game Stats' tiles, chips and sticky history headers. Setting the token to
+   the true desktop blue painted all of those in the same colour as the
+   background they sit on, collapsing the contrast a 9x list view is built on.
+
+   The token keeps the lighter #8fb3d4, but the solid recessed rows no longer
+   use it: they are repainted white in "Recessed list surfaces" below, which is
+   what a 9x list body actually was. The token still feeds the Game Stats
+   washes (which take it at 45-55%, so they read as a tint, not a fill) and,
+   more importantly, the theme picker's preview tile, which shell.ts paints
+   INLINE from the parsed value. That last one is why the token stays blue
+   rather than becoming white outright: it is Windowed's swatch in the gallery.
 
    Icons are inline SVG strokes, so nothing can literally pixelate them.
    `shape-rendering: crispEdges` turns off antialiasing instead, which
@@ -31,8 +40,9 @@
 ============================================================================= */
 
 :root {
-  /* The lighter blue, i.e. every recessed row/tile inside a panel. See the
-     "NOTE ON --color-bg" in the header: the true desktop blue is on `body`. */
+  /* The lighter blue. Now only the Game Stats washes and the theme picker's
+     preview tile; solid recessed rows are white. See "NOTE ON --color-bg" in
+     the header, which explains why all three colours exist. */
   --color-bg:                  #8fb3d4;
   --color-panel:               #d4d0c8;
   --color-input-bg:            #ffffff;
@@ -214,6 +224,41 @@ textarea:focus {
   outline-offset: -3px;
 }
 
+/* ── Recessed list surfaces, painted white ──
+   The rows and tiles that sit INSIDE a grey panel. The shell paints every one
+   of them from --color-bg, and a 9x list body was white in its #d4d0c8 frame,
+   not tinted, so they are repainted here.
+
+   Why override the consumers instead of just setting --color-bg: #ffffff.
+   shell.ts parses --color-bg out of this file and applies it INLINE to the
+   theme picker's preview tile (applyPreviewVars), so the token is what makes
+   Windowed recognisable in the gallery. White there would be a blank swatch,
+   and no rule in this file can correct it, because the tile is painted from
+   the FETCHED value rather than the active theme. Keeping the token blue and
+   repainting the surfaces gets white where it is seen and a blue tile in the
+   picker.
+
+   Cost of the trade: this is a list, so it needs a new entry when a tool adds
+   a recessed row. Find the full set with:  grep -rn "var(--color-bg)" src/
+   Deliberately left OUT of it, and still on the blue token:
+     - .gs-tile / .gs-score-chip / .gs-game-row-player / .gs-player-picker-row,
+       which take --color-bg as a 45-55% wash rather than a solid fill
+     - .gs-hist-section-header, the sticky history header
+     - .tts-display-themed, the Display View backdrop
+   Hover stays --color-hover (#c6c2ba), which reads as a clear press-in
+   against white. ── */
+.entry-row,
+.setup-item,
+.sidebar-edit-item,
+.sound-pack-tile,
+.totals,
+#durationPreview,
+.budget-bill-row,
+.budget-setup-bill-item,
+.budget-bill-action-details {
+  background: #ffffff;
+}
+
 /* ── Buttons, grey face, black label, and a genuine press on :active ── */
 button {
   background: #d4d0c8;
@@ -248,6 +293,7 @@ button:active {
 .theme-tile-icon-btn,
 .lock-show-btn,
 .lock-cred-link,
+.gs-subview-back-btn,
 .gs-segment-btn,
 .gs-player-remove-btn {
   border: none;
@@ -276,13 +322,13 @@ button:active {
   color: #a00000;
 }
 
-/* The underline/pill tab strips are <button>s that clear their own border but
-   not box-shadow (.setup-tab is the one that does, and says so in its own
-   comment). Without this they would carry the button treatment above with no
-   button under it. Border is left alone here: .budget-summary-tab's 2px
-   transparent bottom edge is what its active underline colours in. */
-.budget-summary-tab,
-.theme-picker-tab {
+/* Budget's summary tab strip is <button>s that clear their own border but not
+   box-shadow, so without this they would carry the button treatment above
+   with no button under it. Border is left alone here: .budget-summary-tab's
+   2px transparent bottom edge is what its active underline colours in. The
+   app-wide .modal-tab needs no equivalent, it zeroes its own box-shadow in
+   modal.css for exactly this reason. */
+.budget-summary-tab {
   box-shadow: none;
 }
 
@@ -360,6 +406,92 @@ button:active {
 .tool-back-btn,
 .section-back-btn {
   color: #ffffff;
+}
+
+/* ── Text sitting on the desktop, with no surface under it ──
+   Same problem as the back-arrow above, one level out. --color-text-muted
+   (#4d4d4d) is tuned for the #d4d0c8 panel, where it reads at 5.5:1. A handful
+   of things render straight onto body's #3a6ea5 with nothing beneath them, and
+   against that blue the same grey collapses to 1.6:1. White is both the
+   readable answer (5.3:1, the most the blue allows) and the period-correct
+   one: 9x painted desktop labels white over exactly this colour.
+
+   Every selector here has been checked to have NO background of its own.
+   Anything on a panel, card, tile or title bar stays on the muted token, which
+   is correct against grey, so this list stays deliberately short.
+
+   .gs-empty is why the two Game Stats entries are id-scoped: the same class
+   also renders inside the Players and Tables lists, the Win Chart panel and
+   the stat-detail modal, all of which are grey. Only the two that land in a
+   bare results container may go white, and both are appended as DIRECT
+   children of it, hence the child combinator. ── */
+.lock-icon,
+.lock-title,
+.lock-subtitle,
+.gs-view-crumb,
+.gs-subview-back-btn,
+.coming-soon-panel,
+#gsHistoricalList > .gs-empty,
+#gsStatsResults > .gs-empty {
+  color: #ffffff;
+}
+
+/* The empty state's dashed frame is --color-border-dashed (#404040), which
+   disappears into the blue the same way its text did. */
+#gsHistoricalList > .gs-empty,
+#gsStatsResults > .gs-empty {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+/* Decorative opacities tuned against a light panel. On the blue they pull
+   white back below legibility, so they are reset rather than inherited. */
+.lock-icon { opacity: 0.85; }
+.coming-soon-title { opacity: 1; }
+.coming-soon-desc { opacity: 0.85; }
+
+/* The sub-view back affordance hovers to --gs-accent-soft over a 10% accent
+   wash, i.e. navy on navy once it is out here. Stay white and let a
+   translucent white fill carry the hover instead. It is also added to the
+   bare-face list above, so it no longer wears a bevel with nothing inside it
+   out on the desktop. */
+.gs-subview-back-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Exit App is a transparent button with a #808080 outline, which on the blue
+   is a grey label in a grey box on blue. Give it a real 9x face instead, which
+   fixes the contrast by putting a surface under the text rather than by
+   recolouring it. The hover matches .danger-btn's. */
+.lock-exit-btn {
+  background: #d4d0c8;
+  color: #000000;
+  border: 2px solid;
+  border-color: #ffffff #404040 #404040 #ffffff;
+  box-shadow:
+    inset 1px 1px 0 #dfdfdf,
+    inset -1px -1px 0 #808080;
+}
+
+.lock-exit-btn:hover {
+  background: #e8d8d8;
+  color: #a00000;
+  border-color: #ffffff #404040 #404040 #ffffff;
+}
+
+/* --color-danger (#a00000) on the desktop blue is 1.6:1. The blue caps ANY red
+   at roughly 3.9:1, so this takes the lightest tint that still reads as red
+   and leans on bold weight for the rest. */
+.lock-error-msg {
+  color: #ffd0d0;
+  font-weight: 700;
+}
+
+/* Not on the desktop, on the sticky history header's lighter #8fb3d4, where
+   muted grey is 3.9:1. Near-black is 6.5:1 and stays subordinate to the navy
+   section title beside it. */
+.gs-hist-section-count {
+  color: #2a2a2a;
 }
 
 /* ── Modal, solid: a dialog box. Same chrome, heavier drop shadow ── */
@@ -490,19 +622,18 @@ body:not(.solid-modals) .modal {
    `button { background/color }` rule above otherwise flattens the active
    state; restated here as a pressed-in tab. */
 .budget-summary-tab,
-.setup-tab { color: #4d4d4d; background: #c6c2ba; }
+.modal-tab { color: #4d4d4d; background: #c6c2ba; }
 .budget-summary-tab:hover,
-.setup-tab:hover { color: #000000; background: #d4d0c8; }
+.modal-tab:hover { color: #000000; background: #d4d0c8; }
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #000000;
   background: #d4d0c8;
   font-weight: 700;
   border-bottom-color: #0a246a;
 }
 
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #0a246a;
   color: #ffffff;
   border-color: #404040 #ffffff #ffffff #404040;

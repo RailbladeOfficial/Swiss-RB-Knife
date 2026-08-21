@@ -307,11 +307,11 @@ input:focus {
    active rule and leaves the active tab looking identical to its neighbours.
    Restated here so the fill, border and glow all land. */
 .budget-summary-tab,
-.setup-tab { color: #8a8595; }
+.modal-tab { color: #8a8595; }
 .budget-summary-tab:hover,
-.setup-tab:hover { color: #d7d4dd; }
+.modal-tab:hover { color: #d7d4dd; }
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #ffffff;
   background: rgba(123, 47, 247, 0.2);
   border-color: transparent;
@@ -319,8 +319,7 @@ input:focus {
   box-shadow: 0 0 14px rgba(123, 47, 247, 0.3);
 }
 
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #7b2ff7;
   color: #ffffff;
   border-color: #7b2ff7;

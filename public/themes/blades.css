@@ -662,13 +662,13 @@ button:hover {
   box-shadow: none;
 }
 
-/* The underline/pill tab strips are <button>s that clear their own border but
-   not box-shadow (.setup-tab is the one that does, and says so in its own
-   comment). Without this they would carry the pill treatment above with no
-   pill under it. Border is left alone here: .budget-summary-tab's 2px
-   transparent bottom edge is what its active underline colours in. */
-.budget-summary-tab,
-.theme-picker-tab {
+/* Budget's summary tab strip is <button>s that clear their own border but not
+   box-shadow, so without this they would carry the pill treatment above
+   with no pill under it. Border is left alone here: .budget-summary-tab's
+   2px transparent bottom edge is what its active underline colours in. The
+   app-wide .modal-tab needs no equivalent, it zeroes its own box-shadow in
+   modal.css for exactly this reason. */
+.budget-summary-tab {
   box-shadow: none;
 }
 
@@ -824,11 +824,11 @@ textarea:focus {
    silver-pill `button` rule above otherwise wins and the active tab looks
    like every other pill; restated here as the lit blade. */
 .budget-summary-tab,
-.setup-tab { color: #2f2f2f; }
+.modal-tab { color: #2f2f2f; }
 .budget-summary-tab:hover,
-.setup-tab:hover { color: #1d1d1d; }
+.modal-tab:hover { color: #1d1d1d; }
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #ffffff;
   background: linear-gradient(180deg, var(--bl-deep) 0%, var(--bl-rail) 100%);
   border-color: #ffffff;
@@ -836,8 +836,7 @@ textarea:focus {
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
 }
 
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: linear-gradient(180deg, var(--bl-deep) 0%, var(--bl-rail) 100%);
   color: #ffffff;
   border-color: #ffffff;

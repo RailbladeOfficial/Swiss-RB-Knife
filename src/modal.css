@@ -272,7 +272,7 @@ body:not(.solid-modals) .modal {
 
    These started life as .setup-tab*, named for the Setup modals they were built
    for. They are named for the modal primitive now that every tabbed modal in the
-   app uses them. The 18 built-in themes each hand-write a .modal-tab.active
+   app uses them. All 24 built-in themes hand-write a .modal-tab.active
    override (see below), so a future rename has to sweep public/themes too.
 
    Tab switching is scoped per modal (ModalTabs takes a `scope` selector) so the
@@ -378,7 +378,7 @@ body:not(.solid-modals) .modal {
 
 /* The tinted fill is derived from the theme's own accent, so a Custom theme
    (which has no file of its own to add a rule to) still gets the same
-   treatment the 18 built-ins hand-write. Deliberately NOT !important: every
+   treatment the 24 built-ins hand-write. Deliberately NOT !important: every
    built-in theme overrides these to its own hex, and themeLink loads after
    this stylesheet, so equal specificity lets the theme win. The class
    selectors already outrank any theme's bare `button` rule. */

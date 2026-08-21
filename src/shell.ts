@@ -778,6 +778,42 @@ export function devWarn(...args: unknown[]): void {
  *  Used to detect leaving a tool so tools with pending state can flush it. */
 let _activeViewKey = "";
 
+/* ── Per-view scroll position ──
+   Every section shares one scroll container (#mainContent); the inactive ones
+   are display:none, not separate scrollers. So without this, scrolling halfway
+   down Budget and then opening Time Tracker leaves you halfway down Time
+   Tracker, because scrollTop never moved.
+
+   Two different behaviours are wanted, and the difference is intent rather
+   than destination:
+     - Going somewhere NEW (sidebar icon, Home card, tool card) should start at
+       the top, the way opening a page does.
+     - Coming BACK (the header back button, mouse back/forward) should land
+       where you left off, the way returning to a page does.
+
+   So the position is remembered per view on the way out, and the entry points
+   that represent an explicit jump opt into "top" instead. Default is restore,
+   which means a path that forgets to declare itself behaves like Back rather
+   than silently discarding the user's place. */
+const _viewScroll = new Map<string, number>();
+let _scrollIntent: "top" | "restore" = "restore";
+
+/** Marks the next view change as an explicit jump to somewhere new, which
+ *  lands at the top instead of restoring. Consumed by applyViewScroll(). */
+function scrollToTopOnNextView(): void {
+  _scrollIntent = "top";
+}
+
+/** Applies the pending intent, then resets it. Called at the END of
+ *  activateTool/activateLanding, once the target view is actually displayed:
+ *  scrollTop clamps to scrollHeight, so setting it while every view is still
+ *  hidden would clamp to 0 and quietly lose the restore. */
+function applyViewScroll(): void {
+  const top = _scrollIntent === "top" ? 0 : (_viewScroll.get(_activeViewKey) ?? 0);
+  _scrollIntent = "restore";
+  document.getElementById("mainContent")!.scrollTop = top;
+}
+
 /** Switches the active nav item and content section, does NOT touch tool/landing state.
  *  When toolKey is given, only nav items whose data-tool matches are marked active.
  *  This lets two sidebar items point at the same section (e.g. Auto-Backup and Dummy
@@ -790,6 +826,14 @@ function switchSection(sectionKey: string, toolKey?: string): void {
   const nextViewKey = `${sectionKey}/${toolKey ?? ""}`;
   if (_activeViewKey === "finance/budget" && nextViewKey !== "finance/budget") {
     onBudgetToolExit();
+  }
+  // Bank the outgoing view's scroll position. Guarded on the key actually
+  // changing because activateSection() routes through here twice for one
+  // navigation (once itself, then again via activateTool/activateLanding);
+  // the second pass would otherwise overwrite the entry we just saved with
+  // the scrollTop of the view we are arriving at.
+  if (_activeViewKey && _activeViewKey !== nextViewKey) {
+    _viewScroll.set(_activeViewKey, document.getElementById("mainContent")!.scrollTop);
   }
   _activeViewKey = nextViewKey;
 
@@ -837,13 +881,23 @@ function activateSection(sectionKey: string): void {
 }
 
 /** Wraps activateTool() for explicit user clicks only (sidebar icon, Home
- *  tile, tool-card), never for mouse back/forward history replay or
- *  restored-state entry, which call activateTool() directly. Game Stats uses
- *  this to jump back to its tile view even when the icon is clicked while
- *  the tool is already open; see onGameStatsIconClicked(). */
+ *  tile, tool-card, reminder "Go" button), never for mouse back/forward
+ *  replay or restored-state entry, which call activateTool() directly. Game
+ *  Stats uses this to jump back to its tile view even when the icon is clicked
+ *  while the tool is already open; see onGameStatsIconClicked(). */
 function activateToolFromClick(section: string, tool: string): void {
+  scrollToTopOnNextView();
   activateTool(section, tool);
   if (section === "games" && tool === "game-stats") onGameStatsIconClicked();
+}
+
+/** activateSection() for explicit user clicks only (sidebar icon with no tool,
+ *  Home card header, dashboard button with no tool). The header back buttons
+ *  call activateSection() directly so that returning to Home restores where
+ *  you were on it, which is the whole point of the split. */
+function activateSectionFromClick(section: string): void {
+  scrollToTopOnNextView();
+  activateSection(section);
 }
 
 navItems.forEach((item) => {
@@ -854,7 +908,7 @@ navItems.forEach((item) => {
     if (tool) {
       activateToolFromClick(section, tool);
     } else {
-      activateSection(section);
+      activateSectionFromClick(section);
     }
   });
 });
@@ -911,6 +965,7 @@ function activateTool(section: string, tool: string): void {
   saveShellState(section, tool);
   pushNavHistory(section, tool);
   recordToolUsage(section, tool);
+  applyViewScroll();
 }
 
 /** Returns to the category landing page, restoring the section header and hiding all tool views. */
@@ -934,6 +989,7 @@ function activateLanding(section: string): void {
   const landing = document.getElementById(`${section}-landing`);
   if (landing) landing.style.display = "block";
   pushNavHistory(section);
+  applyViewScroll();
 }
 
 // Dashboard tool buttons and category card headers
@@ -944,7 +1000,7 @@ document.querySelectorAll<HTMLElement>(".dashboard-tool-btn").forEach((btn) => {
     if (tool) {
       activateToolFromClick(section, tool);
     } else {
-      activateSection(section);
+      activateSectionFromClick(section);
     }
   });
 });
@@ -953,7 +1009,7 @@ document
   .querySelectorAll<HTMLElement>(".dashboard-card-header[data-section]")
   .forEach((hdr) => {
     hdr.addEventListener("click", () => {
-      activateSection(hdr.dataset.section!);
+      activateSectionFromClick(hdr.dataset.section!);
     });
   });
 
@@ -3364,7 +3420,7 @@ export function maybeShowBackupReminder(): Promise<void> {
 
 backupReminderGoBtn.addEventListener("click", () => {
   backupReminderModal.close();
-  activateTool("files", "auto-backup");
+  activateToolFromClick("files", "auto-backup");
 });
 
 backupReminderCancelBtn.addEventListener("click", () => {
@@ -3414,7 +3470,7 @@ export function maybeShowBudgetReminder(): Promise<void> {
 
 budgetReminderGoBtn.addEventListener("click", () => {
   budgetReminderModal.close();
-  activateTool("finance", "budget");
+  activateToolFromClick("finance", "budget");
 });
 
 budgetReminderReviewedBtn.addEventListener("click", () => {

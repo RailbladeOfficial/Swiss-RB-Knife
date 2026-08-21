@@ -122,9 +122,8 @@ textarea,
 .dir-btn.active,
 .prv-btn.active,
 .budget-summary-tab.active,
-.setup-tab.active,
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.modal-tab.active,
+.budget-view-mode-btn.active {
   background-image:
     repeating-linear-gradient(135deg,
       rgba(0, 0, 0, 0.18) 0px,
@@ -389,17 +388,16 @@ textarea:focus {
    one; the border is cleared here and the bar itself is declared with the
    rest of the selection group at the top of the file. */
 .budget-summary-tab,
-.setup-tab { color: #6f6f6f; border-color: transparent; }
+.modal-tab { color: #6f6f6f; border-color: transparent; }
 .budget-summary-tab:hover,
-.setup-tab:hover { color: #f2f2f2; border-color: transparent; }
+.modal-tab:hover { color: #f2f2f2; border-color: transparent; }
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   border-color: transparent;
   border-bottom-color: #ff0090;
 }
 
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   border-color: transparent;
 }
 

@@ -384,14 +384,13 @@ input:focus {
 }
 
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #ff8a5b;
   background: rgba(255, 90, 31, 0.15);
   border-bottom-color: #ff5a1f;
 }
 
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #ff5a1f;
   color: #1a0503;
   border-color: #ff5a1f;

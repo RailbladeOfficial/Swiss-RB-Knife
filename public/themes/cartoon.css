@@ -196,13 +196,13 @@ button:hover {
   box-shadow: 1px 1px 0 #171717;
 }
 
-/* The underline/pill tab strips are <button>s that clear their own border but
-   not box-shadow (.setup-tab is the one that does, and says so in its own
-   comment). Without this they would carry the button treatment above with no
-   button under it. Border is left alone here: .budget-summary-tab's 2px
-   transparent bottom edge is what its active underline colours in. */
-.budget-summary-tab,
-.theme-picker-tab {
+/* Budget's summary tab strip is <button>s that clear their own border but not
+   box-shadow, so without this they would carry the button treatment above
+   with no button under it. Border is left alone here: .budget-summary-tab's
+   2px transparent bottom edge is what its active underline colours in. The
+   app-wide .modal-tab needs no equivalent, it zeroes its own box-shadow in
+   modal.css for exactly this reason. */
+.budget-summary-tab {
   box-shadow: none;
 }
 
@@ -342,14 +342,13 @@ textarea:focus {
 
 /* Summary tabs, solid red when active to match .tab-btn.active */
 .budget-summary-tab.active,
-.setup-tab.active {
+.modal-tab.active {
   color: #ffffff;
   background: #e5162c;
   border-bottom-color: #171717;
 }
 
-.budget-view-mode-btn.active,
-.theme-picker-tab.active {
+.budget-view-mode-btn.active {
   background: #1c6df0;
   color: #ffffff;
   border-color: #171717;
