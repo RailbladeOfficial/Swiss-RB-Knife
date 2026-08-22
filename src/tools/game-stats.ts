@@ -25,7 +25,11 @@
 
    Rust commands used:
      save_game_stats_data, load_game_stats_data,
-     save_game_stats_draft, load_game_stats_draft
+     save_game_stats_draft, load_game_stats_draft,
+     read_game_stats_workbook, write_game_stats_download
+
+   The New Game entry in progress survives a restart, same as every other
+   tool's half-filled form. See the DRAFT PERSISTENCE section.
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -1952,6 +1956,7 @@ function resetNewGameSetup(): void {
   setGameNumberUnlocked(false);
   document.getElementById("gsNewGameSetup")!.style.display = "";
   document.getElementById("gsNewGameEntry")!.style.display = "none";
+  clearGameStatsDraft();
   newGameDraft = null;
   editingGameId = null;
   newGameReturnView = "home";
@@ -2121,6 +2126,9 @@ function startNewGame(): void {
   document.getElementById("gsNewGameSetup")!.style.display = "none";
   document.getElementById("gsNewGameEntry")!.style.display = "";
   applyGsGameMode();
+  // Saved before a single score is typed: the roster, table and date are
+  // already work worth not losing.
+  saveGameStatsDraft();
 }
 
 /* =============================================================================
@@ -2324,6 +2332,7 @@ function commitRoundScore(input: HTMLInputElement): void {
   newGameDraft.tieAccepted = false;
   const pending = reconcileOvertimeRounds(newGameDraft, settings.autoOvertime);
   if (pending) openOvertimeConfirmModal(pending);
+  saveGameStatsDraft();
 }
 
 /** True for the last player-cell of the grid's current last round. The one
@@ -2478,6 +2487,7 @@ function getOvertimeConfirmModal(): Modal {
       pendingOvertimeRound = null;
       gsOvertimeConfirmModal!.close();
       renderRoundGrid();
+      saveGameStatsDraft();
     });
 
     document.getElementById("gsOvertimeConfirmDeclineBtn")!.addEventListener("click", () => {
@@ -2485,6 +2495,7 @@ function getOvertimeConfirmModal(): Modal {
       pendingOvertimeRound = null;
       gsOvertimeConfirmModal!.close();
       renderRoundGrid();
+      saveGameStatsDraft();
     });
   }
   return gsOvertimeConfirmModal;
@@ -2498,6 +2509,83 @@ function openOvertimeConfirmModal(pending: RoundEntry): void {
   document.getElementById("gsOvertimeConfirmMessage")!.textContent =
     `${names} are tied at ${tiedTotal} points. Add an overtime round (${roundLabel(pending)}) to break the tie?`;
   getOvertimeConfirmModal().open();
+}
+
+/* =============================================================================
+   DRAFT PERSISTENCE  (the New Game entry in progress)
+   -----------------------------------------------------------------------------
+   Every other tool keeps its half-filled form across a restart; this does the
+   same for a game being scored. Written to its own file (game-stats-draft.json)
+   rather than into game-stats.json, because a draft is not yet a game and must
+   never be mixed into saved history.
+
+   ONLY "create" mode is persisted. newGameDraft doubles as the buffer for
+   viewing and editing an already-saved game, and those live in games[] already:
+   persisting them would restore a duplicate of a saved game on the next launch.
+   That is why every function here checks the mode rather than just the buffer.
+============================================================================= */
+
+let gsDraftSaveTimer: number | null = null;
+
+/** Persists the in-progress entry, debounced so typing a row of scores writes
+ *  once rather than once per cell. Matches Time Tracker's draft timing. */
+function saveGameStatsDraft(): void {
+  if (!newGameDraft || gsGameMode !== "create" || editingGameId) return;
+  const snapshot = JSON.stringify({ gameType: gsNewGameType, game: newGameDraft });
+  if (gsDraftSaveTimer) clearTimeout(gsDraftSaveTimer);
+  gsDraftSaveTimer = window.setTimeout(async () => {
+    gsDraftSaveTimer = null;
+    try {
+      await invoke("save_game_stats_draft", { data: snapshot });
+    } catch (err) {
+      devError("Game Stats: failed to save draft", err);
+    }
+  }, 500);
+}
+
+/** Drops the stored draft. Called wherever an entry is finished or abandoned,
+ *  so a saved or cancelled game never reappears on the next launch. Cancels any
+ *  pending debounced write first, or that write would recreate what this just
+ *  cleared. Stores "null" rather than deleting the file, which is exactly what
+ *  load_game_stats_draft returns for "no draft" anyway. */
+function clearGameStatsDraft(): void {
+  if (gsDraftSaveTimer) {
+    clearTimeout(gsDraftSaveTimer);
+    gsDraftSaveTimer = null;
+  }
+  invoke("save_game_stats_draft", { data: "null" }).catch((err) =>
+    devError("Game Stats: failed to clear draft", err),
+  );
+}
+
+/** Restores a draft left by a previous session, if there is one and it still
+ *  makes sense. Returns whether a draft was restored.
+ *
+ *  A draft is discarded rather than restored when one of its players has since
+ *  been deleted: the entry would come back with "?" where a name should be, and
+ *  saving it would file a game against a player who no longer exists. */
+async function loadGameStatsDraft(): Promise<boolean> {
+  try {
+    const raw = await invoke<string>("load_game_stats_draft");
+    const stored = JSON.parse(raw);
+    const game = stored?.game as GameInstance | undefined;
+    if (!game || !Array.isArray(game.rounds) || !Array.isArray(game.playerIds)) return false;
+
+    const knownPlayers = new Set(profiles.map((pr) => pr.id));
+    if (!game.playerIds.every((id) => knownPlayers.has(id))) {
+      clearGameStatsDraft();
+      return false;
+    }
+
+    newGameDraft = game;
+    gsNewGameType = stored.gameType ?? game.gameType;
+    gsGameMode = "create";
+    editingGameId = null;
+    return true;
+  } catch (err) {
+    devError("Game Stats: failed to load draft", err);
+    return false;
+  }
 }
 
 function saveNewGame(): void {
@@ -2514,6 +2602,7 @@ function saveNewGame(): void {
   // saved, same as a typed name becomes a profile.
   ensureTableFor(newGameDraft);
   saveToDisk();
+  clearGameStatsDraft();
   flash("Game saved", "success");
 
   const returnView = newGameReturnView;
@@ -2525,6 +2614,7 @@ function saveNewGame(): void {
 }
 
 function cancelNewGame(): void {
+  clearGameStatsDraft();
   const returnView = newGameReturnView;
   newGameDraft = null;
   editingGameId = null;
@@ -4743,11 +4833,13 @@ export function initGameStats(): void {
     const val = (e.target as HTMLInputElement).value;
     newGameDraft.date = val || (settings.requireDate ? gsToday() : "");
     (e.target as HTMLInputElement).value = newGameDraft.date;
+    saveGameStatsDraft();
   });
   document.getElementById("gsGameDateNowBtn")!.addEventListener("click", () => {
     if (!newGameDraft) return;
     newGameDraft.date = gsToday();
     (document.getElementById("gsGameDateEdit") as HTMLInputElement).value = newGameDraft.date;
+    saveGameStatsDraft();
   });
   document.getElementById("gsViewEditBtn")!.addEventListener("click", enterEditMode);
   document.getElementById("gsViewSaveBtn")!.addEventListener("click", saveGameChanges);
@@ -4834,12 +4926,24 @@ export function initGameStats(): void {
   fillGameTypeSelect(document.getElementById("gsHistGameTypeSelect") as HTMLSelectElement, gsHistGameType);
   fillGameTypeSelect(document.getElementById("gsStatsGameTypeSelect") as HTMLSelectElement, gsStatsGameType);
 
-  loadFromDisk().then(() => {
+  loadFromDisk().then(async () => {
     renderProfilesList();
     renderTablesList();
     refreshProfileDatalist();
     applyGsPreferenceLabels();
     renderHomeDashboard();
+
+    // A game left part-scored last session comes back. Deliberately does NOT
+    // navigate anywhere: the New Game screen is simply already showing the
+    // entry grid instead of the blank setup step when the user next opens it.
+    // Nothing is shown unprompted, and nothing is lost.
+    // Runs after loadFromDisk() because the draft is validated against the
+    // profile list, which does not exist until then.
+    if (await loadGameStatsDraft()) {
+      document.getElementById("gsNewGameSetup")!.style.display = "none";
+      document.getElementById("gsNewGameEntry")!.style.display = "";
+      applyGsGameMode();
+    }
   });
 }
 

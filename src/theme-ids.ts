@@ -69,3 +69,82 @@ const THEME_ID_MIGRATIONS: Record<string, string> = {
 export function migrateThemeId(themeId: string): string {
   return THEME_ID_MIGRATIONS[themeId] ?? themeId;
 }
+
+/* -----------------------------------------------------------------------------
+   THE BUILT-IN THEME REGISTRY
+   -----------------------------------------------------------------------------
+   Lives here, in the file that imports nothing, because three different places
+   need it and none of them should have to import the others to get it: the
+   theme picker renders it, cycle-theme builds its rotation pool from it, and
+   theme-core validates stored theme ids against it. Keeping it in shell.ts (or
+   in the picker) forced those modules to reach across the import cycle for what
+   is really just a list.
+----------------------------------------------------------------------------- */
+
+export type ThemePickerTab =
+  | "main"
+  | "holiday"
+  | "special"
+  | "cycle"
+  | "random"
+  | "custom"
+  | "preferences";
+
+/** Exported so cycle-theme.ts can build its cycle pool and holiday-override
+ *  lookups off the same built-in theme list, rather than duplicating it. */
+export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: string }[] }[] = [
+  {
+    // Dark and Light first and alone: they're the two themes almost every app
+    // has, so they're what someone reaches for before they've explored. Dark
+    // leads because it's DEFAULT_THEME_ID, what a new install opens on.
+    // The three Midnights follow as a set, always in Blue/Green/Red order so
+    // the family reads as one row rather than three loose entries.
+    // NOTE: buildCyclePool() in cycle-theme.ts falls back to pool[0], so
+    // whatever sits first here is also where Cycle starts from.
+    tab: "main",
+    themes: [
+      { id: "dark", label: "Dark" },
+      { id: "light", label: "Light" },
+      { id: "midnight-blue", label: "Midnight Blue" },
+      { id: "midnight-green", label: "Midnight Green" },
+      { id: "midnight-red", label: "Midnight Red" },
+    ],
+  },
+  {
+    tab: "holiday",
+    themes: [
+      { id: "valentine", label: "Valentine" },
+      { id: "mardi-gras", label: "Mardi Gras" },
+      { id: "rainbow", label: "Rainbow" },
+      { id: "patriot", label: "Patriot" },
+      { id: "halloween", label: "Halloween" },
+      { id: "thanksgiving", label: "Thanksgiving" },
+      { id: "christmas", label: "Christmas" },
+    ],
+  },
+  {
+    // Everything that isn't one of the five headline themes or a Holiday one,
+    // sorted by label. Matte, Shadow, Terminal and Void moved here out of Main
+    // when Main was cut down to Dark/Light/Midnight. Alphabetical because this
+    // tab has no meaningful running order, unlike Main (curated) and Holiday
+    // (calendar order), so anything else would just be an arbitrary sequence
+    // to re-derive every time a theme is added. Keep it that way.
+    tab: "special",
+    themes: [
+      { id: "blades", label: "Blades" },
+      { id: "cake", label: "Cake" },
+      { id: "cartoon", label: "Cartoon" },
+      { id: "ezmuze", label: "ezmuze" },
+      { id: "halo", label: "Halo" },
+      { id: "knowledge", label: "Knowledge" },
+      { id: "lava", label: "Lava" },
+      { id: "matte", label: "Matte" },
+      { id: "neon", label: "Neon" },
+      { id: "nostalgia", label: "Nostalgia" },
+      { id: "retro-electric", label: "Retro-Electric" },
+      { id: "shadow", label: "Shadow" },
+      { id: "terminal", label: "Terminal" },
+      { id: "void", label: "Void" },
+    ],
+  },
+];

@@ -30,9 +30,10 @@
    file's own top-level evaluation time, so the cycle is safe.
 ============================================================================= */
 
-import { settings, saveSettings, THEME_GROUPS } from "./shell";
+import { saveSettings } from "./shell";
+import { settings } from "./settings-store";
 import { resolveThemeId, themeLink, themeCssUrl } from "./theme-core";
-import { BASE_THEME_ID, DEFAULT_THEME_ID } from "./theme-ids";
+import { BASE_THEME_ID, DEFAULT_THEME_ID, THEME_GROUPS } from "./theme-ids";
 import { clearRandomPalette, PERSISTENT_RANDOM_KEY } from "./random-theme";
 import { applyCustomThemeById, clearCustomTheme, customThemes } from "./theme-editor";
 

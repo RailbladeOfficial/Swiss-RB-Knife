@@ -779,9 +779,9 @@ pub fn run() {
             tools::budget::budget_set_session_unlock,
             // Game Stats
             tools::game_stats::save_game_stats_data,
-            tools::game_stats::load_game_stats_data,
             tools::game_stats::save_game_stats_draft,
             tools::game_stats::load_game_stats_draft,
+            tools::game_stats::load_game_stats_data,
             tools::game_stats::read_game_stats_workbook,
             tools::game_stats::write_game_stats_download,
             // TTS Repeater

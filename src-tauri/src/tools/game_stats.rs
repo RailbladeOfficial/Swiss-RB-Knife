@@ -46,6 +46,10 @@ pub fn load_game_stats_data(app: tauri::AppHandle) -> Result<String, String> {
 
 /* =============================================================================
    DRAFT COMMANDS
+   -----------------------------------------------------------------------------
+   The New Game screen's in-progress entry, persisted so closing the app
+   mid-entry doesn't lose it. Separate file from game-stats.json on purpose: a
+   draft is not yet a game, and must never be mixed into the saved history.
 ============================================================================= */
 
 /// Saves the current New Game entry draft state to game-stats-draft.json.

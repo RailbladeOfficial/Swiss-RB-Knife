@@ -57,7 +57,6 @@ import { initDaysBetween } from "./tools/days-between";
 import {
   RANDOM_VARS,
   PERSISTENT_RANDOM_KEY,
-  applyRandomModalStyles,
   maybeRegenerateRandom,
 } from "./random-theme";
 import {
@@ -85,6 +84,62 @@ import {
   openThemeEditor,
   requestDeleteCustomTheme,
 } from "./theme-editor";
+import {
+  DEFAULT_SETTINGS,
+  SIDEBAR_SORT_MODES,
+  type ShellSettings,
+  type SidebarItemState,
+  type SidebarSortMode,
+  settings,
+  setSettings,
+} from "./settings-store";
+// Re-exported so the many existing `import { settings } from "./shell"` call
+// sites keep working. New code should import from ./settings-store directly.
+export {
+  DEFAULT_SETTINGS,
+  SIDEBAR_SORT_MODES,
+  type ShellSettings,
+  type SidebarItemState,
+  type SidebarSortMode,
+  settings,
+  setSettings,
+};
+
+import {
+  populateDayNightThemeSelects,
+  refreshCycleDayNightNote,
+  refreshCycleHolidayNote,
+  refreshThemeCurrentBadge,
+  syncCycleSettingsVisibility,
+  themePickerModal,
+  themePickerTabs,
+} from "./theme-picker";
+// Re-exported so theme-editor.ts keeps importing these from shell, matching
+// how it already reaches every other shared binding.
+export { reopenThemePickerOnCustomTab, themePickerModal } from "./theme-picker";
+
+import {
+  applyToastVolumeSettings,
+  clampToastVolume,
+  errorAudio,
+  loadSoundPack,
+  playCue,
+  refreshSoundPackCurrentBadge,
+  successAudio,
+} from "./sound";
+// Re-exported so tool files keep importing these from "../shell", their
+// existing convention, rather than reaching into a shell-internal module.
+export { getSoundOptions, resolveSoundUrl, playSoundUrl } from "./sound";
+
+import {
+  applySidebarOrder,
+  isToolPinned,
+  isToolVisible,
+} from "./sidebar-edit";
+// Re-exported so tool files keep importing it from "../shell", their existing
+// convention, rather than reaching into a shell-internal module.
+export { isToolVisible };
+
 import {
   applyLockSettings,
   buildPinDots,
@@ -137,15 +192,6 @@ type ToolMeta = {
 /** One row of the persisted sidebar order/pin state (settings.sidebarItems).
  *  Array order IS the display order for pinned items; unpinned items are
  *  hidden and their relative order is never shown or editable. */
-type SidebarItemState = {
-  key: string;
-  pinned: boolean;
-  /** Epoch ms this tool was last opened. Absent until it has been. Feeds the
-   *  Most Recent sort. */
-  lastUsedAt?: number;
-  /** How many times it has been opened. Feeds the Most Used sort. */
-  useCount?: number;
-};
 
 /** Advanced visual overrides stored per custom theme. All fields optional,
  *  absent means "no override" (flat colour from the CSS vars applies). */
@@ -171,116 +217,13 @@ export type CustomTheme = {
  *  from the public/sounds folder. Omit either (or both) to mute that cue,
  *  used by the built-in "None" pack. This is the single source of truth for
  *  the Sound Pack dropdown; add a pack here and it appears in Settings. */
-type SoundPack = {
+export type SoundPack = {
   id: string; // stable key, persisted in settings.soundPack
   name: string; // display name shown in the dropdown
   success?: string; // e.g. "/sounds/default/success.wav"
   error?: string; // e.g. "/sounds/default/error.wav"
 };
 
-type ShellSettings = {
-  fontScale: number;
-  hour12: boolean;
-  americanDates: boolean;
-  solidModals: boolean;
-  startupTarget: string;
-  theme: string;
-  randomPersistent: boolean;
-  randomHarmonized: boolean;
-  /** Order themes advance through: "sequential" walks the pool in order,
-   *  "random" jumps to a random other pool member each time. */
-  cycleOrder: "sequential" | "random";
-  /** What advances the cycle: "click" reacts to any button click, "everything"
-   *  additionally reacts to the same field-commit/change events Random's
-   *  Regenerative mode does, "time" advances on a fixed interval instead of
-   *  user interaction (see cycleIntervalAmount/cycleIntervalUnit); "onStartup"
-   *  advances exactly once per session, the moment the app finishes loading
-   *  settings, and never again on its own after that.
-   *
-   *  "dayNight" is the odd one out: it doesn't advance a pointer through the
-   *  pool at all, it alternates between exactly two themes on a clock window
-   *  (see the four cycleDay/cycleNight fields below). Order, Include Custom and
-   *  Restrict to Holiday Season have nothing to act on in that mode and are
-   *  hidden while it's selected; Holiday Overrides still apply, since that's
-   *  a force-switch checked ahead of every other rule. */
-  cycleTrigger: "onStartup" | "time" | "everything" | "click" | "dayNight";
-  cycleIntervalAmount: number;
-  cycleIntervalUnit: "seconds" | "minutes" | "hours" | "days";
-  /** Off by default: whether saved Custom Themes are included in the cycle
-   *  pool alongside the built-in Main/Holiday/Special themes. */
-  cycleIncludeCustom: boolean;
-  /** Off by default: force-switches to the matching Holiday theme on its
-   *  real-world date, overriding whatever the cycle would otherwise show.
-   *  Independent of cycleHolidaySeasonOnly, combine both if you want a
-   *  Holiday theme to appear ONLY by being force-switched to. */
-  cycleHolidayOverride: boolean;
-  /** Off by default, independent of cycleHolidayOverride: keeps each Holiday
-   *  theme out of the normal cycle pool except during its own window (so it
-   *  can still turn up via ordinary click/interaction/time advances, just
-   *  not year-round). */
-  cycleHolidaySeasonOnly: boolean;
-  /** Off by default: widens each Holiday theme's active window to its
-   *  traditional season (e.g. all of October for Halloween) instead of just
-   *  its exact date, shared by both settings above, wherever either is on. */
-  cycleHolidayFullSeason: boolean;
-  /** Which pool member (built-in theme id or custom theme id) Cycle mode is
-   *  currently showing, persisted so reopening the app doesn't jump. */
-  cycleCurrentThemeId: string;
-  /** Epoch ms of the last cycle advance. The anchor the "time" trigger
-   *  counts from, persisted so the countdown survives an app restart. */
-  cycleLastAdvance: number;
-  /** Day/Night mode (the "dayNight" trigger): the two themes it alternates
-   *  between. Either may be a built-in theme id or a saved custom theme's id;
-   *  one that no longer resolves falls back at paint time rather than pointing
-   *  themeLink at a missing file. */
-  cycleDayThemeId: string;
-  cycleNightThemeId: string;
-  /** The clock window that counts as "day", as "HH:MM" 24-hour local strings
-   *  (the format <input type="time"> reads and writes, so the controls need no
-   *  conversion). The window is allowed to wrap midnight: a start of 20:00 with
-   *  an end of 06:00 is a perfectly good overnight "day". Start equal to end
-   *  means the day theme runs the whole 24 hours. */
-  cycleDayStart: string;
-  cycleDayEnd: string;
-  /** On by default: master switch for every theme's canvas animation (snow,
-   *  lightning, fireworks, …). Off suppresses all of them and hides the
-   *  per-theme opt-outs below, which only make sense while this is on. */
-  themeAnimations: boolean;
-  /** Theme ids whose animation is individually switched off while
-   *  themeAnimations is still on, e.g. keeping Christmas snow but dropping
-   *  Halloween's lightning. Stored as an opt-OUT list so a newly added effect
-   *  is enabled by default without needing a migration. */
-  themeAnimationsOff: string[];
-  appLock: boolean;
-  lockCredentialType: "pin" | "password";
-  soundPack: string;
-  /** Toast cue loudness in decibels, relative to the volume the app has always
-   *  played at. 0 is that original level and the default; the usable range is
-   *  -25 to +5, with TOAST_VOLUME_MUTED_DB one step below the bottom standing
-   *  for silence. Decibels rather than a 0-100 percentage because loudness is
-   *  perceived logarithmically, so equal dB steps sound like equal steps. */
-  toastVolumeDb: number;
-  /** Opt-in: run a single GitHub Releases check on startup (and on enable).
-   *  Off by default. The app is offline-by-default and only touches the
-   *  network when this is explicitly turned on. */
-  autoCheckUpdates: boolean;
-  /** How loudly a found update announces itself once per run, false (default)
-   *  is Gentle, a toast; true is Aggressive, a modal you have to dismiss.
-   *  Mirrors Auto-Backup's reminder mode. The passive signals (sidebar pulse,
-   *  Home top-bar line, About notice) show in BOTH modes. This only picks
-   *  which one-shot announcement rides along with them. */
-  updateNotifyAggressive: boolean;
-  /** The release tag the user chose to "ignore" (e.g. "v0.3.4"). A release
-   *  NEWER than this re-surfaces the notice; this exact one stays silent.
-   *  Empty string = nothing ignored. */
-  ignoredUpdateVersion: string;
-  /** Sidebar/Home-dashboard tool order + pin state, edited via the "Edit
-   *  Sidebar" modal. Pinned items (in this array order) appear on the
-   *  sidebar and Home dashboard; unpinned items are hidden from both but
-   *  keep all their own data/settings untouched. */
-  sidebarItems: SidebarItemState[];
-  sidebarSort: SidebarSortMode;
-};
 
 /** Result of a successful update check, shared by the sidebar pulse and the
  *  About-modal notice so neither has to re-query. `available` folds in both
@@ -308,7 +251,7 @@ const MAX_TOASTS = 4;
    the "TOAST NOTIFICATIONS" section for how these are loaded/played.
    Add a new pack by dropping a folder in public/sounds/<id>/ and adding an
    entry here; the Settings dropdown is populated from this array. */
-const SOUND_PACKS: SoundPack[] = [
+export const SOUND_PACKS: SoundPack[] = [
   {
     id: "default",
     name: "Default",
@@ -364,7 +307,7 @@ const SOUND_PACKS: SoundPack[] = [
    Home dashboard, and the "Specific Tool" options in the On Startup select,
    add a tool here (matching its data-section/data-tool attributes in
    index.html) and it's automatically pinnable/reorderable/hideable. */
-const ALL_TOOLS: ToolMeta[] = [
+export const ALL_TOOLS: ToolMeta[] = [
   { key: "finance/budget", section: "finance", tool: "budget", label: "Budget Tracker" },
   { key: "utility/time-tracker", section: "utility", tool: "time-tracker", label: "Time Tracker" },
   { key: "files/auto-backup", section: "files", tool: "auto-backup", label: "Auto-Backup" },
@@ -379,9 +322,7 @@ const ALL_TOOLS: ToolMeta[] = [
 /** How the sidebar is ordered. "classic" is ALL_TOOLS' own order above;
  *  "custom" is whatever the user last dragged it into, and is what a drag
  *  switches you to, otherwise a live sort would immediately undo the drag. */
-type SidebarSortMode = "classic" | "az" | "za" | "recent" | "used" | "custom";
 
-const SIDEBAR_SORT_MODES: SidebarSortMode[] = ["classic", "az", "za", "recent", "used", "custom"];
 
 function toolLabel(key: string): string {
   return ALL_TOOLS.find((t) => t.key === key)?.label ?? key;
@@ -417,7 +358,7 @@ function sortSidebarGroup(items: SidebarItemState[], mode: SidebarSortMode): Sid
 /** Re-orders settings.sidebarItems in place for the active mode. Shown and
  *  hidden are sorted separately and re-concatenated, because the rest of the
  *  sidebar code takes "pinned items come first" as a given. */
-function applySidebarSortMode(): void {
+export function applySidebarSortMode(): void {
   const mode = settings.sidebarSort;
   if (mode === "custom") return;
   settings.sidebarItems = [
@@ -538,49 +479,11 @@ export function isValidDayNightWindow(start: string, end: string): boolean {
   return day >= MIN_DAY_NIGHT_SPAN_MINUTES && night >= MIN_DAY_NIGHT_SPAN_MINUTES;
 }
 
-const DEFAULT_SETTINGS: ShellSettings = {
-  fontScale: 0,
-  hour12: false,
-  americanDates: false,
-  solidModals: true,
-  startupTarget: "lastView",
-  theme: DEFAULT_THEME_ID,
-  randomPersistent: true,
-  randomHarmonized: true,
-  cycleOrder: "sequential",
-  cycleTrigger: "click",
-  cycleIntervalAmount: 1,
-  cycleIntervalUnit: "hours",
-  cycleIncludeCustom: false,
-  cycleHolidayOverride: false,
-  cycleHolidaySeasonOnly: false,
-  cycleHolidayFullSeason: false,
-  cycleCurrentThemeId: "",
-  cycleLastAdvance: 0,
-  cycleDayThemeId: "light",
-  cycleNightThemeId: "dark",
-  cycleDayStart: "07:00",
-  cycleDayEnd: "19:00",
-  themeAnimations: true,
-  themeAnimationsOff: [],
-  appLock: false,
-  lockCredentialType: "pin",
-  soundPack: "default",
-  toastVolumeDb: 0, // 0 dB = the level the app shipped with
-  autoCheckUpdates: false,
-  updateNotifyAggressive: false, // Gentle by default
-  ignoredUpdateVersion: "",
-  // Placeholder, always overridden with freshSidebarItems() wherever settings
-  // get reset to defaults (see the comment on that function for why).
-  sidebarItems: [],
-  sidebarSort: "classic",
-};
 
 /* =============================================================================
    STATE
 ============================================================================= */
 
-export let settings: ShellSettings = { ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() };
 let toastMetas: ToastMeta[] = [];
 let toastCounter = 0;
 
@@ -632,7 +535,6 @@ export const themeSelect = document.getElementById(
   "themeSelect",
 ) as HTMLSelectElement;
 const rerollBtn = document.getElementById("rerollBtn") as HTMLButtonElement;
-const randomSubsettings = document.getElementById("randomSubsettings")!;
 const randomModeToggle = document.getElementById(
   "randomModeToggle",
 ) as HTMLInputElement;
@@ -649,66 +551,28 @@ const dateFormatToggle = document.getElementById(
   "dateFormatToggle",
 ) as HTMLInputElement;
 const dateFormatLabel = document.getElementById("dateFormatLabel")!;
-const startupSelect = document.getElementById(
+export const startupSelect = document.getElementById(
   "startupSelect",
 ) as HTMLSelectElement;
-const soundPackEditBtn = document.getElementById("soundPackEditBtn")!;
-const soundPackCurrentBadge = document.getElementById("soundPackCurrentBadge")!;
-const soundPackPickerBackdrop = document.getElementById("soundPackPickerBackdrop")!;
-const soundPackPickerBack = document.getElementById("soundPackPickerBack")!;
-const soundPackPickerClose = document.getElementById("soundPackPickerClose")!;
-const soundPackPickerGrid = document.getElementById("soundPackPickerGrid")!;
 
-const sidebarEditBtn = document.getElementById("sidebarEditBtn")!;
-const sidebarEditBackdrop = document.getElementById("sidebarEditBackdrop")!;
-const sidebarEditBack = document.getElementById("sidebarEditBack")!;
-const sidebarEditClose = document.getElementById("sidebarEditClose")!;
-const sidebarEditShownList = document.getElementById("sidebarEditShownList")!;
-const sidebarEditHiddenList = document.getElementById("sidebarEditHiddenList")!;
-const sidebarEditHiddenSection = document.getElementById("sidebarEditHiddenSection")!;
-const sidebarHiddenBadge = document.getElementById("sidebarHiddenBadge")!;
-const navListEl = document.getElementById("navList")!;
-const toolCardGrid = document.querySelector<HTMLElement>(".tool-card-grid");
 
-const themeEditBtn = document.getElementById("themeEditBtn")!;
-const themeCurrentBadge = document.getElementById("themeCurrentBadge")!;
-const themePickerBackdrop = document.getElementById("themePickerBackdrop")!;
-const themePickerBack = document.getElementById("themePickerBack")!;
-const themePickerClose = document.getElementById("themePickerClose")!;
-const themePickerGrid = document.getElementById("themePickerGrid")!;
-const themePickerRandomTileWrap = document.getElementById("themePickerRandomTileWrap")!;
-const themePickerCycleTileWrap = document.getElementById("themePickerCycleTileWrap")!;
-const themeAnimationsToggle = document.getElementById("themeAnimationsToggle") as HTMLInputElement;
-const themeAnimationsLabel = document.getElementById("themeAnimationsLabel")!;
-const themeAnimationsPerTheme = document.getElementById("themeAnimationsPerTheme")!;
-const themeAnimationsList = document.getElementById("themeAnimationsList")!;
-const cycleSubsettings = document.getElementById("cycleSubsettings")!;
 const cycleOrderToggle = document.getElementById("cycleOrderToggle") as HTMLInputElement;
 const cycleOrderLabel = document.getElementById("cycleOrderLabel")!;
 const cycleTriggerSelect = document.getElementById("cycleTriggerSelect") as HTMLSelectElement;
-const cycleIntervalRow = document.getElementById("cycleIntervalRow")!;
 const cycleIntervalAmountInput = document.getElementById("cycleIntervalAmount") as HTMLInputElement;
 const cycleIntervalUnitSelect = document.getElementById("cycleIntervalUnit") as HTMLSelectElement;
-const cycleOrderRow = document.getElementById("cycleOrderRow")!;
-const cycleDayNightRows = document.getElementById("cycleDayNightRows")!;
-const cycleDayThemeSelect = document.getElementById("cycleDayThemeSelect") as HTMLSelectElement;
-const cycleNightThemeSelect = document.getElementById("cycleNightThemeSelect") as HTMLSelectElement;
+export const cycleDayThemeSelect = document.getElementById("cycleDayThemeSelect") as HTMLSelectElement;
+export const cycleNightThemeSelect = document.getElementById("cycleNightThemeSelect") as HTMLSelectElement;
 const cycleDayStartInput = document.getElementById("cycleDayStart") as HTMLInputElement;
 const cycleDayEndInput = document.getElementById("cycleDayEnd") as HTMLInputElement;
-const cycleDayNightNote = document.getElementById("cycleDayNightNote")!;
-const cycleIncludeCustomRow = document.getElementById("cycleIncludeCustomRow")!;
-const cycleSeasonOnlyRow = document.getElementById("cycleSeasonOnlyRow")!;
-const cycleNowRow = document.getElementById("cycleNowRow")!;
 const cycleIncludeCustomToggle = document.getElementById("cycleIncludeCustomToggle") as HTMLInputElement;
 const cycleIncludeCustomLabel = document.getElementById("cycleIncludeCustomLabel")!;
 const cycleHolidayOverrideToggle = document.getElementById("cycleHolidayOverrideToggle") as HTMLInputElement;
 const cycleHolidayOverrideLabel = document.getElementById("cycleHolidayOverrideLabel")!;
 const cycleHolidaySeasonOnlyToggle = document.getElementById("cycleHolidaySeasonOnlyToggle") as HTMLInputElement;
 const cycleHolidaySeasonOnlyLabel = document.getElementById("cycleHolidaySeasonOnlyLabel")!;
-const cycleHolidayFullSeasonRow = document.getElementById("cycleHolidayFullSeasonRow")!;
 const cycleHolidayFullSeasonToggle = document.getElementById("cycleHolidayFullSeasonToggle") as HTMLInputElement;
 const cycleHolidayFullSeasonLabel = document.getElementById("cycleHolidayFullSeasonLabel")!;
-const cycleHolidayActiveNote = document.getElementById("cycleHolidayActiveNote")!;
 const cycleNowBtn = document.getElementById("cycleNowBtn") as HTMLButtonElement;
 
 const appVersionEl = document.getElementById("appVersion");
@@ -817,7 +681,7 @@ export function devWarn(...args: unknown[]): void {
 
 /** The currently visible view, as "section/tool" (tool empty on landing pages).
  *  Used to detect leaving a tool so tools with pending state can flush it. */
-let _activeViewKey = "";
+export let _activeViewKey = "";
 
 /* ── Per-view scroll position ──
    Every section shares one scroll container (#mainContent); the inactive ones
@@ -908,7 +772,7 @@ function switchSection(sectionKey: string, toolKey?: string): void {
 /** Called when a sidebar icon is clicked, always resets to landing or default tool.
  *  If the section element has a data-default-tool attribute, goes directly to
  *  that tool instead of the landing page (used for single-tool sections). */
-function activateSection(sectionKey: string): void {
+export function activateSection(sectionKey: string): void {
   const sectionEl = document.getElementById(`section-${sectionKey}`);
   // A key with no matching section element used to fall through to
   // activateLanding(), which renders an empty content area, and then
@@ -1560,7 +1424,7 @@ async function loadSettings(): Promise<void> {
     // in the JSON (wrong type, old enum value, etc.) falls back to the default
     // rather than propagating as-is into applySettings().
     const merged = { ...DEFAULT_SETTINGS, ...parsed };
-    settings = {
+    setSettings({
       fontScale: clampFontScale(merged.fontScale),
       hour12:
         typeof merged.hour12 === "boolean"
@@ -1720,9 +1584,9 @@ async function loadSettings(): Promise<void> {
       sidebarSort: SIDEBAR_SORT_MODES.includes(merged.sidebarSort as SidebarSortMode)
         ? (merged.sidebarSort as SidebarSortMode)
         : DEFAULT_SETTINGS.sidebarSort,
-    };
+    });
   } catch {
-    settings = { ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() };
+    setSettings({ ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() });
   }
   // Checked as a pair, which the per-field coercion above structurally can't
   // do. Both edges revert together: keeping one half of a window the schedule
@@ -1736,1092 +1600,6 @@ async function loadSettings(): Promise<void> {
   applySettings();
 }
 
-/* =============================================================================
-   SIDEBAR ORDER / VISIBILITY  (Edit Sidebar modal)
-   -----------------------------------------------------------------------------
-   Drives three surfaces from a single source of truth (settings.sidebarItems):
-   the sidebar nav-items, the Home dashboard's .tool-card-grid, and the
-   "Specific Tool" options in the On Startup select. Reordering/hiding here
-   only ever moves/hides existing DOM nodes. It never touches a tool's own
-   data or settings, so a re-shown tool picks up exactly where it left off.
-============================================================================= */
-
-const SIDEBAR_DRAG_HANDLE_SVG = `
-  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-    <circle cx="8" cy="6" r="1.6" /><circle cx="16" cy="6" r="1.6" />
-    <circle cx="8" cy="12" r="1.6" /><circle cx="16" cy="12" r="1.6" />
-    <circle cx="8" cy="18" r="1.6" /><circle cx="16" cy="18" r="1.6" />
-  </svg>`;
-
-// Same open-eye / eye-with-slash pair used elsewhere in the app to mark a
-// visible vs. hidden item. The slashed version here is Budget's exact
-// "Excluded from Charts" icon (see budget.ts's summary-row builder), reused
-// verbatim so "hidden" reads identically everywhere in the app.
-const EYE_SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
-const EYE_SHOWN_SVG = `<svg ${EYE_SVG_ATTRS}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
-const EYE_HIDDEN_SVG = `<svg ${EYE_SVG_ATTRS}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
-
-/** Whether the given "section/tool" key is currently shown. Defaults to true
- *  for a key with no recorded state, normalizeSidebarItems() should always
- *  have added one for every known tool, so this is just a safety net. */
-function isToolPinned(key: string): boolean {
-  return settings.sidebarItems.find((it) => it.key === key)?.pinned ?? true;
-}
-
-/** Re-syncs the "Specific Tool" options in the On Startup select with the
- *  current visibility state: hides/disables options for hidden tools so a
- *  user never sees (or can pick) a tool that isn't on the sidebar. If the
- *  currently-selected startup target IS one of those now-hidden options,
- *  falls back to "lastView" and persists the change, otherwise the select
- *  would be silently pointed at an option the user can no longer choose. */
-function refreshStartupSelectOptions(): void {
-  let selectedNowHidden = false;
-  ALL_TOOLS.forEach((meta) => {
-    const optValue = `${meta.section}:${meta.tool}`;
-    const opt = startupSelect.querySelector<HTMLOptionElement>(
-      `option[value="${optValue}"]`,
-    );
-    if (!opt) return;
-    const shown = isToolPinned(meta.key);
-    opt.hidden = !shown;
-    opt.disabled = !shown;
-    if (!shown && settings.startupTarget === optValue) selectedNowHidden = true;
-  });
-
-  if (selectedNowHidden) {
-    settings.startupTarget = "lastView";
-    saveSettings();
-  }
-  startupSelect.value = settings.startupTarget;
-}
-
-/** Updates the "Sidebar:" row's status badge in General Settings, hidden
- *  entirely when nothing is hidden, "N tools hidden" otherwise. Mirrors Time
- *  Tracker's CSV import status badge pattern. */
-function refreshSidebarHiddenBadge(): void {
-  const hiddenCount = settings.sidebarItems.filter((it) => !it.pinned).length;
-  if (hiddenCount === 0) {
-    sidebarHiddenBadge.style.display = "none";
-    return;
-  }
-  sidebarHiddenBadge.textContent =
-    hiddenCount === ALL_TOOLS.length
-      ? "All tools hidden"
-      : `${hiddenCount} ${hiddenCount === 1 ? "tool" : "tools"} hidden`;
-  sidebarHiddenBadge.style.display = "";
-}
-
-/** Reorders and shows/hides the sidebar nav-items and Home dashboard
- *  tool-cards to match settings.sidebarItems, then re-syncs the On Startup
- *  select and the Settings-row status badge. Call after ANY change to
- *  settings.sidebarItems (drag, show/hide toggle, reset, or a fresh
- *  settings load). */
-function applySidebarOrder(): void {
-  // Sorting happens here rather than only at the moment a sort button is
-  // clicked, so the usage-driven modes stay live: opening a tool re-ranks the
-  // sidebar on the spot instead of at next launch.
-  applySidebarSortMode();
-
-  const shownKeys = settings.sidebarItems.filter((it) => it.pinned).map((it) => it.key);
-  const shownSet = new Set(shownKeys);
-
-  // Move shown items into order (appendChild on an already-attached node
-  // relocates it, repeated in desired order, this leaves everything in that
-  // order without disturbing the fixed, non-reorderable nav-items around it:
-  // the sidebar-toggle control and Home always stay first).
-  shownKeys.forEach((key) => {
-    const meta = ALL_TOOLS.find((t) => t.key === key);
-    if (!meta) return;
-    const li = document.querySelector<HTMLElement>(
-      `.nav-item[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
-    );
-    if (li) {
-      li.style.display = "";
-      navListEl.appendChild(li);
-    }
-    const card = toolCardGrid?.querySelector<HTMLElement>(
-      `.tool-card[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
-    );
-    if (card) {
-      card.style.display = "";
-      toolCardGrid!.appendChild(card);
-    }
-  });
-
-  ALL_TOOLS.forEach((meta) => {
-    if (shownSet.has(meta.key)) return;
-    const li = document.querySelector<HTMLElement>(
-      `.nav-item[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
-    );
-    if (li) li.style.display = "none";
-    const card = toolCardGrid?.querySelector<HTMLElement>(
-      `.tool-card[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
-    );
-    if (card) card.style.display = "none";
-  });
-
-  refreshStartupSelectOptions();
-  refreshSidebarHiddenBadge();
-
-  // Every path that changes tool visibility funnels through here, so this is
-  // the one place a "sidebarchange" needs announcing. Tools that offer a
-  // hand-off to another tool (Countdown Timer → Time Tracker) listen for it so they
-  // can disable that offer when the target has been hidden.
-  window.dispatchEvent(new CustomEvent("sidebarchange"));
-}
-
-/** Whether a tool is currently shown in the sidebar / on Home. Exported for
- *  tools that cross-link to another tool: a hand-off to something the user
- *  has deliberately hidden shouldn't be on offer. Keys are the same
- *  "section/tool" strings ALL_TOOLS uses. */
-export function isToolVisible(key: string): boolean {
-  return isToolPinned(key);
-}
-
-/** Shows or hides a tool, moving it to the end of its new group (shown
- *  entries stay a flat, freely-reorderable list; hidden entries have no
- *  meaningful order of their own). Persists immediately, re-renders both the
- *  live sidebar/Home and (if open) the Edit Sidebar modal, and, per spec,
- *  redirects to Home if the tool being hidden is the one currently open. */
-function setPinned(key: string, shown: boolean): void {
-  const item = settings.sidebarItems.find((it) => it.key === key);
-  if (!item || item.pinned === shown) return;
-  item.pinned = shown;
-
-  const withoutItem = settings.sidebarItems.filter((it) => it.key !== key);
-  const shownItems = withoutItem.filter((it) => it.pinned);
-  const hiddenItems = withoutItem.filter((it) => !it.pinned);
-  settings.sidebarItems = shown
-    ? [...shownItems, item, ...hiddenItems]
-    : [...shownItems, ...hiddenItems, item];
-
-  applySidebarOrder();
-  saveSettings();
-  renderSidebarEditModal();
-
-  if (!shown && _activeViewKey === key) {
-    activateSection("home");
-  }
-}
-
-// Tracks which shown row is mid-drag, shared by every row's dragover
-// handler so a row can find (and move) the node actually being dragged.
-let sidebarDragKey: string | null = null;
-
-function attachSidebarDragHandlers(row: HTMLElement, key: string): void {
-  row.draggable = true;
-
-  row.addEventListener("dragstart", (e) => {
-    sidebarDragKey = key;
-    row.classList.add("dragging");
-    e.dataTransfer?.setData("text/plain", key);
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-  });
-
-  // dragend fires unconditionally (whether or not the drag ended over a
-  // valid drop target) so the commit belongs here, not in "drop". Relying
-  // on "drop" alone would leave the live (already-reordered) DOM out of
-  // sync with settings.sidebarItems whenever the user releases outside any
-  // row (e.g. drops on the modal's padding or off the modal entirely).
-  row.addEventListener("dragend", () => {
-    row.classList.remove("dragging");
-    sidebarDragKey = null;
-    commitShownOrderFromDom();
-  });
-
-  row.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    if (!sidebarDragKey || sidebarDragKey === key) return;
-    const draggedEl = sidebarEditShownList.querySelector<HTMLElement>(
-      `[data-key="${CSS.escape(sidebarDragKey)}"]`,
-    );
-    if (!draggedEl) return;
-    const rect = row.getBoundingClientRect();
-    const before = e.clientY - rect.top < rect.height / 2;
-    row.parentElement?.insertBefore(draggedEl, before ? row : row.nextSibling);
-  });
-
-  // Still needed so the browser allows the drop to occur at all (without
-  // this, some drop targets reject it and the row snaps back).
-  row.addEventListener("drop", (e) => e.preventDefault());
-}
-
-/** Reads the shown list's current DOM order (post-drag) and writes it back
- *  into settings.sidebarItems, leaving the hidden group's order untouched. */
-function commitShownOrderFromDom(): void {
-  const orderedKeys = Array.from(
-    sidebarEditShownList.querySelectorAll<HTMLElement>("[data-key]"),
-  ).map((el) => el.dataset.key!);
-  const hiddenItems = settings.sidebarItems.filter((it) => !it.pinned);
-  settings.sidebarItems = [
-    ...orderedKeys.map((key) => settings.sidebarItems.find((it) => it.key === key)!),
-    ...hiddenItems,
-  ];
-  // A hand-placed order IS the mode from here on. Without this the active sort
-  // would re-apply on the very next applySidebarOrder() and silently undo the
-  // drag the user just made.
-  settings.sidebarSort = "custom";
-  applySidebarOrder();
-  saveSettings();
-  refreshSidebarSortButtons();
-}
-
-/** Marks whichever sort button matches the active mode. Nothing is marked
- *  under "custom", a dragged order isn't any of them. */
-function refreshSidebarSortButtons(): void {
-  document.querySelectorAll<HTMLButtonElement>(".sidebar-sort-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.sort === settings.sidebarSort);
-  });
-}
-
-function buildSidebarEditRow(item: SidebarItemState, draggable: boolean): HTMLElement {
-  const row = document.createElement("div");
-  row.className = draggable ? "sidebar-edit-item" : "sidebar-edit-item sidebar-edit-item-hidden";
-  row.dataset.key = item.key;
-
-  const meta = ALL_TOOLS.find((t) => t.key === item.key);
-  if (!meta) return row; // defensive, normalizeSidebarItems() guarantees a match
-
-  const handle = document.createElement("span");
-  handle.className = draggable
-    ? "sidebar-edit-drag-handle"
-    : "sidebar-edit-drag-handle sidebar-edit-drag-handle-disabled";
-  handle.innerHTML = SIDEBAR_DRAG_HANDLE_SVG;
-  handle.title = "Drag to reorder";
-  row.appendChild(handle);
-
-  const iconWrap = document.createElement("span");
-  iconWrap.className = "sidebar-edit-icon";
-  const sourceIcon = document.querySelector(
-    `.nav-item[data-section="${meta.section}"][data-tool="${meta.tool}"] .nav-icon`,
-  );
-  if (sourceIcon) iconWrap.appendChild(sourceIcon.cloneNode(true));
-  row.appendChild(iconWrap);
-
-  const name = document.createElement("span");
-  name.className = "sidebar-edit-name";
-  name.textContent = meta.label;
-  row.appendChild(name);
-
-  const visibilityBtn = document.createElement("button");
-  visibilityBtn.className = item.pinned
-    ? "sidebar-edit-visibility-btn"
-    : "sidebar-edit-visibility-btn is-hidden";
-  visibilityBtn.innerHTML = item.pinned ? EYE_SHOWN_SVG : EYE_HIDDEN_SVG;
-  visibilityBtn.title = item.pinned
-    ? "Hide from sidebar and Home"
-    : "Show on sidebar and Home";
-  visibilityBtn.addEventListener("click", () => setPinned(item.key, !item.pinned));
-  row.appendChild(visibilityBtn);
-
-  if (draggable) attachSidebarDragHandlers(row, item.key);
-
-  return row;
-}
-
-function renderSidebarEditModal(): void {
-  sidebarEditShownList.innerHTML = "";
-  sidebarEditHiddenList.innerHTML = "";
-
-  const shown = settings.sidebarItems.filter((it) => it.pinned);
-  const hidden = settings.sidebarItems.filter((it) => !it.pinned);
-
-  shown.forEach((it) => sidebarEditShownList.appendChild(buildSidebarEditRow(it, true)));
-  hidden.forEach((it) => sidebarEditHiddenList.appendChild(buildSidebarEditRow(it, false)));
-
-  sidebarEditHiddenSection.style.display = hidden.length > 0 ? "" : "none";
-}
-
-// Replaces (rather than stacks on) the General Settings modal. Same pattern
-// Time Tracker's Setup → Add/Edit Activity / CSV Import modals use: opening
-// closes the parent first, and a back-arrow (not the X) is what reopens it.
-const sidebarEditModal = new Modal(sidebarEditBackdrop, {
-  closeOnEsc: true,
-  onOpen: () => {
-    renderSidebarEditModal();
-    refreshSidebarSortButtons();
-  },
-});
-
-sidebarEditBtn.addEventListener("click", () => {
-  settingsModal.close({ handoff: true });
-  sidebarEditModal.open();
-});
-
-sidebarEditBack.addEventListener("click", () => {
-  sidebarEditModal.close();
-  settingsModal.open();
-});
-
-sidebarEditClose.addEventListener("click", () => sidebarEditModal.close());
-
-/** Shows every hidden tool again. Restored items are appended after the
- *  already-shown ones, keeping their relative order. That only matters under
- *  a custom order, since every sort mode re-ranks the whole list anyway. */
-document.getElementById("sidebarUnhideAllBtn")!.addEventListener("click", () => {
-  const hidden = settings.sidebarItems.filter((it) => !it.pinned);
-  if (hidden.length === 0) return;
-
-  const shown = settings.sidebarItems.filter((it) => it.pinned);
-  hidden.forEach((it) => { it.pinned = true; });
-  settings.sidebarItems = [...shown, ...hidden];
-
-  applySidebarOrder();
-  saveSettings();
-  renderSidebarEditModal();
-  flash(
-    hidden.length === 1 ? "1 tool unhidden" : `${hidden.length} tools unhidden`,
-    "success",
-  );
-});
-
-const SIDEBAR_SORT_LABELS: Record<string, string> = {
-  classic: "Classic order",
-  az: "Sorted A-Z",
-  za: "Sorted Z-A",
-  recent: "Sorted by most recent",
-  used: "Sorted by most used",
-};
-
-document.querySelectorAll<HTMLButtonElement>(".sidebar-sort-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const mode = btn.dataset.sort as SidebarSortMode;
-    if (!SIDEBAR_SORT_MODES.includes(mode)) return;
-    settings.sidebarSort = mode;
-    applySidebarOrder();
-    saveSettings();
-    renderSidebarEditModal();
-    refreshSidebarSortButtons();
-    flash(SIDEBAR_SORT_LABELS[mode] ?? "Sidebar sorted", "success");
-  });
-});
-
-/* =============================================================================
-   CHOOSE THEME MODAL
-   -----------------------------------------------------------------------------
-   Replaces the old <select id="themeSelect"> dropdown with a tabbed grid of
-   preview tiles (Main/Holiday/Special/Custom, matching the old optgroups).
-   themeSelect itself still exists in the DOM (hidden), theme-editor.ts reads
-   and writes its .value directly, so it stays the one place that mapping is
-   defined, but it no longer drives anything by firing "change".
-
-   Built-in themes are previewed by fetching their CSS file and pulling a
-   handful of --color-* values out with a regex (cheap, cached per theme id.
-   These are small static files). Custom themes use their already-in-memory
-   `vars` directly, no fetch needed. Random has no fixed palette to preview,
-   so it gets a die icon instead; the Custom tab's "add" tile gets a palette
-   icon for the same reason.
-============================================================================= */
-
-export type ThemePickerTab =
-  | "main"
-  | "holiday"
-  | "special"
-  | "cycle"
-  | "random"
-  | "custom"
-  | "preferences";
-
-/** Exported so cycle-theme.ts can build its cycle pool and holiday-override
- *  lookups off the same built-in theme list, rather than duplicating it. */
-export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: string }[] }[] = [
-  {
-    // Dark and Light first and alone: they're the two themes almost every app
-    // has, so they're what someone reaches for before they've explored. Dark
-    // leads because it's DEFAULT_THEME_ID, what a new install opens on.
-    // The three Midnights follow as a set, always in Blue/Green/Red order so
-    // the family reads as one row rather than three loose entries.
-    // NOTE: buildCyclePool() in cycle-theme.ts falls back to pool[0], so
-    // whatever sits first here is also where Cycle starts from.
-    tab: "main",
-    themes: [
-      { id: "dark", label: "Dark" },
-      { id: "light", label: "Light" },
-      { id: "midnight-blue", label: "Midnight Blue" },
-      { id: "midnight-green", label: "Midnight Green" },
-      { id: "midnight-red", label: "Midnight Red" },
-    ],
-  },
-  {
-    tab: "holiday",
-    themes: [
-      { id: "valentine", label: "Valentine" },
-      { id: "mardi-gras", label: "Mardi Gras" },
-      { id: "rainbow", label: "Rainbow" },
-      { id: "patriot", label: "Patriot" },
-      { id: "halloween", label: "Halloween" },
-      { id: "thanksgiving", label: "Thanksgiving" },
-      { id: "christmas", label: "Christmas" },
-    ],
-  },
-  {
-    // Everything that isn't one of the five headline themes or a Holiday one,
-    // sorted by label. Matte, Shadow, Terminal and Void moved here out of Main
-    // when Main was cut down to Dark/Light/Midnight. Alphabetical because this
-    // tab has no meaningful running order, unlike Main (curated) and Holiday
-    // (calendar order), so anything else would just be an arbitrary sequence
-    // to re-derive every time a theme is added. Keep it that way.
-    tab: "special",
-    themes: [
-      { id: "blades", label: "Blades" },
-      { id: "cake", label: "Cake" },
-      { id: "cartoon", label: "Cartoon" },
-      { id: "ezmuze", label: "ezmuze" },
-      { id: "halo", label: "Halo" },
-      { id: "knowledge", label: "Knowledge" },
-      { id: "lava", label: "Lava" },
-      { id: "matte", label: "Matte" },
-      { id: "neon", label: "Neon" },
-      { id: "nostalgia", label: "Nostalgia" },
-      { id: "retro-electric", label: "Retro-Electric" },
-      { id: "shadow", label: "Shadow" },
-      { id: "terminal", label: "Terminal" },
-      { id: "void", label: "Void" },
-    ],
-  },
-];
-
-const DIE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="16" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg>`;
-const CYCLE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>`;
-const PALETTE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a9.5 9.5 0 1 1 0-19c4.7 0 9 3.5 9 8 0 2.5-2 4-4.5 4H15a2 2 0 0 0-1.5 3.3c.4.5.5 1.2.1 1.7-.4.6-1 1-1.6 1z"/><circle cx="7.5" cy="10.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="17" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>`;
-const EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>`;
-const TRASH_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>`;
-
-/** Returns the display name for whatever theme is currently active, a
- *  built-in theme's label, "Random", or the active custom theme's own name
- *  (falling back to "Custom" if none is resolvable). Drives both the
- *  Settings-row badge and (indirectly, via re-render) the picker's active
- *  tile highlight. */
-function getThemeDisplayName(themeId: string): string {
-  if (themeId === "random") return "Random";
-  if (themeId === "cycle") return "Cycle";
-  if (themeId === "custom") {
-    const activeId = getActiveCustomId();
-    const active = activeId ? customThemes.find((t) => t.id === activeId) : undefined;
-    return active ? active.name : "Custom";
-  }
-  for (const group of THEME_GROUPS) {
-    const match = group.themes.find((t) => t.id === themeId);
-    if (match) return match.label;
-  }
-  return themeId;
-}
-
-function refreshThemeCurrentBadge(): void {
-  themeCurrentBadge.textContent = getThemeDisplayName(settings.theme);
-}
-
-const THEME_PREVIEW_VAR_NAMES = [
-  "--color-bg",
-  "--color-panel",
-  "--color-text",
-  "--color-text-muted",
-  "--color-btn",
-  "--color-accent",
-  // Budget's 8-color chart palette, deliberately vivid/distinct per theme
-  // (see the "Blue / emerald / amber / red / violet / cyan / orange / mint"
-  // comment in each theme's own CSS), so it doubles as a rich "fingerprint"
-  // strip for the preview tile. Present in every built-in theme's CSS file
-  // AND in RANDOM_VARS (so custom themes carry it too), safe for both tile
-  // kinds.
-  "--color-chart-1",
-  "--color-chart-2",
-  "--color-chart-3",
-  "--color-chart-4",
-  "--color-chart-5",
-  "--color-chart-6",
-  "--color-chart-7",
-  "--color-chart-8",
-] as const;
-
-const CHART_VAR_NAMES = [
-  "--color-chart-1",
-  "--color-chart-2",
-  "--color-chart-3",
-  "--color-chart-4",
-  "--color-chart-5",
-  "--color-chart-6",
-  "--color-chart-7",
-  "--color-chart-8",
-] as const;
-
-// Keyed by theme id. These are small static files under /themes/, so a
-// per-id fetch is cheap and only ever happens once per session.
-const themePreviewCache = new Map<string, Record<string, string>>();
-
-async function fetchThemePreviewVars(themeId: string): Promise<Record<string, string>> {
-  const cached = themePreviewCache.get(themeId);
-  if (cached) return cached;
-  const vars: Record<string, string> = {};
-  try {
-    const res = await fetch(themeCssUrl(themeId));
-    const text = await res.text();
-    for (const name of THEME_PREVIEW_VAR_NAMES) {
-      const match = text.match(new RegExp(`${name}:\\s*([^;]+);`));
-      if (match) vars[name] = match[1]!.trim();
-    }
-  } catch {
-    // Preview tile just keeps its CSS-default colours if the fetch fails.
-  }
-  themePreviewCache.set(themeId, vars);
-  return vars;
-}
-
-/** Paints a set of preview vars onto a tile's .theme-tile-preview markup. */
-function applyPreviewVars(preview: HTMLElement, vars: Record<string, string>): void {
-  if (vars["--color-bg"]) preview.style.background = vars["--color-bg"]!;
-
-  const header = preview.querySelector<HTMLElement>(".theme-tile-preview-header");
-  if (header && vars["--color-panel"]) header.style.background = vars["--color-panel"]!;
-
-  const dot = preview.querySelector<HTMLElement>(".theme-tile-preview-dot");
-  if (dot && vars["--color-btn"]) dot.style.background = vars["--color-btn"]!;
-
-  const bar = preview.querySelector<HTMLElement>(".theme-tile-preview-bar");
-  if (bar && vars["--color-accent"]) bar.style.background = vars["--color-accent"]!;
-
-  const chips = preview.querySelectorAll<HTMLElement>(".theme-tile-preview-chips span");
-  CHART_VAR_NAMES.forEach((name, i) => {
-    const chip = chips[i];
-    if (chip && vars[name]) chip.style.background = vars[name]!;
-  });
-
-  const lines = preview.querySelectorAll<HTMLElement>(".theme-tile-preview-lines span");
-  if (lines[0] && vars["--color-text"]) lines[0].style.background = vars["--color-text"]!;
-  if (lines[1] && vars["--color-text-muted"]) lines[1].style.background = vars["--color-text-muted"]!;
-}
-
-function buildPreviewSwatchMarkup(): string {
-  const chips = CHART_VAR_NAMES.map(() => "<span></span>").join("");
-  return (
-    '<div class="theme-tile-preview-header"><span class="theme-tile-preview-dot"></span><span class="theme-tile-preview-bar"></span></div>' +
-    `<div class="theme-tile-preview-chips">${chips}</div>` +
-    '<div class="theme-tile-preview-lines"><span></span><span></span></div>'
-  );
-}
-
-// Tiles are plain divs, not <button>. The global `button { color:
-// var(--color-btn-text) }` rule (meant for solid-colored buttons) made tile
-// names unreadable against a transparent tile background on themes where
-// --color-btn-text is light (e.g. Light/Patriot), and custom theme tiles
-// need real nested <button>s for their edit/delete icons, which HTML doesn't
-// allow inside a <button> ancestor. Click handling + hover cursor are
-// replicated via CSS/JS instead of relying on native button semantics.
-function buildThemeTile(id: string, label: string): HTMLElement {
-  const tile = document.createElement("div");
-  tile.className = settings.theme === id ? "theme-tile active" : "theme-tile";
-  tile.dataset.themeId = id;
-
-  const preview = document.createElement("div");
-  preview.className = "theme-tile-preview";
-  preview.innerHTML = buildPreviewSwatchMarkup();
-  tile.appendChild(preview);
-  fetchThemePreviewVars(id).then((vars) => applyPreviewVars(preview, vars));
-
-  const name = document.createElement("span");
-  name.className = "theme-tile-name";
-  name.textContent = label;
-  tile.appendChild(name);
-
-  tile.addEventListener("click", () => selectTheme(id));
-  return tile;
-}
-
-function buildRandomTile(): HTMLElement {
-  const tile = document.createElement("div");
-  tile.className = settings.theme === "random" ? "theme-tile active" : "theme-tile";
-  tile.dataset.themeId = "random";
-
-  const preview = document.createElement("div");
-  preview.className = "theme-tile-preview";
-  const iconWrap = document.createElement("div");
-  iconWrap.className = "theme-tile-preview-icon";
-  iconWrap.innerHTML = DIE_SVG;
-  preview.appendChild(iconWrap);
-  tile.appendChild(preview);
-
-  const name = document.createElement("span");
-  name.className = "theme-tile-name";
-  name.textContent = "Random";
-  tile.appendChild(name);
-
-  tile.addEventListener("click", () => selectTheme("random"));
-  return tile;
-}
-
-function buildCycleTile(): HTMLElement {
-  const tile = document.createElement("div");
-  tile.className = settings.theme === "cycle" ? "theme-tile active" : "theme-tile";
-  tile.dataset.themeId = "cycle";
-
-  const preview = document.createElement("div");
-  preview.className = "theme-tile-preview";
-  const iconWrap = document.createElement("div");
-  iconWrap.className = "theme-tile-preview-icon";
-  iconWrap.innerHTML = CYCLE_SVG;
-  preview.appendChild(iconWrap);
-  tile.appendChild(preview);
-
-  const name = document.createElement("span");
-  name.className = "theme-tile-name";
-  name.textContent = "Cycle";
-  tile.appendChild(name);
-
-  tile.addEventListener("click", () => selectTheme("cycle"));
-  return tile;
-}
-
-function buildCustomThemeTile(theme: CustomTheme): HTMLElement {
-  const isActive = settings.theme === "custom" && getActiveCustomId() === theme.id;
-  const tile = document.createElement("div");
-  tile.className = isActive ? "theme-tile active" : "theme-tile";
-  tile.dataset.themeId = theme.id;
-
-  const preview = document.createElement("div");
-  preview.className = "theme-tile-preview";
-  preview.innerHTML = buildPreviewSwatchMarkup();
-  tile.appendChild(preview);
-  applyPreviewVars(preview, theme.vars);
-
-  const footer = document.createElement("div");
-  footer.className = "theme-tile-footer";
-
-  const name = document.createElement("span");
-  name.className = "theme-tile-name";
-  name.textContent = theme.name;
-  footer.appendChild(name);
-
-  const actions = document.createElement("div");
-  actions.className = "theme-tile-custom-actions";
-
-  const editBtn = document.createElement("button");
-  editBtn.className = "theme-tile-icon-btn";
-  editBtn.title = "Edit theme";
-  editBtn.innerHTML = EDIT_SVG;
-  editBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    themePickerModal.close();
-    openThemeEditor("edit", theme.id);
-  });
-  actions.appendChild(editBtn);
-
-  const deleteBtn = document.createElement("button");
-  deleteBtn.className = "theme-tile-icon-btn theme-tile-icon-btn-danger";
-  deleteBtn.title = "Delete theme";
-  deleteBtn.innerHTML = TRASH_SVG;
-  deleteBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    requestDeleteCustomTheme(theme.id);
-  });
-  actions.appendChild(deleteBtn);
-
-  footer.appendChild(actions);
-  tile.appendChild(footer);
-
-  tile.addEventListener("click", () => selectCustomTheme(theme.id));
-  return tile;
-}
-
-function buildNewCustomThemeTile(): HTMLElement {
-  const tile = document.createElement("div");
-  tile.className = "theme-tile";
-
-  const preview = document.createElement("div");
-  preview.className = "theme-tile-preview";
-  const iconWrap = document.createElement("div");
-  iconWrap.className = "theme-tile-preview-icon";
-  iconWrap.innerHTML = PALETTE_SVG;
-  preview.appendChild(iconWrap);
-  tile.appendChild(preview);
-
-  const name = document.createElement("span");
-  name.className = "theme-tile-name";
-  name.textContent = "New Custom Theme";
-  tile.appendChild(name);
-
-  tile.addEventListener("click", () => {
-    themePickerModal.close();
-    openThemeEditor("create");
-  });
-  return tile;
-}
-
-/** Which tab houses the currently active theme, main/holiday/special for a
- *  built-in theme, "random" or "custom" for those (regardless, for custom,
- *  of which saved one). */
-function tabForCurrentTheme(): ThemePickerTab {
-  if (settings.theme === "custom") return "custom";
-  if (settings.theme === "random") return "random";
-  if (settings.theme === "cycle") return "cycle";
-  for (const group of THEME_GROUPS) {
-    if (group.themes.some((t) => t.id === settings.theme)) return group.tab;
-  }
-  return "main";
-}
-
-/** Shows/hides the Cycle pane's conditional rows. The interval row only
- *  matters for the "time" trigger, the Full Holiday Season row only matters
- *  once one of Holiday Overrides / Restrict to Holiday Season is on (it's a
- *  shared window-widener for both, so either one turning it on is enough to
- *  make it relevant). Called from applySettings() (so it stays correct even
- *  while the pane isn't open) and whenever the picker renders the Cycle tab. */
-/** Fills the two Day/Night theme dropdowns from the same THEME_GROUPS source
- *  the picker itself uses, plus saved custom themes when there are any, so a
- *  new built-in theme shows up here without a second list to maintain.
- *  Rebuilt (rather than built once) because the custom-theme list changes at
- *  runtime; each call re-selects the stored value afterwards. */
-const CYCLE_TAB_LABELS: Record<string, string> = {
-  main: "Main",
-  holiday: "Holiday",
-  special: "Special",
-};
-
-function populateDayNightThemeSelects(): void {
-  for (const select of [cycleDayThemeSelect, cycleNightThemeSelect]) {
-    select.innerHTML = "";
-    for (const group of THEME_GROUPS) {
-      const optgroup = document.createElement("optgroup");
-      optgroup.label = CYCLE_TAB_LABELS[group.tab] ?? group.tab;
-      for (const theme of group.themes) {
-        const opt = document.createElement("option");
-        opt.value = theme.id;
-        opt.textContent = theme.label;
-        optgroup.appendChild(opt);
-      }
-      select.appendChild(optgroup);
-    }
-    if (customThemes.length > 0) {
-      const optgroup = document.createElement("optgroup");
-      optgroup.label = "Custom";
-      for (const theme of customThemes) {
-        const opt = document.createElement("option");
-        opt.value = theme.id;
-        opt.textContent = theme.name;
-        optgroup.appendChild(opt);
-      }
-      select.appendChild(optgroup);
-    }
-  }
-  cycleDayThemeSelect.value = settings.cycleDayThemeId;
-  cycleNightThemeSelect.value = settings.cycleNightThemeId;
-}
-
-/** One line under the Day/Night controls saying which side of the window is
- *  live and when it flips, so the schedule is legible without waiting for it.
- *  Refreshed from the same "themechange" listener the Holiday note uses, which
- *  the boundary timer fires on every real switch. */
-function refreshCycleDayNightNote(): void {
-  const status = getDayNightStatus();
-  if (!status) {
-    cycleDayNightNote.style.display = "none";
-    return;
-  }
-  cycleDayNightNote.style.display = "";
-  const side = status.daytime ? "Day" : "Night";
-  const label = themeLabelForId(status.themeId);
-  cycleDayNightNote.textContent = status.nextSwitch
-    ? `${side} right now, showing ${label}. Switches at ${formatClock(status.nextSwitch)}.`
-    : `${side} all day, showing ${label}.`;
-}
-
-/** The note's clock. Honours the app's own Time Format setting rather than the
- *  OS locale, same idiom as the title-bar clock, so the switch time is written
- *  the way the rest of the app writes times. */
-function formatClock(at: Date): string {
-  return at.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: settings.hour12,
-  });
-}
-
-/** Display name for a built-in or custom theme id, for the note above. */
-function themeLabelForId(themeId: string): string {
-  for (const group of THEME_GROUPS) {
-    const hit = group.themes.find((t) => t.id === themeId);
-    if (hit) return hit.label;
-  }
-  return customThemes.find((t) => t.id === themeId)?.name ?? themeId;
-}
-
-function syncCycleSettingsVisibility(): void {
-  const dayNight = settings.cycleTrigger === "dayNight";
-  cycleIntervalRow.style.display = settings.cycleTrigger === "time" ? "" : "none";
-  cycleDayNightRows.style.display = dayNight ? "" : "none";
-  // Day/Night never builds a pool, so everything that only shapes one goes
-  // away rather than sitting there doing nothing. Holiday Overrides stay: that
-  // is a force-switch checked ahead of the mode, so it still applies.
-  cycleOrderRow.style.display = dayNight ? "none" : "";
-  cycleIncludeCustomRow.style.display = dayNight ? "none" : "";
-  cycleSeasonOnlyRow.style.display = dayNight ? "none" : "";
-  cycleNowRow.style.display = dayNight ? "none" : "";
-  cycleHolidayFullSeasonRow.style.display =
-    settings.cycleHolidayOverride || (settings.cycleHolidaySeasonOnly && !dayNight)
-      ? ""
-      : "none";
-  refreshCycleDayNightNote();
-}
-
-/** Explains, right where the Holiday Override toggles live, why the theme is
- *  currently pinned to a Holiday theme regardless of the cycle rule, shown
- *  only while an override is actually live today. Refreshed on tab render and
- *  on every "themechange" so it tracks Cycle Now, interaction/time advances,
- *  and the holiday-boundary recheck without needing its own polling. */
-const HOLIDAY_NOTE_DATE_FMT = new Intl.DateTimeFormat(undefined, { month: "long", day: "numeric" });
-
-function refreshCycleHolidayNote(): void {
-  const holidayId = getActiveHolidayOverrideThemeId();
-  if (!holidayId) {
-    cycleHolidayActiveNote.style.display = "none";
-    return;
-  }
-  let untilText = "";
-  if (settings.cycleHolidayFullSeason) {
-    const endDate = getHolidayOverrideEndDate(holidayId);
-    if (endDate) {
-      const dayAfterEnd = new Date(endDate);
-      dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
-      untilText = ` until ${HOLIDAY_NOTE_DATE_FMT.format(dayAfterEnd)}`;
-    }
-  }
-  cycleHolidayActiveNote.textContent =
-    `Holiday Override active: showing ${getThemeDisplayName(holidayId)} today, overriding the normal cycle rotation${untilText}.`;
-  cycleHolidayActiveNote.style.display = "";
-}
-
-/* -----------------------------------------------------------------------------
-   Theme Animations (Preferences tab)
------------------------------------------------------------------------------ */
-
-/** Re-applies the seasonal-effect decision for whatever theme is showing.
- *  applySeasonalEffect() already listens for "themechange" and re-reads the
- *  animation settings on each one, so re-dispatching is all it takes to start
- *  or tear down an effect the moment a toggle flips. No direct call needed,
- *  and Cycle's underlying-theme resolution stays in the one place that owns
- *  it (theme-core.ts). */
-function refreshSeasonalEffect(): void {
-  window.dispatchEvent(new CustomEvent("themechange"));
-}
-
-/** Builds one toggle row per animated theme. Rebuilt on each render rather
- *  than diffed, it's eight rows behind a tab that has to be opened, so the
- *  simplicity is worth more than the churn. */
-function renderThemeAnimationRows(): void {
-  themeAnimationsList.innerHTML = "";
-
-  for (const anim of ANIMATED_THEMES) {
-    const row = document.createElement("div");
-    row.className = "settings-row";
-
-    const label = document.createElement("span");
-    label.className = "theme-animation-label";
-    const name = document.createElement("span");
-    name.textContent = `${anim.label}:`;
-    const effect = document.createElement("span");
-    effect.className = "theme-animation-effect";
-    effect.textContent = anim.effect;
-    label.append(name, effect);
-
-    const wrap = document.createElement("div");
-    wrap.className = "toggle-with-label";
-    const stateLabel = document.createElement("span");
-    const enabled = !settings.themeAnimationsOff.includes(anim.id);
-    stateLabel.textContent = enabled ? "Enabled" : "Disabled";
-
-    const switchLabel = document.createElement("label");
-    switchLabel.className = "toggle-switch";
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.checked = enabled;
-    const slider = document.createElement("span");
-    slider.className = "toggle-slider";
-    switchLabel.append(input, slider);
-
-    input.addEventListener("change", () => {
-      const off = settings.themeAnimationsOff.filter((id) => id !== anim.id);
-      if (!input.checked) off.push(anim.id);
-      settings.themeAnimationsOff = off;
-      saveSettings();
-      stateLabel.textContent = input.checked ? "Enabled" : "Disabled";
-      refreshSeasonalEffect();
-    });
-
-    wrap.append(stateLabel, switchLabel);
-    row.append(label, wrap);
-    themeAnimationsList.appendChild(row);
-  }
-}
-
-/** Paints the Preferences tab from current settings: master toggle state, and
- *  the per-theme list (hidden entirely while the master switch is off, since
- *  those toggles would otherwise be controls that visibly do nothing). */
-function renderThemePreferences(): void {
-  themeAnimationsToggle.checked = settings.themeAnimations;
-  themeAnimationsLabel.textContent = settings.themeAnimations ? "Enabled" : "Disabled";
-  themeAnimationsPerTheme.style.display = settings.themeAnimations ? "" : "none";
-  if (settings.themeAnimations) renderThemeAnimationRows();
-}
-
-themeAnimationsToggle.addEventListener("change", () => {
-  settings.themeAnimations = themeAnimationsToggle.checked;
-  saveSettings();
-  renderThemePreferences();
-  refreshSeasonalEffect();
-});
-
-/** Fills in whichever tab was just selected. Registered as the theme picker's
- *  ModalTabs onActivate hook, so showing/hiding the panes and marking the tab
- *  button are already done by the time this runs, leaving only the content. */
-function renderThemePickerTab(tab: ThemePickerTab): void {
-  if (tab === "preferences") {
-    renderThemePreferences();
-    return;
-  }
-
-  if (tab === "random") {
-    themePickerRandomTileWrap.innerHTML = "";
-    themePickerRandomTileWrap.appendChild(buildRandomTile());
-    // Settings are visible either way, but only interactive once Random is
-    // actually the active theme, not just being looked at.
-    randomSubsettings.classList.toggle("inactive", settings.theme !== "random");
-    return;
-  }
-
-  if (tab === "cycle") {
-    themePickerCycleTileWrap.innerHTML = "";
-    themePickerCycleTileWrap.appendChild(buildCycleTile());
-    // Same "visible but inert until actually active" treatment as Random.
-    cycleSubsettings.classList.toggle("inactive", settings.theme !== "cycle");
-    syncCycleSettingsVisibility();
-    refreshCycleHolidayNote();
-    return;
-  }
-
-  themePickerGrid.innerHTML = "";
-
-  if (tab === "custom") {
-    customThemes.forEach((ct) => themePickerGrid.appendChild(buildCustomThemeTile(ct)));
-    themePickerGrid.appendChild(buildNewCustomThemeTile());
-    syncThemeGridHeight();
-    return;
-  }
-
-  const group = THEME_GROUPS.find((g) => g.tab === tab);
-  group?.themes.forEach((t) => themePickerGrid.appendChild(buildThemeTile(t.id, t.label)));
-  syncThemeGridHeight();
-}
-
-/** Caps the grid at exactly two full tile rows and lets it scroll beyond
- *  that, instead of the old fixed 58vh cap, which could either clip a
- *  second row's titles or leave dead space, since tile height depends on
- *  how many columns the auto-fill grid ends up with. One or two rows: no
- *  cap, so the modal simply grows to fit. Three or more: capped to the
- *  height of the first two rows, so row three+ scrolls into view instead
- *  of being clipped. Reading offsetTop/offsetHeight forces a synchronous
- *  layout, which is fine here since it runs once right after populating
- *  the grid, not on every frame. */
-function syncThemeGridHeight(): void {
-  const tiles = Array.from(themePickerGrid.children) as HTMLElement[];
-  if (tiles.length === 0) {
-    themePickerGrid.style.maxHeight = "";
-    return;
-  }
-  const rowTops = [...new Set(tiles.map((t) => t.offsetTop))].sort((a, b) => a - b);
-  if (rowTops.length < 3) {
-    themePickerGrid.style.maxHeight = "none";
-    return;
-  }
-  const secondRowTile = tiles.find((t) => t.offsetTop === rowTops[1])!;
-  themePickerGrid.style.maxHeight = `${rowTops[1] + secondRowTile.offsetHeight}px`;
-}
-
-// Column count (and therefore row height/count) can change on window
-// resize, so re-run the cap while the picker is open and on a tab that
-// actually uses the grid (Random/Cycle use their own single-tile panes).
-window.addEventListener("resize", () => {
-  if (themePickerModal.isOpen && themePickerGrid.style.display !== "none") {
-    syncThemeGridHeight();
-  }
-});
-
-/** Selects a built-in theme or "random"/"custom" by id. Same logic the old
- *  themeSelect "change" handler used to run. Re-renders the picker's active
- *  tab afterward so the active-tile highlight tracks the new selection
- *  without closing the modal (letting you flip through a few before leaving). */
-function selectTheme(themeId: string): void {
-  if (settings.theme === "random" && themeId !== "random") {
-    localStorage.removeItem(PERSISTENT_RANDOM_KEY);
-  }
-  if (settings.theme === "custom" && themeId !== "custom") {
-    clearCustomTheme();
-  }
-  settings.theme = themeId;
-  themeSelect.value = themeId;
-  applySettings();
-  saveSettings();
-  themePickerTabs.restore();
-}
-
-/** Selects a specific saved custom theme by id, then applies it via
- *  selectTheme("custom"). */
-function selectCustomTheme(customId: string): void {
-  setActiveCustomId(customId);
-  selectTheme("custom");
-}
-
-/* The picker's tab strip, on the shared ModalTabs controller (modal.ts) like
-   every other tabbed modal. Two things here are specific to this modal:
-
-   • Main/Holiday/Special/Custom all render into the one #themePickerGrid, so
-     they share a pane entry. Cycle, Random and Preferences have their own.
-   • A fresh open lands on the tab housing the theme in use, not on Main, via
-     defaultTab. Returning from a child modal still keeps the tab you left. */
-const themePickerTabs = new ModalTabs<ThemePickerTab>({
-  scope: "#themePickerBackdrop",
-  key: "themeTab",
-  panes: {
-    main: "themePickerGrid",
-    holiday: "themePickerGrid",
-    special: "themePickerGrid",
-    cycle: "themePickerCyclePane",
-    random: "themePickerRandomPane",
-    custom: "themePickerGrid",
-    preferences: "themePickerPreferencesPane",
-  },
-  defaultTab: () => tabForCurrentTheme(),
-  onActivate: (tab) => renderThemePickerTab(tab),
-});
-
-// Replaces (rather than stacks on) the General Settings modal, same pattern
-// as the Edit Sidebar modal above. Exported: theme-editor.ts's Create/Edit
-// Custom Theme flow returns here (not to Settings) when done, since it's now
-// only ever reached from this modal.
-export const themePickerModal = new Modal(themePickerBackdrop, {
-  closeOnEsc: true,
-  tabs: themePickerTabs,
-});
-
-/** Reopens Choose Theme on the Custom tab. Exported for theme-editor.ts to call
- *  when returning from Create/Edit/Delete Custom Theme. Selecting the tab before
- *  opening beats letting defaultTab decide, because tabForCurrentTheme() tracks
- *  settings.theme, which those flows don't necessarily change (e.g. editing or
- *  deleting a custom theme that isn't the active one). */
-export function reopenThemePickerOnCustomTab(): void {
-  themePickerTabs.select("custom");
-  themePickerModal.open();
-}
-
-themeEditBtn.addEventListener("click", () => {
-  settingsModal.close({ handoff: true });
-  themePickerModal.open();
-});
-
-themePickerBack.addEventListener("click", () => {
-  themePickerModal.close();
-  settingsModal.open();
-});
-
-themePickerClose.addEventListener("click", () => themePickerModal.close());
 
 /* =============================================================================
    SETTINGS MODAL
@@ -2852,7 +1630,7 @@ settingsBtn.addEventListener("click", () => settingsModal.open());
 settingsClose.addEventListener("click", () => settingsModal.close());
 
 settingsReset.addEventListener("click", () => {
-  settings = { ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() };
+  setSettings({ ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() });
   applySettings();
   saveSettings();
   flash("Settings reset to defaults", "success");
@@ -2877,16 +1655,6 @@ solidModalsToggle.addEventListener("change", () => {
   settings.solidModals = solidModalsToggle.checked;
   solidModalsLabel.textContent = settings.solidModals ? "On" : "Off";
   document.body.classList.toggle("solid-modals", settings.solidModals);
-  if (settings.theme === "random") {
-    const stored = localStorage.getItem(PERSISTENT_RANDOM_KEY);
-    if (stored) {
-      try {
-        applyRandomModalStyles(JSON.parse(stored));
-      } catch {
-        /* non-critical */
-      }
-    }
-  }
   saveSettings();
 });
 
@@ -3160,308 +1928,6 @@ startupSelect.addEventListener("change", () => {
 });
 
 /* =============================================================================
-   CHOOSE SOUND PACK MODAL
-   -----------------------------------------------------------------------------
-   Tile cards, same modal-replaces-Settings pattern as Sidebar/Theme. Unlike
-   Theme's tiles, these don't preview a different palette, a sound pack has
-   no visuals of its own, so the cards just render in the app's own current
-   theme. Each card has two icon buttons that play that pack's success/error
-   cue directly (independent of the currently *active* pack, and without
-   selecting it), selecting the pack itself happens by clicking the tile.
-============================================================================= */
-
-const SPEAKER_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
-
-/* =============================================================================
-   SOUND API FOR TOOLS
-   -----------------------------------------------------------------------------
-   Tools that need their own alert cue (Countdown Timer's timer-end alarm) pick from
-   the same packs the app ships rather than bundling audio of their own. The
-   pack list stays private; these two functions are the whole surface.
-============================================================================= */
-
-/** Every cue in every pack (both the success and the error sound) as
- *  pickable options. Ids are "<packId>:<kind>", and an EMPTY pack id means
- *  "whichever pack the app is set to", resolved late so changing the app's
- *  sound pack changes the tool's cue with it. */
-export function getSoundOptions(): { id: string; name: string }[] {
-  const options: { id: string; name: string }[] = [
-    { id: ":success", name: "App pack: Success" },
-    { id: ":error", name: "App pack: Error" },
-  ];
-  SOUND_PACKS.forEach((p) => {
-    options.push({ id: `${p.id}:success`, name: `${p.name}: Success` });
-    options.push({ id: `${p.id}:error`, name: `${p.name}: Error` });
-  });
-  return options;
-}
-
-/** Resolves a stored sound id to a playable url. Accepts "<packId>:<kind>",
- *  and tolerates the older bare "<packId>" (and "") forms, which meant that
- *  pack's success cue. Returns null when the pack no longer exists
- *  (uninstalled/renamed) so callers degrade to silence rather than throwing. */
-export function resolveSoundUrl(soundId: string): string | null {
-  const [packPart, kindPart] = soundId.split(":");
-  const wanted = packPart || settings.soundPack;
-  const pack = SOUND_PACKS.find((p) => p.id === wanted);
-  if (!pack) return null;
-  return (kindPart === "error" ? pack.error : pack.success) ?? null;
-}
-
-/** Plays a cue once and resolves when it finishes (or immediately fails
- *  quiet). Resolving on `ended` is what lets a caller chain repeats without
- *  them overlapping into mush. */
-export function playSoundUrl(url: string): Promise<void> {
-  return new Promise((resolve) => {
-    const audio = new Audio(url);
-    const done = (): void => resolve();
-    audio.addEventListener("ended", done, { once: true });
-    audio.addEventListener("error", done, { once: true });
-    audio.play().catch(done);
-  });
-}
-
-function refreshSoundPackCurrentBadge(): void {
-  const pack = SOUND_PACKS.find((p) => p.id === settings.soundPack);
-  soundPackCurrentBadge.textContent = pack ? pack.name : settings.soundPack;
-}
-
-/** Tracks whatever preview cue is currently playing so a new preview click
- *  can stop it. Without this, rapid clicks across tiles/buttons stack up
- *  and play over each other instead of replacing one another. */
-let _soundPackPreviewAudio: HTMLAudioElement | null = null;
-
-/** Plays one specific pack's cue directly, a standalone preview, not tied
- *  to the active successAudio/errorAudio elements used by flash(). Only one
- *  preview ever plays at a time; starting a new one kills the last. */
-function previewSoundPackCue(pack: SoundPack, kind: "success" | "error"): void {
-  const src = kind === "success" ? pack.success : pack.error;
-  if (!src) return;
-
-  if (_soundPackPreviewAudio) {
-    _soundPackPreviewAudio.pause();
-    _soundPackPreviewAudio.currentTime = 0;
-  }
-
-  const audio = new Audio(src);
-  _soundPackPreviewAudio = audio;
-  audio.addEventListener("ended", () => {
-    if (_soundPackPreviewAudio === audio) _soundPackPreviewAudio = null;
-  });
-  // Through playCue so a preview is heard at the volume the cue will actually
-  // play at, which is the whole point of previewing it.
-  playCue(audio);
-}
-
-/** Selects a sound pack. Same effect the old dropdown's "change" handler
- *  had: applies it, persists it, and flashes a success toast (which, using
- *  the newly-loaded pack, doubles as an audible confirmation). */
-function selectSoundPack(id: string): void {
-  settings.soundPack = id;
-  loadSoundPack(settings.soundPack);
-  saveSettings();
-  refreshSoundPackCurrentBadge();
-  renderSoundPackPickerGrid();
-  flash("Sound pack updated", "success");
-}
-
-function buildSoundPackTile(pack: SoundPack): HTMLElement {
-  const tile = document.createElement("div");
-  tile.className = pack.id === settings.soundPack ? "sound-pack-tile active" : "sound-pack-tile";
-
-  const name = document.createElement("span");
-  name.className = "sound-pack-tile-name";
-  name.textContent = pack.name;
-  tile.appendChild(name);
-
-  const actions = document.createElement("div");
-  actions.className = "sound-pack-tile-actions";
-
-  const successBtn = document.createElement("button");
-  successBtn.className = "sound-pack-preview-btn success";
-  successBtn.title = "Preview success sound";
-  successBtn.innerHTML = SPEAKER_SVG;
-  successBtn.disabled = !pack.success;
-  successBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    previewSoundPackCue(pack, "success");
-  });
-  actions.appendChild(successBtn);
-
-  const errorBtn = document.createElement("button");
-  errorBtn.className = "sound-pack-preview-btn error";
-  errorBtn.title = "Preview error sound";
-  errorBtn.innerHTML = SPEAKER_SVG;
-  errorBtn.disabled = !pack.error;
-  errorBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    previewSoundPackCue(pack, "error");
-  });
-  actions.appendChild(errorBtn);
-
-  tile.appendChild(actions);
-
-  tile.addEventListener("click", () => selectSoundPack(pack.id));
-  return tile;
-}
-
-function renderSoundPackPickerGrid(): void {
-  soundPackPickerGrid.innerHTML = "";
-  SOUND_PACKS.forEach((pack) => soundPackPickerGrid.appendChild(buildSoundPackTile(pack)));
-}
-
-const soundPackPickerModal = new Modal(soundPackPickerBackdrop, {
-  closeOnEsc: true,
-  onOpen: () => renderSoundPackPickerGrid(),
-});
-
-soundPackEditBtn.addEventListener("click", () => {
-  settingsModal.close({ handoff: true });
-  soundPackPickerModal.open();
-});
-
-soundPackPickerBack.addEventListener("click", () => {
-  soundPackPickerModal.close();
-  settingsModal.open();
-});
-
-soundPackPickerClose.addEventListener("click", () => soundPackPickerModal.close());
-
-/* ── Notification volume ──────────────────────────────────────────────────
-   Lives on the Audio tab of General Settings, above Notification Sound: same
-   subject, but it applies to whichever pack is selected rather than being
-   part of picking one. Wired up here, next to the pack picker it shares a tab
-   with, rather than up in the settings-modal section. Persisting is debounced
-   off the "change" event rather than "input", so dragging across the range
-   writes settings once at the end instead of thirty times on the way. */
-
-const soundVolumeSlider = document.getElementById(
-  "soundVolumeSlider",
-) as HTMLInputElement;
-const soundVolumeValue = document.getElementById("soundVolumeValue")!;
-const soundVolumeReset = document.getElementById("soundVolumeReset")!;
-
-/** How the current value reads on screen. Three cases, because the two ends of
- *  the range aren't levels: the bottom notch is silence and the centre is the
- *  app's original loudness. */
-function toastVolumeLabel(db: number): string {
-  if (db <= TOAST_VOLUME_MUTED_DB) return "Muted";
-  if (db === 0) return "Default";
-  return `${db > 0 ? "+" : ""}${db} dB`;
-}
-
-/** Syncs the slider, its read-out, and the Reset button's enabled state to the
- *  current setting. Called from applySettings(), so load, reset-to-defaults and
- *  reopening the modal all stay in step. */
-function applyToastVolumeSettings(): void {
-  const db = settings.toastVolumeDb;
-  soundVolumeSlider.value = String(db);
-  soundVolumeValue.textContent = toastVolumeLabel(db);
-  soundVolumeValue.classList.toggle("is-muted", db <= TOAST_VOLUME_MUTED_DB);
-  (soundVolumeReset as HTMLButtonElement).disabled = db === 0;
-}
-
-/** Live feedback while dragging: the read-out tracks the thumb, but nothing is
- *  written to disk until the drag ends. */
-soundVolumeSlider.addEventListener("input", () => {
-  settings.toastVolumeDb = clampToastVolume(Number(soundVolumeSlider.value));
-  applyToastVolumeSettings();
-});
-
-soundVolumeSlider.addEventListener("change", () => {
-  void saveSettings();
-  // Play the active pack's success cue at the new level, so the setting is
-  // judged by ear at the moment it's chosen. Muted plays nothing, which is
-  // itself the correct preview.
-  if (successAudio) playCue(successAudio);
-});
-
-soundVolumeReset.addEventListener("click", () => {
-  settings.toastVolumeDb = 0;
-  applyToastVolumeSettings();
-  void saveSettings();
-  if (successAudio) playCue(successAudio);
-});
-
-/** Double-click the read-out to type an exact dB value, matching the inline
- *  edits elsewhere in the app (Auto-Backup's paths, Budget's amounts, the
- *  Countdown clock): Enter or Tab commits, Escape cancels, blur commits.
- *
- *  Typing is the only way to hit a specific number on a 36-step slider without
- *  fighting the thumb, and "mute"/"muted"/"off" are accepted as words since the
- *  bottom notch has no number to type. */
-function beginToastVolumeEdit(): void {
-  if (soundVolumeValue.querySelector("input")) return; // already editing
-
-  const original = settings.toastVolumeDb;
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "sound-volume-edit";
-  input.value =
-    original <= TOAST_VOLUME_MUTED_DB ? "muted" : String(original);
-  input.setAttribute("aria-label", "Notification volume in decibels");
-
-  soundVolumeValue.textContent = "";
-  soundVolumeValue.appendChild(input);
-  input.focus();
-  input.select();
-
-  let handledByKeydown = false;
-
-  function finish(db: number): void {
-    settings.toastVolumeDb = db;
-    applyToastVolumeSettings();
-    void saveSettings();
-    if (successAudio) playCue(successAudio);
-  }
-
-  function commit(): void {
-    const raw = input.value.trim().toLowerCase();
-    if (raw === "muted" || raw === "mute" || raw === "off") {
-      finish(TOAST_VOLUME_MUTED_DB);
-      return;
-    }
-    // "Default" is what the read-out shows at 0, so accept it back.
-    if (raw === "default") {
-      finish(0);
-      return;
-    }
-    // Tolerates a typed "dB" suffix and a leading "+".
-    const parsed = Number(raw.replace(/\s*db$/, "").replace(/^\+/, ""));
-    if (!Number.isFinite(parsed)) {
-      applyToastVolumeSettings(); // put the old value back
-      flash(
-        `Enter a number between ${TOAST_VOLUME_MIN_DB} and ${TOAST_VOLUME_MAX_DB}, or "muted"`,
-        "error",
-      );
-      return;
-    }
-    finish(clampToastVolume(parsed));
-  }
-
-  input.addEventListener("keydown", (e) => {
-    // The slider is a sibling control; stop arrow keys from reaching it.
-    e.stopPropagation();
-    if (e.key === "Enter" || e.key === "Tab") {
-      e.preventDefault();
-      handledByKeydown = true;
-      commit();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      handledByKeydown = true;
-      applyToastVolumeSettings();
-    }
-  });
-
-  input.addEventListener("blur", () => {
-    if (handledByKeydown) return;
-    commit();
-  });
-}
-
-soundVolumeValue.addEventListener("dblclick", beginToastVolumeEdit);
-
-/* =============================================================================
    BACKUP REMINDER MODAL  (universal, owned by shell; Aggressive mode)
    -----------------------------------------------------------------------------
    Gentle mode is just a flash() toast. No modal needed. Aggressive mode
@@ -3638,136 +2104,6 @@ window.addEventListener("beforeunload", () => {
    TOAST NOTIFICATIONS
 ============================================================================= */
 
-// Active pack's audio elements, swapped out by loadSoundPack() whenever the
-// Sound Pack setting changes. Null means that cue is muted for this pack.
-let successAudio: HTMLAudioElement | null = null;
-let errorAudio: HTMLAudioElement | null = null;
-
-/** Swaps the active success/error Audio elements to the given pack. Falls
- *  back to the first registered pack if the id is unknown (e.g. a pack was
- *  removed after being selected). A pack that omits a path mutes that cue. */
-function loadSoundPack(id: string): void {
-  const pack = SOUND_PACKS.find((p) => p.id === id) ?? SOUND_PACKS[0];
-  successAudio = pack.success ? new Audio(pack.success) : null;
-  errorAudio = pack.error ? new Audio(pack.error) : null;
-}
-loadSoundPack(DEFAULT_SETTINGS.soundPack);
-
-/* =============================================================================
-   TOAST CUE VOLUME
-   -----------------------------------------------------------------------------
-   settings.toastVolumeDb shifts every cue up or down from the level the app
-   has always played at. 0 dB is that level, so an untouched install sounds
-   exactly as it did before this existed.
-
-   Two mechanisms, because one alone can't cover the range:
-
-     quieter (<= 0 dB)  HTMLAudioElement.volume, which is a 0..1 multiplier.
-     louder  (>  0 dB)  volume is already pinned at its 1.0 ceiling, so a boost
-                        has to go through a Web Audio GainNode, which has no
-                        upper limit.
-
-   The Web Audio graph is built lazily, per element, and ONLY when a boost is
-   actually asked for. Cues are load-bearing feedback, and routing every one of
-   them through an AudioContext that might be suspended or unavailable would
-   risk silence for people who never touch this slider. Quieter and default
-   keep the plain, proven path.
-
-   Once an element has been wired it stays wired, which is fine: the element's
-   own `volume` is applied before the graph sees it, so the two multiply
-   cleanly and attenuation still works on a wired element.
-============================================================================= */
-
-const TOAST_VOLUME_MAX_DB = 5;
-const TOAST_VOLUME_MIN_DB = -25;
-/** One step below the quietest real setting, standing for silence rather than
- *  for a level. -25 dB is already very quiet but still audible, and there was
- *  no way to say "off" without a value that means it. */
-const TOAST_VOLUME_MUTED_DB = TOAST_VOLUME_MIN_DB - 1;
-
-/** Holds a stored or typed value inside the slider's range, including the mute
- *  notch at the bottom. */
-function clampToastVolume(db: number): number {
-  if (!Number.isFinite(db)) return 0;
-  return Math.min(TOAST_VOLUME_MAX_DB, Math.max(TOAST_VOLUME_MUTED_DB, Math.round(db)));
-}
-
-/** Linear amplitude for a decibel offset. 0 dB is 1.0 (unchanged), +6 dB is
- *  roughly double, -6 dB roughly half, and the mute notch is a hard 0. */
-function dbToGain(db: number): number {
-  if (db <= TOAST_VOLUME_MUTED_DB) return 0;
-  return Math.pow(10, db / 20);
-}
-
-let _audioCtx: AudioContext | null = null;
-/** Gain node per boosted element. Also serves as the "is this one wired yet"
- *  check, since createMediaElementSource() may only be called once per
- *  element and throws on a second attempt. */
-const _boostNodes = new WeakMap<HTMLAudioElement, GainNode>();
-
-/** Returns the shared AudioContext, creating it on first boost. Null when the
- *  browser has no Web Audio at all, which sends callers back to the plain path
- *  rather than failing. */
-function audioContext(): AudioContext | null {
-  if (_audioCtx) return _audioCtx;
-  try {
-    _audioCtx = new AudioContext();
-  } catch {
-    _audioCtx = null;
-  }
-  return _audioCtx;
-}
-
-/** Applies the current volume setting to one cue element and plays it from the
- *  start. Never throws: a rejected play() (autoplay policy, missing file) is
- *  swallowed exactly as it was before, and any Web Audio failure degrades to
- *  the plain element at its 1.0 ceiling rather than to silence. */
-function playCue(audio: HTMLAudioElement): void {
-  const gain = dbToGain(settings.toastVolumeDb);
-
-  // Muted: don't start playback at all rather than playing at volume 0, so a
-  // muted cue costs nothing and can't be heard through a boosted graph.
-  if (gain === 0) return;
-
-  audio.volume = Math.min(1, gain);
-
-  if (gain > 1) {
-    try {
-      const ctx = audioContext();
-      if (ctx) {
-        // A context created before any user gesture starts suspended.
-        if (ctx.state === "suspended") void ctx.resume();
-
-        const existing = _boostNodes.get(audio);
-        if (existing) {
-          existing.gain.value = gain;
-        } else if (ctx.state === "running") {
-          // Only ever wire an element into a RUNNING graph. Connecting a media
-          // element to Web Audio replaces its normal output, so wiring into a
-          // suspended context would mute the cue outright. A boosted setting
-          // restored at launch, before any click has resumed audio, would then
-          // silence the very first toast. Skipping the boost costs loudness for
-          // one cue; wiring blind costs the cue.
-          const node = ctx.createGain();
-          ctx.createMediaElementSource(audio).connect(node);
-          node.connect(ctx.destination);
-          node.gain.value = gain;
-          _boostNodes.set(audio, node);
-        }
-      }
-    } catch {
-      /* Boost unavailable; the element still plays at full volume. */
-    }
-  } else {
-    // Back down to unity so an element wired during an earlier boost doesn't
-    // keep multiplying after the slider comes back down.
-    const node = _boostNodes.get(audio);
-    if (node) node.gain.value = 1;
-  }
-
-  audio.currentTime = 0;
-  audio.play().catch(() => {});
-}
 
 /* A toast that fires while the app isn't on screen (window unfocused
    (alt-tabbed away, covered by another window) or the document hidden

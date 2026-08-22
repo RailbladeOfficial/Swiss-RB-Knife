@@ -17,7 +17,7 @@
    never actually a problem. Flagging it here so it isn't a surprise later.
 ============================================================================= */
 
-import { THEME_GROUPS, settings } from "./shell";
+import { settings } from "./settings-store";
 import {
   PERSISTENT_RANDOM_KEY,
   applyPalette,
@@ -27,7 +27,7 @@ import {
 } from "./random-theme";
 import { applyCustomThemeById, clearCustomTheme } from "./theme-editor";
 import { activateCycleTheme, getCurrentCycleUnderlyingThemeId } from "./cycle-theme";
-import { BASE_THEME_ID, DEFAULT_THEME_ID, migrateThemeId } from "./theme-ids";
+import { BASE_THEME_ID, DEFAULT_THEME_ID, THEME_GROUPS, migrateThemeId } from "./theme-ids";
 
 export const themeLink = document.getElementById("themeLink") as HTMLLinkElement;
 

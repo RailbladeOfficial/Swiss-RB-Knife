@@ -11,7 +11,7 @@
    file does not import from either of them.
 ============================================================================= */
 
-import { settings } from "./shell";
+import { settings } from "./settings-store";
 
 export const RANDOM_VARS = [
   "--color-bg",
@@ -256,32 +256,18 @@ export function applyPalette(palette: Record<string, string>): void {
   for (const [key, value] of Object.entries(palette)) {
     root.style.setProperty(key, value);
   }
-  applyRandomModalStyles(palette);
   // Notify tools that theme colors have changed so they can redraw anything
   // that reads CSS vars at draw time (e.g. budget chart canvases).
   window.dispatchEvent(new CustomEvent("themechange"));
 }
 
-/** Legacy hook. The random/custom palette now flows entirely through CSS
- *  variables: applyPalette() sets every var on :root (including --color-accent),
- *  and default.css (loaded as the base for random/custom themes) reads those
- *  vars directly (no hardcoded colours, no !important). So there is nothing left
- *  to inject. This stub only clears any stale override tag left by an older
- *  build/session, then no-ops. Kept (rather than deleted) so existing call sites
- *  in applyPalette() and shell.ts stay valid. */
-export function applyRandomModalStyles(_palette: Record<string, string>): void {
-  document.getElementById("random-modal-styles")?.remove();
-}
-
-/** Removes all inline random palette properties from :root and removes the
- *  injected modal style override tag. Call when switching away from random theme. */
+/** Removes all inline random palette properties from :root. Call when switching
+ *  away from the random theme. */
 export function clearRandomPalette(): void {
   const root = document.documentElement;
   (RANDOM_VARS as readonly string[]).forEach((v) =>
     root.style.removeProperty(v),
   );
-  // Remove the injected random modal style override
-  document.getElementById("random-modal-styles")?.remove();
 }
 
 // Coalesces compound triggers so one user action re-rolls at most once: a click
