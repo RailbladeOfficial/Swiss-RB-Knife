@@ -216,10 +216,10 @@ body:not(.theme-animations-off) #sidebar {
 }
 
 /* ── Panel accent slots, molten left rails ── */
-.panel-accent-input    { border-left: 4px solid #ff5a1f; border-color: rgba(255, 90, 31, 0.35); }
-.panel-accent-view     { border-left: 4px solid #ffb020; border-color: rgba(255, 176, 32, 0.32); }
-.panel-accent-totals   { border-left: 4px solid #e0219b; border-color: rgba(224, 33, 155, 0.32); }
-.panel-accent-entries  { border-left: 4px solid #ff2e63; border-color: rgba(255, 46, 99, 0.32); }
+.panel-accent-input    { border-color: rgba(255, 90, 31, 0.35); border-left: 4px solid #ff5a1f; }
+.panel-accent-view     { border-color: rgba(255, 176, 32, 0.32); border-left: 4px solid #ffb020; }
+.panel-accent-totals   { border-color: rgba(224, 33, 155, 0.32); border-left: 4px solid #e0219b; }
+.panel-accent-entries  { border-color: rgba(255, 46, 99, 0.32); border-left: 4px solid #ff2e63; }
 
 /* ── Tool / section header, a heat gradient with an ember glow ── */
 .tool-view-header,

@@ -70,22 +70,10 @@ body::after {
 }
 
 /* ── Panel accent slots, green shades, starkly left-bordered ── */
-.panel-accent-input {
-  border-left: 4px solid #00ff00;
-  border-color: rgba(0, 255, 0, 0.25);
-}
-.panel-accent-view {
-  border-left: 4px solid #00cc00;
-  border-color: rgba(0, 204, 0, 0.2);
-}
-.panel-accent-totals {
-  border-left: 4px solid #00aa00;
-  border-color: rgba(0, 170, 0, 0.2);
-}
-.panel-accent-entries {
-  border-left: 4px solid #007700;
-  border-color: rgba(0, 119, 0, 0.2);
-}
+.panel-accent-input { border-color: rgba(0, 255, 0, 0.25); border-left: 4px solid #00ff00; }
+.panel-accent-view { border-color: rgba(0, 204, 0, 0.2); border-left: 4px solid #00cc00; }
+.panel-accent-totals { border-color: rgba(0, 170, 0, 0.2); border-left: 4px solid #00aa00; }
+.panel-accent-entries { border-color: rgba(0, 119, 0, 0.2); border-left: 4px solid #007700; }
 
 /* ── Glowing inputs ── */
 input:focus {

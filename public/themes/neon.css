@@ -65,26 +65,10 @@ body::after {
 }
 
 /* ── Panel accent slots ── */
-.panel-accent-input {
-  border-left: 4px solid #00ffff;
-  border-color: #00ffff88;
-  box-shadow: 0 0 18px #00ffff55, inset 0 0 8px #00ffff11;
-}
-.panel-accent-view {
-  border-left: 4px solid #39ff14;
-  border-color: #39ff1488;
-  box-shadow: 0 0 18px #39ff1455, inset 0 0 8px #39ff1411;
-}
-.panel-accent-totals {
-  border-left: 4px solid #ff8800;
-  border-color: #ff880088;
-  box-shadow: 0 0 18px #ff880055, inset 0 0 8px #ff880011;
-}
-.panel-accent-entries {
-  border-left: 4px solid #ff00ff;
-  border-color: #ff00ff88;
-  box-shadow: 0 0 18px #ff00ff55, inset 0 0 8px #ff00ff11;
-}
+.panel-accent-input { border-color: #00ffff88; border-left: 4px solid #00ffff; box-shadow: 0 0 18px #00ffff55, inset 0 0 8px #00ffff11; }
+.panel-accent-view { border-color: #39ff1488; border-left: 4px solid #39ff14; box-shadow: 0 0 18px #39ff1455, inset 0 0 8px #39ff1411; }
+.panel-accent-totals { border-color: #ff880088; border-left: 4px solid #ff8800; box-shadow: 0 0 18px #ff880055, inset 0 0 8px #ff880011; }
+.panel-accent-entries { border-color: #ff00ff88; border-left: 4px solid #ff00ff; box-shadow: 0 0 18px #ff00ff55, inset 0 0 8px #ff00ff11; }
 
 /* ── Glowing buttons ── */
 button {

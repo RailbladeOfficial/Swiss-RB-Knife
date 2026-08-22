@@ -481,10 +481,13 @@
   gap: 10px;
   text-align: center;
   padding: 20px 24px;
+  /* Which of the app's four panel-accent colours this tile wears. Defaults to
+     the tool accent; the mapping below overrides it per tile. */
+  --gs-card-accent: var(--gs-accent);
   background: var(--color-panel);
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  border-left: var(--gs-rail-width) solid color-mix(in srgb, var(--gs-accent) 55%, transparent);
+  border-left: var(--gs-rail-width) solid color-mix(in srgb, var(--gs-card-accent) 55%, transparent);
   border-radius: var(--gs-radius);
   transition:
     background var(--hover-transition),
@@ -493,6 +496,30 @@
     box-shadow var(--hover-transition),
     transform 0.16s ease;
 }
+
+/* ── Home tile colours ──
+   Each tile takes one of the four panel-accent colours the rest of the app
+   already uses down the left edge of a Budget / Time Tracker / Auto-Backup
+   panel, so a tile and a panel of the same kind agree rather than every tile
+   being the one tool accent.
+
+   Mapped by meaning, not by position: entering a game is the "input" colour,
+   browsing what's logged is "view", the stats screens are "totals", and the
+   people and tables the records hang off are "entries". Reordering the tiles
+   in index.html therefore does not shuffle the colours.
+
+   Scope is the border only, idle and hover. The hover wash, glow, icon and
+   label deliberately stay on the tool accent, because none of the text colours
+   are per-tile and recolouring the surface without them looked mismatched.
+
+   These are ids because the tiles are individually identified already (shell
+   wires each one by id); .gs-split-card is the one tile that is a container
+   rather than a button, and takes an extra class for specificity so it beats
+   the default set on .gs-action-card regardless of source order. */
+#gsNavNewGameBtn              { --gs-card-accent: var(--color-accent-input); }
+#gsNavHistoricalBtn           { --gs-card-accent: var(--color-accent-view); }
+#gsNavStatsBtn                { --gs-card-accent: var(--color-accent-totals); }
+.gs-action-card.gs-split-card { --gs-card-accent: var(--color-accent-entries); }
 
 /* One column on narrow windows. Two big tiles side by side stop being
    readable well before the sidebar-collapsed width. */
@@ -531,9 +558,13 @@
         declaration. .gs-split-half:hover has always used the shorthand,
         which is exactly why the split tile stayed correct in those two
         themes while these three did not. */
+/* Only the BORDER follows the tile's own colour. The wash, the glow and the
+   label stay on the tool accent: the title and description colours are not
+   per-tile, so tinting the whole surface per-tile left the text looking like it
+   belonged to a different card. */
 .gs-action-card:hover {
-  border-color: var(--gs-accent);
-  border-left-color: var(--gs-accent);
+  border-color: var(--gs-card-accent);
+  border-left-color: var(--gs-card-accent);
   box-shadow: 0 4px 18px color-mix(in srgb, var(--gs-accent) 18%, transparent);
   transform: translateY(-2px);
   background: color-mix(in srgb, var(--gs-accent) 16%, var(--color-panel));

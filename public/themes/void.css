@@ -60,22 +60,10 @@
 }
 
 /* ── Panel accent slots, pure RGB, stark left borders ── */
-.panel-accent-input {
-  border-left: 4px solid #0000ff;
-  border-color: rgba(0, 0, 255, 0.3);
-}
-.panel-accent-view {
-  border-left: 4px solid #00ff00;
-  border-color: rgba(0, 255, 0, 0.2);
-}
-.panel-accent-totals {
-  border-left: 4px solid #ffff00;
-  border-color: rgba(255, 255, 0, 0.2);
-}
-.panel-accent-entries {
-  border-left: 4px solid #ff0000;
-  border-color: rgba(255, 0, 0, 0.2);
-}
+.panel-accent-input { border-color: rgba(0, 0, 255, 0.3); border-left: 4px solid #0000ff; }
+.panel-accent-view { border-color: rgba(0, 255, 0, 0.2); border-left: 4px solid #00ff00; }
+.panel-accent-totals { border-color: rgba(255, 255, 0, 0.2); border-left: 4px solid #ffff00; }
+.panel-accent-entries { border-color: rgba(255, 0, 0, 0.2); border-left: 4px solid #ff0000; }
 
 /* ── Tool / section header, pure black, blue bottom border ── */
 .tool-view-header,

@@ -1,5 +1,5 @@
 /* =============================================================================
-   EZMUZE
+   AUDACIOUS
    -----------------------------------------------------------------------------
    Flat black, thin type, and two colours doing very different jobs.
 
@@ -19,10 +19,33 @@
    Everything else is deliberately unstyled: no gradients on panels, no glow,
    no shadow, 2px corners. The colour is the whole design, so any surface that
    competes with it gets flattened out of the way.
-   Renamed from "Amuzed" (amuzed.css). Palette untouched. No
-   THEME_ID_MIGRATIONS entry: the rename predates any released build carrying
-   this theme, so the old id was never stored anywhere. The lowercase label is
-   deliberate.
+
+   THE SUPPORTING PALETTE
+   ----------------------
+   Magenta and lime carry the interface. Everything that needs a category or
+   series colour (Budget's four panel stripes, its eight chart series) draws
+   from a set taken off a DAW timeline:
+
+     rose  #f84f5d    straw  #f5de47    green   #47e15b
+     blue  #5188f6    violet #bb63ee    white   #ffffff
+
+   These are the screenshot's HUES, not its literal pixels. Sampled straight,
+   they ran 14-54% saturation, because clips on a grey timeline never have to
+   fight a black background. Dropped onto this theme they read as dull and
+   muddy next to magenta at 100% and lime at 66%. Each hue is therefore
+   re-rendered at this theme's own strength (72-92% saturation), which is the
+   whole "full-saturation on black" premise. All six clear 6:1 against the
+   plate, against magenta's 5.7:1 and lime's 11:1.
+
+   Two hues were nudged off their sampled values to stay tellable apart: the
+   crimson (348) and the mauve (308) both sat within 20 degrees of magenta's
+   326 and collapsed into it once saturated, so they became rose at 355 and
+   violet at 278. No two colours in the theme are now closer than 29 degrees.
+
+   Named Amuzed, then ezmuze, now this. No THEME_ID_MIGRATIONS entry for any of
+   those, and none is warranted: this build has not been released, so no id in
+   that chain has ever existed outside development. A rename only needs a
+   migration entry once the id it replaces has actually shipped.
 
 ============================================================================= */
 
@@ -44,26 +67,33 @@
      below. */
   --color-btn:                 #ff0090;
   --color-accent:              #8fce2a;
-  --color-btn-hover:           #ff3faa;
+  /* Darker than --color-btn, not lighter: buttons are a solid magenta fill and
+     press down into this on hover, the same direction every other theme moves
+     (Midnight Blue steps #2563eb -> #1d4ed8). The old value was a LIGHTER pink,
+     which only worked while buttons were hairline outlines that filled on
+     hover. */
+  --color-btn-hover:           #990057;
   --color-btn-text:            #ffffff;
 
   --color-danger:              #ff0055;
   --color-danger-subtle:       rgba(255, 0, 85, 0.14);
   --color-success:             #8fce2a;
 
-  --color-accent-input:        #ff0090;
-  --color-accent-view:         #8fce2a;
-  --color-accent-totals:       #00c2ff;
-  --color-accent-entries:      #ffd400;
+  /* Budget's four category accents. Magenta and lime hold the first two, the
+     other two come from the sampled set (see the palette note in the header). */
+  --color-accent-input:        #f84f5d;
+  --color-accent-view:         #47e15b;
+  --color-accent-totals:       #5188f6;
+  --color-accent-entries:      #f5de47;
 
   --color-toggle-off:          #2a2a2a;
   --color-toggle-on:           #ff0090;
 
-  /* ── Changelog accents ── Features (magenta) / Improvements (lime) / Bugfixes (red) / tool heading (cyan) */
+  /* ── Changelog accents ── Features (magenta) / Improvements (lime) / Bugfixes (red) / tool heading (blue) */
   --color-changelog-features:     #ff0090;
   --color-changelog-improvements: #8fce2a;
   --color-changelog-bugfixes:     #ff0055;
-  --color-changelog-tool:         #00c2ff;
+  --color-changelog-tool:         #5188f6;
 
   --color-toast-success-bg:    #10200a;
   --color-toast-success-border:#8fce2a;
@@ -72,14 +102,16 @@
   --color-toast-error-border:  #ff0090;
   --color-toast-error-text:    #ffd0e8;
 
-  /* ── Budget chart palette ── Magenta / lime / cyan / yellow / orange / violet / mint / white, full-saturation on black */
+  /* ── Budget chart palette ── Magenta / lime / blue / straw / rose / mauve / green / white.
+     The first two are the theme's own; the rest are the sampled set, ordered so
+     no two neighbours share a hue family. */
   --color-chart-1:             #ff0090;
   --color-chart-2:             #8fce2a;
-  --color-chart-3:             #00c2ff;
-  --color-chart-4:             #ffd400;
-  --color-chart-5:             #ff5a00;
-  --color-chart-6:             #a35bff;
-  --color-chart-7:             #00e5a0;
+  --color-chart-3:             #5188f6;
+  --color-chart-4:             #f5de47;
+  --color-chart-5:             #f84f5d;
+  --color-chart-6:             #bb63ee;
+  --color-chart-7:             #47e15b;
   --color-chart-8:             #ffffff;
 }
 
@@ -183,10 +215,16 @@ textarea,
 }
 
 /* ── Panel accent slots, flat black with a single saturated rail ── */
-.panel-accent-input    { background: #0b0b0b; border-left: 3px solid #8fce2a; border-color: #262626; }
-.panel-accent-view     { background: #0b0b0b; border-left: 3px solid #ff0090; border-color: #262626; }
-.panel-accent-totals   { background: #0b0b0b; border-left: 3px solid #00c2ff; border-color: #262626; }
-.panel-accent-entries  { background: #0b0b0b; border-left: 3px solid #ffd400; border-color: #262626; }
+/* One stripe per category, all four from the sampled set. These were the two
+   interface colours plus two of the new ones, and input/view were additionally
+   swapped relative to --color-accent-input/-view, so a panel's stripe and its
+   chart series disagreed. Now they match, and magenta and lime are left to do
+   their own jobs (buttons, the selection band) rather than doubling as
+   category markers. */
+.panel-accent-input    { background: #0b0b0b; border-color: #262626; border-left: 3px solid #f84f5d; }
+.panel-accent-view     { background: #0b0b0b; border-color: #262626; border-left: 3px solid #47e15b; }
+.panel-accent-totals   { background: #0b0b0b; border-color: #262626; border-left: 3px solid #5188f6; }
+.panel-accent-entries  { background: #0b0b0b; border-color: #262626; border-left: 3px solid #f5de47; }
 
 /* ── Tool / section header: the bar, with the title riding it ── */
 .tool-view-header,
@@ -227,18 +265,25 @@ body:not(.solid-modals) .modal {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
 }
 
-/* ── Buttons, hairline outlines that fill lime when they matter ── */
+/* ── Buttons ──
+   Solid magenta at rest, darkening on hover. This is the header's "magenta is
+   the interface" claim taken literally: a control you can press is a magenta
+   block, not an outline that becomes one once you find it. Matches how every
+   other theme treats a button, this one just does it in its own colour.
+   The quiet chips below (.tab-btn, .dir-btn, the chart controls) opt back out
+   with an explicit transparent background; they are secondary controls and
+   carry the lime selection band when active. ── */
 button {
-  background: transparent;
-  color: #f2f2f2;
-  border: 1px solid #333333;
+  background: #ff0090;
+  color: #ffffff;
+  border: 1px solid #ff0090;
   box-shadow: none;
 }
 
 button:hover {
-  background: transparent;
-  color: #ff0090;
-  border-color: #ff0090;
+  background: #990057;
+  color: #ffffff;
+  border-color: #990057;
   box-shadow: none;
 }
 
@@ -250,8 +295,8 @@ button:hover {
 }
 
 .primary-btn:hover {
-  background: #ff3faa;
-  border-color: #ff3faa;
+  background: #990057;
+  border-color: #990057;
   color: #ffffff;
   box-shadow: none;
 }
@@ -343,7 +388,7 @@ textarea:focus {
 /* ── Preview cards ── */
 .preview-card:hover       { border-color: #ff0090; }
 .preview-card.anchor-card { border-color: #ff3faa; box-shadow: none; }
-.preview-card.drag-target { border-color: #00c2ff; }
+.preview-card.drag-target { border-color: #47e15b; }
 
 /* ── Slider, a flat lime block ── */
 .img-slider::-webkit-slider-thumb {
@@ -353,8 +398,11 @@ textarea:focus {
   box-shadow: none;
 }
 
+/* Darkens like a button rather than lightening: after the button change this
+   is the only other magenta control you grab, and two opposite hover
+   directions in one theme reads as a bug. */
 .img-slider::-webkit-slider-thumb:hover {
-  background: #ff3faa;
+  background: #990057;
 }
 
 .slider-val   { color: #ff0090; }
@@ -410,7 +458,7 @@ textarea:focus {
 .budget-stats-table td.neg { color: #FF0000; }
 
 .budget-stats-count-good    { color: #8fce2a; border-color: #8fce2a; }
-.budget-stats-count-late    { color: #ffd400; border-color: #ffd400; }
+.budget-stats-count-late    { color: #f5de47; border-color: #f5de47; }
 .budget-stats-count-overdue { color: #ff0055; border-color: #ff0055; }
 
 .budget-chart-cycle-btn,

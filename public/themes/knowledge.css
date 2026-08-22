@@ -51,26 +51,10 @@
 }
 
 /* ── Panel accent slots, sage / amber alternating ── */
-.panel-accent-input {
-  background: linear-gradient(135deg, rgba(255, 196, 13, 0.05) 0%, #0d1a10 100%);
-  border-left: 4px solid #ffc40d;
-  border-color: rgba(255, 196, 13, 0.28);
-}
-.panel-accent-view {
-  background: linear-gradient(135deg, rgba(104, 153, 111, 0.07) 0%, #0d1a10 100%);
-  border-left: 4px solid #68996f;
-  border-color: rgba(104, 153, 111, 0.28);
-}
-.panel-accent-totals {
-  background: linear-gradient(135deg, rgba(255, 196, 13, 0.05) 0%, #0d1a10 100%);
-  border-left: 4px solid #ffc40d;
-  border-color: rgba(255, 196, 13, 0.28);
-}
-.panel-accent-entries {
-  background: linear-gradient(135deg, rgba(18, 135, 111, 0.06) 0%, #0d1a10 100%);
-  border-left: 4px solid #12876f;
-  border-color: rgba(18, 135, 111, 0.28);
-}
+.panel-accent-input { background: linear-gradient(135deg, rgba(255, 196, 13, 0.05) 0%, #0d1a10 100%); border-color: rgba(255, 196, 13, 0.28); border-left: 4px solid #ffc40d; }
+.panel-accent-view { background: linear-gradient(135deg, rgba(104, 153, 111, 0.07) 0%, #0d1a10 100%); border-color: rgba(104, 153, 111, 0.28); border-left: 4px solid #68996f; }
+.panel-accent-totals { background: linear-gradient(135deg, rgba(255, 196, 13, 0.05) 0%, #0d1a10 100%); border-color: rgba(255, 196, 13, 0.28); border-left: 4px solid #ffc40d; }
+.panel-accent-entries { background: linear-gradient(135deg, rgba(18, 135, 111, 0.06) 0%, #0d1a10 100%); border-color: rgba(18, 135, 111, 0.28); border-left: 4px solid #12876f; }
 
 /* ── Tool / section header, dark green with sage accent ── */
 .tool-view-header,

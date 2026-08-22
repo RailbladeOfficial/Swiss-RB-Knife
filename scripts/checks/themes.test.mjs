@@ -101,6 +101,29 @@ test("the first paint uses the default theme (a wrong href here means a blank fi
   assert.ok(exists(`public/themes/${def}.css`), `default theme ${def}.css is missing`);
 });
 
+test("the coloured stripe on a tool panel is not silently overwritten with grey", () => {
+  // Budget, Time Tracker and Auto-Backup mark their panels with a coloured
+  // left border. Nine themes declared that border and THEN declared a plain
+  // `border-color` after it, and because border-color is a shorthand covering
+  // all four sides, it repainted the stripe grey. The colour was in the file,
+  // correct, and never once reached the screen.
+  //
+  // In CSS the later declaration wins, so border-color has to come FIRST.
+  const problems = [];
+  for (const id of themeFiles()) {
+    const css = read(`public/themes/${id}.css`);
+    for (const m of css.matchAll(/(\.panel-accent-[a-z]+[^{]*)\{([^}]*)\}/g)) {
+      const [, selector, body] = m;
+      const left = body.search(/border-left\s*:/);
+      const all = body.search(/border-color\s*:/);
+      if (left >= 0 && all >= 0 && all > left) {
+        problems.push(`${id}.css ${selector.trim()}: border-color after border-left`);
+      }
+    }
+  }
+  assert.deepEqual(problems, [], "these panel stripes render grey instead of their colour");
+});
+
 test("the Special tab stays alphabetical", () => {
   const block = slice("src/theme-ids.ts", 'tab: "special"', "];");
   const labels = [...block.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);

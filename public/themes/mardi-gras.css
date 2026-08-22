@@ -52,30 +52,10 @@
 }
 
 /* ── Panel accent slots, gold / green / purple / gold ── */
-.panel-accent-input {
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%);
-  border-left: 4px solid #ffd700;
-  border-color: rgba(255, 215, 0, 0.35);
-  box-shadow: 0 0 16px rgba(255, 215, 0, 0.1);
-}
-.panel-accent-view {
-  background: linear-gradient(135deg, rgba(0, 165, 80, 0.07) 0%, #0f0520 100%);
-  border-left: 4px solid #00a550;
-  border-color: rgba(0, 165, 80, 0.35);
-  box-shadow: 0 0 16px rgba(0, 165, 80, 0.1);
-}
-.panel-accent-totals {
-  background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, #0f0520 100%);
-  border-left: 4px solid #7b2fbe;
-  border-color: rgba(123, 47, 190, 0.4);
-  box-shadow: 0 0 16px rgba(123, 47, 190, 0.12);
-}
-.panel-accent-entries {
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%);
-  border-left: 4px solid #ffd700;
-  border-color: rgba(255, 215, 0, 0.35);
-  box-shadow: 0 0 16px rgba(255, 215, 0, 0.1);
-}
+.panel-accent-input { background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%); border-color: rgba(255, 215, 0, 0.35); border-left: 4px solid #ffd700; box-shadow: 0 0 16px rgba(255, 215, 0, 0.1); }
+.panel-accent-view { background: linear-gradient(135deg, rgba(0, 165, 80, 0.07) 0%, #0f0520 100%); border-color: rgba(0, 165, 80, 0.35); border-left: 4px solid #00a550; box-shadow: 0 0 16px rgba(0, 165, 80, 0.1); }
+.panel-accent-totals { background: linear-gradient(135deg, rgba(123, 47, 190, 0.1) 0%, #0f0520 100%); border-color: rgba(123, 47, 190, 0.4); border-left: 4px solid #7b2fbe; box-shadow: 0 0 16px rgba(123, 47, 190, 0.12); }
+.panel-accent-entries { background: linear-gradient(135deg, rgba(255, 215, 0, 0.07) 0%, #0f0520 100%); border-color: rgba(255, 215, 0, 0.35); border-left: 4px solid #ffd700; box-shadow: 0 0 16px rgba(255, 215, 0, 0.1); }
 
 /* ── Tool / section header, gold-to-purple festive gradient ── */
 .tool-view-header,

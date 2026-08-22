@@ -55,11 +55,16 @@ const THEME_ID_MIGRATIONS: Record<string, string> = {
   // Freed up the "Midnight" name for that family. The old Midnight is a
   // true-black theme, which is what "Void" describes.
   midnight: "void",
-  // NOTE: windowed -> nostalgia and amuzed -> ezmuze are deliberately absent.
-  // Those renames happened before any build carrying them shipped, so no
-  // settings file anywhere can name the old ids and an entry would be dead
-  // weight. Only add a pair here once the id it replaces has actually been
-  // released.
+  // The bar for an entry is simply: did the old id ever ship? The two above did.
+  // default.css and midnight.css date from the initial public beta and are in
+  // every release tag to date (v0.3.3, v0.4.0, v0.5.0), so installs out there
+  // have settings files naming them, and dropping either entry strands those
+  // users on the fallback theme.
+  //
+  // windowed -> nostalgia and amuzed -> ezmuze -> audacious are deliberately
+  // absent for the same reason inverted: windowed.css and amuzed.css were added
+  // 2026-08-19, after v0.5.0, and no release contains them. No settings file
+  // anywhere can name those ids, so an entry would be dead weight.
 };
 
 /** Maps a renamed theme id to its current one. Ids that were never renamed
@@ -131,10 +136,10 @@ export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: s
     // to re-derive every time a theme is added. Keep it that way.
     tab: "special",
     themes: [
+      { id: "audacious", label: "Audacious" },
       { id: "blades", label: "Blades" },
       { id: "cake", label: "Cake" },
       { id: "cartoon", label: "Cartoon" },
-      { id: "ezmuze", label: "ezmuze" },
       { id: "halo", label: "Halo" },
       { id: "knowledge", label: "Knowledge" },
       { id: "lava", label: "Lava" },
