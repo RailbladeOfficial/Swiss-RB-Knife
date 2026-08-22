@@ -1,12 +1,25 @@
+/* Surface tones. Panels used to be pure #ffffff on an #f1f5f9 page: both very
+   bright, and only a few percent apart, so a screen of cards read as one flat
+   sheet of white. These step the whole stack down and lean it toward the
+   theme's blue, keeping the same page -> panel -> input ordering:
+   the panel is off-white rather than white, and the page sits far enough below
+   it that panel edges are visible on their own. Everywhere a literal #ffffff
+   appears further down as a *surface* (headers, modals, budget panels, the
+   slider thumb ring) it follows these; #ffffff as *label text on blue* stays
+   white. */
 :root {
-  --color-bg:                  #f1f5f9;
-  --color-panel:               #ffffff;
-  --color-input-bg:            #f8fafc;
-  --color-border:              #cbd5e1;
+  --color-bg:                  #e4eaf3;
+  --color-panel:               #f4f7fc;
+  --color-input-bg:            #ebf1f9;
+  --color-border:              #c6d3e3;
   --color-border-dashed:       #94a3b8;
   --color-text:                #1e293b;
-  --color-text-muted:          #64748b;
-  --color-hover:               #e2e8f0;
+  /* Nudged one step darker to hold its old margin: at #64748b it read 4.76:1
+     against the pure-white panel, and dropping the panel to #f4f7fc would have
+     taken it to 4.43. This puts it back to 5.01 on the panel and 4.45 on the
+     page. */
+  --color-text-muted:          #5f6b80;
+  --color-hover:               #dde5f1;
 
   --color-btn:                 #3b82f6;
   --color-accent:              #1e40af;
@@ -38,7 +51,7 @@
   --color-toast-error-border:  #dc2626;
   --color-toast-error-text:    #7f1d1d;
 
-  /* ── Budget chart palette ── Blue / teal / amber / red / violet / cyan / pink / green, medium sat for white bg */
+  /* ── Budget chart palette ── Blue / teal / amber / red / violet / cyan / pink / green, medium sat for the light plate */
   --color-chart-1:             #2563eb;
   --color-chart-2:             #059669;
   --color-chart-3:             #d97706;
@@ -49,21 +62,38 @@
   --color-chart-8:             #16a34a;
 }
 
-/* ── Panel accent slots, clean left-border accents on white ── */
+/* ── Panel accent slots, clean left-border accents on the panel tone ── */
 .panel-accent-input    { border-left: 4px solid #3b82f6; }
 .panel-accent-view     { border-left: 4px solid #059669; }
 .panel-accent-totals   { border-left: 4px solid #d97706; }
 .panel-accent-entries  { border-left: 4px solid #dc2626; }
 
-/* ── Panel base, white cards with a soft shadow instead of glow ── */
+/* ── Panel base, off-white cards with a soft shadow instead of glow ── */
 .panel {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-/* ── Tool / section header, clean white with a blue bottom border ── */
+/* ── Chrome surfaces ──
+   The title bar, the sidebar rail and the tool/section header bars all default
+   to --color-panel, which put three more near-white slabs around every screen.
+   They're chrome, not content, so this theme gives them one shared blue tint
+   instead. It sits *below* the page colour in lightness (75% vs 82%), so the
+   frame reads as a frame and the content panels above it (93%) are clearly the
+   brightest thing on screen, which is where you actually want the eye. ── */
+#titleBar,
+#sidebar,
 .tool-view-header,
 .section-header {
-  background: #ffffff;
+  background: #d6e2f3;
+}
+
+#titleBar,
+#sidebar {
+  border-color: #b9cbe4;
+}
+
+.tool-view-header,
+.section-header {
   border-bottom: 2px solid #3b82f6;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
@@ -71,6 +101,30 @@
 .tool-view-title,
 .section-title {
   color: #1e40af;
+}
+
+/* Sidebar nav. The base rules colour the labels with --color-text-muted and
+   highlight with --color-hover, both tuned against the old white rail: on the
+   tinted one the labels drop to 4.11:1 and the highlight is *lighter* than the
+   surface it sits on. Darker labels (5.05:1) and a deeper highlight fix both. */
+.nav-item {
+  color: #525d73;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: #c3d5ee;
+  color: #1e293b;
+}
+
+/* Same two problems in the title bar, same fix. */
+.titlebar-btn {
+  color: #525d73;
+}
+
+.titlebar-btn:hover {
+  background: #c3d5ee;
+  color: #1e293b;
 }
 
 /* ── Buttons, need explicit border since shell base has none ── */
@@ -101,19 +155,20 @@ button:hover {
   border-color: #dc2626;
 }
 
-/* ── Modal, solid: white card (original look) ── */
+/* ── Modal, solid: off-white card ── */
 body.solid-modals .modal {
-  background: #ffffff;
-  border-color: #cbd5e1;
+  background: #f4f7fc;
+  border-color: #c6d3e3;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
 
-/* ── Modal, translucent: frosted white glass ── */
+/* ── Modal, translucent: frosted glass, opacity raised a touch since the
+   panel tone behind it is no longer pure white ── */
 body:not(.solid-modals) .modal {
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(244, 247, 252, 0.6);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-color: rgba(203, 213, 225, 0.7);
+  border-color: rgba(198, 211, 227, 0.8);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
@@ -124,7 +179,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Tab buttons ── */
 .tab-btn {
-  color: #64748b;
+  color: #5f6b80;
   border-color: transparent;
   background: transparent;
   box-shadow: none;
@@ -146,9 +201,9 @@ body:not(.solid-modals) .modal {
 
 /* ── Dir buttons ── */
 .dir-btn, .prv-btn {
-  background: #f1f5f9;
-  color: #64748b;
-  border-color: #cbd5e1;
+  background: #ebf1f9;
+  color: #5f6b80;
+  border-color: #c6d3e3;
 }
 
 .dir-btn:hover, .prv-btn:hover {
@@ -175,8 +230,8 @@ body:not(.solid-modals) .modal {
 
 /* ── Size estimate box ── */
 .size-estimate {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: #ebf1f9;
+  border-color: #c6d3e3;
 }
 
 /* ── Preview card accents ── */
@@ -190,7 +245,7 @@ body:not(.solid-modals) .modal {
    matching how every other theme handles it. ── */
 .img-slider::-webkit-slider-thumb {
   background: #3b82f6;
-  border-color: #ffffff;
+  border-color: #f4f7fc;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
@@ -199,7 +254,38 @@ body:not(.solid-modals) .modal {
 }
 
 .result-preview-wrap {
-  border-color: #cbd5e1;
+  border-color: #c6d3e3;
+}
+
+/* ── App Lock screen ──
+   The numpad is twelve --color-panel keys filling the middle of the screen, so
+   on this theme it was the largest single block of white in the app. The key
+   faces take a blue a step deeper than the chrome tint, which gives the pad a
+   definite shape against the page instead of leaving it as pale rectangles on
+   a pale background. The pressed state is already the solid accent
+   (lockscreen.css sets :active to --color-btn), so a key runs
+   tint -> deeper tint -> solid blue as you touch it. ── */
+.lock-numpad-btn {
+  background: #c7d9f2;
+  border-color: #a9c4e8;
+  color: #1e293b;
+}
+
+.lock-numpad-btn:hover {
+  background: #b5cdec;
+  border-color: #3b82f6;
+}
+
+/* Unfilled PIN dots and the outlined buttons around the pad, which all border
+   with --color-border, a tone picked to sit on the panel rather than on the
+   lock screen's page colour. */
+.lock-dot {
+  border-color: #a9c4e8;
+}
+
+.lock-exit-btn,
+.lock-type-btn {
+  border-color: #a9c4e8;
 }
 
 /* ── Update-notifier accents ──
@@ -210,14 +296,14 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds, white/near-white with very subtle tints on white panels */
-#finance-tool-budget .panel-accent-input  { background: #ffffff; box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6; }
-#finance-tool-budget .panel-accent-view   { background: #ffffff; box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669; }
-#finance-tool-budget .panel-accent-totals { background: #ffffff; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706; }
-#finance-tool-budget .panel-accent-entries{ background: #ffffff; box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08),  inset 3px 0 0 #dc2626; }
+/* Panel backgrounds, panel tone with very subtle accent tints */
+#finance-tool-budget .panel-accent-input  { background: #f4f7fc; box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6; }
+#finance-tool-budget .panel-accent-view   { background: #f4f7fc; box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669; }
+#finance-tool-budget .panel-accent-totals { background: #f4f7fc; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706; }
+#finance-tool-budget .panel-accent-entries{ background: #f4f7fc; box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08),  inset 3px 0 0 #dc2626; }
 
 /* Annual Stats title panel */
-.budget-annual-stats-title-panel { border-left: 4px solid #3b82f6; background: #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.budget-annual-stats-title-panel { border-left: 4px solid #3b82f6; background: #f4f7fc; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 .budget-annual-stats-title { color: #1e40af; }
 
 /* Summary tab active */
@@ -238,7 +324,7 @@ body:not(.solid-modals) .modal {
 .budget-chart-expand-btn,
 .budget-chart-modal-cycle-btn {
   border-color: rgba(59, 130, 246, 0.35);
-  color: #64748b;
+  color: #5f6b80;
 }
 .budget-chart-cycle-btn:hover,
 .budget-chart-expand-btn:hover,
@@ -270,6 +356,6 @@ body:not(.solid-modals) .modal {
   --gs-loss:        #dc2626;
   --gs-surface:     rgba(59, 130, 246, 0.07);
   --gs-header-bg:   rgba(59, 130, 246, 0.10);
-  --gs-grid-line:   #e2e8f0;
+  --gs-grid-line:   #dde5f1;
   --gs-zebra:       rgba(15, 23, 42, 0.03);
 }

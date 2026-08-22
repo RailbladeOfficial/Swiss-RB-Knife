@@ -1933,17 +1933,17 @@ button:hover {
 /* =============================================================================
    NOTIFICATION VOLUME  (General Settings, Audio tab)
    -----------------------------------------------------------------------------
-   Sits under the Sound Pack row, separated by a rule, because it's a different
-   kind of choice from "which pack": it applies to whichever pack is selected.
+   First block in the Audio tab, above the Sound Pack row. It carried a
+   border-top back when it lived at the bottom of the Choose Sound Pack modal
+   and needed separating from the pack grid; at the top of a tab that rule has
+   nothing above it to divide, so it's just bottom spacing now.
 ============================================================================= */
 
 .sound-volume-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border);
+  margin-bottom: 14px;
 }
 
 .sound-volume-label {
