@@ -1,5 +1,47 @@
 [
   {
+    "version": "0.6.1",
+    "date": "2026-08-22",
+    "changes": {
+      "features": {
+        "App Overall": [
+          "Added ability to cycle between two themes depending on time of day, allowing for using the Light theme during the day and the Dark theme at night, or any two themes you want to switch between.",
+          "New Theme Added - Midnight Green.",
+          "New Theme Added - Midnight Red.",
+          "New Theme Added - Shadow.",
+          "New Theme Added - Cartoon.",
+          "New Theme Added - Lava.",
+          "New Theme Added - Nostalgia.",
+          "New Theme Added - Blades.",
+          "New Theme Added - Audacious."
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "Changed General Settings modal to a three-tabbed view with tabs for Display, Audio, and Preferences.",
+          "Moved Notification Volume out of the Choose Sound Pack modal, into the Audio tab of General Settings.",
+          "Made the Light theme less blinding to the retinas.",
+          "Made the Dark theme the new 'default' in terms of which theme you start on and which one the system falls back to on errors.",
+          "Renamed theme 'Default' to 'Midnight Blue'.",
+          "Renamed theme 'Midnight' to 'Void'.",
+          "Moved themes Matte, Void, and Terminal to the Special themes tab.",
+          "Split some files from shell for organization's sake."
+        ],
+        "Game Stats": [
+          "Made the New Game view persist draft data between app close/reopen."
+        ]
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Fixed issues where a theme not being found would load the app unstyled.",
+          "Fixed various styling inconsistencies.",
+          "Fixed an issue where App Lock could have perma-locked you out of the app.",
+          "Ensured you couldn't set a Display Font Scale out of the -10 to 10 range."
+        ]
+      }
+    }
+  },
+  {
     "version": "0.6.0",
     "date": "2026-08-18",
     "changes": {
