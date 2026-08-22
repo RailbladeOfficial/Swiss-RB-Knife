@@ -31,7 +31,8 @@
 ============================================================================= */
 
 import { settings, saveSettings, THEME_GROUPS } from "./shell";
-import { themeLink, themeCssUrl } from "./theme-core";
+import { resolveThemeId, themeLink, themeCssUrl } from "./theme-core";
+import { BASE_THEME_ID, DEFAULT_THEME_ID } from "./theme-ids";
 import { clearRandomPalette, PERSISTENT_RANDOM_KEY } from "./random-theme";
 import { applyCustomThemeById, clearCustomTheme, customThemes } from "./theme-editor";
 
@@ -303,7 +304,7 @@ function buildCyclePool(): string[] {
     .map((t) => t.id);
   const customs = settings.cycleIncludeCustom ? customThemes.map((t) => t.id) : [];
   const pool = [...builtins, ...customs];
-  return pool.length > 0 ? pool : ["default"];
+  return pool.length > 0 ? pool : [DEFAULT_THEME_ID];
 }
 
 /** What Cycle mode should be showing right now: a live Holiday Override wins
@@ -325,7 +326,7 @@ function resolveActiveCycleThemeId(): string {
 }
 
 function pickNextInPool(pool: string[], current: string): string {
-  if (pool.length === 0) return "default";
+  if (pool.length === 0) return DEFAULT_THEME_ID;
   if (settings.cycleOrder === "random") {
     if (pool.length === 1) return pool[0]!;
     let next = current;
@@ -345,7 +346,7 @@ function pickNextInPool(pool: string[], current: string): string {
 function applyUnderlyingTheme(themeId: string): void {
   const isCustom = customThemes.some((t) => t.id === themeId);
   if (isCustom) {
-    themeLink.href = themeCssUrl("default");
+    themeLink.href = themeCssUrl(BASE_THEME_ID);
     themeLink.onload = () => {
       applyCustomThemeById(themeId);
       window.dispatchEvent(new CustomEvent("themechange"));
@@ -355,7 +356,11 @@ function applyUnderlyingTheme(themeId: string): void {
     return;
   }
   localStorage.removeItem(PERSISTENT_RANDOM_KEY);
-  themeLink.href = themeCssUrl(themeId);
+  // Same guard as applyTheme()'s standard branch: a Cycle pool entry or a
+  // stored day/night pick naming a theme that no longer exists must not be
+  // handed to themeLink raw. See resolveThemeId() for why a missing file does
+  // not announce itself.
+  themeLink.href = themeCssUrl(resolveThemeId(themeId));
   themeLink.onload = () => {
     clearRandomPalette();
     clearCustomTheme();

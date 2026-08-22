@@ -20,7 +20,12 @@
   <link rel="stylesheet" href="src/tools/tts-repeater.css" />
   <link rel="stylesheet" href="src/tools/days-between.css" />
   <link rel="stylesheet" href="src/tools/countdown.css" />
-  <link id="themeLink" rel="stylesheet" href="/themes/default.css" />
+  <!-- Boot-time palette only. applyTheme() swaps this href as soon as settings
+       load, so this is just what paints for the first frame; keep it pointing at
+       DEFAULT_THEME_ID (theme-core.ts) so a fresh install has nothing to swap and
+       shows no flash. Must be a file that always exists, an unresolvable href
+       here means no --color-* vars at all until JS runs. -->
+  <link id="themeLink" rel="stylesheet" href="/themes/dark.css" />
   <script type="module" src="src/shell.ts"></script>
 </head>
 
@@ -2940,13 +2945,11 @@
                  writes it directly), it's just no longer rendered as a dropdown. -->
             <select id="themeSelect" style="display:none;">
               <optgroup label="Main">
-                <option value="default">Default</option>
-                <option value="light">Light</option>
                 <option value="dark">Dark</option>
-                <option value="matte">Matte</option>
-                <option value="midnight">Midnight</option>
-                <option value="terminal">Terminal</option>
-                <option value="shadow">Shadow</option>
+                <option value="light">Light</option>
+                <option value="midnight-blue">Midnight Blue</option>
+                <option value="midnight-green">Midnight Green</option>
+                <option value="midnight-red">Midnight Red</option>
               </optgroup>
               <optgroup label="Holiday">
                 <option value="valentine">Valentine</option>
@@ -2958,16 +2961,20 @@
                 <option value="christmas">Christmas</option>
               </optgroup>
               <optgroup label="Special">
-                <option value="cake">Cake</option>
-                <option value="knowledge">Knowledge</option>
-                <option value="neon">Neon</option>
-                <option value="retro-electric">Retro-Electric</option>
-                <option value="halo">Halo</option>
-                <option value="cartoon">Cartoon</option>
-                <option value="lava">Lava</option>
-                <option value="windowed">Windowed</option>
                 <option value="blades">Blades</option>
-                <option value="amuzed">Amuzed</option>
+                <option value="cake">Cake</option>
+                <option value="cartoon">Cartoon</option>
+                <option value="ezmuze">ezmuze</option>
+                <option value="halo">Halo</option>
+                <option value="knowledge">Knowledge</option>
+                <option value="lava">Lava</option>
+                <option value="matte">Matte</option>
+                <option value="neon">Neon</option>
+                <option value="nostalgia">Nostalgia</option>
+                <option value="retro-electric">Retro-Electric</option>
+                <option value="shadow">Shadow</option>
+                <option value="terminal">Terminal</option>
+                <option value="void">Void</option>
                 <option value="random">Random</option>
                 <option value="custom">Custom</option>
               </optgroup>
@@ -5881,27 +5888,37 @@
           <div class="te-base-field">
             <label class="te-field-label">Start fresh from:</label>
             <select id="teBaseSelect" class="settings-select">
+              <!-- Mirrors THEME_GROUPS (shell.ts). base-theme is deliberately
+                   absent: it is the sheet custom themes are built ON, not a
+                   theme you can pick. Valentine/Thanksgiving/Halo/Terminal had
+                   drifted out of this list and are restored. -->
               <optgroup label="System Themes">
-                <option value="default">Default</option>
-                <option value="light">Light</option>
                 <option value="dark">Dark</option>
-                <option value="matte">Matte</option>
-                <option value="midnight">Midnight</option>
+                <option value="light">Light</option>
+                <option value="midnight-blue">Midnight Blue</option>
+                <option value="midnight-green">Midnight Green</option>
+                <option value="midnight-red">Midnight Red</option>
+                <option value="valentine">Valentine</option>
                 <option value="mardi-gras">Mardi Gras</option>
                 <option value="rainbow">Rainbow</option>
                 <option value="patriot">Patriot</option>
                 <option value="halloween">Halloween</option>
+                <option value="thanksgiving">Thanksgiving</option>
                 <option value="christmas">Christmas</option>
-                <option value="cake">Cake</option>
-                <option value="knowledge">Knowledge</option>
-                <option value="neon">Neon</option>
-                <option value="retro-electric">Retro-Electric</option>
-                <option value="cartoon">Cartoon</option>
-                <option value="lava">Lava</option>
-                <option value="shadow">Shadow</option>
-                <option value="windowed">Windowed</option>
                 <option value="blades">Blades</option>
-                <option value="amuzed">Amuzed</option>
+                <option value="cake">Cake</option>
+                <option value="cartoon">Cartoon</option>
+                <option value="ezmuze">ezmuze</option>
+                <option value="halo">Halo</option>
+                <option value="knowledge">Knowledge</option>
+                <option value="lava">Lava</option>
+                <option value="matte">Matte</option>
+                <option value="neon">Neon</option>
+                <option value="nostalgia">Nostalgia</option>
+                <option value="retro-electric">Retro-Electric</option>
+                <option value="shadow">Shadow</option>
+                <option value="terminal">Terminal</option>
+                <option value="void">Void</option>
               </optgroup>
               <optgroup id="teBaseCustomGroup" label="Custom Themes" style="display:none;"></optgroup>
             </select>

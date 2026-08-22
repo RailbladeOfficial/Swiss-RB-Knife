@@ -1,3 +1,14 @@
+/* =============================================================================
+   VOID
+   -----------------------------------------------------------------------------
+   Was "Midnight" (midnight.css) until the Midnight family arrived and needed
+   the name. The palette is untouched, only the id and label changed, and the
+   new name is the more accurate one anyway: this is a true-black theme, #000000
+   page with #050505 panels and a pure-blue accent, not a navy one. No migration
+   exists for the old "midnight" id, see the note in midnight-blue.css. Nothing here is shared with
+   midnight-blue/red/green.
+============================================================================= */
+
 :root {
   --color-bg:                  #000000;
   --color-panel:               #050505;

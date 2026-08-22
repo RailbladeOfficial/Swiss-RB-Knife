@@ -1,5 +1,5 @@
 /* =============================================================================
-   WINDOWED
+   NOSTALGIA
    -----------------------------------------------------------------------------
    Windows 2000. The #3a6ea5 desktop blue behind everything, #d4d0c8 grey
    chrome on top of it, square corners, and the four-tone raised bevel (white /
@@ -37,6 +37,10 @@
    Icons are inline SVG strokes, so nothing can literally pixelate them.
    `shape-rendering: crispEdges` turns off antialiasing instead, which
    stair-steps every diagonal and reads as the low-res icon art of the era.
+   Renamed from "Windowed" (windowed.css). Palette untouched. No
+   THEME_ID_MIGRATIONS entry: the rename predates any released build carrying
+   this theme, so the old id was never stored anywhere.
+
 ============================================================================= */
 
 :root {

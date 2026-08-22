@@ -528,27 +528,78 @@ fn save_lock_hash(app: tauri::AppHandle, credential: String) -> Result<(), Strin
     atomic_write(&get_data_path(&app, "lock.json"), hash.as_bytes())
 }
 
+/// Reads lock.json and returns the stored hash only if it is actually a usable
+/// Argon2 PasswordHash. `None` covers all three "there is no working lock here"
+/// cases: no file, unreadable file, and a file whose contents don't parse.
+///
+/// That last case is the reason this exists. A lock.json that is present but
+/// truncated or garbled (an interrupted write, a half-restored backup, a
+/// hand-edit) used to satisfy lock_is_set()'s bare `.exists()` check while
+/// making verify_lock() fail for EVERY credential, including the correct one.
+/// The lock screen has no "reset credential" affordance of its own (Change and
+/// Remove live in the General Settings modal, which is behind the lock), so the
+/// only ways out were the Exit App button or deleting the file by hand. One
+/// corrupt file meant a permanently unopenable app.
+fn read_valid_lock_hash(app: &tauri::AppHandle) -> Option<String> {
+    let stored = fs::read_to_string(get_data_path(app, "lock.json")).ok()?;
+    let stored = stored.trim().to_string();
+    if is_usable_lock_hash(&stored) {
+        Some(stored)
+    } else {
+        None
+    }
+}
+
+/// Whether `stored` is a hash that verification could actually succeed against.
+///
+/// Parsing alone is NOT enough, which is the subtle half of this. The PHC
+/// string format permits a value carrying algorithm, version, params and salt
+/// but no digest, so a lock.json truncated partway through still parses cleanly
+/// while being impossible to match any credential against. Requiring both the
+/// digest and the salt is what actually distinguishes "a lock" from "the
+/// wreckage of one".
+fn is_usable_lock_hash(stored: &str) -> bool {
+    match PasswordHash::new(stored.trim()) {
+        Ok(parsed) => parsed.hash.is_some() && parsed.salt.is_some(),
+        Err(_) => false,
+    }
+}
+
 /// Verifies a supplied credential against the stored Argon2id hash.
-/// Returns `true` if it matches, `false` if it doesn't or no hash is stored.
-/// The credential is zeroized on return, see save_lock_hash.
+/// Returns `true` if it matches, `false` if it doesn't, if no hash is stored,
+/// or if the stored hash is unusable. The credential is zeroized on return,
+/// see save_lock_hash.
 #[tauri::command]
 fn verify_lock(app: tauri::AppHandle, credential: String) -> Result<bool, String> {
     let credential = zeroize::Zeroizing::new(credential);
-    let path = get_data_path(&app, "lock.json");
-    let stored = match fs::read_to_string(&path) {
-        Ok(s) => s,
-        Err(_) => return Ok(false),
+    // Ok(false) rather than Err on a bad hash: an unreadable credential store
+    // is "this does not match", not an exceptional condition to surface. The
+    // caller (submitPin/submitPassword in lockscreen.ts) treats a rejected
+    // promise and a `false` identically anyway.
+    let Some(stored) = read_valid_lock_hash(&app) else {
+        return Ok(false);
     };
-    let parsed_hash = PasswordHash::new(stored.trim()).map_err(|e| e.to_string())?;
+    let Ok(parsed_hash) = PasswordHash::new(&stored) else {
+        return Ok(false);
+    };
     Ok(Argon2::default()
         .verify_password(credential.as_bytes(), &parsed_hash)
         .is_ok())
 }
 
-/// Returns whether a lock hash file exists on disk (i.e. lock has been set up).
+/// Returns whether a USABLE lock hash is stored, i.e. whether the app should
+/// gate on the lock screen at startup. Deliberately not a bare `.exists()`: a
+/// corrupt hash is a broken file, not a lock, and treating it as one strands
+/// the user outside an app they can no longer unlock (see read_valid_lock_hash).
+///
+/// This fails open by design. The app lock is a convenience gate on a local
+/// single-user tool, not a security boundary: nothing on disk is encrypted, so
+/// anyone who can corrupt lock.json can equally read every other data file or
+/// simply delete lock.json to the same effect. Refusing to open costs real
+/// recoverability and buys no real protection.
 #[tauri::command]
 fn lock_is_set(app: tauri::AppHandle) -> bool {
-    get_data_path(&app, "lock.json").exists()
+    read_valid_lock_hash(&app).is_some()
 }
 
 /// Removes the stored lock hash, disabling the lock entirely.
@@ -746,6 +797,47 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod lock_hash_tests {
+    use super::is_usable_lock_hash as is_usable;
+    use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
+    use argon2::Argon2;
+
+    #[test]
+    fn a_real_hash_is_usable() {
+        let salt = SaltString::generate(&mut OsRng);
+        let hash = Argon2::default()
+            .hash_password(b"1234", &salt)
+            .unwrap()
+            .to_string();
+        assert!(is_usable(&hash));
+        // Trailing whitespace survives a round trip through a text editor.
+        assert!(is_usable(&format!("{hash}
+")));
+    }
+
+    #[test]
+    fn corrupt_contents_are_not_a_lock() {
+        // Each of these is a lock.json that EXISTS, which is all the old
+        // lock_is_set() checked. Every one of them used to gate the app behind
+        // a lock screen that could never be satisfied, with no in-app way out.
+        let salt = SaltString::generate(&mut OsRng);
+        let real = Argon2::default()
+            .hash_password(b"1234", &salt)
+            .unwrap()
+            .to_string();
+        let truncated = &real[..real.len() / 2];
+
+        for bad in ["", "   ", "
+", "not-a-hash", "{}", "null", truncated] {
+            assert!(
+                !is_usable(bad),
+                "{bad:?} must not count as a lock, it would strand the user"
+            );
+        }
+    }
 }
 
 #[cfg(test)]

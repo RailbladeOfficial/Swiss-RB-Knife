@@ -63,10 +63,12 @@ import {
 import {
   ANIMATED_THEMES,
   applyTheme,
+  isKnownBuiltinTheme,
   themeCssUrl,
   getActiveCustomId,
   setActiveCustomId,
 } from "./theme-core";
+import { DEFAULT_THEME_ID, THEME_SENTINELS, migrateThemeId } from "./theme-ids";
 import {
   advanceCycleNow,
   getActiveHolidayOverrideThemeId,
@@ -449,6 +451,45 @@ function freshSidebarItems(): SidebarItemState[] {
   return ALL_TOOLS.map((t) => ({ key: t.key, pinned: true }));
 }
 
+/** Whether `target` is a startup target the app actually offers. Checked
+ *  against #startupSelect's own options rather than a second hardcoded list,
+ *  so the dropdown stays the single source of truth.
+ *
+ *  Hidden options still count as known values, which is the point: the
+ *  category targets are shelved from the UI rather than removed, and anyone
+ *  who set one before they were hidden keeps it through the shelving.
+ *
+ *  CSS.escape because this string can come from a hand-edited settings file
+ *  and is being interpolated into a selector. */
+function isKnownStartupTarget(target: string): boolean {
+  return (
+    startupSelect.querySelector(`option[value="${CSS.escape(target)}"]`) !== null
+  );
+}
+
+/** Bounds for settings.fontScale, matching #fontScaleValue's min/max in
+ *  index.html. Declared here because the HTML attributes were the ONLY thing
+ *  enforcing this, and a number input does not actually prevent an
+ *  out-of-range value being typed into it. */
+const FONT_SCALE_MIN = -10;
+const FONT_SCALE_MAX = 10;
+
+/** Clamps a font scale into the usable range, mapping anything non-numeric to
+ *  the default.
+ *
+ *  Worth being strict about: --font-scale feeds `font-size: calc(20px +
+ *  var(--font-scale) * 1px)` on :root in shell.css, so a value of 500 renders
+ *  the entire app at a ~520px root font. At that size the General Settings
+ *  modal cannot be read, which means the control that would undo it is no
+ *  longer usable and the only fix is hand-editing settings.json. NaN passes a
+ *  bare `typeof === "number"` check, so it is excluded explicitly. */
+function clampFontScale(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_SETTINGS.fontScale;
+  }
+  return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, Math.round(value)));
+}
+
 /** Enforces the "After Time Passes" trigger's floor: an interval under 10
  *  seconds is too fast to be a deliberate "ambient" cycle and mostly just
  *  thrashes the theme, so seconds-denominated intervals are clamped up to at
@@ -503,7 +544,7 @@ const DEFAULT_SETTINGS: ShellSettings = {
   americanDates: false,
   solidModals: true,
   startupTarget: "lastView",
-  theme: "default",
+  theme: DEFAULT_THEME_ID,
   randomPersistent: true,
   randomHarmonized: true,
   cycleOrder: "sequential",
@@ -868,9 +909,28 @@ function switchSection(sectionKey: string, toolKey?: string): void {
  *  If the section element has a data-default-tool attribute, goes directly to
  *  that tool instead of the landing page (used for single-tool sections). */
 function activateSection(sectionKey: string): void {
+  const sectionEl = document.getElementById(`section-${sectionKey}`);
+  // A key with no matching section element used to fall through to
+  // activateLanding(), which renders an empty content area, and then
+  // saveShellState() wrote the bad key straight back to disk, so the empty
+  // view survived every restart. Home instead.
+  //
+  // This is NOT about the category sections. Those are only shelved from the
+  // nav UI, not removed: section-utility/files/media/music/finance/games all
+  // still exist in index.html, so activateSection("utility") resolves normally
+  // today and will keep doing so when categories come back. Nor is it about
+  // "lastCategory", which has its own branch in loadShellState() and resolves
+  // through state.lastCategory. What reaches this guard is a key with no
+  // section at all: a hand-edited settings file, or a stale shell-state naming
+  // a section that no longer exists.
+  if (!sectionEl && sectionKey !== "home") {
+    console.warn(`[nav] no section "${sectionKey}", falling back to home`);
+    activateSection("home");
+    return;
+  }
+
   switchSection(sectionKey);
 
-  const sectionEl = document.getElementById(`section-${sectionKey}`);
   const defaultTool = sectionEl?.dataset.defaultTool;
   if (defaultTool) {
     activateTool(sectionKey, defaultTool);
@@ -1501,10 +1561,7 @@ async function loadSettings(): Promise<void> {
     // rather than propagating as-is into applySettings().
     const merged = { ...DEFAULT_SETTINGS, ...parsed };
     settings = {
-      fontScale:
-        typeof merged.fontScale === "number"
-          ? merged.fontScale
-          : DEFAULT_SETTINGS.fontScale,
+      fontScale: clampFontScale(merged.fontScale),
       hour12:
         typeof merged.hour12 === "boolean"
           ? merged.hour12
@@ -1518,12 +1575,20 @@ async function loadSettings(): Promise<void> {
           ? merged.solidModals
           : DEFAULT_SETTINGS.solidModals,
       startupTarget:
-        typeof merged.startupTarget === "string"
+        typeof merged.startupTarget === "string" &&
+        isKnownStartupTarget(merged.startupTarget)
           ? merged.startupTarget
           : DEFAULT_SETTINGS.startupTarget,
+      // Renames are mapped here so the corrected id is what gets persisted on
+      // the next save. It runs on every stored theme id, not just this one, or
+      // a Cycle day/night pick silently stops resolving. Note this only handles
+      // RENAMES: an id that was never valid is caught later by resolveThemeId()
+      // at paint time, which is also where ids that can't be checked yet (a
+      // custom theme's, since custom themes load after settings do) get their
+      // one and only validation.
       theme:
         typeof merged.theme === "string"
-          ? merged.theme
+          ? migrateThemeId(merged.theme)
           : DEFAULT_SETTINGS.theme,
       randomPersistent:
         typeof merged.randomPersistent === "boolean"
@@ -1586,7 +1651,7 @@ async function loadSettings(): Promise<void> {
           : DEFAULT_SETTINGS.cycleHolidayFullSeason,
       cycleCurrentThemeId:
         typeof merged.cycleCurrentThemeId === "string"
-          ? merged.cycleCurrentThemeId
+          ? migrateThemeId(merged.cycleCurrentThemeId)
           : DEFAULT_SETTINGS.cycleCurrentThemeId,
       cycleLastAdvance:
         typeof merged.cycleLastAdvance === "number"
@@ -1598,11 +1663,11 @@ async function loadSettings(): Promise<void> {
       // paint time instead, when the full list actually exists.
       cycleDayThemeId:
         typeof merged.cycleDayThemeId === "string" && merged.cycleDayThemeId
-          ? merged.cycleDayThemeId
+          ? migrateThemeId(merged.cycleDayThemeId)
           : DEFAULT_SETTINGS.cycleDayThemeId,
       cycleNightThemeId:
         typeof merged.cycleNightThemeId === "string" && merged.cycleNightThemeId
-          ? merged.cycleNightThemeId
+          ? migrateThemeId(merged.cycleNightThemeId)
           : DEFAULT_SETTINGS.cycleNightThemeId,
       cycleDayStart: isClockTime(merged.cycleDayStart)
         ? merged.cycleDayStart
@@ -2061,15 +2126,20 @@ export type ThemePickerTab =
  *  lookups off the same built-in theme list, rather than duplicating it. */
 export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: string }[] }[] = [
   {
+    // Dark and Light first and alone: they're the two themes almost every app
+    // has, so they're what someone reaches for before they've explored. Dark
+    // leads because it's DEFAULT_THEME_ID, what a new install opens on.
+    // The three Midnights follow as a set, always in Blue/Green/Red order so
+    // the family reads as one row rather than three loose entries.
+    // NOTE: buildCyclePool() in cycle-theme.ts falls back to pool[0], so
+    // whatever sits first here is also where Cycle starts from.
     tab: "main",
     themes: [
-      { id: "default", label: "Default" },
-      { id: "light", label: "Light" },
       { id: "dark", label: "Dark" },
-      { id: "matte", label: "Matte" },
-      { id: "midnight", label: "Midnight" },
-      { id: "terminal", label: "Terminal" },
-      { id: "shadow", label: "Shadow" },
+      { id: "light", label: "Light" },
+      { id: "midnight-blue", label: "Midnight Blue" },
+      { id: "midnight-green", label: "Midnight Green" },
+      { id: "midnight-red", label: "Midnight Red" },
     ],
   },
   {
@@ -2085,18 +2155,28 @@ export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: s
     ],
   },
   {
+    // Everything that isn't one of the five headline themes or a Holiday one,
+    // sorted by label. Matte, Shadow, Terminal and Void moved here out of Main
+    // when Main was cut down to Dark/Light/Midnight. Alphabetical because this
+    // tab has no meaningful running order, unlike Main (curated) and Holiday
+    // (calendar order), so anything else would just be an arbitrary sequence
+    // to re-derive every time a theme is added. Keep it that way.
     tab: "special",
     themes: [
-      { id: "cake", label: "Cake" },
-      { id: "knowledge", label: "Knowledge" },
-      { id: "neon", label: "Neon" },
-      { id: "retro-electric", label: "Retro-Electric" },
-      { id: "halo", label: "Halo" },
-      { id: "cartoon", label: "Cartoon" },
-      { id: "lava", label: "Lava" },
-      { id: "windowed", label: "Windowed" },
       { id: "blades", label: "Blades" },
-      { id: "amuzed", label: "Amuzed" },
+      { id: "cake", label: "Cake" },
+      { id: "cartoon", label: "Cartoon" },
+      { id: "ezmuze", label: "ezmuze" },
+      { id: "halo", label: "Halo" },
+      { id: "knowledge", label: "Knowledge" },
+      { id: "lava", label: "Lava" },
+      { id: "matte", label: "Matte" },
+      { id: "neon", label: "Neon" },
+      { id: "nostalgia", label: "Nostalgia" },
+      { id: "retro-electric", label: "Retro-Electric" },
+      { id: "shadow", label: "Shadow" },
+      { id: "terminal", label: "Terminal" },
+      { id: "void", label: "Void" },
     ],
   },
 ];
@@ -2779,7 +2859,10 @@ settingsReset.addEventListener("click", () => {
 });
 
 fontScaleInput.addEventListener("input", () => {
-  settings.fontScale = parseInt(fontScaleInput.value, 10) || 0;
+  // Clamped here too, not just on load: the min/max attributes on a number
+  // input mark an out-of-range value invalid, they don't stop it being typed,
+  // and this handler is what writes it to settings.
+  settings.fontScale = clampFontScale(parseInt(fontScaleInput.value, 10));
   applySettings();
   saveSettings();
 });
@@ -3941,6 +4024,37 @@ async function restoreWindowSize(): Promise<void> {
    INITIALISATION
 ============================================================================= */
 
+/** Rewrites settings.theme to the default when it names something that can't be
+ *  resolved, and persists the correction.
+ *
+ *  resolveThemeId() already stops a junk id from painting an unstyled window,
+ *  but it resolves without writing anything back, so the junk stays on disk and
+ *  the picker highlights no tile. This closes that loop.
+ *
+ *  Deliberately runs from init() after loadCustomThemes() rather than inside
+ *  loadSettings(): "custom" is only meaningful once the custom themes exist.
+ *
+ *  Deliberately touches settings.theme ONLY. cycleDayThemeId/cycleNightThemeId
+ *  may legitimately name a custom theme, and a custom theme can be absent for
+ *  reasons that aren't corruption (a not-yet-synced install, a restored backup
+ *  mid-copy). Overwriting those would destroy a real setting to fix nothing,
+ *  since resolveDayNightThemeId() already resolves them safely at paint time.
+ *  Healing is for values that are unrecoverable, not merely unresolvable now. */
+async function healStoredThemeId(): Promise<void> {
+  const stored = settings.theme;
+  if (THEME_SENTINELS.includes(stored) || isKnownBuiltinTheme(stored)) return;
+  console.warn(
+    `[theme] stored theme ${JSON.stringify(stored)} does not exist, resetting to ${JSON.stringify(DEFAULT_THEME_ID)}`,
+  );
+  settings.theme = DEFAULT_THEME_ID;
+  await saveSettings();
+  // The first applySettings() (end of loadSettings) already painted the
+  // resolved fallback, but it did so while settings.theme still read as the
+  // junk value, so the Settings badge and picker highlight are stale. Re-run
+  // now that the field itself is correct.
+  applySettings();
+}
+
 async function init(): Promise<void> {
   // loadSettings() must finish before loadShellState() runs. The latter
   // uses settings.sidebarItems (via activateToolIfPinned) to decide whether
@@ -3952,6 +4066,10 @@ async function init(): Promise<void> {
     loadShellState(),
     loadCustomThemes(),
   ]);
+
+  // Must precede the "custom" seeding below: that branch is only correct once
+  // settings.theme is known to be a value applyTheme() can actually act on.
+  await healStoredThemeId();
 
   // If the saved theme is "custom", seed the active custom theme (theme-core.ts)
   // from the first stored theme and re-apply now that customThemes is loaded.

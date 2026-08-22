@@ -1,16 +1,34 @@
+/* =============================================================================
+   MIDNIGHT RED
+   -----------------------------------------------------------------------------
+   Sibling of Midnight Blue, which is the original of the three. This file is
+   identical to midnight-blue.css apart from the neutrals and accent ramp below.
+
+   The six neutrals are Midnight Blue's hue-rotated from 220 deg to 0 deg and then
+   re-solved for the SAME perceived luminance, not the same HSL lightness. That
+   distinction matters: an HSL-preserving rotation to green comes out roughly
+   twice as bright as the blue it replaces, because the green channel carries
+   ~71% of luminance against blue's ~7%. Matching luminance instead is what
+   keeps all three at genuinely the same darkness.
+
+   The accent is the red ramp at the position that matches Blue's white-label
+   legibility (5.48:1 vs 5.17:1), rather than the nominally equivalent step on the ramp.
+   Everything else is stock, see the note in midnight-blue.css.
+============================================================================= */
+
 :root {
-  --color-bg:                  #0b1220;
-  --color-panel:               #0f172a;
-  --color-input-bg:            #111827;
-  --color-border:              #1f2937;
-  --color-border-dashed:       #334155;
+  --color-bg:                  #210c0c;
+  --color-panel:               #2a100f;
+  --color-input-bg:            #281211;
+  --color-border:              #3b2123;
+  --color-border-dashed:       #5a3639;
   --color-text:                #e5e7eb;
   --color-text-muted:          #9ca3af;
-  --color-hover:               #1f2937;
+  --color-hover:               #3b2123;
 
-  --color-btn:                 #2563eb;
-  --color-accent:              #60a5fa;
-  --color-btn-hover:           #1d4ed8;
+  --color-btn:                 #dc2626;
+  --color-accent:              #f87171;
+  --color-btn-hover:           #b91c1c;
   --color-btn-text:            #ffffff;
 
   --color-danger:              #ef4444;
@@ -23,7 +41,7 @@
   --color-accent-entries:      #ef4444;
 
   --color-toggle-off:          #374151;
-  --color-toggle-on:           #2563eb;
+  --color-toggle-on:           #dc2626;
 
   /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (red) / tool heading (violet) */
   --color-changelog-features:     #2563eb;

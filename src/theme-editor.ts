@@ -28,7 +28,14 @@ import {
   type CustomTheme,
 } from "./shell";
 import { RANDOM_VARS, clearRandomPalette } from "./random-theme";
-import { applyTheme, themeLink, themeCssUrl, getActiveCustomId, setActiveCustomId } from "./theme-core";
+import {
+  applyTheme,
+  themeLink,
+  themeCssUrl,
+  getActiveCustomId,
+  setActiveCustomId,
+} from "./theme-core";
+import { DEFAULT_THEME_ID } from "./theme-ids";
 
 /* ── Element refs ────────────────────────────────────────────────────────── */
 
@@ -157,7 +164,7 @@ const customThemeDeleteCancelBtn = document.getElementById(
 export let customThemes: CustomTheme[] = [];
 let _teMode: "create" | "edit" = "create";
 let _teEditId: string | null = null; // id of the theme being edited (edit mode)
-let _tePrevTheme: string = "default"; // settings.theme value before editor opened
+let _tePrevTheme: string = DEFAULT_THEME_ID; // settings.theme value before editor opened
 let _teWorkingVars: Record<string, string> = {}; // live working copy of vars in editor
 let _teWorkingAdv: AdvancedOptions = {}; // live working copy of advanced options
 
@@ -988,10 +995,10 @@ customThemeDeleteConfirmBtn.addEventListener("click", async () => {
   await saveCustomThemes();
   customThemeDeleteModal.close();
   if (wasActive) {
-    // Deleted the active theme, revert to default
-    settings.theme = "default";
+    // Deleted the active theme, revert to the app default
+    settings.theme = DEFAULT_THEME_ID;
     setActiveCustomId(null);
-    themeSelect.value = "default";
+    themeSelect.value = DEFAULT_THEME_ID;
     applySettings();
     await saveSettings();
   }

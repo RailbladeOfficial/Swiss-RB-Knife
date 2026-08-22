@@ -17,7 +17,7 @@
    never actually a problem. Flagging it here so it isn't a surprise later.
 ============================================================================= */
 
-import { settings } from "./shell";
+import { THEME_GROUPS, settings } from "./shell";
 import {
   PERSISTENT_RANDOM_KEY,
   applyPalette,
@@ -27,6 +27,7 @@ import {
 } from "./random-theme";
 import { applyCustomThemeById, clearCustomTheme } from "./theme-editor";
 import { activateCycleTheme, getCurrentCycleUnderlyingThemeId } from "./cycle-theme";
+import { BASE_THEME_ID, DEFAULT_THEME_ID, migrateThemeId } from "./theme-ids";
 
 export const themeLink = document.getElementById("themeLink") as HTMLLinkElement;
 
@@ -40,6 +41,7 @@ export const themeLink = document.getElementById("themeLink") as HTMLLinkElement
 export function themeCssUrl(themeId: string): string {
   return `/themes/${themeId}.css?v=${__BUILD_ID__}`;
 }
+
 
 /** Which custom theme (if any) is currently active. Theme-selection state,
  *  owned here rather than in theme-editor.ts's storage/editing logic. Mutate
@@ -55,6 +57,37 @@ export function setActiveCustomId(id: string | null): void {
   _activeCustomId = id;
 }
 
+/** True if `id` names a built-in theme CSS file that actually ships. Reads
+ *  THEME_GROUPS rather than a second hardcoded list so adding a theme in one
+ *  place is enough. Called from inside functions only, never at module top
+ *  level, since shell.ts is the other half of an import cycle. */
+export function isKnownBuiltinTheme(id: string): boolean {
+  if (id === BASE_THEME_ID) return true;
+  return THEME_GROUPS.some((g) => g.themes.some((t) => t.id === id));
+}
+
+/** Turns whatever is stored in settings into an id that is guaranteed to name a
+ *  real file: renames are mapped, and anything still unrecognised falls back to
+ *  the default theme.
+ *
+ *  The validation half is not paranoia, it is the only thing that works. A
+ *  themeLink pointing at a file that isn't there does NOT reliably fail: the
+ *  Vite dev server answers an unknown /themes/*.css with 200 and the text/html
+ *  body of index.html (its SPA fallback), so the stylesheet "loads" perfectly,
+ *  the browser parses HTML as CSS, gets zero rules, and every --color-* is
+ *  undefined, because shell.css's :root declares none. The result is a fully
+ *  unstyled window and no error anywhere: `onload` fires, `onerror` never does.
+ *  Checking the id BEFORE assigning href is what actually prevents that, in dev
+ *  and in a packaged build alike. */
+export function resolveThemeId(themeId: string): string {
+  const migrated = migrateThemeId(themeId);
+  if (isKnownBuiltinTheme(migrated)) return migrated;
+  console.warn(
+    `[theme] unknown theme id ${JSON.stringify(themeId)}, falling back to ${JSON.stringify(DEFAULT_THEME_ID)}`,
+  );
+  return DEFAULT_THEME_ID;
+}
+
 /** Applies a named theme, the random palette system, or a custom theme.
  *  For standard themes: loads the CSS file and clears any leftover inline
  *  random overrides. For "random": generates and applies a palette immediately
@@ -62,7 +95,7 @@ export function setActiveCustomId(id: string | null): void {
  *  For "custom": applies the selected custom theme by id. */
 export function applyTheme(themeName: string): void {
   if (themeName === "custom") {
-    themeLink.href = themeCssUrl("default");
+    themeLink.href = themeCssUrl(BASE_THEME_ID);
     themeLink.onload = () => {
       if (_activeCustomId) applyCustomThemeById(_activeCustomId);
     };
@@ -93,13 +126,13 @@ export function applyTheme(themeName: string): void {
         palette = generator();
       }
       localStorage.setItem(PERSISTENT_RANDOM_KEY, JSON.stringify(palette));
-      themeLink.href = themeCssUrl("default");
+      themeLink.href = themeCssUrl(BASE_THEME_ID);
       themeLink.onload = () => applyPalette(palette);
       applyPalette(palette);
     } else {
       // Regenerative: generate fresh every time applyTheme is called
       const palette = generator();
-      themeLink.href = themeCssUrl("default");
+      themeLink.href = themeCssUrl(BASE_THEME_ID);
       themeLink.onload = () => applyPalette(palette);
       applyPalette(palette);
     }
@@ -108,16 +141,27 @@ export function applyTheme(themeName: string): void {
 
   // Standard theme: load CSS first, clear inline overrides once ready.
   // clearRandomPalette() is called immediately AND on onload because if the new
-  // href is the same as the current one (e.g. switching from Random to Default,
-  // both of which use default.css as a base), the browser won't fire onload.
+  // href is the same as the current one (e.g. switching from Random to a theme
+  // that shares base-theme.css), the browser won't fire onload.
   localStorage.removeItem(PERSISTENT_RANDOM_KEY);
-  themeLink.href = themeCssUrl(themeName);
+  const resolved = resolveThemeId(themeName);
+  themeLink.href = themeCssUrl(resolved);
   themeLink.onload = () => {
     clearRandomPalette();
     clearCustomTheme();
     // CSS file is now loaded and :root vars are live, notify tools.
     window.dispatchEvent(new CustomEvent("themechange"));
   };
+  // Second net, for the case resolveThemeId() can't see: an id that IS in
+  // THEME_GROUPS but whose file is missing from the build. That one does 404
+  // properly in a packaged app, so onerror is the right hook for it. Guarded so
+  // a missing base sheet can't ping-pong.
+  themeLink.onerror = () => {
+    if (themeLink.dataset.fellBack === "1") return;
+    themeLink.dataset.fellBack = "1";
+    themeLink.href = themeCssUrl(BASE_THEME_ID);
+  };
+  if (resolved !== BASE_THEME_ID) delete themeLink.dataset.fellBack;
   clearRandomPalette();
   clearCustomTheme();
 }

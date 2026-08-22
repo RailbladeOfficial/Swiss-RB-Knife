@@ -1,5 +1,5 @@
 /* =============================================================================
-   AMUZED
+   EZMUZE
    -----------------------------------------------------------------------------
    Flat black, thin type, and two colours doing very different jobs.
 
@@ -19,6 +19,11 @@
    Everything else is deliberately unstyled: no gradients on panels, no glow,
    no shadow, 2px corners. The colour is the whole design, so any surface that
    competes with it gets flattened out of the way.
+   Renamed from "Amuzed" (amuzed.css). Palette untouched. No
+   THEME_ID_MIGRATIONS entry: the rename predates any released build carrying
+   this theme, so the old id was never stored anywhere. The lowercase label is
+   deliberate.
+
 ============================================================================= */
 
 :root {

@@ -256,6 +256,20 @@
   padding: 0 16px;
 }
 
+/* Breathing room between the tab strip's bottom rule and the first line of
+   content, which otherwise starts flush against it.
+   Scoped to this modal on purpose: .changelog-body is shared by seven modals
+   (Changelog, Readme, Security, Contributing, the license gate, the full
+   licence text, and this one) and this is the only one with a tab strip above
+   it, so putting the space on the shared class would indent six modals that
+   have nothing to be separated from.
+   margin rather than padding because #licensingBody is the scroll region:
+   padding-top sits inside the scroll box and slides away with the content on
+   the first wheel tick, a margin holds the gap. */
+#licensingBody {
+  margin-top: 14px;
+}
+
 .full-license-btn {
   display: block;
   margin-top: 20px;
