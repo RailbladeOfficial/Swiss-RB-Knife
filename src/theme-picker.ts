@@ -568,12 +568,12 @@ function refreshSeasonalEffect(): void {
 
 /** Builds one toggle cell per animated theme, laid out by
  *  .theme-animations-list's grid. Rebuilt on each render rather than diffed,
- *  it's nine cells behind a tab that has to be opened, so the simplicity is
+ *  it's ten cells behind a tab that has to be opened, so the simplicity is
  *  worth more than the churn.
  *
  *  No Enabled/Disabled word next to these switches, unlike the master toggle
- *  above them: the switch already says which way it is set, and nine copies of
- *  the word were both noise and a real chunk of the pane's height. The state
+ *  above them: the switch already says which way it is set, and a copy of the
+ *  word on every row was both noise and a real chunk of the pane's height. The state
  *  still reaches a screen reader through the input's aria-label. */
 function renderThemeAnimationRows(): void {
   themeAnimationsList.innerHTML = "";

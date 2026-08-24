@@ -1,0 +1,953 @@
+/* =============================================================================
+   LIMINAL
+   -----------------------------------------------------------------------------
+   3am in a place that was built for daylight. An empty natatorium, a mall an
+   hour after close, a corridor of patterned carpet that turns a corner it
+   shouldn't. The dreamcore end of liminal space rather than the Backrooms end:
+   the room is dim, but everything in it is lit in bleached fluorescent teal
+   and faded motel pink, and the whole thing looks like it was left on a VHS
+   tape in a hot car for twenty years.
+
+   THREE LIGHT SOURCES, NO WINDOWS
+   Nothing in this theme is lit from outside. The palette is built from three
+   fixtures that never move:
+     - pool teal   (#6fd8d4), from below and to the left, water light on tile
+     - motel pink  (#f79ec4), from the upper right, a sign still switched on
+     - tube cream  (#f3d38a), overhead, the one fluorescent that never got fixed
+   Lilac (#b79cf0) is what teal and pink make where they overlap, so it takes
+   the fourth accent slot rather than being invented for it.
+
+   Everything reads as FADED-BRIGHT, not neon. Neon (neon.css, retro-electric)
+   is saturated colour on near-black with hard glow. This is the opposite move:
+   the hues are pastel, the ground is a dusty indigo rather than black, and
+   every glow is wide and weak. Nothing here has a hard edge, because the point
+   is that you cannot tell how big the room is.
+
+   THE TWO FULL-WINDOW LAYERS
+   `body::before` is THE ROOM: four enormous radial washes on a fixed layer at
+   z-index -1, under all app content and over the body's own --color-bg fill
+   (the same slot lava.css paints its blobs in, and it works for the same
+   reason: #appBody and #mainContent are transparent). It drifts, and the
+   overhead tube flickers.
+
+   `body::after` is THE TAPE: scanlines, a corner vignette, and a tracking band
+   that sweeps down the screen every ~30s, at z-index 9998 above everything
+   except the lock screen. Same slot neon.css and terminal.css use for their
+   scanlines.
+
+   Both animations are gated on `body:not(.theme-animations-off)`, the class
+   theme-core.ts maintains from the Theme Animations preferences, so switching
+   Liminal's animation off leaves a still, silent room rather than a
+   half-disabled one. Liminal is registered in ANIMATED_THEMES (theme-core.ts)
+   alongside Lava as the second CSS-driven, canvas-free effect.
+
+   WHY THE SIDEBAR AND TITLE BAR ARE TRANSLUCENT
+   They are the only two chrome surfaces that span a whole edge of the window,
+   so they are the only two where the room's glow needs to continue rather than
+   stop. Both take a translucent tint over the fixed ::before layer instead of
+   an opaque --color-panel fill, which is what makes the light read as one
+   source crossing the whole app. Panels do NOT do this: they hold content,
+   they stack, and a wall of translucent rectangles over a moving gradient is
+   unreadable. Panels get their own baked gradient instead.
+
+   Neither takes a backdrop-filter, on purpose. An element with one creates a
+   stacking context that renders above higher-z-index siblings (this is the
+   exact bug modal.css documents, where a blurred backdrop covered the toast
+   container at z-index 9999), and the title bar sits under the toasts. It
+   would also buy nothing: what is behind them is a soft radial gradient, and
+   blurring a soft radial gradient produces a soft radial gradient. The modal
+   keeps its blur because it is above the toasts anyway and has real content
+   behind it to frost.
+
+   ON THE CHROMATIC FRINGE
+   Titles carry a 1px pink-left / teal-right text-shadow pair, which is the
+   colour separation of a worn tape and the single most recognisable thing in
+   the whole genre. It is kept to headings ONLY, never body copy: at 0.8rem it
+   stops reading as an artifact and starts reading as a rendering bug.
+============================================================================= */
+
+:root {
+  /* The unlit end of the corridor. Also every RECESSED surface inside a panel
+     (entry rows, ledger rows, totals blocks, Game Stats tiles), which is why
+     it is a real colour and not near-black: those rows have to sit visibly
+     BELOW --color-panel without falling into a hole. */
+  --color-bg:                  #141b2a;
+  --color-panel:               #1d2739;
+  --color-input-bg:            #16202f;
+  --color-border:              #34455e;
+  /* Dashed frames (drop zones, empty states) are the one border allowed to
+     carry a hue: they are asking for something, so they glow faintly. */
+  --color-border-dashed:       #6fd8d4;
+  /* Cool near-white, the colour of a wall that has only ever been lit by a
+     fluorescent tube. Deliberately not #ffffff, nothing in here is clean. */
+  --color-text:                #e9f3f2;
+  --color-text-muted:          #93aec0;
+  --color-hover:               #26334a;
+
+  /* Pool teal is the app's primary. --color-btn is consumed all over the shell
+     as THE bright accent (tool-card icons, active rails, filled toggles, modal
+     links, the About pulse), so it has to stay vivid enough to read as a
+     highlight against the panel; --color-accent is its lighter companion, used
+     as TEXT on section titles and slider values. */
+  --color-btn:                 #6fd8d4;
+  --color-accent:              #8fe3df;
+  --color-btn-hover:           #9defe9;
+  /* Dark ink for anything sitting ON a teal fill. */
+  --color-btn-text:            #0d1420;
+
+  /* Motel pink doubles as the danger colour. That is not a compromise: in a
+     palette this soft, pink is the only hue loud enough to stop someone, and a
+     true red would be the one colour in the theme that isn't sun-bleached. */
+  --color-danger:              #f77ba6;
+  --color-danger-subtle:       rgba(247, 123, 166, 0.13);
+  --color-success:             #86e0bf;
+
+  /* The four panel rails walk the fixtures in order: water, sign, tube, and
+     the lilac where the first two overlap. */
+  --color-accent-input:        #6fd8d4;
+  --color-accent-view:         #f79ec4;
+  --color-accent-totals:       #f3d38a;
+  --color-accent-entries:      #b79cf0;
+
+  --color-toggle-off:          #3a4a63;
+  --color-toggle-on:           #6fd8d4;
+
+  /* ── Changelog accents ── Features (teal) / Improvements (mint) / Bugfixes (pink) / tool heading (lilac) */
+  --color-changelog-features:     #6fd8d4;
+  --color-changelog-improvements: #86e0bf;
+  --color-changelog-bugfixes:     #f79ec4;
+  --color-changelog-tool:         #b79cf0;
+
+  --color-toast-success-bg:    #10322f;
+  --color-toast-success-border:#86e0bf;
+  --color-toast-success-text:  #cdf3e6;
+  --color-toast-error-bg:      #351a2a;
+  --color-toast-error-border:  #f79ec4;
+  --color-toast-error-text:    #ffdcea;
+
+  /* ── Budget chart palette ── Teal / pink / lilac / cream / mint / pool-blue / exit-sign coral / periwinkle, the whole faded set */
+  --color-chart-1:             #6fd8d4;
+  --color-chart-2:             #f79ec4;
+  --color-chart-3:             #b79cf0;
+  --color-chart-4:             #f3d38a;
+  --color-chart-5:             #86e0bf;
+  --color-chart-6:             #7fc4f0;
+  --color-chart-7:             #ff9d8a;
+  --color-chart-8:             #9aa9e8;
+}
+
+/* =============================================================================
+   THE ROOM
+   -----------------------------------------------------------------------------
+   One fixed layer behind all app content. #appBody and #mainContent are both
+   transparent, so a negative z-index child of <body> sits above the body's own
+   --color-bg fill and below everything drawn in the tool views.
+
+   Four washes, each sized in vmin so the room scales with the window instead
+   of tiling: the pool light rising from the lower left, the sign burning in
+   from the upper right, the bad tube overhead, and the lilac where the first
+   two meet in the middle. They are enormous on purpose. A gradient you can see
+   the edge of is a shape, and a shape would tell you how big the room is.
+============================================================================= */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-image:
+    /* the bad tube, overhead */
+    radial-gradient(ellipse at 50% 50%, rgba(243, 211, 138, 0.20) 0%, rgba(243, 211, 138, 0.07) 45%, rgba(243, 211, 138, 0) 72%),
+    /* the sign, upper right */
+    radial-gradient(circle at 50% 50%, rgba(247, 158, 196, 0.26) 0%, rgba(247, 158, 196, 0.09) 46%, rgba(247, 158, 196, 0) 73%),
+    /* the water, lower left */
+    radial-gradient(circle at 50% 50%, rgba(111, 216, 212, 0.30) 0%, rgba(111, 216, 212, 0.11) 46%, rgba(111, 216, 212, 0) 74%),
+    /* where the two of them overlap */
+    radial-gradient(circle at 50% 50%, rgba(183, 156, 240, 0.20) 0%, rgba(183, 156, 240, 0.07) 48%, rgba(183, 156, 240, 0) 76%);
+  background-size:
+    140vmin 70vmin,
+    92vmin 88vmin,
+    108vmin 96vmin,
+    86vmin 82vmin;
+  background-position:
+    50% -18%,
+    92% -6%,
+    -6% 104%,
+    38% 52%;
+}
+
+/* The room breathes. Movement is deliberately tiny, a few percent over a
+   minute and a half: the light should never be caught moving, only be
+   somewhere slightly different than you remember. ease-in-out gives each wash
+   a long stall at the ends of its travel instead of a constant slide. */
+@keyframes liminal-room-drift {
+  0%,
+  100% { background-position: 50% -18%, 92% -6%, -6% 104%, 38% 52%; }
+  33%  { background-position: 44% -12%, 86%  2%,  2%  96%, 46% 44%; }
+  66%  { background-position: 56% -22%, 97% -2%, -2% 100%, 32% 58%; }
+}
+
+/* The tube. One long stretch of nothing, then a short stutter, then nothing
+   again. The gap is what sells it: a light that flickers CONSTANTLY is a
+   broken light, and a broken light is a prop. This one is just old.
+
+   Amplitude is held to ~20% and only ever downward, so the flicker dims the
+   room rather than strobing it, and nothing in the reading area moves. */
+@keyframes liminal-tube-flicker {
+  0%, 62%, 65.4%, 67.1%, 69.8%, 100% { opacity: 1; }
+  63.6% { opacity: 0.8; }
+  66.2% { opacity: 0.9; }
+  68.5% { opacity: 0.76; }
+}
+
+body:not(.theme-animations-off)::before {
+  animation:
+    liminal-room-drift 94s ease-in-out infinite,
+    liminal-tube-flicker 17s steps(1, end) infinite;
+}
+
+/* =============================================================================
+   THE TAPE
+   -----------------------------------------------------------------------------
+   Everything above sits under this. Three layers on one fixed overlay at
+   z-index 9998: the tracking band, the scanlines, and the vignette that closes
+   the corners in. #lockScreen is z-index 9999 and repaints the room itself, so
+   the lock screen is the one surface that is NOT behind the tape.
+
+   The band is parked off the top of the window in the static declaration, so
+   with animations switched off this is a clean scanline overlay and nothing
+   is left frozen mid-sweep.
+============================================================================= */
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-image:
+    /* the tracking band: white core, colour fringing above and below it */
+    linear-gradient(
+      to bottom,
+      rgba(111, 216, 212, 0) 0%,
+      rgba(111, 216, 212, 0.05) 34%,
+      rgba(233, 243, 242, 0.07) 50%,
+      rgba(247, 158, 196, 0.05) 66%,
+      rgba(247, 158, 196, 0) 100%
+    ),
+    /* scanlines */
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(10, 15, 26, 0.09) 2px,
+      rgba(10, 15, 26, 0.09) 4px
+    ),
+    /* Vignette, centred slightly high so the floor is the darkest part. Held
+       to 0.22 and starting late, at 55%: the window controls, the clock and
+       the sidebar's Exit button all live in corners, and a vignette heavy
+       enough to be admired is heavy enough to bury them. */
+    radial-gradient(ellipse at 50% 42%, rgba(10, 15, 26, 0) 55%, rgba(10, 15, 26, 0.22) 100%);
+  background-size: 100% 30vh, auto, auto;
+  background-position: 0 -34vh, 0 0, 0 0;
+}
+
+/* One pass every half a minute, and the band is only on screen for about a
+   fifth of it. linear, not ease: tape transport does not accelerate. */
+@keyframes liminal-tracking {
+  0%,
+  74%  { background-position: 0 -34vh, 0 0, 0 0; }
+  100% { background-position: 0 116vh, 0 0, 0 0; }
+}
+
+body:not(.theme-animations-off)::after {
+  animation: liminal-tracking 31s linear infinite;
+}
+
+/* =============================================================================
+   CHROME: the two surfaces the light crosses
+   -----------------------------------------------------------------------------
+   The title bar and the sidebar are the only chrome that spans a whole edge of
+   the window, so they are the only two that go translucent over the room
+   rather than taking an opaque --color-panel fill. Everything else in the app
+   stacks, and translucent surfaces over a moving gradient stop being readable
+   the moment two of them overlap.
+============================================================================= */
+
+#titleBar {
+  background: linear-gradient(180deg, rgba(29, 39, 57, 0.86) 0%, rgba(20, 27, 42, 0.72) 100%);
+  border-bottom-color: rgba(111, 216, 212, 0.16);
+}
+
+/* The app name, the one piece of body chrome that gets the tape fringe. It is
+   a fixed 1rem label that never wraps or reflows, which is the only place the
+   effect is safe outside a heading. */
+.title {
+  color: #cfe6e4;
+  opacity: 1;
+  text-shadow:
+    -1px 0 rgba(247, 158, 196, 0.45),
+     1px 0 rgba(111, 216, 212, 0.45);
+}
+
+/* The corridor. A vertical gradient rather than a flat fill, lighter at the
+   top where the ceiling tube is and falling away toward the floor, so the
+   sidebar reads as a wall receding rather than as a strip of UI. */
+#sidebar {
+  background: linear-gradient(180deg, rgba(35, 46, 66, 0.82) 0%, rgba(22, 30, 46, 0.74) 55%, rgba(17, 23, 36, 0.8) 100%);
+  border-right-color: rgba(111, 216, 212, 0.14);
+}
+
+#navList::-webkit-scrollbar-thumb {
+  background: rgba(111, 216, 212, 0.28);
+}
+
+#navList::-webkit-scrollbar-thumb:hover {
+  background: rgba(111, 216, 212, 0.5);
+}
+
+#navBottom {
+  border-top-color: rgba(111, 216, 212, 0.12);
+}
+
+/* Nav rows: quiet until touched, then lit teal from the rail outward. The
+   active row keeps the pink rail instead, so the place you are is the one
+   thing in the corridor lit by the sign rather than by the water. */
+.nav-item {
+  color: #9fb8c6;
+}
+
+.nav-item:hover {
+  background: linear-gradient(90deg, rgba(111, 216, 212, 0.16) 0%, rgba(111, 216, 212, 0.03) 100%);
+  color: var(--color-text);
+}
+
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(247, 158, 196, 0.18) 0%, rgba(247, 158, 196, 0.03) 100%);
+  color: #ffe3ee;
+  border-left-color: #f79ec4;
+  box-shadow: inset 3px 0 12px rgba(247, 158, 196, 0.22);
+}
+
+.nav-item.active .nav-icon {
+  color: #f79ec4;
+  filter: drop-shadow(0 0 6px rgba(247, 158, 196, 0.55));
+}
+
+/* =============================================================================
+   SURFACES
+   -----------------------------------------------------------------------------
+   Panels are opaque, but they are not flat: each one carries a baked wash that
+   is brightest at its top-left corner, as if the room's light fell on it, plus
+   a wide low-alpha bloom instead of a border shadow. The bloom is what keeps
+   the theme soft; a panel with a crisp edge would be the only object in here
+   you could measure.
+============================================================================= */
+
+.panel,
+.tool-card,
+.size-estimate,
+.result-preview-wrap {
+  border-radius: 12px;
+}
+
+.panel {
+  background: linear-gradient(140deg, #24304a 0%, #1d2739 52%, #1a2334 100%);
+  border-color: rgba(111, 216, 212, 0.14);
+  box-shadow:
+    0 0 28px rgba(111, 216, 212, 0.07),
+    inset 0 1px 0 rgba(233, 243, 242, 0.05);
+}
+
+.tool-card {
+  background: linear-gradient(140deg, #242f48 0%, #1c2637 100%);
+  border-color: rgba(111, 216, 212, 0.14);
+  box-shadow: 0 0 20px rgba(111, 216, 212, 0.05);
+}
+
+/* Hovering a card is the sign catching it. Pink, matching the active nav row,
+   so "the thing you are pointing at" and "the thing you are in" are lit by the
+   same fixture throughout the app. */
+.tool-card:hover {
+  background: linear-gradient(140deg, #33294a 0%, #221c34 100%);
+  border-color: rgba(247, 158, 196, 0.55);
+  box-shadow: 0 0 26px rgba(247, 158, 196, 0.22);
+}
+
+.tool-card-icon {
+  color: #8fe3df;
+  filter: drop-shadow(0 0 10px rgba(111, 216, 212, 0.4));
+}
+
+.tool-card:hover .tool-card-icon {
+  color: #ffc4dc;
+  filter: drop-shadow(0 0 12px rgba(247, 158, 196, 0.55));
+}
+
+.dashboard-card-icon {
+  color: #8fe3df;
+}
+
+/* The empty-state panel is the most on-theme surface in the app: a dashed
+   frame around nothing. Give it the faintest of the four hues and leave it
+   otherwise bare. */
+.coming-soon-panel {
+  border-color: rgba(183, 156, 240, 0.35);
+  background: rgba(183, 156, 240, 0.04);
+}
+
+.coming-soon-icon {
+  color: #b79cf0;
+}
+
+/* ── Panel accent slots ──
+   border-color FIRST, then border-left. The shorthand covers all four sides,
+   so the reverse order repaints the rail with the frame colour and the hue
+   never reaches the screen. Each slot takes its fixture's wash and bloom. */
+.panel-accent-input {
+  border-color: rgba(111, 216, 212, 0.28);
+  border-left: 4px solid #6fd8d4;
+  background: linear-gradient(140deg, rgba(111, 216, 212, 0.11) 0%, #1d2739 62%);
+  box-shadow: 0 0 26px rgba(111, 216, 212, 0.12);
+}
+
+.panel-accent-view {
+  border-color: rgba(247, 158, 196, 0.28);
+  border-left: 4px solid #f79ec4;
+  background: linear-gradient(140deg, rgba(247, 158, 196, 0.11) 0%, #1d2739 62%);
+  box-shadow: 0 0 26px rgba(247, 158, 196, 0.12);
+}
+
+.panel-accent-totals {
+  border-color: rgba(243, 211, 138, 0.26);
+  border-left: 4px solid #f3d38a;
+  background: linear-gradient(140deg, rgba(243, 211, 138, 0.1) 0%, #1d2739 62%);
+  box-shadow: 0 0 26px rgba(243, 211, 138, 0.1);
+}
+
+.panel-accent-entries {
+  border-color: rgba(183, 156, 240, 0.28);
+  border-left: 4px solid #b79cf0;
+  background: linear-gradient(140deg, rgba(183, 156, 240, 0.11) 0%, #1d2739 62%);
+  box-shadow: 0 0 26px rgba(183, 156, 240, 0.12);
+}
+
+/* ── Tool / section header ──
+   The one place all three fixtures land at once, left to right: water, sign,
+   tube. It is the widest element in any view, so it is the only one with room
+   to show the whole palette without the three of them muddying each other. */
+.tool-view-header,
+.section-header {
+  background: linear-gradient(
+    90deg,
+    rgba(111, 216, 212, 0.14) 0%,
+    rgba(247, 158, 196, 0.09) 55%,
+    rgba(243, 211, 138, 0.07) 100%
+  );
+  border-bottom-color: rgba(111, 216, 212, 0.22);
+  box-shadow: 0 0 24px rgba(111, 216, 212, 0.08);
+}
+
+/* The tape fringe, and the only place it appears at size. Letter-spacing is
+   part of it: the genre's text is always a little too far apart, like it was
+   set by someone who had never seen the room either. */
+.tool-view-title,
+.section-title {
+  color: #a6ece8;
+  opacity: 1;
+  letter-spacing: 0.06em;
+  text-shadow:
+    -1px 0 rgba(247, 158, 196, 0.5),
+     1px 0 rgba(111, 216, 212, 0.5),
+     0 0 22px rgba(111, 216, 212, 0.35);
+}
+
+.home-update-notice a {
+  color: #8fe3df;
+}
+
+.home-update-notice a:hover {
+  color: #ffc4dc;
+}
+
+/* =============================================================================
+   MODALS
+   -----------------------------------------------------------------------------
+   A dialog in here is a doorway: lit teal along the top edge, falling into the
+   dark toward the bottom, with a pink rim where the sign reaches it. The
+   translucent variant leans hard on the blur, since a frosted pane over a
+   drifting gradient is the single most on-theme surface the app has.
+============================================================================= */
+
+body:not(.solid-modals) .modal {
+  background: linear-gradient(160deg, rgba(59, 74, 104, 0.42) 0%, rgba(24, 31, 47, 0.62) 55%, rgba(37, 26, 48, 0.6) 100%);
+  backdrop-filter: blur(26px) saturate(1.15);
+  -webkit-backdrop-filter: blur(26px) saturate(1.15);
+  border-color: rgba(111, 216, 212, 0.3);
+  box-shadow:
+    0 0 42px rgba(111, 216, 212, 0.14),
+    0 0 90px rgba(247, 158, 196, 0.08),
+    0 26px 60px rgba(6, 9, 16, 0.62);
+}
+
+body.solid-modals .modal {
+  background: linear-gradient(160deg, #2a3550 0%, #1c2536 58%, #221b30 100%);
+  border-color: rgba(111, 216, 212, 0.28);
+  box-shadow:
+    0 0 42px rgba(111, 216, 212, 0.12),
+    0 0 90px rgba(247, 158, 196, 0.07),
+    0 26px 60px rgba(6, 9, 16, 0.62);
+}
+
+/* The backdrop's own blur lives on ::before (see modal.css); this only tints
+   it, warm-dark rather than neutral black, so the room stays visible behind
+   an open dialog instead of being switched off. */
+.modal-backdrop::before {
+  background: rgba(16, 12, 26, 0.42);
+}
+
+.modal-body a {
+  color: #8fe3df;
+}
+
+.modal-body a:hover {
+  color: #ffc4dc;
+}
+
+/* =============================================================================
+   BUTTONS
+   -----------------------------------------------------------------------------
+   The shell's base `button` is already a solid --color-btn fill with dark ink,
+   which is the right shape for this theme; what it lacks is the bloom. So this
+   only softens and lights the existing face rather than rebuilding it as an
+   outlined chip, which keeps every segmented "active" state in the tools
+   (they fill from var(--color-btn)) working with no per-tool rule.
+
+   THE GHOST LIST BELOW IS NOT OPTIONAL. Adding box-shadow to bare `button`
+   reaches every icon-only and link-style control in the app, all of which
+   clear their own background and border on a class selector but none of which
+   clear box-shadow. Without the reset they end up as a glowing halo around
+   nothing. Every selector there is a bare class, so it outranks `button`
+   regardless of source order.
+============================================================================= */
+
+button {
+  background: linear-gradient(180deg, #7fe0dc 0%, #62cbc7 100%);
+  border-radius: 8px;
+  box-shadow:
+    0 0 14px rgba(111, 216, 212, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+button:hover {
+  background: linear-gradient(180deg, #a6f2ec 0%, #82ded9 100%);
+  box-shadow:
+    0 0 22px rgba(111, 216, 212, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.titlebar-btn,
+.modal-close-btn,
+.nav-back-btn,
+.tool-back-btn,
+.section-back-btn,
+.dashboard-tool-btn,
+.changelog-toggle-btn,
+.sidebar-edit-visibility-btn,
+.theme-tile-icon-btn,
+.lock-show-btn,
+.lock-cred-link,
+.gs-subview-back-btn,
+.gs-segment-btn,
+.gs-player-remove-btn,
+.budget-summary-tab,
+.modal-tab,
+.modal-cancel-btn,
+.tab-btn,
+.danger-btn {
+  box-shadow: none;
+}
+
+/* Secondary action in a two-button modal. Kept as a bare outline with no glow
+   at all, so the lit teal confirm beside it is unmistakably the primary. */
+.modal-cancel-btn {
+  border-color: rgba(147, 174, 192, 0.35);
+}
+
+.modal-cancel-btn:hover {
+  background: rgba(147, 174, 192, 0.12);
+  color: var(--color-text);
+  border-color: rgba(147, 174, 192, 0.6);
+}
+
+.primary-btn {
+  background: linear-gradient(180deg, #7fe0dc 0%, #62cbc7 100%);
+  border-color: rgba(111, 216, 212, 0.6);
+  color: var(--color-btn-text);
+}
+
+.primary-btn:hover {
+  background: linear-gradient(180deg, #a6f2ec 0%, #82ded9 100%);
+  border-color: #9defe9;
+  box-shadow: 0 0 22px rgba(111, 216, 212, 0.45);
+}
+
+/* Danger keeps the shell's transparent outlined shape, since a filled pink
+   button would be indistinguishable from a lit primary at a glance. The glow
+   only arrives on hover, which is the point at which it should worry you. */
+.danger-btn {
+  border-color: rgba(247, 123, 166, 0.55);
+}
+
+.danger-btn:hover {
+  background: rgba(247, 123, 166, 0.15);
+  box-shadow: 0 0 18px rgba(247, 123, 166, 0.3);
+}
+
+.close-btn:hover {
+  box-shadow: 0 0 14px rgba(247, 123, 166, 0.25);
+}
+
+/* =============================================================================
+   INPUTS
+============================================================================= */
+
+input,
+select,
+textarea {
+  border-color: rgba(111, 216, 212, 0.18);
+  box-shadow: inset 0 2px 8px rgba(6, 9, 16, 0.35);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: rgba(111, 216, 212, 0.65);
+  box-shadow:
+    inset 0 2px 8px rgba(6, 9, 16, 0.35),
+    0 0 16px rgba(111, 216, 212, 0.3);
+}
+
+::placeholder {
+  color: rgba(147, 174, 192, 0.55);
+}
+
+.drop-zone {
+  border-color: rgba(111, 216, 212, 0.38);
+  background: rgba(111, 216, 212, 0.04);
+}
+
+/* =============================================================================
+   TABS AND SEGMENTED CONTROLS
+============================================================================= */
+
+.tab-btn {
+  color: var(--color-text-muted);
+  border-color: transparent;
+  background: transparent;
+}
+
+.tab-btn:hover {
+  color: #8fe3df;
+  border-color: rgba(111, 216, 212, 0.3);
+  background: rgba(111, 216, 212, 0.07);
+}
+
+.tab-btn.active {
+  color: #a6ece8;
+  border-color: rgba(111, 216, 212, 0.5);
+  background: rgba(111, 216, 212, 0.13);
+  box-shadow: 0 0 16px rgba(111, 216, 212, 0.18);
+}
+
+.dir-btn,
+.prv-btn {
+  background: rgba(22, 32, 47, 0.9);
+  color: var(--color-text-muted);
+  border-color: rgba(111, 216, 212, 0.2);
+  box-shadow: none;
+}
+
+.dir-btn:hover,
+.prv-btn:hover {
+  color: #8fe3df;
+  border-color: rgba(111, 216, 212, 0.45);
+  background: rgba(111, 216, 212, 0.09);
+  box-shadow: none;
+}
+
+.prv-btn.active {
+  color: #a6ece8;
+  border-color: #6fd8d4;
+  background: rgba(111, 216, 212, 0.14);
+}
+
+/* =============================================================================
+   SEGMENTED / TOGGLE ACTIVE-STATE FILLS
+   -----------------------------------------------------------------------------
+   Each of these fills from var(--color-btn) in its own tool CSS, which already
+   resolves to this theme's teal, so the colour is right without help. What
+   they are missing is the bloom every other lit control in here has; restating
+   them purely to add it keeps a selected segment reading as lit rather than as
+   merely painted.
+============================================================================= */
+.dir-btn.active,              /* Image CCR. Combine: Append Direction */
+.fmt-btn.active,              /* Image CCR. Combine: Output Format */
+.gravity-btn.active,          /* Image CCR. Resize: Image Placement */
+.resize-fmt-btn.active,       /* Image CCR. Resize: Output Format */
+.dfg-organize-btn.active,     /* Dummy File Generator. Organize */
+.dfg-naming-btn.active,       /* Dummy File Generator, output style (123 / abc / 0xF) */
+.budget-view-mode-btn.active {
+  background: #6fd8d4;
+  color: var(--color-btn-text);
+  border-color: #6fd8d4;
+  box-shadow: 0 0 16px rgba(111, 216, 212, 0.4);
+}
+
+.preset-btn.active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: #6fd8d4;
+  box-shadow: 0 0 16px rgba(111, 216, 212, 0.35);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  box-shadow: 0 0 14px rgba(111, 216, 212, 0.4);
+}
+
+/* =============================================================================
+   IMAGE CCR
+============================================================================= */
+
+.anchor-badge {
+  background: #6fd8d4;
+  color: var(--color-btn-text);
+  box-shadow: 0 0 12px rgba(111, 216, 212, 0.45);
+}
+
+.preview-card:hover {
+  border-color: rgba(111, 216, 212, 0.55);
+  box-shadow: 0 0 16px rgba(111, 216, 212, 0.2);
+}
+
+.preview-card.anchor-card {
+  border-color: #6fd8d4;
+  box-shadow: 0 0 18px rgba(111, 216, 212, 0.35);
+}
+
+.preview-card.drag-target {
+  border-color: #f79ec4;
+  box-shadow: 0 0 18px rgba(247, 158, 196, 0.4);
+}
+
+.img-slider::-webkit-slider-thumb {
+  background: #8fe3df;
+  border-color: #141b2a;
+  box-shadow: 0 0 12px rgba(111, 216, 212, 0.6);
+}
+
+.img-slider::-webkit-slider-thumb:hover {
+  background: #ffc4dc;
+  box-shadow: 0 0 14px rgba(247, 158, 196, 0.6);
+}
+
+.slider-val {
+  color: #8fe3df;
+}
+
+.estimate-val {
+  color: #f3d38a;
+}
+
+.size-estimate {
+  background: rgba(22, 32, 47, 0.8);
+  border-color: rgba(111, 216, 212, 0.16);
+}
+
+.result-preview-wrap {
+  border-color: rgba(183, 156, 240, 0.28);
+  box-shadow: 0 0 20px rgba(183, 156, 240, 0.12);
+}
+
+/* Image CCR's "N images found" count reads var(--color-btn-text) from the tool
+   CSS, this theme's near-black ink, which vanishes on the dark stat surface it
+   sits on. Recolour just that value. */
+.resize-stat .resize-stat-val,
+.resize-stat-count .resize-stat-val {
+  color: #8fe3df;
+}
+
+/* =============================================================================
+   LOCK SCREEN
+   -----------------------------------------------------------------------------
+   #lockScreen is z-index 9999, above the tape overlay, and paints an opaque
+   --color-bg over the room, so neither full-window layer reaches it. It
+   repaints the room itself instead: the same three fixtures, arranged around
+   the centred keypad rather than around the window. This is the first thing
+   anyone with app-lock on ever sees of the theme, so it is worth the rule.
+============================================================================= */
+
+#lockScreen {
+  background:
+    radial-gradient(ellipse at 50% 8%, rgba(243, 211, 138, 0.16) 0%, rgba(243, 211, 138, 0) 55%),
+    radial-gradient(circle at 82% 22%, rgba(247, 158, 196, 0.2) 0%, rgba(247, 158, 196, 0) 58%),
+    radial-gradient(circle at 14% 92%, rgba(111, 216, 212, 0.24) 0%, rgba(111, 216, 212, 0) 60%),
+    #141b2a;
+}
+
+.lock-title {
+  letter-spacing: 0.1em;
+  text-shadow:
+    -1px 0 rgba(247, 158, 196, 0.4),
+     1px 0 rgba(111, 216, 212, 0.4);
+}
+
+.lock-icon {
+  color: #8fe3df;
+  opacity: 0.65;
+}
+
+.lock-dot.filled {
+  box-shadow: 0 0 10px rgba(111, 216, 212, 0.55);
+}
+
+/* =============================================================================
+   BUDGET TRACKER
+============================================================================= */
+
+#finance-tool-budget .panel-accent-input {
+  background: linear-gradient(140deg, rgba(111, 216, 212, 0.1) 0%, #1d2739 60%);
+  box-shadow: 0 0 20px rgba(111, 216, 212, 0.1);
+}
+#finance-tool-budget .panel-accent-view {
+  background: linear-gradient(140deg, rgba(247, 158, 196, 0.1) 0%, #1d2739 60%);
+  box-shadow: 0 0 20px rgba(247, 158, 196, 0.1);
+}
+#finance-tool-budget .panel-accent-totals {
+  background: linear-gradient(140deg, rgba(243, 211, 138, 0.09) 0%, #1d2739 60%);
+  box-shadow: 0 0 20px rgba(243, 211, 138, 0.09);
+}
+#finance-tool-budget .panel-accent-entries {
+  background: linear-gradient(140deg, rgba(183, 156, 240, 0.1) 0%, #1d2739 60%);
+  box-shadow: 0 0 20px rgba(183, 156, 240, 0.1);
+}
+
+.budget-annual-stats-title-panel {
+  border-left: 4px solid #6fd8d4;
+  background: linear-gradient(140deg, rgba(111, 216, 212, 0.09) 0%, #1d2739 60%);
+  box-shadow: 0 0 22px rgba(111, 216, 212, 0.12);
+}
+
+.budget-annual-stats-title {
+  color: #a6ece8;
+  letter-spacing: 0.05em;
+  text-shadow:
+    -1px 0 rgba(247, 158, 196, 0.4),
+     1px 0 rgba(111, 216, 212, 0.4);
+}
+
+/* Tab strips. The active tab is the pink one for the same reason the active
+   nav row is: whatever you are currently inside is lit by the sign. */
+.budget-summary-tab,
+.modal-tab {
+  color: var(--color-text-muted);
+}
+
+.budget-summary-tab:hover,
+.modal-tab:hover {
+  color: var(--color-text);
+  background: rgba(111, 216, 212, 0.07);
+}
+
+.budget-summary-tab.active,
+.modal-tab.active {
+  color: #ffc4dc;
+  background: rgba(247, 158, 196, 0.13);
+  border-bottom-color: #f79ec4;
+  text-shadow: 0 0 12px rgba(247, 158, 196, 0.45);
+}
+
+/* Semantic, intentionally literal, and left alone by every theme: profit is
+   green and loss is red no matter what the room looks like. */
+.budget-stats-table td.pos { color: #00FF00; }
+.budget-stats-table td.neg { color: #FF0000; }
+
+.budget-stats-count-good    { color: #86e0bf; border-color: #86e0bf; }
+.budget-stats-count-late    { color: #f3d38a; border-color: #f3d38a; }
+.budget-stats-count-overdue { color: #f77ba6; border-color: #f77ba6; }
+
+.budget-chart-cycle-btn,
+.budget-chart-expand-btn,
+.budget-chart-modal-cycle-btn {
+  border-color: rgba(111, 216, 212, 0.28);
+  color: var(--color-text-muted);
+}
+
+.budget-chart-cycle-btn:hover,
+.budget-chart-expand-btn:hover,
+.budget-chart-modal-cycle-btn:hover {
+  background: rgba(111, 216, 212, 0.09);
+  border-color: #6fd8d4;
+  color: #8fe3df;
+  box-shadow: 0 0 12px rgba(111, 216, 212, 0.22);
+}
+
+.budget-stats-section-heading {
+  color: var(--color-text-muted);
+  letter-spacing: 0.05em;
+}
+
+/* =============================================================================
+   GAME STATS
+   -----------------------------------------------------------------------------
+   The whole tool re-skins through the --gs-* hooks declared at the top of
+   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   table, history cards, chart tooltip). Override the hooks here rather than
+   restating a selector per component.
+
+   --gs-loss takes the pink that is already --color-danger, and --gs-win takes
+   the mint rather than the teal, because the teal is the tool's own accent:
+   win and accent in the same colour would make every panel look like it was
+   announcing a winner.
+============================================================================= */
+
+:root {
+  --gs-accent:      #6fd8d4;
+  --gs-accent-soft: #8fe3df;
+  --gs-win:         #86e0bf;
+  --gs-loss:        #f77ba6;
+  --gs-surface:     rgba(111, 216, 212, 0.07);
+  --gs-header-bg:   rgba(111, 216, 212, 0.12);
+  --gs-grid-line:   rgba(111, 216, 212, 0.18);
+  --gs-zebra:       rgba(233, 243, 242, 0.03);
+  --gs-radius:      12px;
+}
+
+/* The leading player and an alert tile are the two things in the tool that
+   have to be found at a glance, and the mint they are drawn in is close enough
+   to the teal around them to get lost. A bloom separates them without
+   introducing a colour the theme does not already have. */
+.gs-score-chip.leader,
+.gs-tile.gs-tile-alert {
+  box-shadow: 0 0 16px rgba(134, 224, 191, 0.35);
+}
+
+/* =============================================================================
+   TOASTS
+   -----------------------------------------------------------------------------
+   The palette tokens already colour these; this only puts the same wide bloom
+   on them that every other lit surface has, so a toast arrives as a light
+   coming on rather than as a rectangle appearing.
+============================================================================= */
+
+.toast.success {
+  box-shadow: 0 0 24px rgba(134, 224, 191, 0.22);
+}
+
+.toast.error {
+  box-shadow: 0 0 24px rgba(247, 158, 196, 0.25);
+}

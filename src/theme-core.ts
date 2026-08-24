@@ -523,10 +523,11 @@ function stopSeasonalEffect(): void {
  *  takes for it to appear (and be switchable) in the UI. Ordered to match the
  *  Holiday tab's own order, with the Special-tab effects last.
  *
- *  Lava is the one entry with no canvas branch below: its blobs are CSS
- *  keyframes living in themes/lava.css, gated on the body class that
- *  applyThemeAnimationClass() maintains. It's listed here so it shares one
- *  toggle list with the canvas effects rather than growing a second one. */
+ *  Lava and Liminal are the two entries with no canvas branch below: their
+ *  motion is CSS keyframes living in themes/lava.css and themes/liminal.css,
+ *  gated on the body class that applyThemeAnimationClass() maintains. They are
+ *  listed here so they share one toggle list with the canvas effects rather
+ *  than growing a second one. */
 export const ANIMATED_THEMES: { id: string; label: string; effect: string }[] = [
   { id: "valentine", label: "Valentine", effect: "Floating hearts" },
   { id: "mardi-gras", label: "Mardi Gras", effect: "Falling bead strands" },
@@ -537,6 +538,7 @@ export const ANIMATED_THEMES: { id: string; label: string; effect: string }[] = 
   { id: "christmas", label: "Christmas", effect: "Falling snow" },
   { id: "halo", label: "Halo", effect: "Cursor glow swirl" },
   { id: "lava", label: "Lava", effect: "Drifting lava blobs" },
+  { id: "liminal", label: "Liminal", effect: "Drifting haze and tape tracking" },
 ];
 
 /** Set on <body> whenever the active theme's animation is switched off.

@@ -143,6 +143,7 @@ export const THEME_GROUPS: { tab: ThemePickerTab; themes: { id: string; label: s
       { id: "halo", label: "Halo" },
       { id: "knowledge", label: "Knowledge" },
       { id: "lava", label: "Lava" },
+      { id: "liminal", label: "Liminal" },
       { id: "matte", label: "Matte" },
       { id: "neon", label: "Neon" },
       { id: "nostalgia", label: "Nostalgia" },
