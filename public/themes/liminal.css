@@ -4,27 +4,43 @@
    3am in a place that was built for daylight. An empty natatorium, a mall an
    hour after close, a corridor of patterned carpet that turns a corner it
    shouldn't. The dreamcore end of liminal space rather than the Backrooms end:
-   the room is dim, but everything in it is lit in bleached fluorescent teal
-   and faded motel pink, and the whole thing looks like it was left on a VHS
-   tape in a hot car for twenty years.
+   the room is dim, but every surface in it is washed in faded motel pink, with
+   the pool throwing bleached fluorescent teal up from below, and the whole
+   thing looks like it was left on a VHS tape in a hot car for twenty years.
 
-   THREE LIGHT SOURCES, NO WINDOWS
-   Nothing in this theme is lit from outside. The palette is built from three
-   fixtures that never move:
-     - pool teal   (#6fd8d4), from below and to the left, water light on tile
-     - motel pink  (#f79ec4), from the upper right, a sign still switched on
-     - tube cream  (#f3d38a), overhead, the one fluorescent that never got fixed
-   Lilac (#b79cf0) is what teal and pink make where they overlap, so it takes
+   THE ROOM IS PINK. THE WATER IS TEAL.
+   Nothing in this theme is lit from outside. The palette is built from
+   fixtures that never move, and they are not equal partners:
+     - motel pink  (#e5aec4), the ceiling neon, running the whole width of the
+                   room, plus the sign upper right and the same tube again on
+                   the far wall. It is the AMBIENT: it lands on every surface,
+                   frame, bloom and header in the app.
+     - sign pink   (#c879a1), the same fixture seen closer, deep enough to sit
+                   under the pale wash without the two of them flattening out.
+     - pool teal   (#6fd8d4), from below and to the left. It is the
+                   INTERACTIVE: buttons, focus rings, filled toggles, selected
+                   segments. Water is the thing you touch.
+     - tube cream  (#f3d38a), overhead, the one fluorescent that never got
+                   fixed. Held down deliberately; it is warm, and at strength
+                   it turns the pink orange.
+   Lilac (#b79cf0) is what pink and teal make where they overlap, so it takes
    the fourth accent slot rather than being invented for it.
+
+   That split is the whole layout rule: if a surface is just THERE, it is lit
+   pink; if it responds to you, it lights teal. It is also why the resting
+   border on an input is pink and its focus ring is teal, and why the active
+   nav row, the active tab and a hovered tool card all catch the sign.
 
    Everything reads as FADED-BRIGHT, not neon. Neon (neon.css, retro-electric)
    is saturated colour on near-black with hard glow. This is the opposite move:
-   the hues are pastel, the ground is a dusty indigo rather than black, and
-   every glow is wide and weak. Nothing here has a hard edge, because the point
-   is that you cannot tell how big the room is.
+   the pink is dried out to about half the saturation of a candy pink, the
+   ground is a dusty plum rather than black (the colour the shadows in a
+   pink-tiled room actually go), and every glow is wide and weak. Nothing here
+   has a hard edge, because the point is that you cannot tell how big the room
+   is.
 
    THE TWO FULL-WINDOW LAYERS
-   `body::before` is THE ROOM: four enormous radial washes on a fixed layer at
+   `body::before` is THE ROOM: six enormous radial washes on a fixed layer at
    z-index -1, under all app content and over the body's own --color-bg fill
    (the same slot lava.css paints its blobs in, and it works for the same
    reason: #appBody and #mainContent are transparent). It drifts, and the
@@ -71,18 +87,19 @@
      (entry rows, ledger rows, totals blocks, Game Stats tiles), which is why
      it is a real colour and not near-black: those rows have to sit visibly
      BELOW --color-panel without falling into a hole. */
-  --color-bg:                  #141b2a;
-  --color-panel:               #1d2739;
-  --color-input-bg:            #16202f;
-  --color-border:              #34455e;
+  --color-bg:                  #251821;
+  --color-panel:               #362631;
+  --color-input-bg:            #2b1c26;
+  --color-border:              #563c4c;
   /* Dashed frames (drop zones, empty states) are the one border allowed to
      carry a hue: they are asking for something, so they glow faintly. */
   --color-border-dashed:       #6fd8d4;
-  /* Cool near-white, the colour of a wall that has only ever been lit by a
-     fluorescent tube. Deliberately not #ffffff, nothing in here is clean. */
-  --color-text:                #e9f3f2;
-  --color-text-muted:          #93aec0;
-  --color-hover:               #26334a;
+  /* Near-white with the room in it: a wall that has only ever been lit by a
+     pink tube reads faintly pink even where the light is strongest.
+     Deliberately not #ffffff, nothing in here is clean. */
+  --color-text:                #f3e8ee;
+  --color-text-muted:          #bba0ae;
+  --color-hover:               #452f3e;
 
   /* Pool teal is the app's primary. --color-btn is consumed all over the shell
      as THE bright accent (tool-card icons, active rails, filled toggles, modal
@@ -93,41 +110,43 @@
   --color-accent:              #8fe3df;
   --color-btn-hover:           #9defe9;
   /* Dark ink for anything sitting ON a teal fill. */
-  --color-btn-text:            #0d1420;
+  --color-btn-text:            #1c1017;
 
   /* Motel pink doubles as the danger colour. That is not a compromise: in a
      palette this soft, pink is the only hue loud enough to stop someone, and a
      true red would be the one colour in the theme that isn't sun-bleached. */
-  --color-danger:              #f77ba6;
-  --color-danger-subtle:       rgba(247, 123, 166, 0.13);
+  --color-danger:              #e788a2;
+  --color-danger-subtle:       rgba(231, 136, 162, 0.13);
   --color-success:             #86e0bf;
 
   /* The four panel rails walk the fixtures in order: water, sign, tube, and
-     the lilac where the first two overlap. */
+     the lilac where the first two overlap. These are RAILS, 4px of colour on
+     the edge of a panel, so they are the one place the teal is allowed to lead
+     without meaning "press me". */
   --color-accent-input:        #6fd8d4;
-  --color-accent-view:         #f79ec4;
+  --color-accent-view:         #e5aec4;
   --color-accent-totals:       #f3d38a;
   --color-accent-entries:      #b79cf0;
 
-  --color-toggle-off:          #3a4a63;
+  --color-toggle-off:          #4a3444;
   --color-toggle-on:           #6fd8d4;
 
   /* ── Changelog accents ── Features (teal) / Improvements (mint) / Bugfixes (pink) / tool heading (lilac) */
   --color-changelog-features:     #6fd8d4;
   --color-changelog-improvements: #86e0bf;
-  --color-changelog-bugfixes:     #f79ec4;
+  --color-changelog-bugfixes:     #e5aec4;
   --color-changelog-tool:         #b79cf0;
 
   --color-toast-success-bg:    #10322f;
   --color-toast-success-border:#86e0bf;
   --color-toast-success-text:  #cdf3e6;
-  --color-toast-error-bg:      #351a2a;
-  --color-toast-error-border:  #f79ec4;
+  --color-toast-error-bg:      #3a1c2c;
+  --color-toast-error-border:  #e5aec4;
   --color-toast-error-text:    #ffdcea;
 
   /* ── Budget chart palette ── Teal / pink / lilac / cream / mint / pool-blue / exit-sign coral / periwinkle, the whole faded set */
   --color-chart-1:             #6fd8d4;
-  --color-chart-2:             #f79ec4;
+  --color-chart-2:             #e5aec4;
   --color-chart-3:             #b79cf0;
   --color-chart-4:             #f3d38a;
   --color-chart-5:             #86e0bf;
@@ -159,21 +178,29 @@ body::before {
   background-repeat: no-repeat;
   background-image:
     /* the bad tube, overhead */
-    radial-gradient(ellipse at 50% 50%, rgba(243, 211, 138, 0.20) 0%, rgba(243, 211, 138, 0.07) 45%, rgba(243, 211, 138, 0) 72%),
+    radial-gradient(ellipse at 50% 50%, rgba(243, 211, 138, 0.13) 0%, rgba(243, 211, 138, 0.05) 45%, rgba(243, 211, 138, 0) 72%),
+    /* the ceiling neon, running the whole width of the room */
+    radial-gradient(ellipse at 50% 50%, rgba(229, 174, 196, 0.34) 0%, rgba(229, 174, 196, 0.14) 42%, rgba(229, 174, 196, 0) 70%),
     /* the sign, upper right */
-    radial-gradient(circle at 50% 50%, rgba(247, 158, 196, 0.26) 0%, rgba(247, 158, 196, 0.09) 46%, rgba(247, 158, 196, 0) 73%),
+    radial-gradient(circle at 50% 50%, rgba(200, 121, 161, 0.28) 0%, rgba(200, 121, 161, 0.10) 46%, rgba(200, 121, 161, 0) 73%),
+    /* the same neon on the far wall, two rooms away */
+    radial-gradient(circle at 50% 50%, rgba(229, 174, 196, 0.20) 0%, rgba(229, 174, 196, 0.07) 47%, rgba(229, 174, 196, 0) 75%),
     /* the water, lower left */
-    radial-gradient(circle at 50% 50%, rgba(111, 216, 212, 0.30) 0%, rgba(111, 216, 212, 0.11) 46%, rgba(111, 216, 212, 0) 74%),
-    /* where the two of them overlap */
-    radial-gradient(circle at 50% 50%, rgba(183, 156, 240, 0.20) 0%, rgba(183, 156, 240, 0.07) 48%, rgba(183, 156, 240, 0) 76%);
+    radial-gradient(circle at 50% 50%, rgba(111, 216, 212, 0.24) 0%, rgba(111, 216, 212, 0.09) 46%, rgba(111, 216, 212, 0) 74%),
+    /* where the sign and the water overlap */
+    radial-gradient(circle at 50% 50%, rgba(183, 156, 240, 0.16) 0%, rgba(183, 156, 240, 0.06) 48%, rgba(183, 156, 240, 0) 76%);
   background-size:
-    140vmin 70vmin,
+    120vmin 60vmin,
+    188vmin 84vmin,
     92vmin 88vmin,
+    104vmin 100vmin,
     108vmin 96vmin,
     86vmin 82vmin;
   background-position:
-    50% -18%,
+    58% -16%,
+    50% -10%,
     92% -6%,
+    -14% 40%,
     -6% 104%,
     38% 52%;
 }
@@ -184,9 +211,9 @@ body::before {
    a long stall at the ends of its travel instead of a constant slide. */
 @keyframes liminal-room-drift {
   0%,
-  100% { background-position: 50% -18%, 92% -6%, -6% 104%, 38% 52%; }
-  33%  { background-position: 44% -12%, 86%  2%,  2%  96%, 46% 44%; }
-  66%  { background-position: 56% -22%, 97% -2%, -2% 100%, 32% 58%; }
+  100% { background-position: 58% -16%, 50% -10%, 92% -6%, -14% 40%, -6% 104%, 38% 52%; }
+  33%  { background-position: 52% -10%, 45%  -6%, 86%  2%,  -8% 34%,  2%  96%, 46% 44%; }
+  66%  { background-position: 63% -20%, 56% -14%, 97% -2%, -19% 46%, -2% 100%, 32% 58%; }
 }
 
 /* The tube. One long stretch of nothing, then a short stutter, then nothing
@@ -233,24 +260,24 @@ body::after {
     linear-gradient(
       to bottom,
       rgba(111, 216, 212, 0) 0%,
-      rgba(111, 216, 212, 0.05) 34%,
-      rgba(233, 243, 242, 0.07) 50%,
-      rgba(247, 158, 196, 0.05) 66%,
-      rgba(247, 158, 196, 0) 100%
+      rgba(111, 216, 212, 0.04) 33%,
+      rgba(243, 232, 238, 0.07) 48%,
+      rgba(229, 174, 196, 0.11) 64%,
+      rgba(229, 174, 196, 0) 100%
     ),
     /* scanlines */
     repeating-linear-gradient(
       0deg,
       transparent,
       transparent 2px,
-      rgba(10, 15, 26, 0.09) 2px,
-      rgba(10, 15, 26, 0.09) 4px
+      rgba(14, 8, 13, 0.09) 2px,
+      rgba(14, 8, 13, 0.09) 4px
     ),
     /* Vignette, centred slightly high so the floor is the darkest part. Held
        to 0.22 and starting late, at 55%: the window controls, the clock and
        the sidebar's Exit button all live in corners, and a vignette heavy
        enough to be admired is heavy enough to bury them. */
-    radial-gradient(ellipse at 50% 42%, rgba(10, 15, 26, 0) 55%, rgba(10, 15, 26, 0.22) 100%);
+    radial-gradient(ellipse at 50% 42%, rgba(14, 8, 13, 0) 55%, rgba(14, 8, 13, 0.22) 100%);
   background-size: 100% 30vh, auto, auto;
   background-position: 0 -34vh, 0 0, 0 0;
 }
@@ -278,18 +305,18 @@ body:not(.theme-animations-off)::after {
 ============================================================================= */
 
 #titleBar {
-  background: linear-gradient(180deg, rgba(29, 39, 57, 0.86) 0%, rgba(20, 27, 42, 0.72) 100%);
-  border-bottom-color: rgba(111, 216, 212, 0.16);
+  background: linear-gradient(180deg, rgba(54, 38, 49, 0.86) 0%, rgba(37, 24, 33, 0.72) 100%);
+  border-bottom-color: rgba(229, 174, 196, 0.22);
 }
 
 /* The app name, the one piece of body chrome that gets the tape fringe. It is
    a fixed 1rem label that never wraps or reflows, which is the only place the
    effect is safe outside a heading. */
 .title {
-  color: #cfe6e4;
+  color: #e7d5de;
   opacity: 1;
   text-shadow:
-    -1px 0 rgba(247, 158, 196, 0.45),
+    -1px 0 rgba(229, 174, 196, 0.45),
      1px 0 rgba(111, 216, 212, 0.45);
 }
 
@@ -297,27 +324,27 @@ body:not(.theme-animations-off)::after {
    top where the ceiling tube is and falling away toward the floor, so the
    sidebar reads as a wall receding rather than as a strip of UI. */
 #sidebar {
-  background: linear-gradient(180deg, rgba(35, 46, 66, 0.82) 0%, rgba(22, 30, 46, 0.74) 55%, rgba(17, 23, 36, 0.8) 100%);
-  border-right-color: rgba(111, 216, 212, 0.14);
+  background: linear-gradient(180deg, rgba(63, 44, 57, 0.82) 0%, rgba(46, 31, 41, 0.74) 55%, rgba(33, 21, 29, 0.8) 100%);
+  border-right-color: rgba(229, 174, 196, 0.2);
 }
 
 #navList::-webkit-scrollbar-thumb {
-  background: rgba(111, 216, 212, 0.28);
+  background: rgba(229, 174, 196, 0.3);
 }
 
 #navList::-webkit-scrollbar-thumb:hover {
-  background: rgba(111, 216, 212, 0.5);
+  background: rgba(229, 174, 196, 0.55);
 }
 
 #navBottom {
-  border-top-color: rgba(111, 216, 212, 0.12);
+  border-top-color: rgba(229, 174, 196, 0.16);
 }
 
 /* Nav rows: quiet until touched, then lit teal from the rail outward. The
    active row keeps the pink rail instead, so the place you are is the one
    thing in the corridor lit by the sign rather than by the water. */
 .nav-item {
-  color: #9fb8c6;
+  color: #bda8b5;
 }
 
 .nav-item:hover {
@@ -326,15 +353,15 @@ body:not(.theme-animations-off)::after {
 }
 
 .nav-item.active {
-  background: linear-gradient(90deg, rgba(247, 158, 196, 0.18) 0%, rgba(247, 158, 196, 0.03) 100%);
-  color: #ffe3ee;
-  border-left-color: #f79ec4;
-  box-shadow: inset 3px 0 12px rgba(247, 158, 196, 0.22);
+  background: linear-gradient(90deg, rgba(229, 174, 196, 0.18) 0%, rgba(229, 174, 196, 0.03) 100%);
+  color: #f7dee8;
+  border-left-color: #e5aec4;
+  box-shadow: inset 3px 0 12px rgba(229, 174, 196, 0.22);
 }
 
 .nav-item.active .nav-icon {
-  color: #f79ec4;
-  filter: drop-shadow(0 0 6px rgba(247, 158, 196, 0.55));
+  color: #e5aec4;
+  filter: drop-shadow(0 0 6px rgba(229, 174, 196, 0.55));
 }
 
 /* =============================================================================
@@ -355,26 +382,26 @@ body:not(.theme-animations-off)::after {
 }
 
 .panel {
-  background: linear-gradient(140deg, #24304a 0%, #1d2739 52%, #1a2334 100%);
-  border-color: rgba(111, 216, 212, 0.14);
+  background: linear-gradient(140deg, #472e3f 0%, #362631 52%, #2d2029 100%);
+  border-color: rgba(229, 174, 196, 0.18);
   box-shadow:
-    0 0 28px rgba(111, 216, 212, 0.07),
-    inset 0 1px 0 rgba(233, 243, 242, 0.05);
+    0 0 28px rgba(229, 174, 196, 0.09),
+    inset 0 1px 0 rgba(243, 232, 238, 0.05);
 }
 
 .tool-card {
-  background: linear-gradient(140deg, #242f48 0%, #1c2637 100%);
-  border-color: rgba(111, 216, 212, 0.14);
-  box-shadow: 0 0 20px rgba(111, 216, 212, 0.05);
+  background: linear-gradient(140deg, #432d3d 0%, #30222c 100%);
+  border-color: rgba(229, 174, 196, 0.18);
+  box-shadow: 0 0 20px rgba(229, 174, 196, 0.07);
 }
 
 /* Hovering a card is the sign catching it. Pink, matching the active nav row,
    so "the thing you are pointing at" and "the thing you are in" are lit by the
    same fixture throughout the app. */
 .tool-card:hover {
-  background: linear-gradient(140deg, #33294a 0%, #221c34 100%);
-  border-color: rgba(247, 158, 196, 0.55);
-  box-shadow: 0 0 26px rgba(247, 158, 196, 0.22);
+  background: linear-gradient(140deg, #562e41 0%, #3d2430 100%);
+  border-color: rgba(229, 174, 196, 0.55);
+  box-shadow: 0 0 26px rgba(229, 174, 196, 0.22);
 }
 
 .tool-card-icon {
@@ -383,8 +410,8 @@ body:not(.theme-animations-off)::after {
 }
 
 .tool-card:hover .tool-card-icon {
-  color: #ffc4dc;
-  filter: drop-shadow(0 0 12px rgba(247, 158, 196, 0.55));
+  color: #f3cdde;
+  filter: drop-shadow(0 0 12px rgba(229, 174, 196, 0.55));
 }
 
 .dashboard-card-icon {
@@ -410,28 +437,28 @@ body:not(.theme-animations-off)::after {
 .panel-accent-input {
   border-color: rgba(111, 216, 212, 0.28);
   border-left: 4px solid #6fd8d4;
-  background: linear-gradient(140deg, rgba(111, 216, 212, 0.11) 0%, #1d2739 62%);
+  background: linear-gradient(140deg, rgba(111, 216, 212, 0.11) 0%, #362631 62%);
   box-shadow: 0 0 26px rgba(111, 216, 212, 0.12);
 }
 
 .panel-accent-view {
-  border-color: rgba(247, 158, 196, 0.28);
-  border-left: 4px solid #f79ec4;
-  background: linear-gradient(140deg, rgba(247, 158, 196, 0.11) 0%, #1d2739 62%);
-  box-shadow: 0 0 26px rgba(247, 158, 196, 0.12);
+  border-color: rgba(229, 174, 196, 0.28);
+  border-left: 4px solid #e5aec4;
+  background: linear-gradient(140deg, rgba(229, 174, 196, 0.11) 0%, #362631 62%);
+  box-shadow: 0 0 26px rgba(229, 174, 196, 0.12);
 }
 
 .panel-accent-totals {
   border-color: rgba(243, 211, 138, 0.26);
   border-left: 4px solid #f3d38a;
-  background: linear-gradient(140deg, rgba(243, 211, 138, 0.1) 0%, #1d2739 62%);
+  background: linear-gradient(140deg, rgba(243, 211, 138, 0.1) 0%, #362631 62%);
   box-shadow: 0 0 26px rgba(243, 211, 138, 0.1);
 }
 
 .panel-accent-entries {
   border-color: rgba(183, 156, 240, 0.28);
   border-left: 4px solid #b79cf0;
-  background: linear-gradient(140deg, rgba(183, 156, 240, 0.11) 0%, #1d2739 62%);
+  background: linear-gradient(140deg, rgba(183, 156, 240, 0.11) 0%, #362631 62%);
   box-shadow: 0 0 26px rgba(183, 156, 240, 0.12);
 }
 
@@ -443,12 +470,12 @@ body:not(.theme-animations-off)::after {
 .section-header {
   background: linear-gradient(
     90deg,
-    rgba(111, 216, 212, 0.14) 0%,
-    rgba(247, 158, 196, 0.09) 55%,
-    rgba(243, 211, 138, 0.07) 100%
+    rgba(229, 174, 196, 0.2) 0%,
+    rgba(200, 121, 161, 0.12) 46%,
+    rgba(111, 216, 212, 0.1) 100%
   );
-  border-bottom-color: rgba(111, 216, 212, 0.22);
-  box-shadow: 0 0 24px rgba(111, 216, 212, 0.08);
+  border-bottom-color: rgba(229, 174, 196, 0.28);
+  box-shadow: 0 0 24px rgba(229, 174, 196, 0.1);
 }
 
 /* The tape fringe, and the only place it appears at size. Letter-spacing is
@@ -460,7 +487,7 @@ body:not(.theme-animations-off)::after {
   opacity: 1;
   letter-spacing: 0.06em;
   text-shadow:
-    -1px 0 rgba(247, 158, 196, 0.5),
+    -1px 0 rgba(229, 174, 196, 0.5),
      1px 0 rgba(111, 216, 212, 0.5),
      0 0 22px rgba(111, 216, 212, 0.35);
 }
@@ -470,7 +497,7 @@ body:not(.theme-animations-off)::after {
 }
 
 .home-update-notice a:hover {
-  color: #ffc4dc;
+  color: #f3cdde;
 }
 
 /* =============================================================================
@@ -483,30 +510,30 @@ body:not(.theme-animations-off)::after {
 ============================================================================= */
 
 body:not(.solid-modals) .modal {
-  background: linear-gradient(160deg, rgba(59, 74, 104, 0.42) 0%, rgba(24, 31, 47, 0.62) 55%, rgba(37, 26, 48, 0.6) 100%);
+  background: linear-gradient(160deg, rgba(93, 60, 83, 0.42) 0%, rgba(47, 33, 43, 0.62) 55%, rgba(61, 38, 51, 0.6) 100%);
   backdrop-filter: blur(26px) saturate(1.15);
   -webkit-backdrop-filter: blur(26px) saturate(1.15);
-  border-color: rgba(111, 216, 212, 0.3);
+  border-color: rgba(229, 174, 196, 0.34);
   box-shadow:
-    0 0 42px rgba(111, 216, 212, 0.14),
-    0 0 90px rgba(247, 158, 196, 0.08),
-    0 26px 60px rgba(6, 9, 16, 0.62);
+    0 0 42px rgba(229, 174, 196, 0.16),
+    0 0 90px rgba(111, 216, 212, 0.08),
+    0 26px 60px rgba(10, 5, 9, 0.62);
 }
 
 body.solid-modals .modal {
-  background: linear-gradient(160deg, #2a3550 0%, #1c2536 58%, #221b30 100%);
-  border-color: rgba(111, 216, 212, 0.28);
+  background: linear-gradient(160deg, #4a3346 0%, #332330 58%, #3d2836 100%);
+  border-color: rgba(229, 174, 196, 0.32);
   box-shadow:
-    0 0 42px rgba(111, 216, 212, 0.12),
-    0 0 90px rgba(247, 158, 196, 0.07),
-    0 26px 60px rgba(6, 9, 16, 0.62);
+    0 0 42px rgba(229, 174, 196, 0.14),
+    0 0 90px rgba(111, 216, 212, 0.07),
+    0 26px 60px rgba(10, 5, 9, 0.62);
 }
 
 /* The backdrop's own blur lives on ::before (see modal.css); this only tints
    it, warm-dark rather than neutral black, so the room stays visible behind
    an open dialog instead of being switched off. */
 .modal-backdrop::before {
-  background: rgba(16, 12, 26, 0.42);
+  background: rgba(20, 10, 18, 0.42);
 }
 
 .modal-body a {
@@ -514,7 +541,7 @@ body.solid-modals .modal {
 }
 
 .modal-body a:hover {
-  color: #ffc4dc;
+  color: #f3cdde;
 }
 
 /* =============================================================================
@@ -574,13 +601,13 @@ button:hover {
 /* Secondary action in a two-button modal. Kept as a bare outline with no glow
    at all, so the lit teal confirm beside it is unmistakably the primary. */
 .modal-cancel-btn {
-  border-color: rgba(147, 174, 192, 0.35);
+  border-color: rgba(187, 160, 174, 0.35);
 }
 
 .modal-cancel-btn:hover {
-  background: rgba(147, 174, 192, 0.12);
+  background: rgba(187, 160, 174, 0.12);
   color: var(--color-text);
-  border-color: rgba(147, 174, 192, 0.6);
+  border-color: rgba(187, 160, 174, 0.6);
 }
 
 .primary-btn {
@@ -599,16 +626,16 @@ button:hover {
    button would be indistinguishable from a lit primary at a glance. The glow
    only arrives on hover, which is the point at which it should worry you. */
 .danger-btn {
-  border-color: rgba(247, 123, 166, 0.55);
+  border-color: rgba(231, 136, 162, 0.55);
 }
 
 .danger-btn:hover {
-  background: rgba(247, 123, 166, 0.15);
-  box-shadow: 0 0 18px rgba(247, 123, 166, 0.3);
+  background: rgba(231, 136, 162, 0.15);
+  box-shadow: 0 0 18px rgba(231, 136, 162, 0.3);
 }
 
 .close-btn:hover {
-  box-shadow: 0 0 14px rgba(247, 123, 166, 0.25);
+  box-shadow: 0 0 14px rgba(231, 136, 162, 0.25);
 }
 
 /* =============================================================================
@@ -618,8 +645,8 @@ button:hover {
 input,
 select,
 textarea {
-  border-color: rgba(111, 216, 212, 0.18);
-  box-shadow: inset 0 2px 8px rgba(6, 9, 16, 0.35);
+  border-color: rgba(229, 174, 196, 0.22);
+  box-shadow: inset 0 2px 8px rgba(10, 5, 9, 0.35);
 }
 
 input:focus,
@@ -628,12 +655,12 @@ textarea:focus {
   outline: none;
   border-color: rgba(111, 216, 212, 0.65);
   box-shadow:
-    inset 0 2px 8px rgba(6, 9, 16, 0.35),
+    inset 0 2px 8px rgba(10, 5, 9, 0.35),
     0 0 16px rgba(111, 216, 212, 0.3);
 }
 
 ::placeholder {
-  color: rgba(147, 174, 192, 0.55);
+  color: rgba(187, 160, 174, 0.55);
 }
 
 .drop-zone {
@@ -658,17 +685,17 @@ textarea:focus {
 }
 
 .tab-btn.active {
-  color: #a6ece8;
-  border-color: rgba(111, 216, 212, 0.5);
-  background: rgba(111, 216, 212, 0.13);
-  box-shadow: 0 0 16px rgba(111, 216, 212, 0.18);
+  color: #f7dee8;
+  border-color: rgba(229, 174, 196, 0.55);
+  background: rgba(229, 174, 196, 0.15);
+  box-shadow: 0 0 16px rgba(229, 174, 196, 0.2);
 }
 
 .dir-btn,
 .prv-btn {
-  background: rgba(22, 32, 47, 0.9);
+  background: rgba(45, 30, 40, 0.9);
   color: var(--color-text-muted);
-  border-color: rgba(111, 216, 212, 0.2);
+  border-color: rgba(229, 174, 196, 0.24);
   box-shadow: none;
 }
 
@@ -740,19 +767,19 @@ textarea:focus {
 }
 
 .preview-card.drag-target {
-  border-color: #f79ec4;
-  box-shadow: 0 0 18px rgba(247, 158, 196, 0.4);
+  border-color: #e5aec4;
+  box-shadow: 0 0 18px rgba(229, 174, 196, 0.4);
 }
 
 .img-slider::-webkit-slider-thumb {
   background: #8fe3df;
-  border-color: #141b2a;
+  border-color: #251821;
   box-shadow: 0 0 12px rgba(111, 216, 212, 0.6);
 }
 
 .img-slider::-webkit-slider-thumb:hover {
-  background: #ffc4dc;
-  box-shadow: 0 0 14px rgba(247, 158, 196, 0.6);
+  background: #f3cdde;
+  box-shadow: 0 0 14px rgba(229, 174, 196, 0.6);
 }
 
 .slider-val {
@@ -764,8 +791,8 @@ textarea:focus {
 }
 
 .size-estimate {
-  background: rgba(22, 32, 47, 0.8);
-  border-color: rgba(111, 216, 212, 0.16);
+  background: rgba(45, 30, 40, 0.8);
+  border-color: rgba(229, 174, 196, 0.2);
 }
 
 .result-preview-wrap {
@@ -793,16 +820,17 @@ textarea:focus {
 
 #lockScreen {
   background:
-    radial-gradient(ellipse at 50% 8%, rgba(243, 211, 138, 0.16) 0%, rgba(243, 211, 138, 0) 55%),
-    radial-gradient(circle at 82% 22%, rgba(247, 158, 196, 0.2) 0%, rgba(247, 158, 196, 0) 58%),
-    radial-gradient(circle at 14% 92%, rgba(111, 216, 212, 0.24) 0%, rgba(111, 216, 212, 0) 60%),
-    #141b2a;
+    radial-gradient(ellipse at 50% 4%, rgba(229, 174, 196, 0.3) 0%, rgba(229, 174, 196, 0) 62%),
+    radial-gradient(ellipse at 50% 12%, rgba(243, 211, 138, 0.1) 0%, rgba(243, 211, 138, 0) 52%),
+    radial-gradient(circle at 84% 40%, rgba(200, 121, 161, 0.22) 0%, rgba(200, 121, 161, 0) 58%),
+    radial-gradient(circle at 14% 92%, rgba(111, 216, 212, 0.2) 0%, rgba(111, 216, 212, 0) 60%),
+    #251821;
 }
 
 .lock-title {
   letter-spacing: 0.1em;
   text-shadow:
-    -1px 0 rgba(247, 158, 196, 0.4),
+    -1px 0 rgba(229, 174, 196, 0.4),
      1px 0 rgba(111, 216, 212, 0.4);
 }
 
@@ -820,25 +848,25 @@ textarea:focus {
 ============================================================================= */
 
 #finance-tool-budget .panel-accent-input {
-  background: linear-gradient(140deg, rgba(111, 216, 212, 0.1) 0%, #1d2739 60%);
+  background: linear-gradient(140deg, rgba(111, 216, 212, 0.1) 0%, #362631 60%);
   box-shadow: 0 0 20px rgba(111, 216, 212, 0.1);
 }
 #finance-tool-budget .panel-accent-view {
-  background: linear-gradient(140deg, rgba(247, 158, 196, 0.1) 0%, #1d2739 60%);
-  box-shadow: 0 0 20px rgba(247, 158, 196, 0.1);
+  background: linear-gradient(140deg, rgba(229, 174, 196, 0.1) 0%, #362631 60%);
+  box-shadow: 0 0 20px rgba(229, 174, 196, 0.1);
 }
 #finance-tool-budget .panel-accent-totals {
-  background: linear-gradient(140deg, rgba(243, 211, 138, 0.09) 0%, #1d2739 60%);
+  background: linear-gradient(140deg, rgba(243, 211, 138, 0.09) 0%, #362631 60%);
   box-shadow: 0 0 20px rgba(243, 211, 138, 0.09);
 }
 #finance-tool-budget .panel-accent-entries {
-  background: linear-gradient(140deg, rgba(183, 156, 240, 0.1) 0%, #1d2739 60%);
+  background: linear-gradient(140deg, rgba(183, 156, 240, 0.1) 0%, #362631 60%);
   box-shadow: 0 0 20px rgba(183, 156, 240, 0.1);
 }
 
 .budget-annual-stats-title-panel {
   border-left: 4px solid #6fd8d4;
-  background: linear-gradient(140deg, rgba(111, 216, 212, 0.09) 0%, #1d2739 60%);
+  background: linear-gradient(140deg, rgba(111, 216, 212, 0.09) 0%, #362631 60%);
   box-shadow: 0 0 22px rgba(111, 216, 212, 0.12);
 }
 
@@ -846,7 +874,7 @@ textarea:focus {
   color: #a6ece8;
   letter-spacing: 0.05em;
   text-shadow:
-    -1px 0 rgba(247, 158, 196, 0.4),
+    -1px 0 rgba(229, 174, 196, 0.4),
      1px 0 rgba(111, 216, 212, 0.4);
 }
 
@@ -865,10 +893,10 @@ textarea:focus {
 
 .budget-summary-tab.active,
 .modal-tab.active {
-  color: #ffc4dc;
-  background: rgba(247, 158, 196, 0.13);
-  border-bottom-color: #f79ec4;
-  text-shadow: 0 0 12px rgba(247, 158, 196, 0.45);
+  color: #f3cdde;
+  background: rgba(229, 174, 196, 0.13);
+  border-bottom-color: #e5aec4;
+  text-shadow: 0 0 12px rgba(229, 174, 196, 0.45);
 }
 
 /* Semantic, intentionally literal, and left alone by every theme: profit is
@@ -878,12 +906,12 @@ textarea:focus {
 
 .budget-stats-count-good    { color: #86e0bf; border-color: #86e0bf; }
 .budget-stats-count-late    { color: #f3d38a; border-color: #f3d38a; }
-.budget-stats-count-overdue { color: #f77ba6; border-color: #f77ba6; }
+.budget-stats-count-overdue { color: #e788a2; border-color: #e788a2; }
 
 .budget-chart-cycle-btn,
 .budget-chart-expand-btn,
 .budget-chart-modal-cycle-btn {
-  border-color: rgba(111, 216, 212, 0.28);
+  border-color: rgba(229, 174, 196, 0.3);
   color: var(--color-text-muted);
 }
 
@@ -919,11 +947,11 @@ textarea:focus {
   --gs-accent:      #6fd8d4;
   --gs-accent-soft: #8fe3df;
   --gs-win:         #86e0bf;
-  --gs-loss:        #f77ba6;
-  --gs-surface:     rgba(111, 216, 212, 0.07);
-  --gs-header-bg:   rgba(111, 216, 212, 0.12);
-  --gs-grid-line:   rgba(111, 216, 212, 0.18);
-  --gs-zebra:       rgba(233, 243, 242, 0.03);
+  --gs-loss:        #e788a2;
+  --gs-surface:     rgba(229, 174, 196, 0.08);
+  --gs-header-bg:   rgba(229, 174, 196, 0.14);
+  --gs-grid-line:   rgba(229, 174, 196, 0.2);
+  --gs-zebra:       rgba(243, 232, 238, 0.03);
   --gs-radius:      12px;
 }
 
@@ -949,5 +977,5 @@ textarea:focus {
 }
 
 .toast.error {
-  box-shadow: 0 0 24px rgba(247, 158, 196, 0.25);
+  box-shadow: 0 0 24px rgba(229, 174, 196, 0.25);
 }
