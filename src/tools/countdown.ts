@@ -156,7 +156,9 @@ const DEFAULT_SETTINGS: CountdownSettings = {
   displayMode: "brief",
   bareUnit: "minutes",
   showTrackerLog: true,
-  soundId: ":success",
+  // The timer's own long chime, rather than a notification cue doing double
+  // duty as an alarm. One repeat: the chime already rings out on its own.
+  soundId: "timer:timer-chime-long",
   soundRepeats: 1,
   soundGapMs: 400,
 };
@@ -1317,6 +1319,11 @@ function applySettingsToForm(): void {
   setSegValue("cd-bare-unit", cdSettings.bareUnit);
   showTrackerToggle.checked = cdSettings.showTrackerLog;
   soundSelect.value = cdSettings.soundId;
+  // An id can name a cue file that is not in this build (the manifest folders
+  // are scanned at build time). Assigning one the select has no option for
+  // leaves it blank, so fall back to Silent in the UI. cdSettings keeps the
+  // stored id, which comes back if the file does.
+  if (soundSelect.selectedIndex === -1) soundSelect.value = "none";
   soundRepeatsInput.value = String(cdSettings.soundRepeats);
   soundGapInput.value = String(cdSettings.soundGapMs);
 }
@@ -1333,9 +1340,13 @@ function syncSetupUI(): void {
     : "Unavailable: Time Tracker is hidden in Settings › Sidebar.";
 }
 
-/** Every cue in every pack (success AND error) plus a silent option. The
- *  "App pack" entries at the top track whatever the app's sound pack is set
- *  to, rather than pinning a specific one. */
+/** Every cue the app ships, grouped by where it comes from: the pack the app
+ *  is currently set to, the timer's own sounds, then every notification pack,
+ *  button cue and modal cue individually. Silent sits above the groups as a
+ *  plain option because it belongs to none of them.
+ *
+ *  The groups and their contents are decided by getSoundOptions() in sound.ts;
+ *  all this does is turn them into optgroups. */
 function populateSoundOptions(): void {
   soundSelect.innerHTML = "";
 
@@ -1344,11 +1355,16 @@ function populateSoundOptions(): void {
   silent.textContent = "Silent";
   soundSelect.appendChild(silent);
 
-  getSoundOptions().forEach((opt) => {
-    const el = document.createElement("option");
-    el.value = opt.id;
-    el.textContent = opt.name;
-    soundSelect.appendChild(el);
+  getSoundOptions().forEach((group) => {
+    const groupEl = document.createElement("optgroup");
+    groupEl.label = group.label;
+    group.options.forEach((opt) => {
+      const el = document.createElement("option");
+      el.value = opt.id;
+      el.textContent = opt.name;
+      groupEl.appendChild(el);
+    });
+    soundSelect.appendChild(groupEl);
   });
 }
 

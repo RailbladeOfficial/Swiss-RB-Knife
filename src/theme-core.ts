@@ -26,7 +26,13 @@ import {
   generateRandomPalette,
 } from "./random-theme";
 import { applyCustomThemeById, clearCustomTheme } from "./theme-editor";
-import { activateCycleTheme, getCurrentCycleUnderlyingThemeId } from "./cycle-theme";
+import {
+  activateCycleTheme,
+  applyHolidayOverrideIfActive,
+  ensureHolidayOverrideWatch,
+  getCurrentCycleUnderlyingThemeId,
+  getPaintedHolidayOverrideThemeId,
+} from "./cycle-theme";
 import { BASE_THEME_ID, DEFAULT_THEME_ID, THEME_GROUPS, migrateThemeId } from "./theme-ids";
 
 export const themeLink = document.getElementById("themeLink") as HTMLLinkElement;
@@ -94,6 +100,18 @@ export function resolveThemeId(themeId: string): string {
  *  (persistent reuses the stored palette; regenerative always generates fresh).
  *  For "custom": applies the selected custom theme by id. */
 export function applyTheme(themeName: string): void {
+  // Holiday Overrides are app-wide, not a Cycle rule. While today falls
+  // inside a Holiday theme's window the override paints that theme over
+  // whatever mode is selected, and settings.theme is deliberately left
+  // untouched, so the real choice comes back by itself the moment the window
+  // (or the setting) lapses. Cycle is the one mode that skips this, because
+  // activateCycleTheme() already runs the same check inside its own
+  // resolution, ahead of both the pool and the day/night clock.
+  if (themeName !== "cycle") {
+    ensureHolidayOverrideWatch();
+    if (applyHolidayOverrideIfActive()) return;
+  }
+
   if (themeName === "custom") {
     themeLink.href = themeCssUrl(BASE_THEME_ID);
     themeLink.onload = () => {
@@ -1909,8 +1927,14 @@ function startPatriotFireworks(): void {
   window.addEventListener("resize", seasonalResizeHandler);
 }
 
-window.addEventListener("themechange", () =>
-  applySeasonalEffect(
-    settings.theme === "cycle" ? getCurrentCycleUnderlyingThemeId() : settings.theme,
-  ),
-);
+/** Which theme is actually on screen, which is not always settings.theme:
+ *  Cycle resolves its own underlying pick, and an app-wide Holiday Override
+ *  paints over any other mode. The seasonal effects follow what is painted,
+ *  so Christmas still snows while an override holds it there even though the
+ *  chosen theme is something else entirely. */
+function paintedThemeId(): string {
+  if (settings.theme === "cycle") return getCurrentCycleUnderlyingThemeId();
+  return getPaintedHolidayOverrideThemeId() ?? settings.theme;
+}
+
+window.addEventListener("themechange", () => applySeasonalEffect(paintedThemeId()));

@@ -1747,9 +1747,10 @@ button:hover {
 
 /* Preferences pane, a single settings column with no tile beside it, so it
    spans the full body rather than using .theme-picker-random-pane's two-column
-   split. Capped and scrollable for the same reason the settings column above
-   is: with eight per-theme rows expanded, the pane has to absorb its own
-   overflow or the whole modal body scrolls and drags the tabs out of view. */
+   split. Still capped and scrollable as a safety net: the per-theme grid below
+   now fits without it at the picker's normal size, but a short window or a
+   large font size must absorb its own overflow rather than scrolling the whole
+   modal body and dragging the tabs out of view. */
 .theme-picker-preferences-pane {
   display: flex;
   flex-direction: column;
@@ -1760,14 +1761,21 @@ button:hover {
   overflow-y: auto;
 }
 
+/* Per-theme opt-outs laid out as a responsive grid rather than one full-width
+   row each. Nine stacked rows, each carrying its own Enabled/Disabled word,
+   made this the tallest pane in the picker and the only one that had to
+   scroll. At the picker's 1000px the grid settles on three columns and steps
+   down to two, then one, as the window narrows. */
 .theme-animations-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 6px 20px;
 }
 
-/* Theme name over its effect description, so the row reads as one label and
-   the toggle still lines up with the other settings rows. */
+/* Theme name over its effect description, so the cell reads as one label and
+   the toggle still lines up with the other settings rows. The switch carries
+   the state on its own here, there is no Enabled/Disabled word beside it, so
+   the label needs the room. */
 .theme-animation-label {
   display: flex;
   flex-direction: column;
@@ -1914,11 +1922,15 @@ button:hover {
 }
 
 /* =============================================================================
-   CHOOSE SOUND PACK MODAL
+   SOUND PICKER MODALS  (notification pack, button cue, modal cue)
    -----------------------------------------------------------------------------
-   Tile cards styled like the Theme picker's, but plainer, a sound pack has
-   no palette to preview, so each card just uses the ambient (currently
-   active) theme's own colors rather than fetching/rendering another one's.
+   Tile cards styled like the Theme picker's, but plainer, a sound has no
+   palette to preview, so each card just uses the ambient (currently active)
+   theme's own colors rather than fetching/rendering another one's.
+
+   All three pickers share these classes and the modal width below. They differ
+   only in what a tile carries: a pack tile has a success and an error preview,
+   a cue tile has one neutral preview, and the cue grids lead with a None tile.
 ============================================================================= */
 
 /* Combined-class selector. Same reasoning as .modal.theme-picker-modal
@@ -1926,24 +1938,31 @@ button:hover {
    rule here would otherwise lose the cascade and silently render at the
    base .modal width of 500px. */
 .modal.sound-pack-picker-modal {
-  width: 680px;
+  /* Sized so the grid below lands on exactly five tiles per row, matching the
+     theme picker. Five 140px minimums plus their gaps need 756px of content
+     box; 860 leaves that with room for the modal's 20px padding, the body's
+     10px, and the scrollbar a three-row grid brings with it. */
+  width: 860px;
   max-width: 94vw;
 }
 
 /* =============================================================================
-   NOTIFICATION VOLUME  (General Settings, Audio tab)
+   CUE VOLUME  (inside each of the three sound pickers)
    -----------------------------------------------------------------------------
-   First block in the Audio tab, above the Sound Pack row. It carried a
-   border-top back when it lived at the bottom of the Choose Sound Pack modal
-   and needed separating from the pack grid; at the top of a tab that rule has
-   nothing above it to divide, so it's just bottom spacing now.
+   One block, used three times over: notification volume under the pack grid,
+   button volume under the button-sound grid, modal volume under the modal-sound
+   grid. It sits below the tiles and is separated by a rule, because it is a
+   different kind of choice from "which sound": it applies to whichever tile is
+   selected rather than being one of them.
 ============================================================================= */
 
 .sound-volume-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 14px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
 }
 
 .sound-volume-label {
@@ -2017,7 +2036,11 @@ button:hover {
 
 .sound-pack-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* auto-fill rather than a hard repeat(5, 1fr): at the modal's full width
+     this lands on five, same as the theme grid, but it steps down to four and
+     three as max-width: 94vw takes over on a narrow window, instead of
+     squeezing five columns until the names ellipsis away. */
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 14px;
   max-height: 60vh;
   overflow-y: auto;
@@ -2083,6 +2106,17 @@ button:hover {
 
 .sound-pack-preview-btn:active {
   transform: scale(0.92);
+}
+
+/* Button and modal cues are one sound with no counterpart, so their preview
+   has no success/error pairing to colour it by and takes the accent instead. */
+.sound-pack-preview-btn.neutral {
+  color: var(--color-btn);
+}
+
+.sound-pack-preview-btn.neutral:hover:not(:disabled) {
+  background: var(--color-hover);
+  border-color: var(--color-btn);
 }
 
 .sound-pack-preview-btn.success {

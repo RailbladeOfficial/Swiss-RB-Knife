@@ -111,6 +111,7 @@ import {
   refreshCycleHolidayNote,
   refreshThemeCurrentBadge,
   syncCycleSettingsVisibility,
+  syncHolidayOverrideControls,
   themePickerModal,
   themePickerTabs,
 } from "./theme-picker";
@@ -119,13 +120,13 @@ import {
 export { reopenThemePickerOnCustomTab, themePickerModal } from "./theme-picker";
 
 import {
-  applyToastVolumeSettings,
-  clampToastVolume,
-  errorAudio,
+  applyAudioSettings,
+  clampCueVolumeDb,
   loadSoundPack,
-  playCue,
+  playButtonCue,
+  playModalCue,
+  playToastCue,
   refreshSoundPackCurrentBadge,
-  successAudio,
 } from "./sound";
 // Re-exported so tool files keep importing these from "../shell", their
 // existing convention, rather than reaching into a shell-internal module.
@@ -216,12 +217,13 @@ export type CustomTheme = {
 /** A toast sound pack. `success`/`error` are URL paths under /sounds/ served
  *  from the public/sounds folder. Omit either (or both) to mute that cue,
  *  used by the built-in "None" pack. This is the single source of truth for
- *  the Sound Pack dropdown; add a pack here and it appears in Settings. */
+ *  the Choose Notification Sound Pack modal; add a pack here and a tile for
+ *  it appears there. */
 export type SoundPack = {
   id: string; // stable key, persisted in settings.soundPack
-  name: string; // display name shown in the dropdown
-  success?: string; // e.g. "/sounds/default/success.wav"
-  error?: string; // e.g. "/sounds/default/error.wav"
+  name: string; // display name shown on the pack's tile
+  success?: string; // e.g. "/sounds/notification-sound-packs/default/success.wav"
+  error?: string; // e.g. "/sounds/notification-sound-packs/default/error.wav"
 };
 
 
@@ -247,60 +249,120 @@ export const LICENSE_VERSION = "1";
 const MAX_TOASTS = 4;
 
 /* Sound packs available for toast cues. Each pack is a subfolder under
-   public/sounds/ containing (at minimum) the files referenced below, see
-   the "TOAST NOTIFICATIONS" section for how these are loaded/played.
-   Add a new pack by dropping a folder in public/sounds/<id>/ and adding an
-   entry here; the Settings dropdown is populated from this array. */
+   public/sounds/notification-sound-packs/ containing (at minimum) the files
+   referenced below, see the "TOAST NOTIFICATIONS" section for how these are
+   loaded/played. Add a new pack by dropping a folder in there and adding an
+   entry here; the picker is populated from this array.
+
+   These stay hand-written, unlike the button/modal cues in sound-manifest.ts:
+   a pack is a curated success/error pair with a display name ("Saxy Time")
+   that no filename-derived guess would produce.
+
+   Paths are written as URLs, so anything in a name that has to travel as an
+   escape belongs escaped here; scripts/checks/settings.test.mjs decodes them
+   back before checking each file is on disk. */
 export const SOUND_PACKS: SoundPack[] = [
   {
     id: "default",
     name: "Default",
-    success: "/sounds/default/default-success.wav",
-    error: "/sounds/default/default-error.wav",
+    success: "/sounds/notification-sound-packs/default/default-success.wav",
+    error: "/sounds/notification-sound-packs/default/default-error.wav",
   },
   {
-    id: "alternate",
-    name: "Alternate",
-    success: "/sounds/alternate/alternate-success.wav",
-    error: "/sounds/alternate/alternate-error.wav",
+    id: "machine",
+    name: "Machine",
+    success: "/sounds/notification-sound-packs/machine/machine-success.wav",
+    error: "/sounds/notification-sound-packs/machine/machine-error.wav",
   },
   {
     id: "subtle",
     name: "Subtle",
-    success: "/sounds/subtle/subtle-success.wav",
-    error: "/sounds/subtle/subtle-error.wav",
+    success: "/sounds/notification-sound-packs/subtle/subtle-success.wav",
+    error: "/sounds/notification-sound-packs/subtle/subtle-error.wav",
   },
   {
     id: "saxy-time",
     name: "Saxy Time",
-    success: "/sounds/saxy-time/saxy-time-success.wav",
-    error: "/sounds/saxy-time/saxy-time-error.wav",
+    success: "/sounds/notification-sound-packs/saxy-time/saxy-time-success.wav",
+    error: "/sounds/notification-sound-packs/saxy-time/saxy-time-error.wav",
   },
   {
     id: "futuristic-1",
     name: "Futuristic 1",
-    success: "/sounds/futuristic-1/futuristic-1-success.wav",
-    error: "/sounds/futuristic-1/futuristic-1-error.wav",
+    success: "/sounds/notification-sound-packs/futuristic-1/futuristic-1-success.wav",
+    error: "/sounds/notification-sound-packs/futuristic-1/futuristic-1-error.wav",
   },
   {
     id: "futuristic-2",
     name: "Futuristic 2",
-    success: "/sounds/futuristic-2/futuristic-2-success.wav",
-    error: "/sounds/futuristic-2/futuristic-2-error.wav",
+    success: "/sounds/notification-sound-packs/futuristic-2/futuristic-2-success.wav",
+    error: "/sounds/notification-sound-packs/futuristic-2/futuristic-2-error.wav",
+  },
+  {
+    id: "ancient-forest",
+    name: "Ancient Forest",
+    success: "/sounds/notification-sound-packs/ancient-forest/ancient-forest-success.wav",
+    error: "/sounds/notification-sound-packs/ancient-forest/ancient-forest-error.wav",
+  },
+  {
+    id: "chipped",
+    name: "Chipped",
+    success: "/sounds/notification-sound-packs/chipped/chipped-success.wav",
+    error: "/sounds/notification-sound-packs/chipped/chipped-error.wav",
+  },
+  {
+    id: "intergalactic",
+    name: "Intergalactic",
+    success: "/sounds/notification-sound-packs/intergalactic/intergalactic-success.wav",
+    error: "/sounds/notification-sound-packs/intergalactic/intergalactic-error.wav",
+  },
+  {
+    id: "minimal",
+    name: "Minimal",
+    success: "/sounds/notification-sound-packs/minimal/minimal-success.wav",
+    error: "/sounds/notification-sound-packs/minimal/minimal-error.wav",
+  },
+  {
+    id: "sleek",
+    name: "Sleek",
+    success: "/sounds/notification-sound-packs/sleek/sleek-success.wav",
+    error: "/sounds/notification-sound-packs/sleek/sleek-error.wav",
   },
   {
     id: "cake",
     name: "Cake",
-    success: "/sounds/cake/cake-success.wav",
-    error: "/sounds/cake/cake-error.wav",
+    success: "/sounds/notification-sound-packs/cake/cake-success.wav",
+    error: "/sounds/notification-sound-packs/cake/cake-error.wav",
   },
   {
     id: "sassy-cake",
     name: "Sassy Cake",
-    success: "/sounds/sassy-cake/sassy-cake-success.wav",
-    error: "/sounds/sassy-cake/sassy-cake-error.wav",
+    success: "/sounds/notification-sound-packs/sassy-cake/sassy-cake-success.wav",
+    error: "/sounds/notification-sound-packs/sassy-cake/sassy-cake-error.wav",
   },
 ];
+
+/* Packs that have been renamed, old id -> current id. A pack id is not just
+   a label: it is persisted in settings.soundPack, and the Countdown Timer
+   stores it inside its alarm cue id too. Without a map, renaming a folder
+   silently resets the app's pack to Default and leaves that timer with no
+   alarm sound at all, which is the kind of quiet breakage nobody reports.
+
+   Same bar as THEME_ID_MIGRATIONS in theme-ids.ts, and the same permanence:
+   an entry earns its place if the old id ever shipped, and is then never
+   removed, because dropping it strands anyone whose settings still name it,
+   whether from an older build, a restored backup or a hand-edited file. */
+export const RENAMED_SOUND_PACKS: Record<string, string> = {
+  // Renamed 2026-08-24. "alternate" shipped in v0.3.3, v0.4.0, v0.5.0 and
+  // v0.6.0, so settings files naming it are out there.
+  alternate: "machine",
+};
+
+/** Maps a possibly-stale pack id to the current one. Ids that were never
+ *  renamed pass straight through, still to be validated by the caller. */
+export function currentSoundPackId(id: string): string {
+  return RENAMED_SOUND_PACKS[id] ?? id;
+}
 
 /* Every real, navigable tool in the app, in the app's original/default
    order. This is the single source of truth for the Edit Sidebar modal, the
@@ -567,12 +629,12 @@ const cycleDayStartInput = document.getElementById("cycleDayStart") as HTMLInput
 const cycleDayEndInput = document.getElementById("cycleDayEnd") as HTMLInputElement;
 const cycleIncludeCustomToggle = document.getElementById("cycleIncludeCustomToggle") as HTMLInputElement;
 const cycleIncludeCustomLabel = document.getElementById("cycleIncludeCustomLabel")!;
-const cycleHolidayOverrideToggle = document.getElementById("cycleHolidayOverrideToggle") as HTMLInputElement;
-const cycleHolidayOverrideLabel = document.getElementById("cycleHolidayOverrideLabel")!;
+// Holiday Overrides / Full Holiday Season are wired in theme-picker.ts
+// instead of here: each has a second copy on the Preferences tab, and both
+// copies have to move together. Restrict to Holiday Season stays below,
+// since it only ever shapes the Cycle pool.
 const cycleHolidaySeasonOnlyToggle = document.getElementById("cycleHolidaySeasonOnlyToggle") as HTMLInputElement;
 const cycleHolidaySeasonOnlyLabel = document.getElementById("cycleHolidaySeasonOnlyLabel")!;
-const cycleHolidayFullSeasonToggle = document.getElementById("cycleHolidayFullSeasonToggle") as HTMLInputElement;
-const cycleHolidayFullSeasonLabel = document.getElementById("cycleHolidayFullSeasonLabel")!;
 const cycleNowBtn = document.getElementById("cycleNowBtn") as HTMLButtonElement;
 
 const appVersionEl = document.getElementById("appVersion");
@@ -1324,7 +1386,7 @@ export function applySettings(): void {
   startupSelect.value = settings.startupTarget;
   loadSoundPack(settings.soundPack);
   refreshSoundPackCurrentBadge();
-  applyToastVolumeSettings();
+  applyAudioSettings();
   themeSelect.value = settings.theme;
   refreshThemeCurrentBadge();
 
@@ -1353,12 +1415,9 @@ export function applySettings(): void {
   cycleIntervalUnitSelect.value = settings.cycleIntervalUnit;
   cycleIncludeCustomToggle.checked = settings.cycleIncludeCustom;
   cycleIncludeCustomLabel.textContent = settings.cycleIncludeCustom ? "On" : "Off";
-  cycleHolidayOverrideToggle.checked = settings.cycleHolidayOverride;
-  cycleHolidayOverrideLabel.textContent = settings.cycleHolidayOverride ? "On" : "Off";
   cycleHolidaySeasonOnlyToggle.checked = settings.cycleHolidaySeasonOnly;
   cycleHolidaySeasonOnlyLabel.textContent = settings.cycleHolidaySeasonOnly ? "On" : "Off";
-  cycleHolidayFullSeasonToggle.checked = settings.cycleHolidayFullSeason;
-  cycleHolidayFullSeasonLabel.textContent = settings.cycleHolidayFullSeason ? "On" : "Off";
+  syncHolidayOverrideControls();
   syncCycleSettingsVisibility();
 
   applyLockSettings();
@@ -1560,14 +1619,38 @@ async function loadSettings(): Promise<void> {
           : DEFAULT_SETTINGS.lockCredentialType,
       soundPack:
         typeof merged.soundPack === "string" &&
-        SOUND_PACKS.some((p) => p.id === merged.soundPack)
-          ? merged.soundPack
+        SOUND_PACKS.some((p) => p.id === currentSoundPackId(merged.soundPack))
+          ? currentSoundPackId(merged.soundPack)
           : DEFAULT_SETTINGS.soundPack,
       toastVolumeDb:
         typeof merged.toastVolumeDb === "number" &&
         Number.isFinite(merged.toastVolumeDb)
-          ? clampToastVolume(Math.round(merged.toastVolumeDb))
+          ? clampCueVolumeDb(Math.round(merged.toastVolumeDb))
           : DEFAULT_SETTINGS.toastVolumeDb,
+      // The two cue ids are NOT checked against the manifest here. The
+      // folders they name are scanned at build time, so an id can be valid
+      // on one machine and gone on the next; the cue pickers resolve that at
+      // the point of use (silent cue, badge reads Unavailable) and leave the
+      // stored id alone, so a temporarily-missing file is not erased out of
+      // settings on load.
+      buttonSoundId:
+        typeof merged.buttonSoundId === "string"
+          ? merged.buttonSoundId
+          : DEFAULT_SETTINGS.buttonSoundId,
+      buttonVolumeDb:
+        typeof merged.buttonVolumeDb === "number" &&
+        Number.isFinite(merged.buttonVolumeDb)
+          ? clampCueVolumeDb(Math.round(merged.buttonVolumeDb))
+          : DEFAULT_SETTINGS.buttonVolumeDb,
+      modalSoundId:
+        typeof merged.modalSoundId === "string"
+          ? merged.modalSoundId
+          : DEFAULT_SETTINGS.modalSoundId,
+      modalVolumeDb:
+        typeof merged.modalVolumeDb === "number" &&
+        Number.isFinite(merged.modalVolumeDb)
+          ? clampCueVolumeDb(Math.round(merged.modalVolumeDb))
+          : DEFAULT_SETTINGS.modalVolumeDb,
       autoCheckUpdates:
         typeof merged.autoCheckUpdates === "boolean"
           ? merged.autoCheckUpdates
@@ -1833,25 +1916,10 @@ cycleIncludeCustomToggle.addEventListener("change", () => {
   saveSettings();
 });
 
-cycleHolidayOverrideToggle.addEventListener("change", () => {
-  settings.cycleHolidayOverride = cycleHolidayOverrideToggle.checked;
-  cycleHolidayOverrideLabel.textContent = settings.cycleHolidayOverride ? "On" : "Off";
-  syncCycleSettingsVisibility();
-  applyTheme("cycle");
-  saveSettings();
-});
-
 cycleHolidaySeasonOnlyToggle.addEventListener("change", () => {
   settings.cycleHolidaySeasonOnly = cycleHolidaySeasonOnlyToggle.checked;
   cycleHolidaySeasonOnlyLabel.textContent = settings.cycleHolidaySeasonOnly ? "On" : "Off";
   syncCycleSettingsVisibility();
-  applyTheme("cycle");
-  saveSettings();
-});
-
-cycleHolidayFullSeasonToggle.addEventListener("change", () => {
-  settings.cycleHolidayFullSeason = cycleHolidayFullSeasonToggle.checked;
-  cycleHolidayFullSeasonLabel.textContent = settings.cycleHolidayFullSeason ? "On" : "Off";
   applyTheme("cycle");
   saveSettings();
 });
@@ -1910,6 +1978,63 @@ document.querySelectorAll<HTMLButtonElement>(".theme-picker-info-btn[data-toolti
   });
 });
 document.addEventListener("click", () => closeThemePickerInfoTooltip());
+
+/* -----------------------------------------------------------------------------
+   Button press cue
+   -----------------------------------------------------------------------------
+   One delegated listener rather than a cue call in every handler the app has:
+   buttons are created dynamically all over this codebase (tool rows, theme
+   tiles, generated lists) and anything per-handler would miss them and go on
+   missing them as new ones are added.
+
+   Not only <button>. The things that feel most like buttons in this app are
+   the Home tool cards and the sidebar's tool listings, and neither is one:
+   they are a <div> and an <li>. They are matched explicitly below. The
+   sidebar's About and Settings entries are deliberately left out, along with
+   the collapse toggle: those three carry no data-section, which is what marks
+   a nav item as going somewhere, and the first two open a modal whose own cue
+   is the better announcement of what just happened.
+
+   Capture phase, so a handler that calls stopPropagation() (several do, the
+   sound-pack tile previews among them) does not silently swallow the cue.
+
+   Excluded: the three sound pickers' tile grids and their volume rows, plus
+   the Countdown Timer's alarm Test button. Those all make a sound of their own
+   (a preview, or the cue being adjusted), and firing the button cue on top of
+   it would compete with the very thing being auditioned. The priority gate
+   cannot help here: an audition plays through playSoundUrl(), outside the gate
+   entirely, precisely because a preview must never be suppressed. A disabled
+   button never fires click at all, so those need no exclusion.
+
+   Silent unless a cue has been chosen; playButtonCue() no-ops on None, which
+   is the default. -------------------------------------------------------- */
+
+/** What counts as a press. Anything matching is a cue; `closest` picks the
+ *  nearest match, so a real <button> inside a tool card is still the button. */
+const BUTTON_CUE_INCLUDE = [
+  "button",
+  ".nav-item[data-section]",
+  ".tool-card[data-tool]",
+  ".dashboard-card-header[data-section]",
+].join(", ");
+
+const BUTTON_CUE_EXCLUDE = [
+  "#soundPackPickerGrid",
+  "#buttonSoundPickerGrid",
+  "#modalSoundPickerGrid",
+  ".sound-volume-row",
+  "#cd-sound-test",
+].join(", ");
+
+document.addEventListener(
+  "click",
+  (e) => {
+    const pressed = (e.target as HTMLElement | null)?.closest(BUTTON_CUE_INCLUDE);
+    if (!pressed || pressed.closest(BUTTON_CUE_EXCLUDE)) return;
+    playButtonCue();
+  },
+  true,
+);
 
 dateFormatToggle.addEventListener("change", () => {
   settings.americanDates = dateFormatToggle.checked;
@@ -2175,8 +2300,10 @@ export function flash(
    *  repeat. */
   silent = false,
 ): void {
-  if (!silent && type === "success" && successAudio) playCue(successAudio);
-  if (!silent && type === "error" && errorAudio) playCue(errorAudio);
+  // Through the cue gate rather than straight to the element, so a toast
+  // fired by a click pre-empts that click's own button cue instead of landing
+  // on top of it. See CUE PRIORITY GATE in sound.ts.
+  if (!silent) playToastCue(type);
 
   if (toastMetas.length >= MAX_TOASTS) {
     const oldest = toastMetas.shift()!;
@@ -2430,9 +2557,15 @@ async function init(): Promise<void> {
   }
   if (appVersionEl) appVersionEl.textContent = `v${_appVersion}`;
 
-  // Regenerate the random palette (when in regenerative-random mode) on every
-  // modal open, without modal.ts needing any knowledge of the theme system.
-  setGlobalModalOpenHook(maybeRegenerateRandom);
+  // Everything that has to happen on any modal open, funnelled through the
+  // one hook modal.ts exposes so it needs no knowledge of either subject:
+  // regenerate the random palette (in regenerative-random mode), and play the
+  // modal cue. A click that opens a modal fires the button cue too, which is
+  // why the two are separate settings rather than one; set either to None.
+  setGlobalModalOpenHook(() => {
+    maybeRegenerateRandom();
+    playModalCue();
+  });
 
   initTimeTracker();
   initImageCCR();

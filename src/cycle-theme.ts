@@ -21,6 +21,13 @@
        to persist and no catch-up to do after the app has been closed.
 
    Holiday Overrides sit above both: a live override wins outright either way.
+   They also sit above every OTHER theme mode, which is why the date math and
+   the force-switch live in this file but are not gated on settings.theme ===
+   "cycle": theme-core.ts consults applyHolidayOverrideIfActive() for a fixed,
+   Random or Custom theme too, so someone who never touches Cycle can still
+   have Christmas paint itself on Christmas. The two settings keep their
+   cycle* names only because renaming persisted keys would need a migration
+   for no behavioural gain.
 
    Split out the same way random-theme.ts is split out of shell.ts: this file
    is one more node in the existing theme-core.ts <-> theme-editor.ts <->
@@ -32,7 +39,7 @@
 
 import { saveSettings } from "./shell";
 import { settings } from "./settings-store";
-import { resolveThemeId, themeLink, themeCssUrl } from "./theme-core";
+import { applyTheme, resolveThemeId, themeLink, themeCssUrl } from "./theme-core";
 import { BASE_THEME_ID, DEFAULT_THEME_ID, THEME_GROUPS } from "./theme-ids";
 import { clearRandomPalette, PERSISTENT_RANDOM_KEY } from "./random-theme";
 import { applyCustomThemeById, clearCustomTheme, customThemes } from "./theme-editor";
@@ -161,6 +168,34 @@ function getActiveHolidayThemeId(now: Date = new Date()): string | null {
  *  window active today), same as resolveActiveCycleThemeId's own check. */
 export function getActiveHolidayOverrideThemeId(): string | null {
   return settings.cycleHolidayOverride ? getActiveHolidayThemeId() : null;
+}
+
+/** What the app-wide (non-Cycle) override path last painted, or null when it
+ *  is not currently overriding anything. Two jobs: it tells the seasonal-effect
+ *  wiring which theme is really on screen, and it lets the boundary recheck
+ *  below repaint only when the answer actually changed. */
+let _paintedHolidayId: string | null = null;
+
+export function getPaintedHolidayOverrideThemeId(): string | null {
+  return _paintedHolidayId;
+}
+
+/** Paints the live Holiday Override over whatever theme mode is selected, and
+ *  returns the theme id it painted (null if no override is live, in which case
+ *  nothing was touched and the caller should paint its own theme normally).
+ *
+ *  Cycle does NOT come through here: resolveActiveCycleThemeId() folds the same
+ *  check into its own resolution, ahead of the pool and the day/night clock, so
+ *  routing it through this as well would paint twice. Every other mode does. */
+export function applyHolidayOverrideIfActive(): string | null {
+  const holidayId = getActiveHolidayOverrideThemeId();
+  if (!holidayId) {
+    _paintedHolidayId = null;
+    return null;
+  }
+  _paintedHolidayId = holidayId;
+  applyUnderlyingTheme(holidayId, true);
+  return holidayId;
 }
 
 /** The last calendar day `themeId`'s currently-active window keeps it forced
@@ -344,7 +379,7 @@ function pickNextInPool(pool: string[], current: string): string {
  *  (same "call sync + set onload" idiom) since Cycle needs to apply an
  *  arbitrary underlying theme without ever setting settings.theme away from
  *  "cycle". */
-function applyUnderlyingTheme(themeId: string): void {
+function applyUnderlyingTheme(themeId: string, keepPersistentRandom = false): void {
   const isCustom = customThemes.some((t) => t.id === themeId);
   if (isCustom) {
     themeLink.href = themeCssUrl(BASE_THEME_ID);
@@ -356,7 +391,12 @@ function applyUnderlyingTheme(themeId: string): void {
     window.dispatchEvent(new CustomEvent("themechange"));
     return;
   }
-  localStorage.removeItem(PERSISTENT_RANDOM_KEY);
+  // Dropping the stored palette is what applyTheme() does whenever a real
+  // theme choice moves away from Random, and Cycle inherits that. A Holiday
+  // Override must not: settings.theme is still "random", the person never
+  // left it, and wiping the key here would silently reroll their persistent
+  // palette the moment the window lapsed.
+  if (!keepPersistentRandom) localStorage.removeItem(PERSISTENT_RANDOM_KEY);
   // Same guard as applyTheme()'s standard branch: a Cycle pool entry or a
   // stored day/night pick naming a theme that no longer exists must not be
   // handed to themeLink raw. See resolveThemeId() for why a missing file does
@@ -507,23 +547,37 @@ function rescheduleDayNightTimer(): void {
    Holiday-boundary recheck, a periodic re-resolve so a Holiday Override
    engages/disengages at the right moment even if the app is left open across
    a date boundary (e.g. open at 11:50pm Dec 23rd, still open past midnight).
-   Self-cancels the moment Cycle/Holiday-Override stops being relevant, so
-   nothing needs to explicitly stop it when the user switches away.
+   Runs for every theme mode, not just Cycle, since the override does too.
+   Self-cancels the moment Holiday Overrides is switched off, so nothing needs
+   to explicitly stop it.
 ----------------------------------------------------------------------------- */
 
 const HOLIDAY_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 let _holidayCheckHandle: number | null = null;
 
-function ensureHolidayCheckInterval(): void {
-  if (settings.theme !== "cycle" || !settings.cycleHolidayOverride) return;
+/** Arms the recheck if Holiday Overrides is on. Idempotent, and called from
+ *  both activateCycleTheme() and theme-core.ts's applyTheme(), so whichever
+ *  mode the app settles into ends up watching the calendar. */
+export function ensureHolidayOverrideWatch(): void {
+  if (!settings.cycleHolidayOverride) return;
   if (_holidayCheckHandle !== null) return;
   _holidayCheckHandle = window.setInterval(() => {
-    if (settings.theme !== "cycle" || !settings.cycleHolidayOverride) {
+    if (!settings.cycleHolidayOverride) {
       window.clearInterval(_holidayCheckHandle!);
       _holidayCheckHandle = null;
       return;
     }
-    applyResolvedCycleTheme();
+    if (settings.theme === "cycle") {
+      applyResolvedCycleTheme();
+      return;
+    }
+    // Outside Cycle there is no pointer to re-resolve, only the question of
+    // whether today has crossed into or out of a window. Repainting either
+    // way would restart the seasonal canvas effect every 15 minutes, so this
+    // only acts when the answer actually changed. applyTheme() re-runs the
+    // override check itself and paints the real theme when it has lapsed.
+    if (getActiveHolidayOverrideThemeId() === _paintedHolidayId) return;
+    applyTheme(settings.theme);
   }, HOLIDAY_CHECK_INTERVAL_MS);
 }
 
@@ -542,6 +596,9 @@ let _cycleActivatedOnce = false;
  *  is independently idempotent, except the one-time "onStartup" advance
  *  below. */
 export function activateCycleTheme(): void {
+  // Cycle resolves the override itself, so the app-wide path is not the one
+  // painting here; drop any id it left behind on the way in from another mode.
+  _paintedHolidayId = null;
   const isFirstActivation = !_cycleActivatedOnce;
   _cycleActivatedOnce = true;
   if (isFirstActivation && settings.cycleTrigger === "onStartup") {
@@ -551,7 +608,7 @@ export function activateCycleTheme(): void {
   }
   rescheduleCycleTimer();
   rescheduleDayNightTimer();
-  ensureHolidayCheckInterval();
+  ensureHolidayOverrideWatch();
 }
 
 /* -----------------------------------------------------------------------------

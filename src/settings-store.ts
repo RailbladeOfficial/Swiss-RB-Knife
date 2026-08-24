@@ -64,9 +64,13 @@ export type ShellSettings = {
    *  pool alongside the built-in Main/Holiday/Special themes. */
   cycleIncludeCustom: boolean;
   /** Off by default: force-switches to the matching Holiday theme on its
-   *  real-world date, overriding whatever the cycle would otherwise show.
-   *  Independent of cycleHolidaySeasonOnly, combine both if you want a
-   *  Holiday theme to appear ONLY by being force-switched to. */
+   *  real-world date, overriding whatever would otherwise be showing.
+   *  Despite the cycle* name (kept so the persisted key needs no migration)
+   *  this is app-wide, not a Cycle rule: it applies to a fixed, Random or
+   *  Custom theme too, and is exposed on both the Cycle and the Preferences
+   *  tab of the theme picker. Independent of cycleHolidaySeasonOnly, combine
+   *  both if you want a Holiday theme to appear ONLY by being force-switched
+   *  to. */
   cycleHolidayOverride: boolean;
   /** Off by default, independent of cycleHolidayOverride: keeps each Holiday
    *  theme out of the normal cycle pool except during its own window (so it
@@ -75,7 +79,9 @@ export type ShellSettings = {
   cycleHolidaySeasonOnly: boolean;
   /** Off by default: widens each Holiday theme's active window to its
    *  traditional season (e.g. all of October for Halloween) instead of just
-   *  its exact date, shared by both settings above, wherever either is on. */
+   *  its exact date, shared by both settings above, wherever either is on.
+   *  App-wide for the same reason cycleHolidayOverride is, and exposed
+   *  alongside it on both tabs. */
   cycleHolidayFullSeason: boolean;
   /** Which pool member (built-in theme id or custom theme id) Cycle mode is
    *  currently showing, persisted so reopening the app doesn't jump. */
@@ -110,10 +116,25 @@ export type ShellSettings = {
   soundPack: string;
   /** Toast cue loudness in decibels, relative to the volume the app has always
    *  played at. 0 is that original level and the default; the usable range is
-   *  -25 to +5, with TOAST_VOLUME_MUTED_DB one step below the bottom standing
+   *  -25 to +5, with CUE_VOLUME_MUTED_DB one step below the bottom standing
    *  for silence. Decibels rather than a 0-100 percentage because loudness is
    *  perceived logarithmically, so equal dB steps sound like equal steps. */
   toastVolumeDb: number;
+  /** Which cue plays on a button press, by SoundEffect id from
+   *  sound-manifest.ts's BUTTON_SOUNDS. Empty string is None, and is the
+   *  default: an install that never opens the Audio tab stays silent on
+   *  clicks, exactly as it was before this existed. An id whose file has
+   *  since left the folder resolves to null and plays nothing. */
+  buttonSoundId: string;
+  /** Button-cue loudness, same decibel scale and range as toastVolumeDb but
+   *  its own level, since a click cue fires far more often than a toast and
+   *  usually wants to sit well under it. */
+  buttonVolumeDb: number;
+  /** Which cue plays when a modal opens, by SoundEffect id from
+   *  sound-manifest.ts's MODAL_SOUNDS. Empty string is None (default). */
+  modalSoundId: string;
+  /** Modal-cue loudness, same scale as the two above. */
+  modalVolumeDb: number;
   /** Opt-in: run a single GitHub Releases check on startup (and on enable).
    *  Off by default. The app is offline-by-default and only touches the
    *  network when this is explicitly turned on. */
@@ -165,6 +186,10 @@ export const DEFAULT_SETTINGS: ShellSettings = {
   lockCredentialType: "pin",
   soundPack: "default",
   toastVolumeDb: 0, // 0 dB = the level the app shipped with
+  buttonSoundId: "", // None: clicks are silent unless a cue is chosen
+  buttonVolumeDb: 0,
+  modalSoundId: "", // None
+  modalVolumeDb: 0,
   autoCheckUpdates: false,
   updateNotifyAggressive: false, // Gentle by default
   ignoredUpdateVersion: "",

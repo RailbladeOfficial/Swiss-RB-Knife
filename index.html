@@ -2987,25 +2987,16 @@
         <div id="settingsTabAudio" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
 
-            <!-- Toast volume. 0 dB is the volume the app has always played at, so
-                 an untouched install sounds exactly as it did before this existed.
-                 The slider runs to -26, one step past the quietest real level, and
-                 that bottom notch is Muted rather than a level. Releasing the
-                 slider plays a preview so it can be judged by ear; double-clicking
-                 the read-out types an exact value. -->
-            <div class="sound-volume-row">
-              <div class="sound-volume-label">
-                <span>Notification Volume</span>
-                <span id="soundVolumeValue" class="sound-volume-value"
-                  title="Double-click to type an exact value">Default</span>
-              </div>
-              <div class="sound-volume-slider-row">
-                <span class="sound-volume-end">Muted</span>
-                <input type="range" id="soundVolumeSlider" min="-26" max="5" step="1" value="0" />
-                <span class="sound-volume-end">+5 dB</span>
-              </div>
-              <button id="soundVolumeReset" class="sound-volume-reset">Reset to Default</button>
-            </div>
+            <!-- Three cues, one row each: what plays on a notification, on a
+                 button press, and when a modal opens. Every row has the same
+                 shape (the current choice, then Customize), and each Customize
+                 opens that cue's own picker, where the sound and how loud it
+                 plays are set together. Volume lives with the sound it governs
+                 rather than here, so picking a cue and judging its level is one
+                 visit instead of two.
+
+                 Button and modal cues both default to None, so an install that
+                 never opens this tab sounds exactly as it always did. -->
 
             <div class="settings-row">
               <div class="settings-label-col">
@@ -3013,6 +3004,22 @@
                 <span id="soundPackCurrentBadge" class="settings-status-badge"></span>
               </div>
               <button id="soundPackEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>Button Sound:</span>
+                <span id="buttonSoundCurrentBadge" class="settings-status-badge"></span>
+              </div>
+              <button id="buttonSoundEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>Modal Sound:</span>
+                <span id="modalSoundCurrentBadge" class="settings-status-badge"></span>
+              </div>
+              <button id="modalSoundEditBtn" class="settings-action-btn">Customize</button>
             </div>
 
           </div>
@@ -3315,7 +3322,7 @@
             <div class="settings-row">
               <span class="theme-picker-label-with-info">
                 Holiday Overrides:
-                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="When today's date matches a Holiday theme (Christmas, Halloween, etc.), Cycle force-switches to it, overriding whatever it would otherwise be showing, until the date passes. Independent of the setting below. Combine both if you want a Holiday theme to appear ONLY by being force-switched to.">ℹ</button>
+                <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="When today's date matches a Holiday theme (Christmas, Halloween, etc.), the app force-switches to it until the date passes, overriding whatever Cycle would otherwise be showing. Applies app-wide, not just in Cycle, and is mirrored on the Preferences tab. Independent of the setting below. Combine both if you want a Holiday theme to appear ONLY by being force-switched to.">ℹ</button>
               </span>
               <div class="toggle-with-label">
                 <span id="cycleHolidayOverrideLabel">Off</span>
@@ -3366,9 +3373,48 @@
              ANIMATED_THEMES (theme-core.ts) rather than written out here, so
              the two can't drift apart. -->
         <div id="themePickerPreferencesPane" class="theme-picker-preferences-pane" style="display:none;">
-          <div class="theme-picker-section-divider">Theme Preferences</div>
+          <!-- Holiday Overrides first: they change which theme you actually
+               see, so they outrank the animation switches below. The two
+               settings here are the same keys the Cycle pane exposes (the
+               override is app-wide, not a Cycle rule), and
+               syncHolidayOverrideControls() keeps both copies in step. -->
+          <div class="theme-picker-section-divider">Holiday Overrides</div>
           <div class="settings-row">
-            <span>Theme Animations:</span>
+            <span class="theme-picker-label-with-info">
+              Holiday Overrides:
+              <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="When today's date matches a Holiday theme (Christmas, Halloween, etc.), the app force-switches to it until the date passes, whatever theme you have selected. This is the same setting as the one on the Cycle tab.">ℹ</button>
+            </span>
+            <div class="toggle-with-label">
+              <span id="prefHolidayOverrideLabel">Off</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="prefHolidayOverrideToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div id="prefHolidayFullSeasonRow" class="settings-row" style="display:none;">
+            <span class="theme-picker-label-with-info">
+              Full Holiday Season:
+              <button type="button" class="info-trigger-btn theme-picker-info-btn" data-tooltip="Widens each Holiday theme's active date range to its traditional season (e.g. all of October for Halloween) instead of just its exact date. Same setting as the one on the Cycle tab.">ℹ</button>
+            </span>
+            <div class="toggle-with-label">
+              <span id="prefHolidayFullSeasonLabel">Off</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="prefHolidayFullSeasonToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <p id="prefHolidayActiveNote" class="theme-picker-holiday-note" style="display:none;"></p>
+
+          <!-- The divider names the section, so the master row underneath is
+               "All Animations" rather than repeating it. There is no second
+               "Per-Theme Animations" heading either: the grid sits directly
+               under the switch that governs it, and nine rows of heading +
+               state text was most of why this pane needed its own scrollbar. -->
+          <div class="theme-picker-section-divider">Theme Animations</div>
+          <div class="settings-row">
+            <span>All Animations:</span>
             <div class="toggle-with-label">
               <span id="themeAnimationsLabel">Enabled</span>
               <label class="toggle-switch">
@@ -3381,7 +3427,6 @@
           <!-- Hidden wholesale while the master switch is off, with nothing
                running, per-theme opt-outs would be controls with no effect. -->
           <div id="themeAnimationsPerTheme">
-            <div class="theme-picker-section-divider">Per-Theme Animations</div>
             <div id="themeAnimationsList" class="theme-animations-list"></div>
           </div>
         </div>
@@ -3391,6 +3436,16 @@
 
   <!-- =====================================================================
        CHOOSE SOUND PACK
+
+       The three cue pickers below share one shape: a grid of tiles for what
+       plays, then that cue's volume under a rule. The volume belongs here
+       rather than on the Audio tab because it only means anything alongside
+       the sound it applies to, and releasing the slider replays that sound so
+       the level can be judged by ear on the spot. All three volume rows are
+       driven by one implementation in sound.ts, createVolumeControl(), keyed
+       off the element ids below. 0 dB is the level the app has always played
+       at, and the notch past -25 is Muted rather than a level; double-click a
+       read-out to type an exact value.
   ====================================================================== -->
   <div id="soundPackPickerBackdrop" class="modal-backdrop" style="display: none;">
     <div class="modal sound-pack-picker-modal">
@@ -3406,6 +3461,104 @@
       <div class="modal-body" style="text-align:left;">
         <p class="sidebar-edit-hint">Click a pack to select it. Use the speaker icons to preview its success/error sounds.</p>
         <div id="soundPackPickerGrid" class="sound-pack-grid"></div>
+
+        <div class="sound-volume-row">
+          <div class="sound-volume-label">
+            <span>Notification Volume</span>
+            <span id="soundVolumeValue" class="sound-volume-value"
+              title="Double-click to type an exact value">Default</span>
+          </div>
+          <div class="sound-volume-slider-row">
+            <span class="sound-volume-end">Muted</span>
+            <input type="range" id="soundVolumeSlider" min="-26" max="5" step="1" value="0" />
+            <span class="sound-volume-end">+5 dB</span>
+          </div>
+          <button id="soundVolumeReset" class="sound-volume-reset">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       CHOOSE BUTTON SOUND
+
+       Modelled on the pack picker above, with one sound per tile instead of a
+       success/error pair, and a None tile first because no cue is the default.
+       Tiles are built from src/sound-manifest.ts, which
+       scripts/generate-sound-manifest.mjs rebuilds from
+       public/sounds/button-sounds/ on every dev/build run, so adding a cue is
+       a matter of dropping an audio file in that folder. An empty folder is a
+       normal state: the grid then offers None alone and says why.
+  ====================================================================== -->
+  <div id="buttonSoundPickerBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal sound-pack-picker-modal">
+      <div class="modal-header">
+        <button id="buttonSoundPickerBack" class="nav-back-btn modal-header-left" title="Back to Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Choose Button Sound</span>
+        <button id="buttonSoundPickerClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+        <p id="buttonSoundPickerHint" class="sidebar-edit-hint">Click a sound to play it on every button press. Use the speaker icon to hear one without selecting it.</p>
+        <div id="buttonSoundPickerGrid" class="sound-pack-grid"></div>
+
+        <div class="sound-volume-row">
+          <div class="sound-volume-label">
+            <span>Button Volume</span>
+            <span id="buttonVolumeValue" class="sound-volume-value"
+              title="Double-click to type an exact value">Default</span>
+          </div>
+          <div class="sound-volume-slider-row">
+            <span class="sound-volume-end">Muted</span>
+            <input type="range" id="buttonVolumeSlider" min="-26" max="5" step="1" value="0" />
+            <span class="sound-volume-end">+5 dB</span>
+          </div>
+          <button id="buttonVolumeReset" class="sound-volume-reset">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       CHOOSE MODAL SOUND
+
+       As above, from public/sounds/modal-sounds/. Kept a separate folder and a
+       separate setting from the button cue on purpose: a modal open is a
+       heavier event than a click and usually wants a different sound, and a
+       click that opens a modal fires both cues, so being able to set one of
+       them to None is the escape hatch.
+  ====================================================================== -->
+  <div id="modalSoundPickerBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal sound-pack-picker-modal">
+      <div class="modal-header">
+        <button id="modalSoundPickerBack" class="nav-back-btn modal-header-left" title="Back to Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Choose Modal Sound</span>
+        <button id="modalSoundPickerClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+        <p id="modalSoundPickerHint" class="sidebar-edit-hint">Click a sound to play it whenever a modal opens. Use the speaker icon to hear one without selecting it.</p>
+        <div id="modalSoundPickerGrid" class="sound-pack-grid"></div>
+
+        <div class="sound-volume-row">
+          <div class="sound-volume-label">
+            <span>Modal Volume</span>
+            <span id="modalVolumeValue" class="sound-volume-value"
+              title="Double-click to type an exact value">Default</span>
+          </div>
+          <div class="sound-volume-slider-row">
+            <span class="sound-volume-end">Muted</span>
+            <input type="range" id="modalVolumeSlider" min="-26" max="5" step="1" value="0" />
+            <span class="sound-volume-end">+5 dB</span>
+          </div>
+          <button id="modalVolumeReset" class="sound-volume-reset">Reset to Default</button>
+        </div>
       </div>
     </div>
   </div>
@@ -3438,6 +3591,7 @@
         <p><a id="readmeLink" href="#">Readme</a> &nbsp;·&nbsp; <a id="licensingLink" href="#">Licensing &amp;
             Attributions</a></p>
         <p><a id="securityLink" href="#">Security</a> &nbsp;·&nbsp; <a id="contributingLink" href="#">Contributing</a></p>
+        <p><a href="https://github.com/RailbladeOfficial/Swiss-RB-Knife">GitHub</a></p>
       </div>
     </div>
   </div>

@@ -56,6 +56,14 @@ public/SECURITY.md
 public/swiss-rb-knife-logo.png
 public/screenshots/
 
+# Sound attribution notes. The credit lines from each sound's source, kept
+# next to the audio while a pack is being put together and consolidated by
+# hand into ATTRIBUTION.md, which is the tracked source of truth. Untracked
+# because they are working notes, not a deliverable; the licences they record
+# live in ATTRIBUTION.md, and scripts/checks/settings.test.mjs fails if a
+# shipped sound has no entry there.
+attr/
+
 # Tauri-generated schemas (regenerated on every dev/build)
 src-tauri/gen/schemas
 

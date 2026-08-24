@@ -18,7 +18,13 @@
 
 import { Modal, ModalTabs } from "./modal";
 import { THEME_GROUPS, type ThemePickerTab } from "./theme-ids";
-import { ANIMATED_THEMES, getActiveCustomId, setActiveCustomId, themeCssUrl } from "./theme-core";
+import {
+  ANIMATED_THEMES,
+  applyTheme,
+  getActiveCustomId,
+  setActiveCustomId,
+  themeCssUrl,
+} from "./theme-core";
 import {
   clearCustomTheme,
   customThemes,
@@ -58,7 +64,17 @@ const cycleOrderRow = document.getElementById("cycleOrderRow")!;
 const cycleNowRow = document.getElementById("cycleNowRow")!;
 const cycleIncludeCustomRow = document.getElementById("cycleIncludeCustomRow")!;
 const cycleSeasonOnlyRow = document.getElementById("cycleSeasonOnlyRow")!;
+const cycleHolidayOverrideToggle = document.getElementById("cycleHolidayOverrideToggle") as HTMLInputElement;
+const cycleHolidayOverrideLabel = document.getElementById("cycleHolidayOverrideLabel")!;
 const cycleHolidayFullSeasonRow = document.getElementById("cycleHolidayFullSeasonRow")!;
+const cycleHolidayFullSeasonToggle = document.getElementById("cycleHolidayFullSeasonToggle") as HTMLInputElement;
+const cycleHolidayFullSeasonLabel = document.getElementById("cycleHolidayFullSeasonLabel")!;
+const prefHolidayOverrideToggle = document.getElementById("prefHolidayOverrideToggle") as HTMLInputElement;
+const prefHolidayOverrideLabel = document.getElementById("prefHolidayOverrideLabel")!;
+const prefHolidayFullSeasonRow = document.getElementById("prefHolidayFullSeasonRow")!;
+const prefHolidayFullSeasonToggle = document.getElementById("prefHolidayFullSeasonToggle") as HTMLInputElement;
+const prefHolidayFullSeasonLabel = document.getElementById("prefHolidayFullSeasonLabel")!;
+const prefHolidayActiveNote = document.getElementById("prefHolidayActiveNote")!;
 const cycleHolidayActiveNote = document.getElementById("cycleHolidayActiveNote")!;
 const cycleDayNightRows = document.getElementById("cycleDayNightRows")!;
 const cycleDayNightNote = document.getElementById("cycleDayNightNote")!;
@@ -472,9 +488,68 @@ export function refreshCycleHolidayNote(): void {
       untilText = ` until ${HOLIDAY_NOTE_DATE_FMT.format(dayAfterEnd)}`;
     }
   }
+  const name = getThemeDisplayName(holidayId);
   cycleHolidayActiveNote.textContent =
-    `Holiday Override active: showing ${getThemeDisplayName(holidayId)} today, overriding the normal cycle rotation${untilText}.`;
+    `Holiday Override active: showing ${name} today, overriding the normal cycle rotation${untilText}.`;
   cycleHolidayActiveNote.style.display = "";
+  prefHolidayActiveNote.textContent =
+    `Holiday Override active: showing ${name} today, overriding your selected theme${untilText}.`;
+  prefHolidayActiveNote.style.display = "";
+}
+
+/* -----------------------------------------------------------------------------
+   Holiday Overrides (Cycle tab AND Preferences tab)
+   -----------------------------------------------------------------------------
+   Two settings, cycleHolidayOverride and cycleHolidayFullSeason, with two sets
+   of controls. They started on the Cycle tab and stay there, but the override
+   is not a Cycle rule: cycle-theme.ts applies it over whatever theme mode is
+   selected, so a person who never opens the Cycle tab still needs a way to
+   reach it. Both copies write the same keys and every commit repaints all four
+   controls, so the two can never drift out of agreement.
+----------------------------------------------------------------------------- */
+
+export function syncHolidayOverrideControls(): void {
+  const override = settings.cycleHolidayOverride;
+  const fullSeason = settings.cycleHolidayFullSeason;
+  cycleHolidayOverrideToggle.checked = override;
+  cycleHolidayOverrideLabel.textContent = override ? "On" : "Off";
+  prefHolidayOverrideToggle.checked = override;
+  prefHolidayOverrideLabel.textContent = override ? "On" : "Off";
+  cycleHolidayFullSeasonToggle.checked = fullSeason;
+  cycleHolidayFullSeasonLabel.textContent = fullSeason ? "On" : "Off";
+  prefHolidayFullSeasonToggle.checked = fullSeason;
+  prefHolidayFullSeasonLabel.textContent = fullSeason ? "On" : "Off";
+  // Preferences carries no "Restrict to Holiday Season" row, so over here the
+  // window-widener is relevant exactly when the override itself is on. The
+  // Cycle copy answers to both settings and stays with the rest of that
+  // pane's conditional rows, in syncCycleSettingsVisibility().
+  prefHolidayFullSeasonRow.style.display = override ? "" : "none";
+  refreshCycleHolidayNote();
+}
+
+/** Shared tail for all four toggles: repaint every copy, then re-apply the
+ *  current theme so the override engages or lapses on the spot. applyTheme()
+ *  gets settings.theme rather than a hardcoded "cycle", because the repaint
+ *  has to run through whichever mode is actually selected. */
+function commitHolidayOverrideSetting(): void {
+  syncHolidayOverrideControls();
+  syncCycleSettingsVisibility();
+  applyTheme(settings.theme);
+  saveSettings();
+}
+
+for (const toggle of [cycleHolidayOverrideToggle, prefHolidayOverrideToggle]) {
+  toggle.addEventListener("change", () => {
+    settings.cycleHolidayOverride = toggle.checked;
+    commitHolidayOverrideSetting();
+  });
+}
+
+for (const toggle of [cycleHolidayFullSeasonToggle, prefHolidayFullSeasonToggle]) {
+  toggle.addEventListener("change", () => {
+    settings.cycleHolidayFullSeason = toggle.checked;
+    commitHolidayOverrideSetting();
+  });
 }
 
 /* -----------------------------------------------------------------------------
@@ -491,9 +566,15 @@ function refreshSeasonalEffect(): void {
   window.dispatchEvent(new CustomEvent("themechange"));
 }
 
-/** Builds one toggle row per animated theme. Rebuilt on each render rather
- *  than diffed, it's eight rows behind a tab that has to be opened, so the
- *  simplicity is worth more than the churn. */
+/** Builds one toggle cell per animated theme, laid out by
+ *  .theme-animations-list's grid. Rebuilt on each render rather than diffed,
+ *  it's nine cells behind a tab that has to be opened, so the simplicity is
+ *  worth more than the churn.
+ *
+ *  No Enabled/Disabled word next to these switches, unlike the master toggle
+ *  above them: the switch already says which way it is set, and nine copies of
+ *  the word were both noise and a real chunk of the pane's height. The state
+ *  still reaches a screen reader through the input's aria-label. */
 function renderThemeAnimationRows(): void {
   themeAnimationsList.innerHTML = "";
 
@@ -510,17 +591,14 @@ function renderThemeAnimationRows(): void {
     effect.textContent = anim.effect;
     label.append(name, effect);
 
-    const wrap = document.createElement("div");
-    wrap.className = "toggle-with-label";
-    const stateLabel = document.createElement("span");
     const enabled = !settings.themeAnimationsOff.includes(anim.id);
-    stateLabel.textContent = enabled ? "Enabled" : "Disabled";
 
     const switchLabel = document.createElement("label");
     switchLabel.className = "toggle-switch";
     const input = document.createElement("input");
     input.type = "checkbox";
     input.checked = enabled;
+    input.setAttribute("aria-label", `${anim.label} animation (${anim.effect})`);
     const slider = document.createElement("span");
     slider.className = "toggle-slider";
     switchLabel.append(input, slider);
@@ -530,12 +608,10 @@ function renderThemeAnimationRows(): void {
       if (!input.checked) off.push(anim.id);
       settings.themeAnimationsOff = off;
       saveSettings();
-      stateLabel.textContent = input.checked ? "Enabled" : "Disabled";
       refreshSeasonalEffect();
     });
 
-    wrap.append(stateLabel, switchLabel);
-    row.append(label, wrap);
+    row.append(label, switchLabel);
     themeAnimationsList.appendChild(row);
   }
 }
@@ -544,6 +620,7 @@ function renderThemeAnimationRows(): void {
  *  the per-theme list (hidden entirely while the master switch is off, since
  *  those toggles would otherwise be controls that visibly do nothing). */
 function renderThemePreferences(): void {
+  syncHolidayOverrideControls();
   themeAnimationsToggle.checked = settings.themeAnimations;
   themeAnimationsLabel.textContent = settings.themeAnimations ? "Enabled" : "Disabled";
   themeAnimationsPerTheme.style.display = settings.themeAnimations ? "" : "none";
