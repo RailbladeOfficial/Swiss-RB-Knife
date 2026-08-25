@@ -73,6 +73,15 @@ type TTSettings = {
   };
   // ISO timestamp of the last successful CSV import, or "" if never.
   lastCsvImportAt: string;
+  // How the Break-In modal asks for the length of an interruption. Off (the
+  // default) asks for a real end time, matching how every other time in this
+  // tool is entered. On asks for a count of minutes, for people who recall
+  // "that ate twenty minutes" more readily than "that ended at 10:47".
+  breakInUseMinutes: boolean;
+  // Tasks parked by the "Break In" button, most recent last. Persisted so
+  // closing the app mid-interruption doesn't lose what you meant to go back
+  // to. See the LIVE BREAK-IN section.
+  pausedTasks: PausedTask[];
 };
 
 /* =============================================================================
@@ -110,6 +119,8 @@ let settings: TTSettings = {
     lengthDays: 14,
   },
   lastCsvImportAt: "",
+  breakInUseMinutes: false,
+  pausedTasks: [],
 };
 
 let settingsSaveTimer: number | null = null;
@@ -412,6 +423,42 @@ function entryDurationSeconds(e: Pick<Entry, "date" | "start" | "endDate" | "end
   return endTotal - startTotal;
 }
 
+/* -----------------------------------------------------------------------------
+   ABSOLUTE TIMELINE
+   ---------------------------------------------------------------------------
+   A single number, "seconds since day 0", that collapses an entry's (date,
+   time) pair into one comparable value. Any operation that has to reason about
+   ordering or containment ACROSS dates (merging entries, carving a break-in
+   out of a span, sorting an overnight shift against a morning one) is written
+   against these rather than against date strings plus times, because comparing
+   the two halves separately is exactly where midnight-spanning entries go
+   wrong. entryDurationSeconds() above is the same arithmetic, inlined.
+----------------------------------------------------------------------------- */
+
+function entryStartAbs(e: Pick<Entry, "date" | "start">): number {
+  return dateToDayIndex(e.date) * 86400 + parseTime(e.start);
+}
+
+function entryEndAbs(e: Pick<Entry, "endDate" | "end">): number {
+  return dateToDayIndex(e.endDate) * 86400 + parseTime(e.end);
+}
+
+/** Inverse of dateToDayIndex. UTC-based for the same reason it is. */
+function dayIndexToDate(index: number): string {
+  const d = new Date(index * 86400000);
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+
+/** Splits an absolute-timeline value back into the (date, HH:MM:SS) pair an
+ *  Entry stores. */
+function absToDateTime(abs: number): { date: string; time: string } {
+  const dayIndex = Math.floor(abs / 86400);
+  return {
+    date: dayIndexToDate(dayIndex),
+    time: secondsToTimeString(abs - dayIndex * 86400),
+  };
+}
+
 /** Formats a canonical "HH:MM:SS" time-of-day for display. Seconds are only
  *  shown when non-zero, so entries logged without second-level precision
  *  keep the plain "HH:MM" look. */
@@ -506,6 +553,11 @@ function applyTTSettings(): void {
   document.getElementById("roundNowLabel")!.textContent =
     settings.roundNowToMinute ? "On" : "Off";
 
+  (document.getElementById("breakInMinutesToggle") as HTMLInputElement).checked =
+    settings.breakInUseMinutes;
+  document.getElementById("breakInMinutesLabel")!.textContent =
+    settings.breakInUseMinutes ? "On" : "Off";
+
   (document.getElementById("payPeriodToggle") as HTMLInputElement).checked =
     settings.payPeriod.enabled;
   document.getElementById("payPeriodLabel")!.textContent =
@@ -519,6 +571,7 @@ function applyTTSettings(): void {
   applyPayPeriodVisibility();
   applyPayPeriodButtons();
   refreshCsvImportStatusUI();
+  refreshBreakInUI();
 }
 
 function saveSettings(): void {
@@ -537,6 +590,8 @@ function saveSettings(): void {
       activities: activities,
       projects: projects,
       lastCsvImportAt: settings.lastCsvImportAt,
+      breakInUseMinutes: settings.breakInUseMinutes,
+      pausedTasks: settings.pausedTasks,
     };
     try {
       await invoke("save_tool_settings", {
@@ -584,6 +639,12 @@ async function loadSettings(): Promise<void> {
         projects = own.projects.filter(isValidProject);
       }
       if (typeof own.lastCsvImportAt === "string") settings.lastCsvImportAt = own.lastCsvImportAt;
+      if (typeof own.breakInUseMinutes === "boolean") {
+        settings.breakInUseMinutes = own.breakInUseMinutes;
+      }
+      if (Array.isArray(own.pausedTasks)) {
+        settings.pausedTasks = own.pausedTasks.filter(isValidPausedTask);
+      }
     } else if ("quickDelete" in shared || "payPeriod" in shared) {
       // Legacy keys found in settings.json and no own-file yet: migrate.
       saveSettings();
@@ -891,46 +952,122 @@ function updateDurationPreview(
 /* =============================================================================
    STATS COMPUTATION
    -----------------------------------------------------------------------------
-   Shared by the Stats pane (renderStats) and the CSV export so the two can
-   never disagree. Operates on whatever slice of entries the caller passes in
-:   always the currently-visible (view-filtered) set, so the numbers track
-   the active view mode exactly like the Totals pane does.
+   Shared by the Stats pane (renderStats), the Totals pane (renderTotals) and
+   the CSV export so none of the three can disagree. Everything operates on
+   whatever slice of entries the caller passes in: always the currently-visible
+   (view-filtered) set, so the numbers track the active view mode exactly.
 ============================================================================= */
 
 type Stat = { label: string; value: string };
 
-function computeStats(visible: Entry[]): Stat[] {
+/** One column of the Stats pane / one section of the CSV STATS block. */
+type StatGroup = { title: string; stats: Stat[] };
+
+/** One row of a Totals-pane breakdown table, and the raw material for every
+ *  per-activity / per-project superlative below. `days` is the set of distinct
+ *  START dates the bucket touches, which is what "spans the most days" means. */
+type BreakdownRow = {
+  name: string;
+  /** True for the single bucket holding entries with an empty project. */
+  unassigned: boolean;
+  count: number;
+  secs: number;
+  days: Set<string>;
+};
+
+/**
+ * Buckets entries by activity or project name, case-insensitively (the same
+ * convention render() and exportCSV() have always used for the Totals summary),
+ * keeping the first-seen spelling as the display name.
+ *
+ * Sorted by total time descending: that is the order the breakdown tables want
+ * (biggest sink of time first) and it means the superlatives below can often
+ * just read row [0] instead of scanning.
+ */
+function breakdownBy(visible: Entry[], field: "activity" | "project"): BreakdownRow[] {
+  const map = new Map<string, BreakdownRow>();
+  visible.forEach((e) => {
+    const raw = e[field].trim();
+    const key = raw.toLowerCase();
+    let row = map.get(key);
+    if (!row) {
+      row = { name: raw, unassigned: raw === "", count: 0, secs: 0, days: new Set<string>() };
+      map.set(key, row);
+    }
+    row.count += 1;
+    row.secs += entryDurationSeconds(e);
+    row.days.add(e.date);
+  });
+  return [...map.values()].sort(
+    (a, b) => b.secs - a.secs || a.name.localeCompare(b.name),
+  );
+}
+
+/** Rows with a real name, i.e. everything except the "no project" bucket. */
+function namedRows(rows: BreakdownRow[]): BreakdownRow[] {
+  return rows.filter((r) => !r.unassigned);
+}
+
+/** The row with the highest value of `pick`, or null for an empty list. Used
+ *  for every "X with the most/highest Y" stat so they all break ties the same
+ *  way (first one wins, and the list is already time-ordered). */
+function maxRow(
+  rows: BreakdownRow[],
+  pick: (r: BreakdownRow) => number,
+): BreakdownRow | null {
+  let best: BreakdownRow | null = null;
+  let bestVal = -Infinity;
+  rows.forEach((r) => {
+    const v = pick(r);
+    if (v > bestVal) { bestVal = v; best = r; }
+  });
+  return best;
+}
+
+/** Whole percent of `total`, guarding the no-entries case. */
+function pct(part: number, total: number): string {
+  if (total <= 0) return "0%";
+  return `${Math.round((part / total) * 100)}%`;
+}
+
+/** Longest run of consecutive calendar days that have at least one entry.
+ *  Counted on start dates, matching how the ledger groups rows into days. */
+function longestDayStreak(dates: string[]): number {
+  if (dates.length === 0) return 0;
+  const idx = [...new Set(dates)].map(dateToDayIndex).sort((a, b) => a - b);
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < idx.length; i++) {
+    run = idx[i] === idx[i - 1]! + 1 ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
+/**
+ * Every stat the Stats pane shows, grouped into the three columns it renders.
+ * The grouping is not cosmetic: it is what lets the pane run three columns
+ * across the panel instead of one long list, and it is what the CSV export
+ * writes as sub-headings.
+ */
+function computeStatGroups(visible: Entry[]): StatGroup[] {
   if (visible.length === 0) return [];
 
   const totalEntries = visible.length;
-  const totalSecs = visible.reduce(
-    (sum, e) => sum + entryDurationSeconds(e),
-    0,
-  );
-  const avgPerActivity = Math.round(totalSecs / totalEntries);
+  const totalSecs = visible.reduce((sum, e) => sum + entryDurationSeconds(e), 0);
 
-  // Group by activity name (case-insensitive), same convention render() and
-  // exportCSV() use for the Totals summary.
-  const byActivity = new Map<string, { display: string; count: number; secs: number }>();
-  visible.forEach((e) => {
-    const key = e.activity.toLowerCase();
-    const g = byActivity.get(key) ?? { display: e.activity, count: 0, secs: 0 };
-    g.count += 1;
-    g.secs += entryDurationSeconds(e);
-    byActivity.set(key, g);
-  });
+  const byActivity = breakdownBy(visible, "activity");
+  const byProject = breakdownBy(visible, "project");
+  const realProjects = namedRows(byProject);
+  const unassignedSecs = byProject.find((r) => r.unassigned)?.secs ?? 0;
+  const assignedSecs = totalSecs - unassignedSecs;
 
-  let mostEntries = { display: "", count: 0 };
-  let highestTime = { display: "", secs: 0 };
-  let highestAvg = { display: "", secs: 0 };
-  byActivity.forEach((g) => {
-    if (g.count > mostEntries.count) mostEntries = { display: g.display, count: g.count };
-    if (g.secs > highestTime.secs) highestTime = { display: g.display, secs: g.secs };
-    const avg = g.secs / g.count;
-    if (avg > highestAvg.secs) highestAvg = { display: g.display, secs: avg };
-  });
+  /* ---- Activities ------------------------------------------------------- */
 
-  // Single entry with the highest duration.
+  const actMostEntries = maxRow(byActivity, (r) => r.count);
+  const actMostTime = byActivity[0] ?? null;         // list is time-sorted
+  const actHighestAvg = maxRow(byActivity, (r) => r.secs / r.count);
+
   let longestEntry = visible[0]!;
   let longestSecs = entryDurationSeconds(longestEntry);
   visible.forEach((e) => {
@@ -938,19 +1075,103 @@ function computeStats(visible: Entry[]): Stat[] {
     if (secs > longestSecs) { longestEntry = e; longestSecs = secs; }
   });
 
-  // Earliest start / latest finish, compared by real time-of-day.
-  let earliestEntry = visible[0]!;
-  let earliestSecs = parseTime(earliestEntry.start);
-  let latestEntry = visible[0]!;
-  let latestSecs = parseTime(latestEntry.end);
-  visible.forEach((e) => {
-    const s = parseTime(e.start);
-    if (s < earliestSecs) { earliestEntry = e; earliestSecs = s; }
-    const e2 = parseTime(e.end);
-    if (e2 > latestSecs) { latestEntry = e; latestSecs = e2; }
-  });
+  const activityStats: Stat[] = [
+    { label: "Unique Activities", value: String(byActivity.length) },
+    { label: "Entries Logged", value: String(totalEntries) },
+    {
+      label: "Avg Time per Entry",
+      value: formatDuration(Math.round(totalSecs / totalEntries)),
+    },
+    {
+      label: "Most Entries",
+      value: actMostEntries
+        ? `${actMostEntries.name} (${entryCountLabel(actMostEntries.count)})`
+        : "—",
+    },
+    {
+      label: "Most Time",
+      value: actMostTime
+        ? `${actMostTime.name} (${formatDuration(actMostTime.secs)})`
+        : "—",
+    },
+    {
+      label: "Highest Avg Time",
+      value: actHighestAvg
+        ? `${actHighestAvg.name} (${formatDuration(Math.round(actHighestAvg.secs / actHighestAvg.count))})`
+        : "—",
+    },
+    {
+      label: "Longest Single Entry",
+      value: `${longestEntry.activity} on ${formatDate(longestEntry.date)} (${formatDuration(longestSecs)})`,
+    },
+  ];
 
-  // Per-date grouping, "craziest" (most entries) and "busiest" (most time).
+  /* ---- Projects --------------------------------------------------------- */
+
+  const projStats: Stat[] = [
+    { label: "Projects Tracked", value: String(realProjects.length) },
+    {
+      label: "Time on Projects",
+      value: `${formatDuration(assignedSecs)} (${pct(assignedSecs, totalSecs)})`,
+    },
+    {
+      label: "Unassigned Time",
+      value: `${formatDuration(unassignedSecs)} (${pct(unassignedSecs, totalSecs)})`,
+    },
+  ];
+
+  if (realProjects.length > 0) {
+    const projMostTime = realProjects[0]!;              // time-sorted
+    const projMostEntries = maxRow(realProjects, (r) => r.count)!;
+    const projHighestAvg = maxRow(realProjects, (r) => r.secs / r.count)!;
+    const projMostDays = maxRow(realProjects, (r) => r.days.size)!;
+
+    // Busiest single (project, day) pairing: the day a project ate the most
+    // time. Distinct from "Busiest Day", which is across everything.
+    const perProjectDay = new Map<string, { project: string; date: string; secs: number }>();
+    visible.forEach((e) => {
+      const name = e.project.trim();
+      if (!name) return;
+      const key = `${name.toLowerCase()}|${e.date}`;
+      const g = perProjectDay.get(key) ?? { project: name, date: e.date, secs: 0 };
+      g.secs += entryDurationSeconds(e);
+      perProjectDay.set(key, g);
+    });
+    let bestProjectDay = { project: "", date: "", secs: -1 };
+    perProjectDay.forEach((g) => {
+      if (g.secs > bestProjectDay.secs) bestProjectDay = g;
+    });
+
+    projStats.push(
+      {
+        label: "Avg Time per Project",
+        value: formatDuration(Math.round(assignedSecs / realProjects.length)),
+      },
+      {
+        label: "Most Time",
+        value: `${projMostTime.name} (${formatDuration(projMostTime.secs)})`,
+      },
+      {
+        label: "Most Entries",
+        value: `${projMostEntries.name} (${entryCountLabel(projMostEntries.count)})`,
+      },
+      {
+        label: "Highest Avg Session",
+        value: `${projHighestAvg.name} (${formatDuration(Math.round(projHighestAvg.secs / projHighestAvg.count))})`,
+      },
+      {
+        label: "Spans Most Days",
+        value: `${projMostDays.name} (${projMostDays.days.size} ${projMostDays.days.size === 1 ? "day" : "days"})`,
+      },
+      {
+        label: "Biggest Project Day",
+        value: `${bestProjectDay.project} on ${formatDate(bestProjectDay.date)} (${formatDuration(bestProjectDay.secs)})`,
+      },
+    );
+  }
+
+  /* ---- Days & Times ----------------------------------------------------- */
+
   // Grouped by start date, same as the ledger's per-day subheaders.
   const byDate = new Map<string, { count: number; secs: number }>();
   visible.forEach((e) => {
@@ -969,36 +1190,42 @@ function computeStats(visible: Entry[]): Stat[] {
     if (g.secs > busiestSecs) { busiestSecs = g.secs; busiestDate = date; }
   });
 
-  const avgEntriesPerDay = totalEntries / byDate.size;
+  // Earliest start / latest finish, compared by real time-of-day.
+  let earliestEntry = visible[0]!;
+  let earliestSecs = parseTime(earliestEntry.start);
+  let latestEntry = visible[0]!;
+  let latestSecs = parseTime(latestEntry.end);
+  visible.forEach((e) => {
+    const s = parseTime(e.start);
+    if (s < earliestSecs) { earliestEntry = e; earliestSecs = s; }
+    const e2 = parseTime(e.end);
+    if (e2 > latestSecs) { latestEntry = e; latestSecs = e2; }
+  });
 
-  return [
+  const streak = longestDayStreak(visible.map((e) => e.date));
+
+  const dayStats: Stat[] = [
+    { label: "Total Time", value: formatDuration(totalSecs) },
+    { label: "Days Tracked", value: String(byDate.size) },
     {
-      label: "Total Activities Logged",
-      value: `${totalEntries} ${totalEntries === 1 ? "activity" : "activities"}`,
+      label: "Avg Time per Day",
+      value: formatDuration(Math.round(totalSecs / byDate.size)),
     },
     {
-      label: "Unique Activities Tracked",
-      value: `${byActivity.size} ${byActivity.size === 1 ? "activity" : "activities"}`,
+      label: "Avg Entries per Day",
+      value: `${(totalEntries / byDate.size).toFixed(1)} entries/day`,
     },
     {
-      label: "Average Time per Activity",
-      value: `${formatDuration(avgPerActivity)} per activity`,
+      label: "Longest Day Streak",
+      value: `${streak} ${streak === 1 ? "day" : "days"}`,
     },
     {
-      label: "Activity with Most Entries",
-      value: `${mostEntries.display} (${mostEntries.count} ${mostEntries.count === 1 ? "entry" : "entries"})`,
+      label: "Craziest Day",
+      value: `${formatDate(craziestDate)} (${entryCountLabel(craziestCount)})`,
     },
     {
-      label: "Activity with Highest Time",
-      value: `${highestTime.display} (${formatDuration(highestTime.secs)})`,
-    },
-    {
-      label: "Activity with Highest Average Time",
-      value: `${highestAvg.display} (${formatDuration(Math.round(highestAvg.secs))})`,
-    },
-    {
-      label: "Entry with Highest Time",
-      value: `${longestEntry.activity} on ${formatDate(longestEntry.date)} (${formatDuration(longestSecs)})`,
+      label: "Busiest Day",
+      value: `${formatDate(busiestDate)} (${formatDuration(busiestSecs)})`,
     },
     {
       label: "Earliest Start",
@@ -1008,18 +1235,12 @@ function computeStats(visible: Entry[]): Stat[] {
       label: "Latest Finish",
       value: `${formatTime(secondsToTimeString(latestSecs))} on ${formatDate(latestEntry.date)} (${latestEntry.activity})`,
     },
-    {
-      label: "Craziest Day",
-      value: `${formatDate(craziestDate)} (${craziestCount} ${craziestCount === 1 ? "entry" : "entries"})`,
-    },
-    {
-      label: "Busiest Day",
-      value: `${formatDate(busiestDate)} (${formatDuration(busiestSecs)})`,
-    },
-    {
-      label: "Avg Entries per Day",
-      value: `${avgEntriesPerDay.toFixed(1)} entries/day`,
-    },
+  ];
+
+  return [
+    { title: "Activities", stats: activityStats },
+    { title: "Projects", stats: projStats },
+    { title: "Days & Times", stats: dayStats },
   ];
 }
 
@@ -1049,15 +1270,6 @@ async function exportCSV(): Promise<void> {
     return true;
   });
 
-  const grouped: Record<string, number> = {};
-  const groupedDisplay: Record<string, string> = {};
-  visibleEntries.forEach((e) => {
-    const secs = entryDurationSeconds(e);
-    const key = e.activity.toLowerCase();
-    grouped[key] = (grouped[key] || 0) + secs;
-    if (!groupedDisplay[key]) groupedDisplay[key] = e.activity;
-  });
-
   const reportDate = now.toLocaleDateString(
     settings.americanDates ? "en-US" : "en-CA",
     { year: "numeric", month: "2-digit", day: "2-digit" },
@@ -1082,24 +1294,35 @@ async function exportCSV(): Promise<void> {
   lines.push(`"Report Generated:","${reportDate}", at, ${reportTime}`);
   lines.push("");
 
-  lines.push("SUMMARY");
-  lines.push("Activity,Total Time");
-  let grandTotal = 0;
-  Object.entries(grouped)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .forEach(([key, secs]) => {
-      lines.push(`${csvField(groupedDisplay[key])},"${formatDuration(secs)}"`);
-      grandTotal += secs;
+  // Both breakdowns come from the same helper the Totals pane renders from, so
+  // an exported report and the on-screen panel can never drift apart.
+  const grandTotal = visibleEntries.reduce((sum, e) => sum + entryDurationSeconds(e), 0);
+
+  (["activity", "project"] as const).forEach((field) => {
+    const label = field === "activity" ? "Activity" : "Project";
+    lines.push(`SUMMARY BY ${label.toUpperCase()}`);
+    lines.push(`${label},Entries,Total Time,Avg Time,Share`);
+    breakdownBy(visibleEntries, field).forEach((row) => {
+      const name = row.unassigned
+        ? (field === "project" ? "(No Project)" : "(Unnamed)")
+        : row.name;
+      lines.push(
+        `${csvField(name)},${row.count},"${formatDuration(row.secs)}",` +
+        `"${formatDuration(Math.round(row.secs / row.count))}","${pct(row.secs, grandTotal)}"`,
+      );
     });
-  lines.push(`"TOTAL","${formatDuration(grandTotal)}"`);
-  lines.push("");
+    lines.push(`"TOTAL",${visibleEntries.length},"${formatDuration(grandTotal)}","",""`);
+    lines.push("");
+  });
 
   lines.push("STATS");
-  lines.push("Stat,Value");
-  computeStats(visibleEntries).forEach((s) => {
-    lines.push(`${csvField(s.label)},${csvField(s.value)}`);
+  computeStatGroups(visibleEntries).forEach((group) => {
+    lines.push(`${csvField(group.title)},`);
+    group.stats.forEach((stat) => {
+      lines.push(`${csvField(stat.label)},${csvField(stat.value)}`);
+    });
+    lines.push("");
   });
-  lines.push("");
 
   lines.push("ENTRIES");
   lines.push("Date,Start,End Date,End,Project,Activity,Duration,Notes");
@@ -1397,8 +1620,235 @@ async function downloadCsvTemplate(): Promise<void> {
 }
 
 /* =============================================================================
+   SUMMARY PANEL: TAB STATE
+   -----------------------------------------------------------------------------
+   The Totals / Stats panes are both rendered on every render() (they are cheap,
+   and keeping them both current means switching tabs never shows stale numbers
+   for a frame). Only visibility is toggled here.
+============================================================================= */
+
+type TTSummaryTab = "totals" | "stats";
+let activeSummaryTab: TTSummaryTab = "totals";
+
+function activateSummaryTab(tab: TTSummaryTab): void {
+  activeSummaryTab = tab;
+  document
+    .querySelectorAll<HTMLButtonElement>(".tt-summary-tabs .tt-summary-tab")
+    .forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.ttSummaryTab === tab);
+    });
+  const totalsPane = document.getElementById("ttSummaryTotals");
+  const statsPane = document.getElementById("ttSummaryStats");
+  if (totalsPane) totalsPane.style.display = tab === "totals" ? "" : "none";
+  if (statsPane) statsPane.style.display = tab === "stats" ? "" : "none";
+}
+
+/* =============================================================================
+   ENTRY SELECTION (bulk clone / merge / delete)
+   -----------------------------------------------------------------------------
+   Selection is opt-in: the Select button in the entries header turns it on,
+   which inserts a checkbox into every row and shows the action bar. Off by
+   default so the ledger keeps its full width for content.
+
+   Selected entries are tracked by OBJECT IDENTITY, not by index. Indexes move
+   whenever entries are added, sorted, merged, or split, and a stale index in a
+   delete path is how you lose the wrong row. Entry objects are stable for as
+   long as they exist in `entries`, so a Set of them is both correct and
+   self-cleaning: pruneSelection() drops anything no longer in the array.
+============================================================================= */
+
+let selectMode = false;
+const selectedEntries = new Set<Entry>();
+/** The entry whose checkbox was last clicked, the anchor for shift-click range
+ *  selection. Cleared whenever selection mode is turned off. */
+let lastCheckedEntry: Entry | null = null;
+/** The entries currently on screen, in display order. Needed by the range
+ *  select and the Select All button, both of which mean "of what I can see". */
+let lastVisible: Entry[] = [];
+
+/** Drops selections whose entry is no longer in `entries` (deleted, merged
+ *  away, replaced by a split) so the count and the bulk actions can never
+ *  operate on a ghost. */
+function pruneSelection(): void {
+  selectedEntries.forEach((e) => {
+    if (!entries.includes(e)) selectedEntries.delete(e);
+  });
+}
+
+/** Selection in display order. Every bulk action wants it ordered, and it must
+ *  come from `entries` rather than the Set's insertion order. */
+function selectedInOrder(): Entry[] {
+  return lastVisible.filter((e) => selectedEntries.has(e));
+}
+
+function setSelectMode(on: boolean): void {
+  selectMode = on;
+  if (!on) {
+    selectedEntries.clear();
+    lastCheckedEntry = null;
+  }
+  const btn = document.getElementById("ttSelectModeBtn");
+  if (btn) {
+    btn.classList.toggle("active", on);
+    btn.textContent = on ? "Done" : "Select";
+  }
+  const bar = document.getElementById("ttSelectionBar");
+  if (bar) bar.style.display = on ? "" : "none";
+  rerenderEntryViews();
+}
+
+/** Refreshes the selection bar's count and which actions are available.
+ *  Merge needs at least two entries; clone and delete need at least one. */
+function refreshSelectionBar(): void {
+  const n = selectedEntries.size;
+  const count = document.getElementById("ttSelectionCount");
+  if (count) count.textContent = `${n} selected`;
+  const setEnabled = (id: string, enabled: boolean) => {
+    const b = document.getElementById(id) as HTMLButtonElement | null;
+    if (b) b.disabled = !enabled;
+  };
+  setEnabled("ttBulkCloneBtn", n >= 1);
+  setEnabled("ttBulkMergeBtn", n >= 2);
+  setEnabled("ttBulkDeleteBtn", n >= 1);
+}
+
+/* =============================================================================
    RENDER
 ============================================================================= */
+
+/** Builds one row of a Totals breakdown table. `share` (0-1) paints the row's
+ *  background bar via the --share custom property, see .tt-breakdown-row. */
+function buildBreakdownRow(
+  name: string,
+  count: number,
+  secs: number,
+  share: number,
+  opts: { header?: boolean; total?: boolean; unassigned?: boolean } = {},
+): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "tt-breakdown-row"
+    + (opts.header ? " tt-breakdown-row-header" : "")
+    + (opts.total ? " tt-breakdown-row-total" : "");
+  if (!opts.header && !opts.total) {
+    row.style.setProperty("--share", `${Math.round(share * 100)}%`);
+  }
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "tt-breakdown-col-name"
+    + (opts.unassigned ? " tt-breakdown-unassigned" : "");
+  nameSpan.textContent = name;
+  nameSpan.title = name;
+
+  const countSpan = document.createElement("span");
+  countSpan.className = "tt-breakdown-col-num";
+  countSpan.textContent = opts.header ? "Entries" : String(count);
+
+  const totalSpan = document.createElement("span");
+  totalSpan.className = "tt-breakdown-col-num";
+  totalSpan.textContent = opts.header ? "Total" : formatDuration(secs);
+
+  const shareSpan = document.createElement("span");
+  shareSpan.className = "tt-breakdown-col-share";
+  shareSpan.textContent = opts.header ? "Share" : (opts.total ? "" : `${Math.round(share * 100)}%`);
+
+  row.append(nameSpan, countSpan, totalSpan, shareSpan);
+  return row;
+}
+
+/** Fills one breakdown table (By Activity or By Project). */
+function renderBreakdownTable(
+  container: HTMLElement,
+  rows: BreakdownRow[],
+  firstColLabel: string,
+  emptyLabel: string,
+  grandTotal: number,
+): void {
+  container.innerHTML = "";
+  if (rows.length === 0) {
+    const p = document.createElement("p");
+    p.className = "placeholder-text";
+    p.textContent = "Nothing in this view yet.";
+    container.appendChild(p);
+    return;
+  }
+
+  container.appendChild(buildBreakdownRow(firstColLabel, 0, 0, 0, { header: true }));
+  let count = 0;
+  rows.forEach((r) => {
+    count += r.count;
+    container.appendChild(
+      buildBreakdownRow(
+        r.unassigned ? emptyLabel : r.name,
+        r.count,
+        r.secs,
+        grandTotal > 0 ? r.secs / grandTotal : 0,
+        { unassigned: r.unassigned },
+      ),
+    );
+  });
+  container.appendChild(
+    buildBreakdownRow("Total", count, grandTotal, 0, { total: true }),
+  );
+}
+
+/** The headline chip strip: the handful of figures worth seeing without
+ *  switching to the Stats tab. */
+function renderHeadlineStrip(
+  strip: HTMLElement,
+  visible: Entry[],
+  totalSecs: number,
+  byActivity: BreakdownRow[],
+  byProject: BreakdownRow[],
+): void {
+  strip.innerHTML = "";
+  if (visible.length === 0) return;
+
+  const days = new Set(visible.map((e) => e.date)).size;
+  const chips: [string, string][] = [
+    [String(visible.length), visible.length === 1 ? "entry" : "entries"],
+    [String(byActivity.length), byActivity.length === 1 ? "activity" : "activities"],
+    [String(namedRows(byProject).length), "projects"],
+    [String(days), days === 1 ? "day" : "days"],
+    [formatDuration(Math.round(totalSecs / days)), "avg/day"],
+    [formatDuration(Math.round(totalSecs / visible.length)), "avg/entry"],
+  ];
+
+  chips.forEach(([value, label]) => {
+    const chip = document.createElement("span");
+    chip.className = "tt-headline-chip";
+    const v = document.createElement("span");
+    v.className = "tt-headline-chip-value";
+    v.textContent = value;
+    const l = document.createElement("span");
+    l.className = "tt-headline-chip-label";
+    l.textContent = label;
+    chip.append(v, l);
+    strip.appendChild(chip);
+  });
+}
+
+/** The whole Totals pane: headline row plus the two breakdown tables. */
+function renderTotals(
+  dayTotalDiv: HTMLElement,
+  groupTotalsDiv: HTMLElement,
+  visible: Entry[],
+): void {
+  const totalSecs = visible.reduce((sum, e) => sum + entryDurationSeconds(e), 0);
+  const byActivity = breakdownBy(visible, "activity");
+  const byProject = breakdownBy(visible, "project");
+
+  dayTotalDiv.textContent = `Total: ${formatDuration(totalSecs)}`;
+
+  const strip = document.getElementById("ttHeadlineStrip");
+  if (strip) renderHeadlineStrip(strip, visible, totalSecs, byActivity, byProject);
+
+  renderBreakdownTable(groupTotalsDiv, byActivity, "Activity", "(Unnamed)", totalSecs);
+
+  const projectTotals = document.getElementById("ttProjectTotals");
+  if (projectTotals) {
+    renderBreakdownTable(projectTotals, byProject, "Project", "(No Project)", totalSecs);
+  }
+}
 
 function render(
   entriesDiv: HTMLElement,
@@ -1407,11 +1857,6 @@ function render(
   statsDiv: HTMLElement,
 ): void {
   entriesDiv.innerHTML = "";
-  groupTotalsDiv.innerHTML = "";
-
-  let total = 0;
-  const grouped: Record<string, number> = {};
-  const groupedDisplay: Record<string, string> = {};
 
   const visible = entries
     .filter((e) => {
@@ -1426,19 +1871,16 @@ function render(
       return d !== 0 ? d : parseTime(a.start) - parseTime(b.start);
     });
 
-  visible.forEach((entry) => {
-    const secs = entryDurationSeconds(entry);
-    total += secs;
-    const key = entry.activity.toLowerCase();
-    grouped[key] = (grouped[key] || 0) + secs;
-    if (!groupedDisplay[key]) groupedDisplay[key] = entry.activity;
-  });
+  lastVisible = visible;
+  pruneSelection();
 
   const byDate: Map<string, Entry[]> = new Map();
   visible.forEach((entry) => {
     if (!byDate.has(entry.date)) byDate.set(entry.date, []);
     byDate.get(entry.date)!.push(entry);
   });
+
+  const rerender = () => render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
 
   byDate.forEach((dateEntries, date) => {
     const daySecs = dateEntries.reduce(
@@ -1456,7 +1898,40 @@ function render(
       const secs = entryDurationSeconds(entry);
 
       const row = document.createElement("div");
-      row.className = "entry-row";
+      row.className = "entry-row"
+        + (selectMode && selectedEntries.has(entry) ? " tt-entry-selected" : "");
+
+      if (selectMode) {
+        const check = document.createElement("input");
+        check.type = "checkbox";
+        check.className = "tt-entry-check";
+        check.checked = selectedEntries.has(entry);
+        check.title = "Select this entry (shift-click to select a range)";
+        // click, not change: only the click event carries shiftKey, and the
+        // browser has already flipped .checked by the time it fires.
+        check.addEventListener("click", (ev) => {
+          const on = check.checked;
+          if ((ev as MouseEvent).shiftKey && lastCheckedEntry) {
+            const a = visible.indexOf(lastCheckedEntry);
+            const b = visible.indexOf(entry);
+            if (a !== -1 && b !== -1) {
+              const [lo, hi] = a < b ? [a, b] : [b, a];
+              for (let k = lo; k <= hi; k++) {
+                const target = visible[k]!;
+                if (on) selectedEntries.add(target);
+                else selectedEntries.delete(target);
+              }
+            }
+          } else if (on) {
+            selectedEntries.add(entry);
+          } else {
+            selectedEntries.delete(entry);
+          }
+          lastCheckedEntry = entry;
+          rerender();
+        });
+        row.appendChild(check);
+      }
 
       const projectSpan = document.createElement("span");
       projectSpan.className = "entry-field entry-col-project";
@@ -1509,17 +1984,29 @@ function render(
       notesSpan.textContent = entry.notes;
       notesSpan.title = "Double-click to edit";
       notesSpan.addEventListener("dblclick", () =>
-        openNotesEditModal(entry, () => render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv)),
+        openNotesEditModal(entry, rerender),
       );
       row.appendChild(notesSpan);
+
+      const breakInBtn = document.createElement("button");
+      breakInBtn.className = "entry-cal-btn tt-entry-action-btn";
+      breakInBtn.textContent = "⤵";
+      breakInBtn.title = "Break-in tasks: carve interruptions out of this entry";
+      breakInBtn.addEventListener("click", () => openBreakInModal(entry, rerender));
+      row.appendChild(breakInBtn);
+
+      const cloneBtn = document.createElement("button");
+      cloneBtn.className = "entry-cal-btn tt-entry-action-btn";
+      cloneBtn.textContent = "⧉";
+      cloneBtn.title = "Duplicate this entry";
+      cloneBtn.addEventListener("click", () => cloneEntries([entry]));
+      row.appendChild(cloneBtn);
 
       const calBtn = document.createElement("button");
       calBtn.className = "entry-cal-btn";
       calBtn.textContent = "📅";
       calBtn.title = "Edit dates";
-      calBtn.addEventListener("click", () =>
-        openDateEditModal(entry, () => render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv)),
-      );
+      calBtn.addEventListener("click", () => openDateEditModal(entry, rerender));
       row.appendChild(calBtn);
 
       const deleteBtn = document.createElement("button");
@@ -1534,17 +2021,9 @@ function render(
     });
   });
 
-  dayTotalDiv.textContent = `Total: ${formatDuration(total)}`;
-
-  Object.entries(grouped)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .forEach(([key, secs]) => {
-      const d = document.createElement("div");
-      d.textContent = `${groupedDisplay[key]}: ${formatDuration(secs)}`;
-      groupTotalsDiv.appendChild(d);
-    });
-
+  renderTotals(dayTotalDiv, groupTotalsDiv, visible);
   renderStats(statsDiv, visible);
+  refreshSelectionBar();
 }
 
 /* =============================================================================
@@ -1553,9 +2032,9 @@ function render(
 
 function renderStats(statsDiv: HTMLElement, visible: Entry[]): void {
   statsDiv.innerHTML = "";
-  const stats = computeStats(visible);
+  const groups = computeStatGroups(visible);
 
-  if (stats.length === 0) {
+  if (groups.length === 0) {
     const p = document.createElement("p");
     p.className = "placeholder-text";
     p.textContent = "No entries in this view yet.";
@@ -1563,21 +2042,37 @@ function renderStats(statsDiv: HTMLElement, visible: Entry[]): void {
     return;
   }
 
-  stats.forEach((stat) => {
-    const row = document.createElement("div");
-    row.className = "stat-row";
+  groups.forEach((group) => {
+    const col = document.createElement("div");
+    col.className = "tt-stats-group";
 
-    const label = document.createElement("span");
-    label.className = "stat-label";
-    label.textContent = stat.label;
-    row.appendChild(label);
+    const title = document.createElement("div");
+    title.className = "tt-stats-group-title";
+    title.textContent = group.title;
+    col.appendChild(title);
 
-    const value = document.createElement("span");
-    value.className = "stat-value";
-    value.textContent = stat.value;
-    row.appendChild(value);
+    const list = document.createElement("div");
+    list.className = "stats-list";
+    group.stats.forEach((stat) => {
+      const row = document.createElement("div");
+      row.className = "stat-row";
 
-    statsDiv.appendChild(row);
+      const label = document.createElement("span");
+      label.className = "stat-label";
+      label.textContent = stat.label;
+      row.appendChild(label);
+
+      const value = document.createElement("span");
+      value.className = "stat-value";
+      value.textContent = stat.value;
+      value.title = stat.value;
+      row.appendChild(value);
+
+      list.appendChild(row);
+    });
+
+    col.appendChild(list);
+    statsDiv.appendChild(col);
   });
 }
 
@@ -1811,6 +2306,380 @@ async function deleteEntry(
     flash("Entry deleted", "success");
   } else {
     openDeleteModal(index);
+  }
+}
+
+/* =============================================================================
+   ENTRY OPERATIONS: CLONE / MERGE / SPLIT
+   -----------------------------------------------------------------------------
+   The three ways an existing entry (or a run of them) can be reshaped without
+   retyping it. All of them go through `entries` + sortEntries() + saveToDisk()
+   rather than touching the file, for the same reason addTimeTrackerEntry does:
+   `entries` is live module state and a second writer would be clobbered.
+============================================================================= */
+
+/** Duplicates entries in place, times and all. The copy is deliberately an
+ *  exact one: "I did that again" is the common case, and the times are the
+ *  part you were always going to edit anyway. */
+async function cloneEntries(list: Entry[]): Promise<void> {
+  if (list.length === 0) return;
+  list.forEach((e) => entries.push({ ...e }));
+  sortEntries();
+  rerenderEntryViews();
+  await saveToDisk();
+  flash(
+    list.length === 1 ? "Entry cloned" : `${list.length} entries cloned`,
+    "success",
+  );
+}
+
+/* -----------------------------------------------------------------------------
+   MERGE
+----------------------------------------------------------------------------- */
+
+/**
+ * Where the merged entry ends.
+ *
+ *   "span"    the latest end among the entries. The merged block covers the
+ *             whole stretch of wall clock they sit in, so any gap between them
+ *             becomes tracked time.
+ *   "compact" earliest start plus what the entries add up to. Total tracked
+ *             time is identical before and after the merge; the end is pulled
+ *             back by however much dead air there was.
+ */
+type MergeDurationMode = "span" | "compact";
+
+/** Where the merged entry's notes come from. "entry:<index>" picks one
+ *  specific entry, indexed into the plan's `ordered` list.
+ *
+ *  There is deliberately no "earliest" / "latest" shorthand: whenever more than
+ *  one entry has notes the dropdown lists each of them by name, so those two
+ *  would just be the first and last rows of that list under a second name. */
+type MergeNotesMode = "combine" | "none" | `entry:${number}`;
+
+/** What merging the given entries would produce, without doing it. Shared by
+ *  the modal's live summary and its Merge button so the preview can't lie. */
+function computeMergePlan(list: Entry[]): {
+  ordered: Entry[];
+  startAbs: number;
+  /** Latest end among the entries: where "span" mode finishes. */
+  endAbs: number;
+  /** Earliest start plus the tracked total: where "compact" mode finishes. */
+  compactEndAbs: number;
+  /** Wall-clock length of the merged entry in "span" mode, gaps included. */
+  mergedSecs: number;
+  /** What the entries add up to on their own, and the length of a
+   *  "compact" merge by construction. */
+  sumSecs: number;
+} {
+  const ordered = [...list].sort((a, b) => entryStartAbs(a) - entryStartAbs(b));
+  const startAbs = Math.min(...ordered.map(entryStartAbs));
+  const endAbs = Math.max(...ordered.map(entryEndAbs));
+  const sumSecs = ordered.reduce((sum, e) => sum + entryDurationSeconds(e), 0);
+  return {
+    ordered,
+    startAbs,
+    endAbs,
+    compactEndAbs: startAbs + sumSecs,
+    mergedSecs: endAbs - startAbs,
+    sumSecs,
+  };
+}
+
+/** The end of a merge under the given mode. One place, so the summary, the
+ *  dropdown labels and the actual merge can't pick different ends. */
+function mergeEndAbs(
+  plan: ReturnType<typeof computeMergePlan>,
+  mode: MergeDurationMode,
+): number {
+  return mode === "compact" ? plan.compactEndAbs : plan.endAbs;
+}
+
+/** A point on the absolute timeline as the modal shows it: bare time when it
+ *  falls on `refDate`, date-qualified when it doesn't. */
+function mergePointLabel(abs: number, refDate: string): string {
+  const { date, time } = absToDateTime(abs);
+  return date === refDate ? formatTime(time) : `${formatDate(date)} ${formatTime(time)}`;
+}
+
+/** The entries carrying notes, in merge order. Every notes option is defined
+ *  in terms of this list rather than the full selection, so "the earliest
+ *  notes" means the earliest notes that exist, not an empty string from an
+ *  entry that happened to sort first. */
+function entriesWithNotes(ordered: Entry[]): Entry[] {
+  return ordered.filter((e) => e.notes.trim());
+}
+
+/** Resolves the notes dropdown to the text the merged entry gets. */
+function resolveMergedNotes(ordered: Entry[], mode: MergeNotesMode): string {
+  if (mode === "none") return "";
+
+  if (mode.startsWith("entry:")) {
+    const index = Number(mode.slice("entry:".length));
+    return ordered[index]?.notes ?? "";
+  }
+
+  // combine: every distinct note, in order, one per line. Duplicates are
+  // dropped because merging three fragments of one session usually means
+  // three copies of the same note.
+  const seen = new Set<string>();
+  return entriesWithNotes(ordered)
+    .map((e) => e.notes.trim())
+    .filter((n) => !seen.has(n) && seen.add(n))
+    .join("\n");
+}
+
+/** Distinct values of one field across the selection, ordered by how much time
+ *  each accounts for. Drives the "keep which name" dropdowns: the name you
+ *  spent the most time under is the one you almost always mean to keep. */
+function distinctByTime(list: Entry[], field: "activity" | "project"): string[] {
+  const totals = new Map<string, { name: string; secs: number }>();
+  list.forEach((e) => {
+    const name = e[field].trim();
+    const g = totals.get(name.toLowerCase()) ?? { name, secs: 0 };
+    g.secs += entryDurationSeconds(e);
+    totals.set(name.toLowerCase(), g);
+  });
+  return [...totals.values()]
+    .sort((a, b) => b.secs - a.secs || a.name.localeCompare(b.name))
+    .map((g) => g.name);
+}
+
+/* -----------------------------------------------------------------------------
+   BREAK-IN / SPLIT
+   ---------------------------------------------------------------------------
+   The retroactive half of the break-in feature. One entry (the "host") is the
+   uninterrupted block you THOUGHT you worked; each break-in is punched out of
+   it, and the host's own task resumes on the far side of every hole. So one
+   four-hour block plus three interruptions becomes seven entries in one pass,
+   instead of one edit and six hand-typed rows.
+----------------------------------------------------------------------------- */
+
+/** One row of the Break-In modal, held as raw input strings so a half-typed
+ *  row doesn't have to be valid to exist.
+ *
+ *  Both `endTime` and `lengthMin` are always carried, even though only one is
+ *  on screen (settings.breakInUseMinutes decides which). Keeping them in step
+ *  costs nothing and means flipping the preference never leaves a row holding
+ *  a stale value from the other mode. */
+type BreakInDraft = {
+  activity: string;
+  project: string;
+  /** Free-text time, run through normalizeTime() on validation. */
+  startTime: string;
+  /** End time, as typed. Used when breakInUseMinutes is OFF (the default). */
+  endTime: string;
+  /** Length in minutes, as typed. Used when breakInUseMinutes is ON. */
+  lengthMin: string;
+  /** Days after the host's START date this break-in falls on. Always 0 unless
+   *  the host spans midnight, in which case the row shows a day picker. */
+  dayOffset: number;
+};
+
+type DraftSpan =
+  | { ok: true; startAbs: number; endAbs: number }
+  | { ok: false; error: string };
+
+/**
+ * Turns one draft row into a start/end pair on the absolute timeline, reading
+ * whichever of the two length modes is switched on.
+ *
+ * Both the validator and the "add another row" default go through here, so the
+ * two can't disagree about what a row means, and the mode switch only has to be
+ * understood in one place.
+ *
+ * End-time mode uses the same overnight convention as the main entry form: an
+ * end at or before the start reads as the next day round. That is what makes a
+ * 23:50 interruption that ended at 00:20 work without a second day picker.
+ */
+function resolveDraftSpan(host: Entry, d: BreakInDraft, label: string): DraftSpan {
+  const start = normalizeTime(d.startTime.trim());
+  if (!start) return { ok: false, error: `${label} has an invalid start time.` };
+
+  const startAbs = (dateToDayIndex(host.date) + d.dayOffset) * 86400 + parseTime(start);
+
+  if (settings.breakInUseMinutes) {
+    const minutes = Number(d.lengthMin);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return { ok: false, error: `${label} needs a length in minutes.` };
+    }
+    return { ok: true, startAbs, endAbs: startAbs + Math.round(minutes * 60) };
+  }
+
+  const end = normalizeTime(d.endTime.trim());
+  if (!end) return { ok: false, error: `${label} has an invalid end time.` };
+  const span = (parseTime(end) - parseTime(start) + 86400) % 86400;
+  if (span === 0) return { ok: false, error: `${label} has to end after it starts.` };
+  return { ok: true, startAbs, endAbs: startAbs + span };
+}
+
+/** A fresh row starting at `fromAbs`, defaulting to a quarter hour and clamped
+ *  to the host's end so a new row is never born out of bounds. Both length
+ *  modes are filled in from the same span. */
+function makeBreakInDraft(host: Entry, fromAbs: number): BreakInDraft {
+  const hostEnd = entryEndAbs(host);
+  const startAbs = Math.min(fromAbs, hostEnd);
+  const endAbs = Math.min(startAbs + 15 * 60, hostEnd);
+  return {
+    activity: "",
+    project: "",
+    startTime: formatTime(absToDateTime(startAbs).time),
+    endTime: formatTime(absToDateTime(endAbs).time),
+    lengthMin: String(Math.max(1, Math.round((endAbs - startAbs) / 60))),
+    dayOffset: Math.floor(startAbs / 86400) - dateToDayIndex(host.date),
+  };
+}
+
+type BreakInSegment = { entry: Entry; isBreak: boolean };
+
+type BreakInResult =
+  | { ok: true; segments: BreakInSegment[] }
+  | { ok: false; error: string };
+
+/**
+ * Turns a host entry plus a list of break-in drafts into the sequence of
+ * entries that should replace it. Pure: validates and computes, changes
+ * nothing. Everything is done on the absolute timeline (see entryStartAbs)
+ * so a host that crosses midnight behaves exactly like one that doesn't.
+ */
+function computeBreakInResult(host: Entry, drafts: BreakInDraft[]): BreakInResult {
+  const hostStart = entryStartAbs(host);
+  const hostEnd = entryEndAbs(host);
+
+  const breaks: { activity: string; project: string; startAbs: number; endAbs: number }[] = [];
+
+  for (let i = 0; i < drafts.length; i++) {
+    const d = drafts[i]!;
+    const label = `Break-in ${i + 1}`;
+    const activity = d.activity.trim();
+    if (!activity) return { ok: false, error: `${label} needs an activity name.` };
+
+    const span = resolveDraftSpan(host, d, label);
+    if (!span.ok) return { ok: false, error: span.error };
+    const { startAbs, endAbs } = span;
+
+    if (startAbs < hostStart) {
+      return { ok: false, error: `${label} starts before the entry it interrupts.` };
+    }
+    if (endAbs > hostEnd) {
+      return { ok: false, error: `${label} runs past the end of the entry it interrupts.` };
+    }
+
+    breaks.push({ activity, project: d.project.trim(), startAbs, endAbs });
+  }
+
+  breaks.sort((a, b) => a.startAbs - b.startAbs);
+  for (let i = 1; i < breaks.length; i++) {
+    if (breaks[i]!.startAbs < breaks[i - 1]!.endAbs) {
+      return { ok: false, error: "Two break-ins overlap. Adjust their times or lengths." };
+    }
+  }
+
+  const segments: BreakInSegment[] = [];
+  let cursor = hostStart;
+  // The host's notes ride on its first SURVIVING segment only. Copying them
+  // onto every segment would turn one note into four identical ones.
+  let notesUnused = true;
+
+  const pushHostSegment = (fromAbs: number, toAbs: number) => {
+    if (toAbs <= fromAbs) return;
+    const from = absToDateTime(fromAbs);
+    const to = absToDateTime(toAbs);
+    segments.push({
+      isBreak: false,
+      entry: {
+        date: from.date,
+        start: from.time,
+        endDate: to.date,
+        end: to.time,
+        activity: host.activity,
+        project: host.project,
+        notes: notesUnused ? host.notes : "",
+      },
+    });
+    notesUnused = false;
+  };
+
+  breaks.forEach((b) => {
+    pushHostSegment(cursor, b.startAbs);
+    const from = absToDateTime(b.startAbs);
+    const to = absToDateTime(b.endAbs);
+    segments.push({
+      isBreak: true,
+      entry: {
+        date: from.date,
+        start: from.time,
+        endDate: to.date,
+        end: to.time,
+        activity: b.activity,
+        project: b.project,
+        notes: "",
+      },
+    });
+    cursor = b.endAbs;
+  });
+  pushHostSegment(cursor, hostEnd);
+
+  if (segments.length === 0) {
+    return { ok: false, error: "That would leave nothing behind. Shorten a break-in." };
+  }
+  return { ok: true, segments };
+}
+
+/* =============================================================================
+   LIVE BREAK-IN  (the go-forward half)
+   -----------------------------------------------------------------------------
+   The Break-In modal above fixes an afternoon after the fact. This fixes it as
+   it happens, in one click, so there is nothing to reconstruct later.
+
+   With the clock running (Start filled, End empty), "Break In" stops the clock
+   at now, files the entry, pushes what you were doing onto a paused stack, and
+   restarts the clock on a blank form. "Resume" does the mirror image: files
+   whatever you pivoted to, pops the stack, and puts the original task back in
+   the form with the clock running again.
+
+   A STACK rather than a single slot, because interruptions nest: the thing
+   that interrupted you gets interrupted too, and each Resume should hand back
+   the most recent thing you dropped. The stack lives in TT's settings file, so
+   closing the app mid-interruption doesn't lose the thread you meant to
+   return to.
+============================================================================= */
+
+type PausedTask = { project: string; activity: string; notes: string };
+
+function isValidPausedTask(t: unknown): t is PausedTask {
+  return (
+    t !== null &&
+    typeof t === "object" &&
+    typeof (t as PausedTask).project === "string" &&
+    typeof (t as PausedTask).activity === "string" &&
+    typeof (t as PausedTask).notes === "string"
+  );
+}
+
+/** Shows/hides the Break In and Resume buttons and labels Resume with whatever
+ *  is on top of the paused stack. Safe to call before the TT view exists. */
+function refreshBreakInUI(): void {
+  const startInput = document.getElementById("startTime") as HTMLInputElement | null;
+  const endInput = document.getElementById("endTime") as HTMLInputElement | null;
+  const breakBtn = document.getElementById("ttBreakInNowBtn");
+  const resumeBtn = document.getElementById("ttResumeBtn");
+  if (!startInput || !endInput || !breakBtn || !resumeBtn) return;
+
+  // "Clock running": a usable start time and no end time yet.
+  const running = !!normalizeTime(startInput.value.trim()) && !endInput.value.trim();
+  breakBtn.style.display = running ? "" : "none";
+
+  const stack = settings.pausedTasks;
+  const paused = stack[stack.length - 1];
+  if (paused) {
+    const name = paused.project ? `${paused.project} · ${paused.activity}` : paused.activity;
+    const deeper = stack.length - 1;
+    resumeBtn.textContent = `↩ Resume: ${name}` + (deeper > 0 ? ` (+${deeper} paused)` : "");
+    resumeBtn.title = `Log what you're on now and pick "${paused.activity}" back up`;
+    resumeBtn.style.display = "";
+  } else {
+    resumeBtn.style.display = "none";
   }
 }
 
@@ -2727,6 +3596,614 @@ function openCsvImportModal(): void {
 ============================================================================= */
 
 /* =============================================================================
+   MODAL: BREAK-IN TASKS
+   -----------------------------------------------------------------------------
+   Carves one or more interruptions out of a single existing entry. See the
+   BREAK-IN / SPLIT section above for the arithmetic; this is only the UI.
+
+   Rows are rebuilt wholesale on add/remove but never on keystroke: each input
+   writes straight into its draft object and re-renders the PREVIEW only, so
+   typing never steals focus from the field you're typing in.
+============================================================================= */
+
+let breakInModal: Modal | null = null;
+let breakInHost: Entry | null = null;
+let breakInRerender: () => void = () => {};
+let breakInDrafts: BreakInDraft[] = [];
+
+/** A label + control pair, one column of a break-in row. */
+function buildBreakInCell(labelText: string, control: HTMLElement): HTMLElement {
+  const cell = document.createElement("div");
+  cell.className = "tt-break-in-cell";
+  const label = document.createElement("label");
+  label.className = "tt-field-label";
+  label.textContent = labelText;
+  cell.append(label, control);
+  return cell;
+}
+
+function renderBreakInRows(): void {
+  const container = document.getElementById("ttBreakInRows");
+  const host = breakInHost;
+  if (!container || !host) return;
+
+  container.innerHTML = "";
+  const spanDays = daysBetween(host.date, host.endDate);
+
+  breakInDrafts.forEach((draft, index) => {
+    const row = document.createElement("div");
+    row.className = "tt-break-in-row" + (spanDays > 0 ? " tt-break-in-row--multiday" : "");
+
+    const activity = document.createElement("input");
+    activity.type = "text";
+    activity.placeholder = "What interrupted you?";
+    activity.setAttribute("list", "ttActivityList");
+    activity.autocomplete = "off";
+    activity.value = draft.activity;
+    activity.addEventListener("input", () => {
+      draft.activity = activity.value;
+      renderBreakInPreview();
+    });
+    row.appendChild(buildBreakInCell("Activity", activity));
+
+    const project = document.createElement("input");
+    project.type = "text";
+    project.placeholder = "Optional";
+    project.setAttribute("list", "ttProjectList");
+    project.autocomplete = "off";
+    project.value = draft.project;
+    project.addEventListener("input", () => {
+      draft.project = project.value;
+      renderBreakInPreview();
+    });
+    row.appendChild(buildBreakInCell("Project", project));
+
+    // Only worth the column when the host actually crosses midnight; otherwise
+    // there is exactly one day it could be on.
+    if (spanDays > 0) {
+      const day = document.createElement("select");
+      for (let d = 0; d <= spanDays; d++) {
+        const opt = document.createElement("option");
+        opt.value = String(d);
+        opt.textContent = formatDate(addDaysToDate(host.date, d));
+        day.appendChild(opt);
+      }
+      day.value = String(draft.dayOffset);
+      day.addEventListener("change", () => {
+        draft.dayOffset = Number(day.value);
+        renderBreakInPreview();
+      });
+      row.appendChild(buildBreakInCell("Day", day));
+    }
+
+    // Start and (in end-time mode) End get identical treatment: type freely,
+    // and on leaving the field the value is normalized and redisplayed in the
+    // app's own time format, the same contract the main entry form offers.
+    const buildTimeField = (
+      labelText: string,
+      placeholder: string,
+      get: () => string,
+      set: (v: string) => void,
+    ) => {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = placeholder;
+      input.autocomplete = "off";
+      input.value = get();
+      restrictToTimeChars(input);
+      input.addEventListener("input", () => {
+        set(input.value);
+        renderBreakInPreview();
+      });
+      input.addEventListener("blur", () => {
+        const normalized = normalizeTime(input.value.trim());
+        if (normalized) {
+          const display = formatTime(normalized);
+          set(display);
+          input.value = display;
+        }
+        renderBreakInPreview();
+      });
+      return buildBreakInCell(labelText, input);
+    };
+
+    row.appendChild(buildTimeField(
+      "Started", "10:15",
+      () => draft.startTime,
+      (v) => { draft.startTime = v; },
+    ));
+
+    if (settings.breakInUseMinutes) {
+      const length = document.createElement("input");
+      length.type = "number";
+      length.min = "1";
+      length.step = "1";
+      length.placeholder = "15";
+      length.autocomplete = "off";
+      length.value = draft.lengthMin;
+      length.addEventListener("input", () => {
+        draft.lengthMin = length.value;
+        renderBreakInPreview();
+      });
+      row.appendChild(buildBreakInCell("Minutes", length));
+    } else {
+      row.appendChild(buildTimeField(
+        "Ended", "10:45",
+        () => draft.endTime,
+        (v) => { draft.endTime = v; },
+      ));
+    }
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "tt-break-in-remove";
+    remove.textContent = "✕";
+    remove.title = "Remove this break-in";
+    // The last row stays: an empty modal has nothing to apply and no obvious
+    // way back to a first row.
+    remove.disabled = breakInDrafts.length <= 1;
+    remove.addEventListener("click", () => {
+      breakInDrafts.splice(index, 1);
+      renderBreakInRows();
+      renderBreakInPreview();
+    });
+    row.appendChild(remove);
+
+    container.appendChild(row);
+  });
+}
+
+/** The resulting timeline, or the first thing wrong with the current drafts.
+ *  Also gates the Apply button. */
+function renderBreakInPreview(): void {
+  const preview = document.getElementById("ttBreakInPreview");
+  const errorBox = document.getElementById("ttBreakInError");
+  const applyBtn = document.getElementById("ttBreakInApply") as HTMLButtonElement | null;
+  const host = breakInHost;
+  if (!preview || !errorBox || !applyBtn || !host) return;
+
+  preview.innerHTML = "";
+  const result = computeBreakInResult(host, breakInDrafts);
+
+  if (!result.ok) {
+    errorBox.textContent = result.error;
+    errorBox.style.display = "";
+    applyBtn.disabled = true;
+    const p = document.createElement("p");
+    p.className = "placeholder-text";
+    p.textContent = "Fill the rows in to see what this becomes.";
+    preview.appendChild(p);
+    return;
+  }
+
+  errorBox.style.display = "none";
+  applyBtn.disabled = false;
+
+  result.segments.forEach((seg) => {
+    const row = document.createElement("div");
+    row.className = "tt-break-in-preview-row" + (seg.isBreak ? " is-break" : "");
+
+    const name = document.createElement("span");
+    name.className = "tt-break-in-preview-name";
+    name.textContent = seg.entry.project
+      ? `${seg.entry.project} · ${seg.entry.activity}`
+      : seg.entry.activity;
+    name.title = name.textContent;
+
+    const span = document.createElement("span");
+    span.className = "tt-break-in-preview-span";
+    const crossesDay = seg.entry.date !== seg.entry.endDate;
+    span.textContent = crossesDay
+      ? `${formatTime(seg.entry.start)} → ${formatDate(seg.entry.endDate)} ${formatTime(seg.entry.end)}`
+      : `${formatTime(seg.entry.start)} → ${formatTime(seg.entry.end)}`;
+
+    const dur = document.createElement("span");
+    dur.className = "tt-break-in-preview-dur";
+    dur.textContent = formatDuration(entryDurationSeconds(seg.entry));
+
+    row.append(name, span, dur);
+    preview.appendChild(row);
+  });
+}
+
+function getBreakInModal(): Modal {
+  if (!breakInModal) {
+    breakInModal = new Modal(document.getElementById("ttBreakInBackdrop")!, {
+      closeOnEsc: true,
+      onClosed: () => {
+        breakInHost = null;
+        breakInDrafts = [];
+      },
+    });
+
+    document.getElementById("ttBreakInClose")!.addEventListener("click", () => breakInModal!.close());
+    document.getElementById("ttBreakInCancel")!.addEventListener("click", () => breakInModal!.close());
+
+    document.getElementById("ttBreakInAddRowBtn")!.addEventListener("click", () => {
+      const host = breakInHost;
+      if (!host) return;
+      // A new row starts where the previous one ended, which is almost always
+      // the right neighbourhood and is never invalid on its own. A previous row
+      // that isn't finished yet has no end to follow, so fall back to the
+      // host's start.
+      const prev = breakInDrafts[breakInDrafts.length - 1];
+      const prevSpan = prev ? resolveDraftSpan(host, prev, "") : null;
+      breakInDrafts.push(makeBreakInDraft(
+        host,
+        prevSpan && prevSpan.ok ? prevSpan.endAbs : entryStartAbs(host),
+      ));
+      renderBreakInRows();
+      renderBreakInPreview();
+    });
+
+    document.getElementById("ttBreakInApply")!.addEventListener("click", async () => {
+      const host = breakInHost;
+      if (!host) return;
+      const result = computeBreakInResult(host, breakInDrafts);
+      if (!result.ok) { flash(result.error, "error"); return; }
+
+      const index = entries.indexOf(host);
+      if (index === -1) { flash("That entry is no longer there", "error"); return; }
+
+      entries.splice(index, 1, ...result.segments.map((seg) => seg.entry));
+      result.segments.forEach((seg) => {
+        if (!seg.isBreak) return;
+        findOrCreateActivity(seg.entry.activity);
+        if (seg.entry.project) findOrCreateProject(seg.entry.project);
+      });
+      sortEntries();
+
+      const breakCount = result.segments.filter((seg) => seg.isBreak).length;
+      breakInModal!.close();
+      breakInRerender();
+      await saveToDisk();
+      flash(
+        `${breakCount} break-in${breakCount === 1 ? "" : "s"} carved out, ` +
+        `${result.segments.length} entries now`,
+        "success",
+      );
+    });
+  }
+  return breakInModal;
+}
+
+function openBreakInModal(entry: Entry, rerender: () => void): void {
+  breakInHost = entry;
+  breakInRerender = rerender;
+  breakInDrafts = [makeBreakInDraft(entry, entryStartAbs(entry))];
+
+  const crossesDay = entry.date !== entry.endDate;
+  setContextLines(document.getElementById("ttBreakInContext")!, [
+    `${entry.project || "—"} · ${entry.activity}`,
+    crossesDay
+      ? `${formatDate(entry.date)} ${formatTime(entry.start)} → ${formatDate(entry.endDate)} ${formatTime(entry.end)} (${formatDuration(entryDurationSeconds(entry))})`
+      : `${formatDate(entry.date)} ${formatTime(entry.start)} → ${formatTime(entry.end)} (${formatDuration(entryDurationSeconds(entry))})`,
+  ]);
+
+  getBreakInModal().open();
+  renderBreakInRows();
+  renderBreakInPreview();
+}
+
+/* =============================================================================
+   MODAL: MERGE ENTRIES
+   -----------------------------------------------------------------------------
+   Collapses a selection of entries into one running from the earliest start to
+   the latest end. The gap figure is shown up front rather than buried: merging
+   two entries with an hour between them ADDS that hour to your tracked time,
+   which is the one surprising thing this operation can do.
+============================================================================= */
+
+let mergeEntriesModal: Modal | null = null;
+let mergeEntriesList: Entry[] = [];
+let mergeEntriesRerender: () => void = () => {};
+
+function buildMergeSummaryRow(label: string, value: string): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "tt-merge-summary-row";
+  const l = document.createElement("span");
+  l.className = "tt-merge-summary-label";
+  l.textContent = label;
+  const v = document.createElement("span");
+  v.className = "tt-merge-summary-value";
+  v.textContent = value;
+  row.append(l, v);
+  return row;
+}
+
+/** The duration dropdown's current value. */
+function mergeDurationMode(): MergeDurationMode {
+  const sel = document.getElementById("ttMergeDuration") as HTMLSelectElement | null;
+  return sel?.value === "compact" ? "compact" : "span";
+}
+
+/**
+ * Redraws the summary block and the note under it for whichever duration mode
+ * is selected. Runs on open and on every change of that dropdown, so the
+ * figures on screen always describe the merge you would actually get.
+ */
+function refreshMergeSummary(plan: ReturnType<typeof computeMergePlan>): void {
+  const mode = mergeDurationMode();
+  const endAbs = mergeEndAbs(plan, mode);
+  const from = absToDateTime(plan.startAbs);
+  const gap = plan.mergedSecs - plan.sumSecs;
+
+  const summary = document.getElementById("ttMergeEntriesSummary")!;
+  summary.innerHTML = "";
+  summary.appendChild(buildMergeSummaryRow(
+    "New span",
+    `${formatDate(from.date)} ${formatTime(from.time)} → ${mergePointLabel(endAbs, from.date)}`,
+  ));
+  summary.appendChild(buildMergeSummaryRow(
+    "Merged duration",
+    formatDuration(endAbs - plan.startAbs),
+  ));
+  summary.appendChild(buildMergeSummaryRow(
+    "The entries add up to",
+    formatDuration(plan.sumSecs),
+  ));
+
+  // One box, two registers: red where the merge changes your tracked total,
+  // muted where it only tells you something you should know.
+  const note = document.getElementById("ttMergeEntriesWarning")!;
+  let text = "";
+  let neutral = false;
+
+  if (mode === "span" && gap > 0) {
+    text =
+      `There is ${formatDuration(gap)} of untracked time between these entries. ` +
+      `Merging swallows it, so the result is ${formatDuration(gap)} longer than the entries themselves.`;
+  } else if (mode === "span" && gap < 0) {
+    text =
+      `These entries overlap by ${formatDuration(-gap)}, so the merged entry is ` +
+      `shorter than their combined time.`;
+  } else if (mode === "compact" && gap > 0) {
+    text =
+      `The end is pulled back ${formatDuration(gap)} to ${mergePointLabel(endAbs, from.date)}, ` +
+      `dropping the untracked time between these entries. Your tracked total is unchanged.`;
+    neutral = true;
+  } else if (mode === "compact" && gap < 0) {
+    // The overlap was double-counted to begin with, so preserving the total
+    // has to push the end past when anything actually ran.
+    text =
+      `These entries overlap by ${formatDuration(-gap)}. Keeping their combined total ` +
+      `runs the merged entry to ${mergePointLabel(endAbs, from.date)}, later than any of them ended.`;
+  }
+
+  note.textContent = text;
+  note.classList.toggle("tt-merge-note", neutral);
+  note.style.display = text ? "" : "none";
+}
+
+function getMergeEntriesModal(): Modal {
+  if (!mergeEntriesModal) {
+    mergeEntriesModal = new Modal(document.getElementById("ttMergeEntriesBackdrop")!, {
+      closeOnEsc: true,
+      onClosed: () => { mergeEntriesList = []; },
+    });
+
+    document.getElementById("ttMergeEntriesClose")!.addEventListener("click", () => mergeEntriesModal!.close());
+    document.getElementById("ttMergeEntriesCancel")!.addEventListener("click", () => mergeEntriesModal!.close());
+
+    document.getElementById("ttMergeDuration")!.addEventListener("change", () => {
+      const list = mergeEntriesList.filter((e) => entries.includes(e));
+      if (list.length >= 2) refreshMergeSummary(computeMergePlan(list));
+    });
+
+    document.getElementById("ttMergeEntriesConfirm")!.addEventListener("click", async () => {
+      const list = mergeEntriesList.filter((e) => entries.includes(e));
+      if (list.length < 2) { flash("Nothing left to merge", "error"); return; }
+
+      const plan = computeMergePlan(list);
+      const activity = (document.getElementById("ttMergeActivity") as HTMLSelectElement).value;
+      const project = (document.getElementById("ttMergeProject") as HTMLSelectElement).value;
+      const notesMode = (document.getElementById("ttMergeNotes") as HTMLSelectElement)
+        .value as MergeNotesMode;
+
+      const endAbs = mergeEndAbs(plan, mergeDurationMode());
+      const from = absToDateTime(plan.startAbs);
+      const to = absToDateTime(endAbs);
+      const merged: Entry = {
+        date: from.date,
+        start: from.time,
+        endDate: to.date,
+        end: to.time,
+        activity,
+        project,
+        notes: resolveMergedNotes(plan.ordered, notesMode),
+      };
+
+      entries = entries.filter((e) => !list.includes(e));
+      entries.push(merged);
+      findOrCreateActivity(activity);
+      if (project) findOrCreateProject(project);
+      sortEntries();
+
+      selectedEntries.clear();
+      mergeEntriesModal!.close();
+      mergeEntriesRerender();
+      await saveToDisk();
+      flash(
+        `${list.length} entries merged into one (${formatDuration(endAbs - plan.startAbs)})`,
+        "success",
+      );
+    });
+  }
+  return mergeEntriesModal;
+}
+
+/** Fills the duration dropdown, spelling out the end time and length each mode
+ *  produces so the choice needs no explaining. With no gap the two are the same
+ *  merge, so there is nothing to choose and the dropdown says so. */
+function fillMergeDurationSelect(plan: ReturnType<typeof computeMergePlan>): void {
+  const sel = document.getElementById("ttMergeDuration") as HTMLSelectElement;
+  const refDate = absToDateTime(plan.startAbs).date;
+  const gap = plan.mergedSecs - plan.sumSecs;
+
+  sel.innerHTML = "";
+  const add = (value: MergeDurationMode, label: string, endAbs: number) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent =
+      `${label} · ends ${mergePointLabel(endAbs, refDate)} (${formatDuration(endAbs - plan.startAbs)})`;
+    sel.appendChild(opt);
+  };
+
+  add("span", "Cover the whole stretch", plan.endAbs);
+  if (gap !== 0) add("compact", "Keep the tracked total", plan.compactEndAbs);
+
+  sel.disabled = gap === 0;
+  sel.title = gap === 0
+    ? "These entries run back to back, so both readings give the same merge."
+    : "";
+  sel.value = "span";
+}
+
+/** Fills the notes dropdown. Which options exist depends on what notes are
+ *  actually there: offering "keep the latest notes" when only one entry has any
+ *  is a choice that isn't a choice. */
+function fillMergeNotesSelect(ordered: Entry[]): void {
+  const sel = document.getElementById("ttMergeNotes") as HTMLSelectElement;
+  const withNotes = entriesWithNotes(ordered);
+  const refDate = ordered[0] ? ordered[0].date : "";
+
+  sel.innerHTML = "";
+  const add = (value: string, label: string) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  };
+
+  if (withNotes.length === 0) {
+    add("none", "No notes on these entries");
+    sel.disabled = true;
+    sel.value = "none";
+    return;
+  }
+
+  sel.disabled = false;
+
+  if (withNotes.length === 1) {
+    add("combine", "Keep the one note there is");
+  } else {
+    add("combine", `Combine all ${withNotes.length} notes`);
+    // Then one named option per noted entry. The time, activity and a snippet
+    // are what make them tellable apart at a glance, and listing every one of
+    // them is why no "earliest" / "latest" shorthand is needed.
+    ordered.forEach((e, index) => {
+      if (!e.notes.trim()) return;
+      const when = mergePointLabel(entryStartAbs(e), refDate);
+      const snippet = e.notes.trim().replace(/\s+/g, " ");
+      const short = snippet.length > 40 ? `${snippet.slice(0, 40)}…` : snippet;
+      add(`entry:${index}`, `Only ${when} ${e.activity} — "${short}"`);
+    });
+  }
+
+  add("none", "Discard notes");
+  sel.value = "combine";
+}
+
+function openMergeEntriesModal(list: Entry[], rerender: () => void): void {
+  if (list.length < 2) { flash("Select at least two entries to merge", "error"); return; }
+  mergeEntriesList = list;
+  mergeEntriesRerender = rerender;
+
+  const plan = computeMergePlan(list);
+
+  setContextLines(document.getElementById("ttMergeEntriesContext")!, [
+    `${list.length} entries into one`,
+  ]);
+
+  fillMergeDurationSelect(plan);
+  refreshMergeSummary(plan);
+
+  const fillSelect = (id: string, values: string[], emptyLabel: string) => {
+    const sel = document.getElementById(id) as HTMLSelectElement;
+    sel.innerHTML = "";
+    values.forEach((name) => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name || emptyLabel;
+      sel.appendChild(opt);
+    });
+    sel.selectedIndex = 0; // distinctByTime puts the biggest time sink first
+  };
+  fillSelect("ttMergeActivity", distinctByTime(list, "activity"), "(No Activity)");
+  fillSelect("ttMergeProject", distinctByTime(list, "project"), "(No Project)");
+  fillMergeNotesSelect(plan.ordered);
+
+  const listEl = document.getElementById("ttMergeEntriesList")!;
+  listEl.innerHTML = "";
+  plan.ordered.forEach((e) => {
+    const row = document.createElement("div");
+    row.className = "tt-merge-list-row";
+
+    const name = document.createElement("span");
+    name.className = "tt-break-in-preview-name";
+    name.textContent = e.project ? `${e.project} · ${e.activity}` : e.activity;
+    name.title = name.textContent;
+
+    const span = document.createElement("span");
+    span.className = "tt-break-in-preview-span";
+    span.textContent = `${formatDate(e.date)} ${formatTime(e.start)} → ${formatTime(e.end)}`;
+
+    const dur = document.createElement("span");
+    dur.className = "tt-break-in-preview-dur";
+    dur.textContent = formatDuration(entryDurationSeconds(e));
+
+    row.append(name, span, dur);
+    listEl.appendChild(row);
+  });
+
+  getMergeEntriesModal().open();
+}
+
+/* =============================================================================
+   MODAL: BULK DELETE CONFIRM
+   Always confirms, even with Quick Delete on: that setting exists to skip a
+   dialog for ONE row, and losing a whole selection is a different order of
+   mistake.
+============================================================================= */
+
+let bulkDeleteModal: Modal | null = null;
+let bulkDeleteList: Entry[] = [];
+let bulkDeleteRerender: () => void = () => {};
+
+function getBulkDeleteModal(): Modal {
+  if (!bulkDeleteModal) {
+    bulkDeleteModal = new Modal(document.getElementById("ttBulkDeleteBackdrop")!, {
+      closeOnEsc: true,
+      onClosed: () => { bulkDeleteList = []; },
+    });
+
+    document.getElementById("ttBulkDeleteCancelBtn")!.addEventListener("click", () => bulkDeleteModal!.close());
+
+    document.getElementById("ttBulkDeleteConfirmBtn")!.addEventListener("click", async () => {
+      const list = bulkDeleteList.filter((e) => entries.includes(e));
+      if (list.length === 0) { bulkDeleteModal!.close(); return; }
+      entries = entries.filter((e) => !list.includes(e));
+      selectedEntries.clear();
+      bulkDeleteModal!.close();
+      bulkDeleteRerender();
+      await saveToDisk();
+      flash(`${list.length} entries deleted`, "success");
+    });
+  }
+  return bulkDeleteModal;
+}
+
+function openBulkDeleteModal(list: Entry[], rerender: () => void): void {
+  if (list.length === 0) return;
+  bulkDeleteList = list;
+  bulkDeleteRerender = rerender;
+  const secs = list.reduce((sum, e) => sum + entryDurationSeconds(e), 0);
+  document.getElementById("ttBulkDeleteMessage")!.textContent =
+    `Delete ${list.length} entries (${formatDuration(secs)} in total)? This can't be undone.`;
+  getBulkDeleteModal().open();
+}
+
+/* =============================================================================
    MODAL: DELETE CONFIRM
    Owned by time-tracker; uses the shared Modal primitive.
 ============================================================================= */
@@ -3059,6 +4536,11 @@ export function initTimeTracker(): void {
   }
   function doUpdateDurationPreview() {
     updateDurationPreview(startInput, endInput, durationPreview, datePicker, endDatePicker);
+    // Whether the clock is "running" is exactly the state the duration preview
+    // already recomputes on, so piggy-backing here means every path that
+    // touches a time field (Now buttons, typing, blur, Clear, draft restore)
+    // keeps the Break In button honest for free.
+    refreshBreakInUI();
   }
   function doApplyPreset(preset: string) {
     applyPreset(preset, viewStartInput, viewEndInput, entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
@@ -3175,6 +4657,150 @@ export function initTimeTracker(): void {
   });
 
   /* -------------------------------------------------------------------------
+     EVENT LISTENERS: BREAK IN / RESUME
+     See the LIVE BREAK-IN section for what these are for.
+  -------------------------------------------------------------------------- */
+
+  /** Files whatever the form is holding as an entry that ends right now.
+   *  Returns the task that got filed, or null if the form wasn't a runnable
+   *  session (clock never started, or the work has no name yet). */
+  async function commitRunningSession(): Promise<PausedTask | null> {
+    const start = normalizeTime(startInput.value.trim());
+    if (!start) { flash("Start the clock first", "error"); return null; }
+
+    // No lastActivity fallback here, unlike Add Entry. On these two paths the
+    // whole point is that you have MOVED to something else, so silently
+    // reusing the previous name would file a duplicate of the very task you
+    // just walked away from.
+    const activity = activityInput.value.trim();
+    if (!activity) {
+      flash("Name what you're working on first", "error");
+      activityInput.focus();
+      return null;
+    }
+
+    const project = projectInput.value.trim();
+    const notes = notesInput.value.trim();
+    // "Now" is a real, explicit end date. Flag it so the overnight auto-roll
+    // doesn't second-guess it (see endDateManuallySet).
+    endDateManuallySet = true;
+    const ok = await addEntry(
+      start, normalizeTime(nowTimeString()), project, activity, notes, today(),
+      datePicker, endDatePicker, projectInput, activityInput, startInput, endInput, notesInput,
+      entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv, durationPreview,
+    );
+    if (!ok) { endDateManuallySet = false; return null; }
+    return { project, activity, notes };
+  }
+
+  /** Leaves the form on a fresh session that is already running: clock started
+   *  at now, end open. Pass a task to reload one, or null for a blank slate. */
+  function startFreshSession(task: PausedTask | null): void {
+    projectInput.value = task?.project ?? "";
+    activityInput.value = task?.activity ?? "";
+    notesInput.value = task?.notes ?? "";
+    datePicker.value = today();
+    selectedDate = today();
+    startInput.value = nowTimeString();
+    endInput.value = "";
+    endDateManuallySet = false;
+    endDatePicker.value = today();
+    endDatePicker.min = today();
+    doUpdateDurationPreview();
+    doSaveDraft();
+  }
+
+  document.getElementById("ttBreakInNowBtn")!.addEventListener("click", async () => {
+    const filed = await commitRunningSession();
+    if (!filed) return;
+    settings.pausedTasks.push(filed);
+    saveSettings();
+    startFreshSession(null);
+    activityInput.focus();
+    flash(`"${filed.activity}" logged and paused, clock restarted`, "success");
+  });
+
+  document.getElementById("ttResumeBtn")!.addEventListener("click", async () => {
+    const stack = settings.pausedTasks;
+    const paused = stack[stack.length - 1];
+    if (!paused) return;
+
+    // A running session gets filed first. Resume means "the detour is done",
+    // not "throw away whatever I've been doing since I broke away".
+    const runningStart = normalizeTime(startInput.value.trim());
+    const running = !!runningStart && !endInput.value.trim();
+    if (running) {
+      if (activityInput.value.trim()) {
+        if (!(await commitRunningSession())) return;
+      } else {
+        // Unnamed. Under a minute it's a mis-click on Break In and dropping it
+        // costs nothing; any longer and it's real time that would vanish
+        // without a trace, so ask for a name rather than eat it.
+        const elapsed =
+          dateToDayIndex(today()) * 86400 + parseTime(normalizeTime(nowTimeString()))
+          - (dateToDayIndex(datePicker.value || today()) * 86400 + parseTime(runningStart));
+        if (elapsed >= 60) {
+          flash("Name what you're on now so it gets logged, or Clear the form", "error");
+          activityInput.focus();
+          return;
+        }
+      }
+    }
+
+    stack.pop();
+    saveSettings();
+    startFreshSession(paused);
+    flash(`Back on "${paused.activity}"`, "success");
+  });
+
+  /* -------------------------------------------------------------------------
+     EVENT LISTENERS: SUMMARY PANEL TABS
+  -------------------------------------------------------------------------- */
+
+  document
+    .querySelectorAll<HTMLButtonElement>(".tt-summary-tabs .tt-summary-tab")
+    .forEach((btn) => {
+      btn.addEventListener("click", () => {
+        // The cast below can't vouch for the attribute actually being there,
+        // so check before trusting it rather than passing undefined on.
+        const tab = btn.dataset.ttSummaryTab;
+        if (!tab) return;
+        activateSummaryTab(tab as TTSummaryTab);
+      });
+    });
+
+  /* -------------------------------------------------------------------------
+     EVENT LISTENERS: BULK SELECTION
+  -------------------------------------------------------------------------- */
+
+  document.getElementById("ttSelectModeBtn")!.addEventListener("click", () => {
+    setSelectMode(!selectMode);
+  });
+
+  document.getElementById("ttSelectAllBtn")!.addEventListener("click", () => {
+    lastVisible.forEach((e) => selectedEntries.add(e));
+    doRender();
+  });
+
+  document.getElementById("ttSelectNoneBtn")!.addEventListener("click", () => {
+    selectedEntries.clear();
+    lastCheckedEntry = null;
+    doRender();
+  });
+
+  document.getElementById("ttBulkCloneBtn")!.addEventListener("click", () => {
+    cloneEntries(selectedInOrder());
+  });
+
+  document.getElementById("ttBulkMergeBtn")!.addEventListener("click", () => {
+    openMergeEntriesModal(selectedInOrder(), doRender);
+  });
+
+  document.getElementById("ttBulkDeleteBtn")!.addEventListener("click", () => {
+    openBulkDeleteModal(selectedInOrder(), doRender);
+  });
+
+  /* -------------------------------------------------------------------------
      EVENT LISTENERS: CONTROLS PANEL
   -------------------------------------------------------------------------- */
 
@@ -3265,6 +4891,15 @@ export function initTimeTracker(): void {
     saveSettings();
   });
 
+  document.getElementById("breakInMinutesToggle")!.addEventListener("change", (e) => {
+    settings.breakInUseMinutes = (e.target as HTMLInputElement).checked;
+    document.getElementById("breakInMinutesLabel")!.textContent =
+      settings.breakInUseMinutes ? "On" : "Off";
+    saveSettings();
+    // The Break-In modal is never open at the same time as Setup, so there is
+    // nothing on screen to re-render here; the next open reads the new mode.
+  });
+
   document.getElementById("payPeriodToggle")!.addEventListener("change", (e) => {
     settings.payPeriod.enabled = (e.target as HTMLInputElement).checked;
     document.getElementById("payPeriodLabel")!.textContent =
@@ -3342,6 +4977,8 @@ export function initTimeTracker(): void {
     refreshActivityDatalist();
     renderProjectsList();
     refreshProjectDatalist();
+    activateSummaryTab(activeSummaryTab);
+    refreshBreakInUI();
     doApplyPreset("today");
   });
 }

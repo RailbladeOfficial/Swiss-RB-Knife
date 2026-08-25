@@ -35,7 +35,7 @@ import {
   getActiveCustomId,
   setActiveCustomId,
 } from "./theme-core";
-import { DEFAULT_THEME_ID } from "./theme-ids";
+import { BASE_THEME_ID, DEFAULT_THEME_ID } from "./theme-ids";
 
 /* ── Element refs ────────────────────────────────────────────────────────── */
 
@@ -49,6 +49,9 @@ const teBaseSelect = document.getElementById(
   "teBaseSelect",
 ) as HTMLSelectElement;
 const teBaseCustomGroup = document.getElementById("teBaseCustomGroup")!;
+const teBaseCurrentOption = document.getElementById(
+  "teBaseCurrentOption",
+) as HTMLOptionElement;
 const teCancel = document.getElementById("teCancel")!;
 const teSave = document.getElementById("teSave")!;
 
@@ -167,6 +170,10 @@ let _teEditId: string | null = null; // id of the theme being edited (edit mode)
 let _tePrevTheme: string = DEFAULT_THEME_ID; // settings.theme value before editor opened
 let _teWorkingVars: Record<string, string> = {}; // live working copy of vars in editor
 let _teWorkingAdv: AdvancedOptions = {}; // live working copy of advanced options
+// What the editor was seeded with when it opened, so the base picker's first
+// option ("current theme") can put it back after a re-seed.
+let _teSeedVars: Record<string, string> = {};
+let _teSeedAdv: AdvancedOptions = {};
 
 /** Generates a simple unique ID for new custom themes. */
 export function genThemeId(): string {
@@ -512,6 +519,57 @@ function teSetIntensity(inputId: string, value: string): void {
 
 /** Live-previews the current working vars + advanced options by applying them
  *  to the document exactly as the active theme application does. */
+/** Points themeLink at a stylesheet and resolves once it has taken effect.
+ *
+ *  The timeout is not belt-and-braces: assigning an href the browser already
+ *  has cached (or the one already set) fires no load event at all, and without
+ *  a floor this would hang forever. onload is cleared on the way out because
+ *  applyTheme() installs its own, and a leftover handler here would fire on
+ *  somebody else's swap. */
+function teSwapThemeSheet(href: string): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (themeLink.onload === finish) themeLink.onload = null;
+      resolve();
+    };
+    themeLink.onload = finish;
+    themeLink.href = href;
+    setTimeout(finish, 150);
+  });
+}
+
+/**
+ * Puts the app on base-theme.css, the sheet a SAVED custom theme runs on
+ * (see applyTheme's "custom" branch, which loads exactly this before applying
+ * the stored vars).
+ *
+ * This is what makes the editor honest. A theme is more than its --color-*
+ * vars: each sheet carries its own rules for headers, modals, tabs, images.
+ * Previewing the working vars on top of whatever theme happened to be active
+ * showed you a hybrid that no saved theme could ever reproduce, and on open
+ * it looked like the editor had simply done nothing, because the seed vars
+ * matched the sheet they were read from.
+ */
+function teEnterPreviewSheet(): Promise<void> {
+  return teSwapThemeSheet(themeCssUrl(BASE_THEME_ID));
+}
+
+/** A system theme's palette, read by loading its sheet just long enough to
+ *  compute the values and then returning to the editor's preview sheet. Inline
+ *  vars are cleared first or they would mask the sheet being measured. */
+async function teReadSystemThemeVars(
+  themeId: string,
+): Promise<Record<string, string>> {
+  clearCustomTheme();
+  await teSwapThemeSheet(themeCssUrl(themeId));
+  const vars = readCurrentVars();
+  await teEnterPreviewSheet();
+  return vars;
+}
+
 function teLivePreview(): void {
   const root = document.documentElement;
   for (const [key, value] of Object.entries(_teWorkingVars)) {
@@ -639,9 +697,12 @@ export function openThemeEditor(mode: "create" | "edit", id?: string): void {
   if (mode === "create") {
     themeEditorTitle.textContent = "Create Custom Theme";
     teNameInput.value = "";
-    // Seed from whatever's currently rendered (the active theme's colours)
+    // Seed from whatever's currently rendered (the active theme's colours).
+    // Read BEFORE the preview sheet swap below, or this would measure
+    // base-theme.css instead of the theme the user is looking at.
     _teWorkingVars = readCurrentVars();
     _teWorkingAdv = {};
+    teBaseCurrentOption.textContent = "Current theme (unchanged)";
     tePopulateSwatches(_teWorkingVars);
     tePopulateAdvanced({});
   } else {
@@ -650,9 +711,17 @@ export function openThemeEditor(mode: "create" | "edit", id?: string): void {
     teNameInput.value = theme.name;
     _teWorkingVars = { ...theme.vars };
     _teWorkingAdv = JSON.parse(JSON.stringify(theme.advanced));
+    teBaseCurrentOption.textContent = "This theme's saved colours";
     tePopulateSwatches(_teWorkingVars);
     tePopulateAdvanced(theme.advanced);
   }
+
+  // Remember the seed so the first option can undo a re-seed, and select it:
+  // nothing has been re-seeded from yet, and leaving the dropdown on a stale
+  // pick was the whole reason it disagreed with what was on screen.
+  _teSeedVars = { ..._teWorkingVars };
+  _teSeedAdv = JSON.parse(JSON.stringify(_teWorkingAdv));
+  teBaseSelect.value = "";
 
   // Rebuild the base-theme picker's custom section
   teBaseCustomGroup.innerHTML = "";
@@ -672,8 +741,11 @@ export function openThemeEditor(mode: "create" | "edit", id?: string): void {
     (teBaseCustomGroup as HTMLOptGroupElement).style.display = "none";
   }
 
-  // Apply live preview immediately
+  // Preview now, and move onto the sheet a saved theme would run on in the
+  // background. Order doesn't matter: the working vars go on as inline custom
+  // properties, which outrank any stylesheet and survive the swap.
   teLivePreview();
+  void teEnterPreviewSheet();
 
   themeEditorModal.open();
 }
@@ -692,7 +764,12 @@ teCancel.addEventListener("click", () => themeEditorModal.close());
 // Base theme picker: re-seed all swatches when the base changes
 teBaseSelect.addEventListener("change", async () => {
   const val = teBaseSelect.value;
-  if (val.startsWith("custom:")) {
+  if (val === "") {
+    // Back to what the editor opened with. Any edits made since are discarded,
+    // which is what "start fresh from" says on the tin.
+    _teWorkingVars = { ..._teSeedVars };
+    _teWorkingAdv = JSON.parse(JSON.stringify(_teSeedAdv));
+  } else if (val.startsWith("custom:")) {
     const id = val.slice(7);
     const theme = customThemes.find((t) => t.id === id);
     if (theme) {
@@ -700,22 +777,8 @@ teBaseSelect.addEventListener("change", async () => {
       _teWorkingAdv = JSON.parse(JSON.stringify(theme.advanced));
     }
   } else {
-    // Named system theme: load its CSS vars by temporarily loading the CSS
-    // and reading computed values. We do this by swapping themeLink, waiting,
-    // then reading; we'll swap back (or leave as-is since editor preview takes over).
-    const saved = themeLink.href;
-    await new Promise<void>((resolve) => {
-      themeLink.onload = () => resolve();
-      themeLink.href = themeCssUrl(val);
-      // Fallback in case onload doesn't fire (same href)
-      setTimeout(resolve, 100);
-    });
-    // Clear any inline overrides so computed style reflects the loaded CSS
-    clearCustomTheme();
-    _teWorkingVars = readCurrentVars();
+    _teWorkingVars = await teReadSystemThemeVars(val);
     _teWorkingAdv = {};
-    // Restore the preview
-    themeLink.href = saved;
   }
   tePopulateSwatches(_teWorkingVars);
   tePopulateAdvanced(_teWorkingAdv);

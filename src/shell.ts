@@ -2016,6 +2016,15 @@ const BUTTON_CUE_INCLUDE = [
   ".nav-item[data-section]",
   ".tool-card[data-tool]",
   ".dashboard-card-header[data-section]",
+  // Real checkboxes only, the same set shell.css restyles as circles. The
+  // inputs inside a .toggle-switch are 0x0 and invisible (the .toggle-slider
+  // beside them is what you actually press), so they are not a "checkbox"
+  // click in any sense a user would recognise.
+  //
+  // Clicking a <label> that wraps a checkbox forwards a second, synthetic
+  // click to the input itself. The label matches nothing here, so the cue
+  // still fires exactly once either way.
+  'input[type="checkbox"]:not(.toggle-switch input)',
 ].join(", ");
 
 const BUTTON_CUE_EXCLUDE = [

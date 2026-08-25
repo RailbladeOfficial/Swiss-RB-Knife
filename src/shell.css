@@ -785,6 +785,102 @@ button:hover {
   appearance: textfield;
 }
 
+/* =============================================================================
+   CHECKBOX  (the real ones, drawn as a themed circle)
+   -----------------------------------------------------------------------------
+   The native control ignores nearly every colour a theme sets, so on a dark
+   palette it stayed a bright grey-and-blue Windows box. appearance:none hands
+   the whole thing over to us: a circle that borrows --color-btn when checked,
+   like every other affirmative control in the app.
+
+   Scoped away from .toggle-switch input, which is a 0x0 invisible input whose
+   .toggle-slider sibling is the real control. Those must keep their own rules.
+   (The same selector drives the button cue, see BUTTON_CUE_INCLUDE in shell.ts.)
+
+   Sizing is deliberately hands-off: several tools set their own width/height on
+   these (image-ccr's transparent toggles are 14px, for instance). The tick is
+   an absolutely positioned mask at inset:0, so it fills whatever box it is
+   given rather than needing a size of its own, and those overrides keep working
+   without this rule having to know about them.
+============================================================================= */
+
+input[type="checkbox"]:not(.toggle-switch input) {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  box-sizing: border-box;
+  width: 1.05em;
+  height: 1.05em;
+  /* The blanket `input, select, textarea` rule above pads every field by
+     6px 8px, which on a box this small would be the whole box. */
+  padding: 0;
+  flex-shrink: 0;
+  /* Nudge onto the text baseline: inline-block inputs otherwise sit a touch
+     high next to their label. */
+  vertical-align: -0.15em;
+  border: 1.5px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-input-bg);
+  cursor: pointer;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition),
+    box-shadow var(--hover-transition);
+}
+
+input[type="checkbox"]:not(.toggle-switch input):hover {
+  border-color: var(--color-btn);
+  background: var(--color-hover);
+}
+
+input[type="checkbox"]:not(.toggle-switch input):checked {
+  background: var(--color-btn);
+  border-color: var(--color-btn);
+}
+
+input[type="checkbox"]:not(.toggle-switch input):checked:hover {
+  background: var(--color-btn-hover);
+  border-color: var(--color-btn-hover);
+}
+
+/* Keyboard focus needs to be visible on a control this small, but a ring on
+   every mouse click would be noise, hence :focus-visible rather than :focus. */
+input[type="checkbox"]:not(.toggle-switch input):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-btn) 35%, transparent);
+}
+
+input[type="checkbox"]:not(.toggle-switch input):disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The tick itself. Drawn as a mask rather than a background-image so its colour
+   is a theme token (--color-btn-text) instead of being baked into the SVG, and
+   it scales to any box size because it is pinned to all four edges. */
+input[type="checkbox"]:not(.toggle-switch input)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--color-btn-text);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 11'/%3E%3C/svg%3E") center / 64% 64% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 11'/%3E%3C/svg%3E") center / 64% 64% no-repeat;
+  transform: scale(0.4);
+  opacity: 0;
+  transition: transform 0.14s ease, opacity 0.1s ease;
+}
+
+input[type="checkbox"]:not(.toggle-switch input):checked::before {
+  transform: scale(1);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input[type="checkbox"]:not(.toggle-switch input)::before {
+    transition: none;
+  }
+}
+
 .toggle-switch {
   position: relative;
   width: 44px;

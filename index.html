@@ -739,7 +739,11 @@
             </div>
 
             <div class="tt-form-actions">
+              <button id="ttResumeBtn" class="tt-resume-btn" type="button" style="display:none;"
+                title="Log what you're on now and pick the paused task back up"></button>
               <button id="clearBtn" class="danger-btn" type="button" tabindex="11">Clear</button>
+              <button id="ttBreakInNowBtn" class="tt-break-in-now-btn" type="button" style="display:none;"
+                title="Something just interrupted you: stop the clock here, log this, and start fresh">Break In</button>
               <button id="addBtn" class="tt-add-btn" type="button" tabindex="10">Add Entry</button>
             </div>
 
@@ -782,24 +786,49 @@
             </div>
           </div>
 
-          <div class="panel panel-accent-totals">
-            <div class="totals-columns">
-              <div class="totals-col">
-                <div class="totals">
-                  <div id="dayTotal"></div>
-                  <div id="groupTotals"></div>
+          <!-- Summary panel (tabbed: Totals / Stats) -->
+          <div class="panel panel-accent-totals tt-summary-panel">
+            <div class="tt-summary-tabs">
+              <button class="tt-summary-tab active" data-tt-summary-tab="totals">Totals</button>
+              <button class="tt-summary-tab" data-tt-summary-tab="stats">Stats</button>
+            </div>
+
+            <div id="ttSummaryTotals" class="tt-summary-pane">
+              <div class="tt-totals-headline">
+                <div id="dayTotal"></div>
+                <div id="ttHeadlineStrip" class="tt-headline-strip"></div>
+              </div>
+              <div class="tt-breakdown-cols">
+                <div class="tt-breakdown-col">
+                  <div class="tt-breakdown-title">By Activity</div>
+                  <div id="groupTotals" class="tt-breakdown-table"></div>
+                </div>
+                <div class="tt-breakdown-col">
+                  <div class="tt-breakdown-title">By Project</div>
+                  <div id="ttProjectTotals" class="tt-breakdown-table"></div>
                 </div>
               </div>
-              <div class="totals-col totals-col-stats">
-                <div class="totals-col-header">Stats</div>
-                <div id="statsPanel" class="stats-list"></div>
-              </div>
+            </div>
+
+            <div id="ttSummaryStats" class="tt-summary-pane" style="display:none;">
+              <div id="statsPanel" class="tt-stats-columns"></div>
             </div>
           </div>
 
           <div class="panel panel-accent-entries tt-entries-panel">
             <div class="entries-header-row">
               <span id="entriesHeader">Entries</span>
+              <button id="ttSelectModeBtn" class="toggle-btn tt-select-mode-btn" type="button"
+                title="Select entries to merge, clone, or delete in bulk">Select</button>
+            </div>
+            <div id="ttSelectionBar" class="tt-selection-bar" style="display:none;">
+              <span id="ttSelectionCount" class="tt-selection-count">0 selected</span>
+              <button id="ttSelectAllBtn" class="tt-selection-btn" type="button">All</button>
+              <button id="ttSelectNoneBtn" class="tt-selection-btn" type="button">None</button>
+              <span class="tt-selection-spacer"></span>
+              <button id="ttBulkCloneBtn" class="tt-selection-btn" type="button" title="Duplicate the selected entries">Clone</button>
+              <button id="ttBulkMergeBtn" class="tt-selection-btn" type="button" title="Combine the selected entries into one">Merge</button>
+              <button id="ttBulkDeleteBtn" class="tt-selection-btn tt-selection-btn-danger" type="button" title="Delete the selected entries">Delete</button>
             </div>
             <div id="entries"></div>
           </div>
@@ -4082,6 +4111,102 @@
   </div>
 
   <!-- =====================================================================
+       TIME TRACKER: BREAK-IN TASKS  (carve interruptions out of one entry)
+  ====================================================================== -->
+  <div id="ttBreakInBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal tt-break-in-modal">
+      <div class="modal-header">
+        <span>Break-In Tasks</span>
+        <button id="ttBreakInClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div id="ttBreakInContext" class="tt-notes-edit-context"></div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <p class="tt-break-in-intro">Name whatever interrupted this block and roughly when. Each break-in is carved
+          out of the entry and the original task picks back up on the other side, so one pass here replaces a pile
+          of hand-typed entries.</p>
+
+        <div id="ttBreakInRows" class="tt-break-in-rows"></div>
+        <button id="ttBreakInAddRowBtn" class="setup-new-btn" type="button">+ Add another break-in</button>
+
+        <div class="tt-break-in-preview-title">Result</div>
+        <div id="ttBreakInPreview" class="tt-break-in-preview"></div>
+        <div id="ttBreakInError" class="tt-break-in-error" style="display:none;"></div>
+
+        <div class="setup-actions">
+          <button id="ttBreakInApply" type="button">Apply</button>
+          <button id="ttBreakInCancel" class="modal-cancel-btn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       TIME TRACKER: MERGE ENTRIES
+  ====================================================================== -->
+  <div id="ttMergeEntriesBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal tt-merge-entries-modal">
+      <div class="modal-header">
+        <span>Merge Entries</span>
+        <button id="ttMergeEntriesClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div id="ttMergeEntriesContext" class="tt-notes-edit-context"></div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <div id="ttMergeEntriesSummary" class="tt-merge-summary"></div>
+        <div id="ttMergeEntriesWarning" class="tt-merge-warning" style="display:none;"></div>
+
+        <div class="setup-form">
+          <div class="setup-field">
+            <label for="ttMergeDuration">Duration</label>
+            <select id="ttMergeDuration"></select>
+          </div>
+          <div class="setup-field">
+            <label for="ttMergeActivity">Keep activity</label>
+            <select id="ttMergeActivity"></select>
+          </div>
+          <div class="setup-field">
+            <label for="ttMergeProject">Keep project</label>
+            <select id="ttMergeProject"></select>
+          </div>
+          <div class="setup-field">
+            <label for="ttMergeNotes">Notes</label>
+            <select id="ttMergeNotes"></select>
+          </div>
+        </div>
+
+        <div class="tt-merge-list-title">Merging</div>
+        <div id="ttMergeEntriesList" class="tt-merge-list"></div>
+
+        <div class="setup-actions">
+          <button id="ttMergeEntriesConfirm" type="button">Merge Entries</button>
+          <button id="ttMergeEntriesCancel" class="modal-cancel-btn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       TIME TRACKER: BULK DELETE CONFIRM
+  ====================================================================== -->
+  <div id="ttBulkDeleteBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Delete Entries</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="ttBulkDeleteMessage">Delete the selected entries?</p>
+        <div class="exit-modal-actions">
+          <button id="ttBulkDeleteConfirmBtn" class="danger-btn">Delete Entries</button>
+          <button id="ttBulkDeleteCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
        TIME TRACKER: SETTINGS MODAL
   ====================================================================== -->
   <div id="ttSettingsBackdrop" class="modal-backdrop" style="display: none;">
@@ -4136,6 +4261,17 @@
                 <span id="roundNowLabel">On</span>
                 <label class="toggle-switch">
                   <input type="checkbox" id="roundNowToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span title="Off: break-ins ask when the interruption ended. On: they ask how many minutes it took.">Break-In Length in Minutes:</span>
+              <div class="toggle-with-label">
+                <span id="breakInMinutesLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="breakInMinutesToggle" />
                   <span class="toggle-slider"></span>
                 </label>
               </div>
@@ -6046,7 +6182,15 @@
               <!-- Mirrors THEME_GROUPS (shell.ts). base-theme is deliberately
                    absent: it is the sheet custom themes are built ON, not a
                    theme you can pick. Valentine/Thanksgiving/Halo/Terminal had
-                   drifted out of this list and are restored. -->
+                   drifted out of this list and are restored.
+
+                   The empty-valued option below is what the editor OPENS on,
+                   and it stands for whatever the swatches were seeded from
+                   (see openThemeEditor). Its label is written at open time,
+                   because the answer differs between Create and Edit. Without
+                   it this dropdown had no way to say "you haven't re-seeded
+                   yet" and sat on a theme the editor was not showing. -->
+              <option value="" id="teBaseCurrentOption">Current theme</option>
               <optgroup label="System Themes">
                 <option value="dark">Dark</option>
                 <option value="light">Light</option>

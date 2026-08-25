@@ -383,6 +383,55 @@ button:active {
   color: #0a246a;
 }
 
+/* ── Checkboxes, the one place the native control is the RIGHT answer ──
+   shell.css draws every real checkbox as a themed circle with a masked tick,
+   because the native box ignores nearly every colour a theme sets. Here that
+   trade runs backwards: a square, sunken, hard-cornered checkbox IS the period
+   look, and the platform draws it for free.
+
+   `revert` rather than spelling out replacement values. It rolls each property
+   back to what it would be if the AUTHOR origin had declared nothing at all,
+   which lands exactly on the user-agent checkbox: shell.css's circle rules are
+   skipped, and so is the blanket `input, select, textarea { padding: 6px 8px }`
+   above it that would otherwise still be sitting on a 13px control.
+
+   The two extra selector blocks exist for specificity, not for effect. The
+   :hover / :checked rules in shell.css outrank a plain base rule here, so each
+   state has to be reverted at its own weight. .toggle-switch inputs stay
+   excluded exactly as they are there: 0x0 and invisible, with the slider
+   beside them as the real control. */
+input[type="checkbox"]:not(.toggle-switch input) {
+  appearance: revert;
+  -webkit-appearance: revert;
+  width: revert;
+  height: revert;
+  padding: revert;
+  border: revert;
+  border-radius: revert;
+  background: revert;
+  box-shadow: revert;
+  vertical-align: revert;
+}
+
+input[type="checkbox"]:not(.toggle-switch input):hover,
+input[type="checkbox"]:not(.toggle-switch input):checked,
+input[type="checkbox"]:not(.toggle-switch input):checked:hover {
+  border: revert;
+  background: revert;
+}
+
+/* The platform ring is the period-correct focus indicator, and it is the only
+   one a native checkbox gets once shell.css's box-shadow is gone. */
+input[type="checkbox"]:not(.toggle-switch input):focus-visible {
+  outline: revert;
+  box-shadow: revert;
+}
+
+/* No masked tick to draw: the widget paints its own. */
+input[type="checkbox"]:not(.toggle-switch input)::before {
+  content: none;
+}
+
 /* ── Panel accent slots, flat grey with a single VGA rail each ── */
 .panel-accent-input    { border-left: 4px solid #000080; }
 .panel-accent-view     { border-left: 4px solid #008080; }
