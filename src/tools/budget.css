@@ -810,12 +810,16 @@
   border-left: 3px solid #FF0000;
 }
 
-/* Ledger rows, 5 equidistant grid columns (Category, Source, Amount, Notes,
-   Buttons), scoped to #budgetEntries so the shared .entry-row flex layout
-   used elsewhere in the shell is untouched. */
+/* Ledger rows, scoped to #budgetEntries so the shared .entry-row flex layout
+   used elsewhere in the shell is untouched. Four equidistant content columns
+   (Category, Source, Amount, Notes) plus an action column that sizes to its
+   buttons: there are five of those now (clone, refund, split, date, delete),
+   which as a fifth 1fr overflowed at ordinary window widths while the content
+   columns went short. Bill-payment rows have no buttons, but the column is
+   shared, so they still line up with everything else. */
 #budgetEntries .entry-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr) auto;
   align-items: center;
 }
 
@@ -1348,4 +1352,391 @@ span.entry-col-category:not(.entry-field) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* =============================================================================
+   LEDGER: BULK SELECTION
+   -----------------------------------------------------------------------------
+   Selection is opt-in (the Select button in the ledger header) so the default
+   ledger keeps its full width for content. Turning it on inserts a checkbox
+   column ahead of the five content columns and reveals the action bar below
+   the header.
+============================================================================= */
+
+/* The header row is space-between, so the sort dropdown and the Select button
+   need their own group or they'd be flung to opposite ends of the panel. */
+.budget-ledger-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.budget-select-mode-btn {
+  padding: 3px 10px;
+  font-size: 0.7rem;
+}
+
+/* Pinned to the top of the scroll area while the ledger is on screen, so the
+   actions stay reachable partway down a long month instead of forcing a
+   scroll back up to the header. Sticks within its own panel, so it releases
+   once the ledger scrolls past.
+
+   Opaque background is not optional here: rows pass underneath it, and the
+   shared --color-bg it already wore is what those rows are painted in too,
+   hence the shadow to separate the two. Same rule the Time Tracker's own
+   selection bar follows. */
+.budget-selection-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+}
+
+.budget-selection-count {
+  font-size: 0.78rem;
+  font-weight: 700;
+  opacity: 0.8;
+  margin-right: 4px;
+}
+
+.budget-selection-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.budget-selection-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.budget-selection-btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* Deliberately no pointer-events: none here (unlike the Time Tracker's bar):
+   Merge greys out for a reason the user can't see from the row, and the title
+   that explains it only surfaces if the button still takes hover. */
+.budget-selection-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.budget-selection-btn-danger {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.budget-selection-btn-danger:hover:not(:disabled) {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+/* Selection mode adds a checkbox column ahead of the content ones. Auto-width
+   rather than another 1fr, so turning selection on nudges the content columns
+   rather than resizing them all. */
+#budgetEntries .entry-row.budget-row-selectable {
+  grid-template-columns: auto repeat(4, 1fr) auto;
+}
+
+.budget-entry-check {
+  flex-shrink: 0;
+  margin: 0 2px 0 0;
+}
+
+/* Bill payments can't be selected (see the ENTRY SELECTION note in budget.ts).
+   The box stays in place to hold the column, faded to say so. */
+.budget-entry-check:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Tinted background plus an inset ring rather than a border colour: the row's
+   3px left border is its income/expense/bill stripe, and recolouring the
+   border would take that signal away exactly when a batch of rows is being
+   reviewed before a bulk action. */
+#budgetEntries .entry-row.budget-row-selected {
+  background: color-mix(in srgb, var(--color-btn) 10%, var(--color-bg));
+  box-shadow: inset 0 0 0 1px var(--color-btn);
+}
+
+/* Four buttons now share the actions column (clone, refund, date, delete).
+   .entry-cal-btn carries a 6px right margin for the flex rows it was written
+   for, which here doubles up with the column's own gap; dropping it is what
+   keeps the cluster from overflowing at narrow widths. */
+.budget-entry-action-btn {
+  margin-right: 0;
+}
+
+/* =============================================================================
+   MERGE ENTRIES MODAL
+============================================================================= */
+
+.budget-merge-modal {
+  width: min(620px, 94vw);
+}
+
+/* Subline under the modal header naming what's being merged. */
+.budget-modal-context {
+  margin: -10px 0 16px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.budget-merge-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  font-size: 0.85rem;
+}
+
+.budget-merge-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.budget-merge-summary-label {
+  opacity: 0.65;
+}
+
+.budget-merge-summary-value {
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Two registers share this box. Bare, it is a warning: the merge is about to
+   produce a total you would not get by adding the rows up. With
+   .budget-merge-note it is only information about where the merged entry
+   lands, and shouting in red would train you to ignore it in the cases that
+   matter. */
+.budget-merge-warning {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: var(--color-toast-error-bg);
+  border: 1px solid var(--color-toast-error-border);
+  color: var(--color-toast-error-text);
+}
+
+.budget-merge-warning.budget-merge-note {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.budget-merge-list-title {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin: 16px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.budget-merge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.budget-merge-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem 7rem;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+.budget-merge-list-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.budget-merge-list-date,
+.budget-merge-list-amount {
+  opacity: 0.75;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.budget-merge-list-amount {
+  text-align: right;
+}
+
+/* =============================================================================
+   SPLIT ENTRY MODAL
+   -----------------------------------------------------------------------------
+   Wider than a stock modal: each part is category + source + amount on one
+   line, and wrapping those onto two lines each would make a four-way split
+   unreadable. Mirrors the Time Tracker's Break-In modal, which does the same
+   job along the time axis.
+============================================================================= */
+
+.budget-split-modal {
+  width: min(720px, 95vw);
+}
+
+.budget-split-intro {
+  font-size: 0.82rem;
+  opacity: 0.7;
+  margin: 0 0 12px;
+}
+
+.budget-split-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.budget-split-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 8rem auto;
+  gap: 8px;
+  align-items: end;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+}
+
+/* An income host has no category, so its rows are one column narrower. */
+.budget-split-row--income {
+  grid-template-columns: minmax(0, 1fr) 8rem auto;
+}
+
+/* One column of the row: its label sits above its control. */
+.budget-split-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.budget-split-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.budget-split-cell input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  margin: 0;
+}
+
+.budget-split-remove {
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  align-self: end;
+  margin-bottom: 1px;
+}
+
+.budget-split-remove:hover {
+  background: var(--color-danger-subtle);
+}
+
+/* The last remaining row can't be removed, see renderSplitRows(). */
+.budget-split-remove:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
+.budget-split-preview-title {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin: 16px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.budget-split-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.budget-split-preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 11rem 7rem;
+  gap: 14px;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+/* The carved-out parts are the new rows, so they carry the tint; the
+   remainder is the entry you already had, left plain. Inverse of the Break-In
+   preview, where the host's own segments are what survive untouched. */
+.budget-split-preview-row:not(.is-remainder) {
+  background: color-mix(in srgb, var(--color-btn) 14%, var(--color-bg));
+}
+
+.budget-split-preview-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.budget-split-preview-note,
+.budget-split-preview-amount {
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.budget-split-preview-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }

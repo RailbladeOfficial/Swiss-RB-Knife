@@ -1579,6 +1579,128 @@ function sumNetAmount(items: LedgerItem[]): number {
 }
 
 /* =============================================================================
+   ENTRY SELECTION  (bulk clone / merge / refund / delete)
+   -----------------------------------------------------------------------------
+   Selection is opt-in: the Select button in the ledger header turns it on,
+   which inserts a checkbox into every row and shows the action bar. Off by
+   default so the ledger keeps its full width for content.
+
+   Only income entries and fluctuating expenses take part. Bill payments are
+   deliberately excluded: a BillInstance is half of a pair with its bill's
+   `nextDue`, and removing or duplicating one without rolling that date is how
+   a recurring bill ends up scheduled for a month it was already paid for.
+   Undoing a payment already has a home, the Pay modal's Undo button, so bill
+   rows render a disabled checkbox that says so rather than a gap that reads
+   as a bug.
+
+   Selections are tracked by "kind:id" key rather than by object, because
+   `data` is replaced wholesale on every load from disk (unlock, re-entry into
+   the tool) and object identity does not survive that. Keys are pruned against
+   what is actually on screen each render, so the count in the bar and what the
+   buttons act on are always the same set.
+============================================================================= */
+
+/** The ledger items that support the bulk actions: everything but a bill payment. */
+type EntryItem = Extract<LedgerItem, { kind: "income" | "expense" }>;
+
+function isEntryItem(item: LedgerItem): item is EntryItem {
+  return item.kind !== "bill";
+}
+
+/** Stable identity for a selectable row. Kind-qualified because income and
+ *  expense ids come from separate arrays and are only unique within one. */
+function itemKey(item: EntryItem): string {
+  return `${item.kind}:${item.entry.id}`;
+}
+
+/** The amount a row shows, signed the way it is stored: positive income is
+ *  money in, positive expense is money out. Both negate under Refund. */
+function itemAmount(item: EntryItem): number {
+  return item.kind === "income" ? item.entry.actual : item.entry.amount;
+}
+
+/** The row's second column: income source name, or the expense's own source
+ *  text. Used by the merge list and the bulk-action confirmations. */
+function itemSourceLabel(item: EntryItem): string {
+  return item.kind === "income"
+    ? getIncomeSourceById(item.entry.sourceId)?.name ?? "(unknown)"
+    : item.entry.description || "(no source)";
+}
+
+let selectMode = false;
+const selectedKeys = new Set<string>();
+/** The row whose checkbox was last clicked, the anchor for shift-click range
+ *  selection. Cleared whenever selection mode is turned off. */
+let lastCheckedKey: string | null = null;
+/** The selectable rows currently on screen, in display order. Both the range
+ *  select and the All button mean "of what I can see", and every bulk action
+ *  wants its list in display order. */
+let lastVisibleEntries: EntryItem[] = [];
+
+/** Drops selections that are no longer on screen, whether because the entry
+ *  was deleted/merged away or because the browsed range moved off it. Keeping
+ *  off-screen rows selected would let a Delete land on entries in a month the
+ *  user can no longer see. */
+function pruneSelection(): void {
+  const live = new Set(lastVisibleEntries.map(itemKey));
+  selectedKeys.forEach((key) => {
+    if (!live.has(key)) selectedKeys.delete(key);
+  });
+  if (lastCheckedKey && !live.has(lastCheckedKey)) lastCheckedKey = null;
+}
+
+/** The current selection, in display order. */
+function selectedInOrder(): EntryItem[] {
+  return lastVisibleEntries.filter((item) => selectedKeys.has(itemKey(item)));
+}
+
+function setSelectMode(on: boolean): void {
+  selectMode = on;
+  if (!on) {
+    selectedKeys.clear();
+    lastCheckedKey = null;
+  }
+  const btn = document.getElementById("budgetSelectModeBtn");
+  if (btn) {
+    btn.classList.toggle("active", on);
+    btn.textContent = on ? "Done" : "Select";
+  }
+  const bar = document.getElementById("budgetSelectionBar");
+  if (bar) bar.style.display = on ? "" : "none";
+  renderEntries();
+}
+
+/** Refreshes the selection bar's count and which actions are available.
+ *  Clone, Refund and Delete need one entry; Merge needs two, and needs them
+ *  all income or all expense, since the two carry different fields and the
+ *  merged row can only be one of them. */
+function refreshSelectionBar(): void {
+  const list = selectedInOrder();
+  const n = list.length;
+  const count = document.getElementById("budgetSelectionCount");
+  if (count) count.textContent = `${n} selected`;
+
+  const mixedKinds = list.some((i) => i.kind !== list[0]!.kind);
+
+  const setEnabled = (id: string, enabled: boolean, why = "") => {
+    const b = document.getElementById(id) as HTMLButtonElement | null;
+    if (!b) return;
+    b.disabled = !enabled;
+    if (why) b.title = why;
+  };
+  setEnabled("budgetBulkCloneBtn", n >= 1);
+  setEnabled(
+    "budgetBulkMergeBtn",
+    n >= 2 && !mixedKinds,
+    mixedKinds
+      ? "Income and expenses can't merge into one entry"
+      : "Combine the selected entries into one",
+  );
+  setEnabled("budgetBulkRefundBtn", n >= 1);
+  setEnabled("budgetBulkDeleteBtn", n >= 1);
+}
+
+/* =============================================================================
    DOM REFS & UI STATE  (resolved in initBudget)
 ============================================================================= */
 
@@ -3223,11 +3345,45 @@ function renderBills(): void {
   }
 }
 
+/** Duplicate this row, one click, no dialog. Clone is the cheap half of
+ *  "I bought that again": the copy is exact, and the amount or date is the
+ *  part you were always going to retype anyway. */
+function makeCloneBtn(item: EntryItem): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.className = "entry-cal-btn budget-entry-action-btn";
+  btn.textContent = "⧉";
+  btn.title = "Duplicate this entry";
+  btn.addEventListener("click", () => cloneLedgerEntries([item]));
+  return btn;
+}
+
+/** Book this row back onto today as its own negative. See refundLedgerEntries
+ *  for why the refund is a new entry rather than an edit of this one. */
+function makeRefundBtn(item: EntryItem): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.className = "entry-cal-btn budget-entry-action-btn";
+  btn.textContent = "↩";
+  btn.title = `Refund: copy this onto ${formatDate(today())} as ${formatCurrency(-itemAmount(item))}`;
+  btn.addEventListener("click", () => refundLedgerEntries([item]));
+  return btn;
+}
+
+/** Carve this entry into parts. See the SPLIT section for what that means and
+ *  what stays behind on the original. */
+function makeSplitBtn(item: EntryItem): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.className = "entry-cal-btn budget-entry-action-btn";
+  btn.textContent = "\u2702";
+  btn.title = "Split this entry into parts";
+  btn.addEventListener("click", () => openSplitModal(item));
+  return btn;
+}
+
 function makeCalBtn(
   item: LedgerItem & { kind: "income" | "expense" },
 ): HTMLButtonElement {
   const calBtn = document.createElement("button");
-  calBtn.className = "entry-cal-btn";
+  calBtn.className = "entry-cal-btn budget-entry-action-btn";
   calBtn.textContent = "📅";
   calBtn.title = "Edit date";
   calBtn.addEventListener("click", () => {
@@ -3405,6 +3561,55 @@ function buildLedgerRow(item: LedgerItem): HTMLElement {
   const row = document.createElement("div");
   row.className = "entry-row";
 
+  // The running record of what the bulk actions can reach, rebuilt as the
+  // ledger draws so it is always in display order and always matches what is
+  // on screen. renderEntries() clears it before each pass.
+  if (isEntryItem(item)) lastVisibleEntries.push(item);
+
+  // Selection mode adds a sixth grid column ahead of everything else. Bill
+  // payments get a disabled box rather than an empty cell: the gap alone
+  // reads as a rendering fault, the disabled box and its tooltip say why the
+  // row is out of bounds.
+  if (selectMode) {
+    row.classList.add("budget-row-selectable");
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.className = "budget-entry-check";
+    if (isEntryItem(item)) {
+      const key = itemKey(item);
+      check.checked = selectedKeys.has(key);
+      check.title = "Select this entry (shift-click to select a range)";
+      if (check.checked) row.classList.add("budget-row-selected");
+      // click, not change: only the click event carries shiftKey, and the
+      // browser has already flipped .checked by the time it fires.
+      check.addEventListener("click", (ev) => {
+        const on = check.checked;
+        const keys = lastVisibleEntries.map(itemKey);
+        if ((ev as MouseEvent).shiftKey && lastCheckedKey) {
+          const a = keys.indexOf(lastCheckedKey);
+          const b = keys.indexOf(key);
+          if (a !== -1 && b !== -1) {
+            const [lo, hi] = a < b ? [a, b] : [b, a];
+            for (let k = lo; k <= hi; k++) {
+              if (on) selectedKeys.add(keys[k]!);
+              else selectedKeys.delete(keys[k]!);
+            }
+          }
+        } else if (on) {
+          selectedKeys.add(key);
+        } else {
+          selectedKeys.delete(key);
+        }
+        lastCheckedKey = key;
+        renderEntries();
+      });
+    } else {
+      check.disabled = true;
+      check.title = "Bill payments are cloned, edited and undone from the payment itself";
+    }
+    row.appendChild(check);
+  }
+
   // Item 2: direction-aware exact colors (not theme variables).
   // Income where actual >= expected = money in = green.
   // Income where actual < expected = shortfall = red.
@@ -3470,7 +3675,13 @@ function buildLedgerRow(item: LedgerItem): HTMLElement {
       makeLedgerEditable(notes, item, "notes"),
     );
 
-    actions.append(makeCalBtn(item), makeDeleteBtn("income", e.id));
+    actions.append(
+      makeCloneBtn(item),
+      makeRefundBtn(item),
+      makeSplitBtn(item),
+      makeCalBtn(item),
+      makeDeleteBtn("income", e.id),
+    );
     row.append(category, name, amount, notes, actions);
   } else if (item.kind === "expense") {
     const e = item.entry;
@@ -3499,7 +3710,13 @@ function buildLedgerRow(item: LedgerItem): HTMLElement {
       makeLedgerEditable(notes, item, "notes"),
     );
 
-    actions.append(makeCalBtn(item), makeDeleteBtn("expense", e.id));
+    actions.append(
+      makeCloneBtn(item),
+      makeRefundBtn(item),
+      makeSplitBtn(item),
+      makeCalBtn(item),
+      makeDeleteBtn("expense", e.id),
+    );
     row.append(category, name, amount, notes, actions);
   } else {
     // Bill payment, read-only in the ledger, click opens Pay modal
@@ -3536,6 +3753,9 @@ function buildLedgerRow(item: LedgerItem): HTMLElement {
 
 function renderEntries(): void {
   entriesEl.innerHTML = "";
+  // buildLedgerRow refills this as it draws; clearing it here is what makes
+  // the selection track the view instead of an older one.
+  lastVisibleEntries = [];
   const items = getLedgerForRange(viewStart, viewEnd);
 
   if (items.length === 0) {
@@ -3543,6 +3763,7 @@ function renderEntries(): void {
     p.className = "placeholder-text";
     p.textContent = "No ledger entries yet for this month.";
     entriesEl.appendChild(p);
+    finishEntriesRender();
     return;
   }
 
@@ -3634,6 +3855,17 @@ function renderEntries(): void {
       appendDateGroups(groupItems);
     }
   }
+
+  finishEntriesRender();
+}
+
+/** Closes out a ledger pass: the rows are drawn, so `lastVisibleEntries` is
+ *  final and the selection can be reconciled against it. Called from every
+ *  exit of renderEntries, including the empty-ledger one, or a selection made
+ *  in one month would survive into a month with nothing in it. */
+function finishEntriesRender(): void {
+  pruneSelection();
+  refreshSelectionBar();
 }
 
 function renderAll(): void {
@@ -3710,6 +3942,1074 @@ function confirmDelete(): void {
   renderEntries();
   getDeleteModal().close();
   flash("Entry deleted", "success");
+}
+
+/* =============================================================================
+   ENTRY OPERATIONS: CLONE / REFUND / SPLIT / MERGE / BULK DELETE
+   -----------------------------------------------------------------------------
+   The ways an existing ledger entry (or a run of them) can be reshaped without
+   retyping it. All of them mutate `data` and go through queueSave() + a full
+   re-render, the same path the Add Entry form uses, so nothing here has to know
+   about the debounce or the encrypted-file writer.
+============================================================================= */
+
+/** True while the entry still exists in `data`. Every bulk action re-checks
+ *  its list against this before acting: a modal can sit open while the entries
+ *  behind it are deleted from a row button, and acting on a stale id would
+ *  either do nothing or, worse, hit whatever took its place. */
+function stillPresent(item: EntryItem): boolean {
+  return item.kind === "income"
+    ? data.incomeEntries.some((e) => e.id === item.entry.id)
+    : data.fluctuatingExpenses.some((e) => e.id === item.entry.id);
+}
+
+/**
+ * Duplicates entries in place, date, amount and all. The copy is deliberately
+ * exact: "that again" is the common case, and whichever field actually differs
+ * is the one you were going to edit anyway.
+ */
+function cloneLedgerEntries(list: EntryItem[]): void {
+  const live = list.filter(stillPresent);
+  if (live.length === 0) return;
+  for (const item of live) {
+    if (item.kind === "income") {
+      data.incomeEntries.push({ ...item.entry, id: makeId() });
+    } else {
+      data.fluctuatingExpenses.push({ ...item.entry, id: makeId() });
+    }
+  }
+  queueSave();
+  renderAll();
+  flash(
+    live.length === 1 ? "Entry cloned" : `${live.length} entries cloned`,
+    "success",
+  );
+}
+
+/**
+ * Books entries back as credits: a copy on today's date with every amount
+ * negated. A new entry rather than an edit of the original, because the money
+ * really did go out on the original date and really did come back on this one.
+ * Editing or deleting the original instead would leave the month it was spent
+ * in looking like it never happened.
+ *
+ * For income, `expected` is negated alongside `actual` so the Expected vs
+ * Actual figures stay a matched pair rather than showing a clawback as a
+ * shortfall against an expectation nobody had.
+ */
+function refundLedgerEntries(list: EntryItem[]): void {
+  const live = list.filter(stillPresent);
+  if (live.length === 0) return;
+  const day = today();
+
+  for (const item of live) {
+    if (item.kind === "income") {
+      data.incomeEntries.push({
+        ...item.entry,
+        id: makeId(),
+        date: day,
+        expected: -item.entry.expected,
+        actual: -item.entry.actual,
+      });
+    } else {
+      data.fluctuatingExpenses.push({
+        ...item.entry,
+        id: makeId(),
+        date: day,
+        amount: -item.entry.amount,
+      });
+    }
+  }
+  queueSave();
+  renderAll();
+
+  // Today is very often outside the range being browsed (reconciling last
+  // month is exactly when refunds get entered), and a success toast for a row
+  // that never appears is indistinguishable from a silent failure.
+  const offView = todayInRange(viewStart, viewEnd)
+    ? ""
+    : " (outside the range you're viewing)";
+  const total = live.reduce((sum, item) => sum - itemAmount(item), 0);
+  flash(
+    live.length === 1
+      ? `Refunded onto ${formatDate(day)} as ${formatCurrency(total)}${offView}`
+      : `${live.length} entries refunded onto ${formatDate(day)}, ${formatCurrency(total)} in total${offView}`,
+    "success",
+  );
+}
+
+/* -----------------------------------------------------------------------------
+   SPLIT
+   ---------------------------------------------------------------------------
+   The budget answer to the Time Tracker's break-in tasks. One entry (the
+   "host") is the single line you thought you spent; each part is carved out of
+   its amount, and whatever is left over stays on the host. So one $120 shop
+   that was really groceries plus a bathroom cabinet becomes two lines in one
+   pass, instead of an edit and a hand-typed row.
+
+   Where break-in carves out of a span of time, this carves out of an amount,
+   and the constraints are the same shape: a part has to point the same way as
+   the host (you cannot take a credit out of a charge), and the parts together
+   cannot exceed what is there.
+----------------------------------------------------------------------------- */
+
+/** Money rounded to whole cents. Splitting is the one place in the tool that
+ *  does repeated subtraction on user-entered decimals, which is where binary
+ *  floats leave a 1e-17 remainder on a sum that should have come out exact. */
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** One row of the Split modal, held as raw input strings so a half-typed row
+ *  doesn't have to be valid to exist. `category` is unused for an income host,
+ *  which has no category to put anything in. */
+type SplitDraft = {
+  category: string;
+  source: string;
+  amount: string;
+};
+
+/** One carved-out part, as names rather than ids: computing the split has to
+ *  stay pure, and turning a typed name into a category or source is a mutation
+ *  (findOrCreate*). Applying resolves these; nothing before that point does. */
+type SplitPart = {
+  /** Expense hosts only, the category name this part lands in. */
+  category: string;
+  /** Income: the income source name. Expense: the source/description text. */
+  source: string;
+  amount: number;
+  /** Income hosts only, this part's share of the host's `expected`. */
+  expected: number;
+};
+
+type SplitResult =
+  | {
+      ok: true;
+      parts: SplitPart[];
+      /** What stays on the host. Zero means the parts consumed the whole
+       *  entry and the host row goes away. */
+      remainder: number;
+      /** Income hosts only, the `expected` left on the host. */
+      remainderExpected: number;
+    }
+  | { ok: false; error: string };
+
+/** The amount a split divides up: an income entry's actual, an expense's
+ *  amount. Its sign is the direction every part has to point in. */
+function splitHostAmount(host: EntryItem): number {
+  return itemAmount(host);
+}
+
+/**
+ * Turns a host entry plus a list of draft parts into what should replace it.
+ * Pure: validates and computes, changes nothing.
+ *
+ * An income host also divides its `expected`, in proportion to each part's
+ * share of `actual`, so a paycheck that was really two sources doesn't leave
+ * all of the expectation sitting on whichever half kept the original row. The
+ * remainder takes whatever proportioning left over rather than being computed
+ * the same way, so the parts always add back up to exactly the host.
+ */
+function computeSplitResult(host: EntryItem, drafts: SplitDraft[]): SplitResult {
+  const hostAmount = splitHostAmount(host);
+  const direction = Math.sign(hostAmount);
+  const hostExpected = host.kind === "income" ? host.entry.expected : 0;
+
+  const parts: SplitPart[] = [];
+  let used = 0;
+
+  for (let i = 0; i < drafts.length; i++) {
+    const d = drafts[i]!;
+    const label = `Part ${i + 1}`;
+    const category = d.category.trim();
+    const source = d.source.trim();
+
+    if (host.kind === "expense" && !category) {
+      return { ok: false, error: `${label} needs a category.` };
+    }
+    if (host.kind === "income" && !source) {
+      return { ok: false, error: `${label} needs an income source.` };
+    }
+
+    const amount = parseFloat(d.amount);
+    if (!Number.isFinite(amount) || amount === 0) {
+      return { ok: false, error: `${label} needs an amount.` };
+    }
+    if (Math.sign(amount) !== direction) {
+      return {
+        ok: false,
+        error:
+          `${label} points the other way to the entry it comes out of. ` +
+          `Split ${formatCurrency(hostAmount)} into parts of the same sign, and use Refund for a credit.`,
+      };
+    }
+
+    used = roundMoney(used + amount);
+    parts.push({
+      category,
+      source,
+      amount,
+      // Share of the host's expectation, by share of its actual. Safe from a
+      // divide-by-zero because a zero-amount host can't be split at all, see
+      // openSplitModal.
+      expected: hostAmount === 0 ? 0 : roundMoney(hostExpected * (amount / hostAmount)),
+    });
+  }
+
+  if (parts.length === 0) {
+    return { ok: false, error: "Add at least one part to split this into." };
+  }
+  if (Math.abs(used) > Math.abs(hostAmount)) {
+    return {
+      ok: false,
+      error:
+        `These parts come to ${formatCurrency(used)}, more than the ` +
+        `${formatCurrency(hostAmount)} on this entry.`,
+    };
+  }
+
+  const remainder = roundMoney(hostAmount - used);
+  return {
+    ok: true,
+    parts,
+    remainder,
+    remainderExpected: roundMoney(
+      hostExpected - parts.reduce((sum, p) => sum + p.expected, 0),
+    ),
+  };
+}
+
+/** What is still unspoken for across the drafts that currently parse. Drives
+ *  the amount a fresh row is born with, so the last part of a split fills
+ *  itself in and only the parts you actually know have to be typed. */
+function unallocatedAmount(host: EntryItem, drafts: SplitDraft[]): number {
+  const used = drafts.reduce((sum, d) => {
+    const n = parseFloat(d.amount);
+    return Number.isFinite(n) ? sum + n : sum;
+  }, 0);
+  return roundMoney(splitHostAmount(host) - used);
+}
+
+/** A fresh row, pre-filled with whatever is left of the host. Left blank when
+ *  nothing is left (or when what's left points the wrong way), since a row
+ *  born holding an invalid amount would show an error nobody caused. */
+function makeSplitDraft(host: EntryItem, drafts: SplitDraft[]): SplitDraft {
+  const left = unallocatedAmount(host, drafts);
+  const usable = left !== 0 && Math.sign(left) === Math.sign(splitHostAmount(host));
+  return { category: "", source: "", amount: usable ? left.toFixed(2) : "" };
+}
+
+/* =============================================================================
+   MODAL: SPLIT ENTRY
+   -----------------------------------------------------------------------------
+   See the SPLIT section above for the arithmetic; this is only the UI.
+
+   Rows are rebuilt wholesale on add/remove but never on keystroke: each input
+   writes straight into its draft object and re-renders the PREVIEW only, so
+   typing never steals focus from the field you're typing in.
+============================================================================= */
+
+let splitModal: Modal | null = null;
+let splitHost: EntryItem | null = null;
+let splitDrafts: SplitDraft[] = [];
+
+/** A label + control pair, one column of a split row. */
+function buildSplitCell(labelText: string, control: HTMLElement): HTMLElement {
+  const cell = document.createElement("div");
+  cell.className = "budget-split-cell";
+  const label = document.createElement("label");
+  label.className = "budget-split-label";
+  label.textContent = labelText;
+  cell.append(label, control);
+  return cell;
+}
+
+function renderSplitRows(): void {
+  const container = document.getElementById("budgetSplitRows");
+  const host = splitHost;
+  if (!container || !host) return;
+
+  container.innerHTML = "";
+  const isIncome = host.kind === "income";
+
+  splitDrafts.forEach((draft, index) => {
+    const row = document.createElement("div");
+    row.className =
+      "budget-split-row" + (isIncome ? " budget-split-row--income" : "");
+
+    // Expense hosts get a category column; income entries have no category
+    // field at all, so the column would be a dead box.
+    if (!isIncome) {
+      const category = document.createElement("input");
+      category.type = "text";
+      category.placeholder = "Where did this part go?";
+      category.setAttribute("list", "budgetCategoryList");
+      category.autocomplete = "off";
+      category.value = draft.category;
+      category.addEventListener("input", () => {
+        draft.category = category.value;
+        renderSplitPreview();
+      });
+      row.appendChild(buildSplitCell("Category", category));
+    }
+
+    const source = document.createElement("input");
+    source.type = "text";
+    source.placeholder = isIncome ? "Who paid this part?" : "Optional";
+    source.setAttribute("list", isIncome ? "budgetSourceList" : "budgetExpenseSourceList");
+    source.autocomplete = "off";
+    source.value = draft.source;
+    source.addEventListener("input", () => {
+      draft.source = source.value;
+      renderSplitPreview();
+    });
+    row.appendChild(buildSplitCell("Source", source));
+
+    const amount = document.createElement("input");
+    amount.type = "number";
+    amount.step = "0.01";
+    amount.placeholder = "0.00";
+    amount.autocomplete = "off";
+    amount.value = draft.amount;
+    amount.addEventListener("input", () => {
+      draft.amount = amount.value;
+      renderSplitPreview();
+    });
+    row.appendChild(buildSplitCell("Amount", amount));
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "budget-split-remove";
+    remove.textContent = "✕";
+    remove.title = "Remove this part";
+    // The last row stays: an empty modal has nothing to apply and no obvious
+    // way back to a first row.
+    remove.disabled = splitDrafts.length <= 1;
+    remove.addEventListener("click", () => {
+      splitDrafts.splice(index, 1);
+      renderSplitRows();
+      renderSplitPreview();
+    });
+    row.appendChild(remove);
+
+    container.appendChild(row);
+  });
+}
+
+/** One line of the result preview. */
+function buildSplitPreviewRow(
+  name: string,
+  amount: number,
+  isRemainder: boolean,
+): HTMLElement {
+  const row = document.createElement("div");
+  row.className =
+    "budget-split-preview-row" + (isRemainder ? " is-remainder" : "");
+
+  const nameEl = document.createElement("span");
+  nameEl.className = "budget-split-preview-name";
+  nameEl.textContent = name;
+  nameEl.title = name;
+
+  // Parenthesised, not bare: this sits between two values, and a long name
+  // ellipsising up against it reads as a missing space otherwise.
+  const note = document.createElement("span");
+  note.className = "budget-split-preview-note";
+  note.textContent = isRemainder ? "(stays on this entry)" : "(new entry)";
+
+  const amountEl = document.createElement("span");
+  amountEl.className = "budget-split-preview-amount";
+  amountEl.textContent = formatCurrency(amount);
+
+  row.append(nameEl, note, amountEl);
+  return row;
+}
+
+/**
+ * The rows this split would leave behind, once the drafts describe one.
+ *
+ * Deliberately says nothing about WHY they don't yet. Apply stays live and
+ * reports the problem as a toast when it is pressed: a live error box under a
+ * half-typed row spends most of its life telling you that a field you haven't
+ * reached yet is empty, which trains you to stop reading it.
+ */
+function renderSplitPreview(): void {
+  const preview = document.getElementById("budgetSplitPreview");
+  const host = splitHost;
+  if (!preview || !host) return;
+
+  preview.innerHTML = "";
+  const result = computeSplitResult(host, splitDrafts);
+
+  if (!result.ok) {
+    const p = document.createElement("p");
+    p.className = "placeholder-text";
+    p.textContent = "Fill the rows in to see what this becomes.";
+    preview.appendChild(p);
+    return;
+  }
+
+  for (const part of result.parts) {
+    const name =
+      host.kind === "income"
+        ? part.source
+        : part.source
+          ? `${part.category} · ${part.source}`
+          : part.category;
+    preview.appendChild(buildSplitPreviewRow(name, part.amount, false));
+  }
+
+  // The host's own row, only when something is left on it. When the parts
+  // consume the whole entry it is deleted, and showing a $0.00 line for it
+  // would suggest otherwise.
+  if (result.remainder !== 0) {
+    const name =
+      host.kind === "income"
+        ? itemSourceLabel(host)
+        : `${getCategoryById(host.entry.categoryId)?.name ?? "(unknown)"}` +
+          (host.entry.description ? ` · ${host.entry.description}` : "");
+    preview.appendChild(buildSplitPreviewRow(name, result.remainder, true));
+  }
+}
+
+function applySplit(): void {
+  const host = splitHost;
+  if (!host) return;
+  if (!stillPresent(host)) {
+    flash("That entry is no longer there", "error");
+    splitModal?.close();
+    return;
+  }
+
+  const result = computeSplitResult(host, splitDrafts);
+  if (!result.ok) {
+    flash(result.error, "error");
+    return;
+  }
+
+  const { parts, remainder, remainderExpected } = result;
+  // The host's notes ride its surviving row. When it survives that is the host
+  // itself, untouched; when it doesn't, they move to the first part rather
+  // than being copied onto every one of them.
+  const notesForFirstPart = remainder === 0 ? host.entry.notes : "";
+
+  if (host.kind === "income") {
+    parts.forEach((part, i) => {
+      data.incomeEntries.push({
+        id: makeId(),
+        date: host.entry.date,
+        sourceId: findOrCreateIncomeSource(part.source),
+        expected: part.expected,
+        actual: part.amount,
+        notes: i === 0 ? notesForFirstPart : "",
+      });
+    });
+    if (remainder === 0) {
+      data.incomeEntries = data.incomeEntries.filter((e) => e.id !== host.entry.id);
+    } else {
+      // Edited in place rather than rebuilt, which keeps the entry's id and,
+      // more to the point, its original sourceId: pushing the name back
+      // through findOrCreateIncomeSource would fork a retired source into a
+      // fresh duplicate.
+      host.entry.actual = remainder;
+      host.entry.expected = remainderExpected;
+    }
+  } else {
+    parts.forEach((part, i) => {
+      const categoryId = findOrCreateCategory(part.category);
+      if (part.source) findOrCreateExpenseSource(part.source);
+      data.fluctuatingExpenses.push({
+        id: makeId(),
+        date: host.entry.date,
+        categoryId,
+        description: part.source,
+        amount: part.amount,
+        notes: i === 0 ? notesForFirstPart : "",
+      });
+    });
+    if (remainder === 0) {
+      data.fluctuatingExpenses = data.fluctuatingExpenses.filter(
+        (e) => e.id !== host.entry.id,
+      );
+    } else {
+      host.entry.amount = remainder;
+    }
+  }
+
+  const rowCount = parts.length + (remainder === 0 ? 0 : 1);
+  queueSave();
+  splitModal!.close();
+  refreshDatalists();
+  renderAll();
+  flash(
+    rowCount === 1
+      ? "The whole entry moved onto its one part"
+      : `Split into ${rowCount} entries` +
+        (remainder === 0 ? "" : `, ${formatCurrency(remainder)} left on the original`),
+    "success",
+  );
+}
+
+function getSplitModal(): Modal {
+  if (!splitModal) {
+    splitModal = new Modal(document.getElementById("budgetSplitBackdrop")!, {
+      closeOnEsc: true,
+      onClosed: () => {
+        splitHost = null;
+        splitDrafts = [];
+      },
+    });
+
+    document
+      .getElementById("budgetSplitCloseBtn")!
+      .addEventListener("click", () => splitModal!.close());
+    document
+      .getElementById("budgetSplitCancelBtn")!
+      .addEventListener("click", () => splitModal!.close());
+
+    document.getElementById("budgetSplitAddRowBtn")!.addEventListener("click", () => {
+      const host = splitHost;
+      if (!host) return;
+      splitDrafts.push(makeSplitDraft(host, splitDrafts));
+      renderSplitRows();
+      renderSplitPreview();
+    });
+
+    document.getElementById("budgetSplitApplyBtn")!.addEventListener("click", applySplit);
+  }
+  return splitModal;
+}
+
+function openSplitModal(item: EntryItem): void {
+  const hostAmount = splitHostAmount(item);
+  if (hostAmount === 0) {
+    flash(`There is nothing to split: this entry is ${formatCurrency(0)}`, "error");
+    return;
+  }
+
+  splitHost = item;
+  // One row, pre-filled with the whole entry. Filling in a smaller amount
+  // leaves the difference on the original; adding a second row starts it at
+  // whatever that difference is.
+  splitDrafts = [makeSplitDraft(item, [])];
+
+  const label =
+    item.kind === "income"
+      ? itemSourceLabel(item)
+      : `${getCategoryById(item.entry.categoryId)?.name ?? "(unknown)"}` +
+        (item.entry.description ? ` · ${item.entry.description}` : "");
+  document.getElementById("budgetSplitContext")!.textContent =
+    `${label} · ${formatDate(item.entry.date)} · ${formatCurrency(hostAmount)}`;
+
+  document.getElementById("budgetSplitIntro")!.textContent =
+    item.kind === "income"
+      ? "Name the sources this payment was really made up of and how much came from each. " +
+        "Anything you don't account for stays on the original entry, and the expected figure " +
+        "is divided the same way."
+      : "Name what the parts of this actually were and how much each came to. " +
+        "Anything you don't account for stays on the original entry.";
+
+  getSplitModal().open();
+  renderSplitRows();
+  renderSplitPreview();
+}
+
+/* -----------------------------------------------------------------------------
+   MERGE
+----------------------------------------------------------------------------- */
+
+/** Which of the selection's dates the merged entry keeps. */
+type MergeDateMode = "earliest" | "latest" | "today";
+
+/** Where the merged entry's notes come from. "entry:<index>" picks one
+ *  specific entry, indexed into the plan's `ordered` list.
+ *
+ *  There is deliberately no "earliest" / "latest" shorthand: whenever more
+ *  than one entry has notes the dropdown lists each of them by name, so those
+ *  two would just be the first and last rows of that list under a second name. */
+type MergeNotesMode = "combine" | "none" | `entry:${number}`;
+
+/** What merging the given entries would produce, without doing it. Shared by
+ *  the modal's live summary and its Merge button so the preview can't lie. */
+function computeMergePlan(list: EntryItem[]): {
+  ordered: EntryItem[];
+  kind: "income" | "expense";
+  earliest: string;
+  latest: string;
+  /** The merged amount: the signed sum, so credits cancel charges. */
+  total: number;
+  /** Income only: the merged entry's `expected`. */
+  expectedTotal: number;
+  /** What the entries move in absolute terms, which is larger than `total`
+   *  exactly when the selection nets out. */
+  gross: number;
+  mixedSigns: boolean;
+} {
+  const ordered = [...list].sort((a, b) => a.entry.date.localeCompare(b.entry.date));
+  return {
+    ordered,
+    kind: ordered[0]!.kind,
+    earliest: ordered[0]!.entry.date,
+    latest: ordered[ordered.length - 1]!.entry.date,
+    total: ordered.reduce((sum, i) => sum + itemAmount(i), 0),
+    expectedTotal: ordered.reduce(
+      (sum, i) => sum + (i.kind === "income" ? i.entry.expected : 0),
+      0,
+    ),
+    gross: ordered.reduce((sum, i) => sum + Math.abs(itemAmount(i)), 0),
+    mixedSigns:
+      ordered.some((i) => itemAmount(i) > 0) && ordered.some((i) => itemAmount(i) < 0),
+  };
+}
+
+/** The date a merge lands on under the given mode. One place, so the summary,
+ *  the dropdown labels and the actual merge can't pick different days. */
+function mergeDateFor(
+  plan: ReturnType<typeof computeMergePlan>,
+  mode: MergeDateMode,
+): string {
+  if (mode === "latest") return plan.latest;
+  if (mode === "today") return today();
+  return plan.earliest;
+}
+
+/** The entries carrying notes, in merge order. Every notes option is defined
+ *  in terms of this list rather than the full selection, so "keep that note"
+ *  never resolves to an empty string from an entry that happened to sort
+ *  first. */
+function entriesWithNotes(ordered: EntryItem[]): EntryItem[] {
+  return ordered.filter((i) => i.entry.notes.trim());
+}
+
+/** Resolves the notes dropdown to the text the merged entry gets. */
+function resolveMergedNotes(ordered: EntryItem[], mode: MergeNotesMode): string {
+  if (mode === "none") return "";
+
+  if (mode.startsWith("entry:")) {
+    const index = Number(mode.slice("entry:".length));
+    return ordered[index]?.entry.notes ?? "";
+  }
+
+  // combine: every distinct note, in order, one per line. Duplicates are
+  // dropped because merging three parts of one shop run usually means three
+  // copies of the same note.
+  const seen = new Set<string>();
+  return entriesWithNotes(ordered)
+    .map((i) => i.entry.notes.trim())
+    .filter((n) => !seen.has(n) && seen.add(n))
+    .join("\n");
+}
+
+/** Distinct values of one field across the selection, heaviest first by the
+ *  money sitting behind each. Drives the "keep which" dropdowns: the category
+ *  or source most of the amount came from is the one you almost always mean
+ *  to keep. Values are ids (or, for an expense's free-text source, the text
+ *  itself) rather than names, so a merge can land on a retired category
+ *  without quietly resurrecting a duplicate of it. */
+function distinctByAmount(
+  list: EntryItem[],
+  pick: (item: EntryItem) => { value: string; label: string },
+): { value: string; label: string }[] {
+  const totals = new Map<string, { value: string; label: string; weight: number }>();
+  for (const item of list) {
+    const { value, label } = pick(item);
+    const group = totals.get(value) ?? { value, label, weight: 0 };
+    group.weight += Math.abs(itemAmount(item));
+    totals.set(value, group);
+  }
+  return [...totals.values()]
+    .sort((a, b) => b.weight - a.weight)
+    .map(({ value, label }) => ({ value, label }));
+}
+
+/* =============================================================================
+   MODAL: MERGE ENTRIES
+   -----------------------------------------------------------------------------
+   Collapses a selection into one entry. The amount is always the sum and is
+   shown up front rather than buried, because the one surprising thing this
+   operation can do is net a charge against a credit and leave a total smaller
+   than any of the rows that went into it.
+============================================================================= */
+
+let mergeModal: Modal | null = null;
+let mergeList: EntryItem[] = [];
+
+function buildMergeSummaryRow(label: string, value: string): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "budget-merge-summary-row";
+  const l = document.createElement("span");
+  l.className = "budget-merge-summary-label";
+  l.textContent = label;
+  const v = document.createElement("span");
+  v.className = "budget-merge-summary-value";
+  v.textContent = value;
+  row.append(l, v);
+  return row;
+}
+
+/** The date dropdown's current value. */
+function mergeDateMode(): MergeDateMode {
+  const sel = document.getElementById("budgetMergeDate") as HTMLSelectElement | null;
+  const v = sel?.value;
+  return v === "latest" || v === "today" ? v : "earliest";
+}
+
+/**
+ * Redraws the summary block and the note under it for whichever date is
+ * selected. Runs on open and on every change of that dropdown, so the figures
+ * on screen always describe the merge you would actually get.
+ */
+function refreshMergeSummary(plan: ReturnType<typeof computeMergePlan>): void {
+  const date = mergeDateFor(plan, mergeDateMode());
+
+  const summary = document.getElementById("budgetMergeSummary")!;
+  summary.innerHTML = "";
+  summary.appendChild(buildMergeSummaryRow("Date", formatDate(date)));
+  summary.appendChild(buildMergeSummaryRow("Merged amount", formatCurrency(plan.total)));
+  if (plan.kind === "income") {
+    summary.appendChild(
+      buildMergeSummaryRow("Merged expected", formatCurrency(plan.expectedTotal)),
+    );
+  }
+  summary.appendChild(
+    buildMergeSummaryRow("Replaces", `${plan.ordered.length} entries`),
+  );
+
+  // One box, two registers: red where the merge changes the figure you would
+  // expect from adding the rows up, muted where it only tells you something
+  // you should know.
+  const note = document.getElementById("budgetMergeWarning")!;
+  const lines: string[] = [];
+
+  if (plan.mixedSigns) {
+    lines.push(
+      `This selection mixes ${plan.kind === "income" ? "income and clawbacks" : "charges and credits"}, ` +
+      `so they cancel rather than add: ${formatCurrency(plan.gross)} of movement becomes ` +
+      `one entry of ${formatCurrency(plan.total)}.`,
+    );
+  }
+  if (plan.earliest !== plan.latest) {
+    lines.push(
+      `These entries run from ${formatDate(plan.earliest)} to ${formatDate(plan.latest)}. ` +
+      `The merged entry lands on ${formatDate(date)} and the rest are removed, ` +
+      `which moves money between those periods.`,
+    );
+  }
+
+  note.textContent = lines.join(" ");
+  note.classList.toggle("budget-merge-note", !plan.mixedSigns);
+  note.style.display = lines.length > 0 ? "" : "none";
+}
+
+function getMergeModal(): Modal {
+  if (!mergeModal) {
+    mergeModal = new Modal(document.getElementById("budgetMergeBackdrop")!, {
+      closeOnEsc: true,
+      onClosed: () => {
+        mergeList = [];
+      },
+    });
+
+    document
+      .getElementById("budgetMergeCloseBtn")!
+      .addEventListener("click", () => mergeModal!.close());
+    document
+      .getElementById("budgetMergeCancelBtn")!
+      .addEventListener("click", () => mergeModal!.close());
+
+    document.getElementById("budgetMergeDate")!.addEventListener("change", () => {
+      const live = mergeList.filter(stillPresent);
+      if (live.length >= 2) refreshMergeSummary(computeMergePlan(live));
+    });
+
+    document
+      .getElementById("budgetMergeConfirmBtn")!
+      .addEventListener("click", confirmMerge);
+  }
+  return mergeModal;
+}
+
+function confirmMerge(): void {
+  const live = mergeList.filter(stillPresent);
+  if (live.length < 2) {
+    flash("Nothing left to merge", "error");
+    mergeModal?.close();
+    return;
+  }
+
+  const plan = computeMergePlan(live);
+  const date = mergeDateFor(plan, mergeDateMode());
+  const sourceValue = (document.getElementById("budgetMergeSource") as HTMLSelectElement).value;
+  const notesMode = (document.getElementById("budgetMergeNotes") as HTMLSelectElement)
+    .value as MergeNotesMode;
+  const notes = resolveMergedNotes(plan.ordered, notesMode);
+  const ids = new Set(live.map((i) => i.entry.id));
+
+  if (plan.kind === "income") {
+    data.incomeEntries = data.incomeEntries.filter((e) => !ids.has(e.id));
+    data.incomeEntries.push({
+      id: makeId(),
+      date,
+      sourceId: sourceValue,
+      expected: plan.expectedTotal,
+      actual: plan.total,
+      notes,
+    });
+  } else {
+    const categoryId = (document.getElementById("budgetMergeCategory") as HTMLSelectElement).value;
+    data.fluctuatingExpenses = data.fluctuatingExpenses.filter((e) => !ids.has(e.id));
+    data.fluctuatingExpenses.push({
+      id: makeId(),
+      date,
+      categoryId,
+      description: sourceValue,
+      amount: plan.total,
+      notes,
+    });
+    // The source dropdown carries free text, not an id, so a merge onto a
+    // source that was never registered should register it, the same way
+    // typing one into the Add Entry form does.
+    if (sourceValue) findOrCreateExpenseSource(sourceValue);
+  }
+
+  selectedKeys.clear();
+  queueSave();
+  mergeModal!.close();
+  refreshDatalists();
+  renderAll();
+  flash(
+    `${live.length} entries merged into one (${formatCurrency(plan.total)})`,
+    "success",
+  );
+}
+
+/** Fills the date dropdown. Options only exist where they mean something
+ *  different: one date across the whole selection leaves nothing to choose
+ *  between earliest and latest, and "today" is not offered when today is
+ *  already one of them under another name. */
+function fillMergeDateSelect(plan: ReturnType<typeof computeMergePlan>): void {
+  const sel = document.getElementById("budgetMergeDate") as HTMLSelectElement;
+  const day = today();
+
+  sel.innerHTML = "";
+  const add = (value: MergeDateMode, label: string, date: string) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = `${label} · ${formatDate(date)}`;
+    sel.appendChild(opt);
+  };
+
+  add("earliest", plan.earliest === plan.latest ? "Keep" : "Earliest", plan.earliest);
+  if (plan.latest !== plan.earliest) add("latest", "Latest", plan.latest);
+  if (day !== plan.earliest && day !== plan.latest) add("today", "Today", day);
+
+  sel.disabled = sel.options.length < 2;
+  sel.title = sel.disabled
+    ? "These entries are all on the same day, so there is nothing to choose."
+    : "";
+  sel.value = "earliest";
+}
+
+/** Fills one of the "keep which" dropdowns from a weighted distinct list. */
+function fillMergeChoiceSelect(
+  id: string,
+  choices: { value: string; label: string }[],
+): void {
+  const sel = document.getElementById(id) as HTMLSelectElement;
+  sel.innerHTML = "";
+  for (const { value, label } of choices) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  }
+  // distinctByAmount puts the heaviest first, which is the sane default.
+  sel.selectedIndex = 0;
+  sel.disabled = choices.length < 2;
+}
+
+/** Fills the notes dropdown. Which options exist depends on what notes are
+ *  actually there: offering "keep the other note" when only one entry has any
+ *  is a choice that isn't a choice. */
+function fillMergeNotesSelect(ordered: EntryItem[]): void {
+  const sel = document.getElementById("budgetMergeNotes") as HTMLSelectElement;
+  const withNotes = entriesWithNotes(ordered);
+
+  sel.innerHTML = "";
+  const add = (value: string, label: string) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  };
+
+  if (withNotes.length === 0) {
+    add("none", "No notes on these entries");
+    sel.disabled = true;
+    sel.value = "none";
+    return;
+  }
+
+  sel.disabled = false;
+
+  if (withNotes.length === 1) {
+    add("combine", "Keep the one note there is");
+  } else {
+    add("combine", `Combine all ${withNotes.length} notes`);
+    // Then one named option per noted entry. The date, source and a snippet
+    // are what make them tellable apart at a glance, and listing every one is
+    // why no "earliest" / "latest" shorthand is needed.
+    ordered.forEach((item, index) => {
+      if (!item.entry.notes.trim()) return;
+      const snippet = item.entry.notes.trim().replace(/\s+/g, " ");
+      const short = snippet.length > 40 ? `${snippet.slice(0, 40)}…` : snippet;
+      add(
+        `entry:${index}`,
+        `Only ${formatDate(item.entry.date)} ${itemSourceLabel(item)} — "${short}"`,
+      );
+    });
+  }
+
+  add("none", "Discard notes");
+  sel.value = "combine";
+}
+
+function openMergeModal(list: EntryItem[]): void {
+  if (list.length < 2) {
+    flash("Select at least two entries to merge", "error");
+    return;
+  }
+  if (list.some((i) => i.kind !== list[0]!.kind)) {
+    flash("Income and expenses can't merge into one entry", "error");
+    return;
+  }
+  mergeList = list;
+
+  const plan = computeMergePlan(list);
+
+  document.getElementById("budgetMergeContext")!.textContent =
+    `${list.length} ${plan.kind === "income" ? "income entries" : "expenses"} into one`;
+
+  fillMergeDateSelect(plan);
+
+  // Category is an expense-only field; income rows have no category at all,
+  // so the row goes rather than showing a dropdown with nothing in it.
+  const categoryField = document.getElementById("budgetMergeCategoryField")!;
+  categoryField.style.display = plan.kind === "expense" ? "" : "none";
+  if (plan.kind === "expense") {
+    fillMergeChoiceSelect(
+      "budgetMergeCategory",
+      distinctByAmount(list, (item) => ({
+        value: item.kind === "expense" ? item.entry.categoryId : "",
+        label:
+          item.kind === "expense"
+            ? getCategoryById(item.entry.categoryId)?.name ?? "(unknown)"
+            : "",
+      })),
+    );
+  }
+
+  document.getElementById("budgetMergeSourceLabel")!.textContent =
+    plan.kind === "income" ? "Keep income source" : "Keep expense source";
+  fillMergeChoiceSelect(
+    "budgetMergeSource",
+    distinctByAmount(list, (item) => ({
+      value: item.kind === "income" ? item.entry.sourceId : item.entry.description,
+      label: itemSourceLabel(item),
+    })),
+  );
+
+  fillMergeNotesSelect(plan.ordered);
+  refreshMergeSummary(plan);
+
+  const listEl = document.getElementById("budgetMergeList")!;
+  listEl.innerHTML = "";
+  for (const item of plan.ordered) {
+    const row = document.createElement("div");
+    row.className = "budget-merge-list-row";
+
+    const name = document.createElement("span");
+    name.className = "budget-merge-list-name";
+    name.textContent =
+      item.kind === "expense"
+        ? `${getCategoryById(item.entry.categoryId)?.name ?? "(unknown)"} · ${itemSourceLabel(item)}`
+        : itemSourceLabel(item);
+    name.title = name.textContent;
+
+    const when = document.createElement("span");
+    when.className = "budget-merge-list-date";
+    when.textContent = formatDate(item.entry.date);
+
+    const amount = document.createElement("span");
+    amount.className = "budget-merge-list-amount";
+    amount.textContent = formatCurrency(itemAmount(item));
+
+    row.append(name, when, amount);
+    listEl.appendChild(row);
+  }
+
+  getMergeModal().open();
+}
+
+/* =============================================================================
+   MODAL: BULK DELETE CONFIRM
+   Always confirms, even with Quick Delete on: that setting exists to skip a
+   dialog for ONE row, and losing a whole selection is a different order of
+   mistake.
+============================================================================= */
+
+let bulkDeleteModal: Modal | null = null;
+let bulkDeleteList: EntryItem[] = [];
+
+function getBulkDeleteModal(): Modal {
+  if (!bulkDeleteModal) {
+    bulkDeleteModal = new Modal(document.getElementById("budgetBulkDeleteBackdrop")!, {
+      closeOnEsc: true,
+      onClosed: () => {
+        bulkDeleteList = [];
+      },
+    });
+
+    document
+      .getElementById("budgetBulkDeleteCancelBtn")!
+      .addEventListener("click", () => bulkDeleteModal!.close());
+
+    document.getElementById("budgetBulkDeleteConfirmBtn")!.addEventListener("click", () => {
+      const live = bulkDeleteList.filter(stillPresent);
+      if (live.length === 0) {
+        bulkDeleteModal!.close();
+        return;
+      }
+      const incomeIds = new Set(
+        live.filter((i) => i.kind === "income").map((i) => i.entry.id),
+      );
+      const expenseIds = new Set(
+        live.filter((i) => i.kind === "expense").map((i) => i.entry.id),
+      );
+      data.incomeEntries = data.incomeEntries.filter((e) => !incomeIds.has(e.id));
+      data.fluctuatingExpenses = data.fluctuatingExpenses.filter(
+        (e) => !expenseIds.has(e.id),
+      );
+
+      selectedKeys.clear();
+      queueSave();
+      bulkDeleteModal!.close();
+      renderAll();
+      flash(`${live.length} entries deleted`, "success");
+    });
+  }
+  return bulkDeleteModal;
+}
+
+function openBulkDeleteModal(list: EntryItem[]): void {
+  if (list.length === 0) return;
+  bulkDeleteList = list;
+  // The net, not the gross: it is the figure the ledger's own subtotals move
+  // by, and the one worth checking before confirming.
+  const net = list.reduce((sum, item) => sum + itemAmount(item), 0);
+  document.getElementById("budgetBulkDeleteMessage")!.textContent =
+    `Delete ${list.length} entries, ${formatCurrency(net)} in total? This can't be undone.`;
+  getBulkDeleteModal().open();
 }
 
 /* =============================================================================
@@ -5464,6 +6764,41 @@ async function _continueInit(): Promise<void> {
     ledgerSortSelect.addEventListener("change", () => {
       ledgerSortMode = ledgerSortSelect.value as LedgerSortMode;
       renderEntries();
+    });
+
+    /* --- Bulk selection ---------------------------------------------------
+       The bar's own buttons all read selectedInOrder() at click time rather
+       than holding a list, so nothing here can act on rows that have since
+       scrolled out of the browsed range. */
+    document.getElementById("budgetSelectModeBtn")!.addEventListener("click", () => {
+      setSelectMode(!selectMode);
+    });
+
+    document.getElementById("budgetSelectAllBtn")!.addEventListener("click", () => {
+      lastVisibleEntries.forEach((item) => selectedKeys.add(itemKey(item)));
+      renderEntries();
+    });
+
+    document.getElementById("budgetSelectNoneBtn")!.addEventListener("click", () => {
+      selectedKeys.clear();
+      lastCheckedKey = null;
+      renderEntries();
+    });
+
+    document.getElementById("budgetBulkCloneBtn")!.addEventListener("click", () => {
+      cloneLedgerEntries(selectedInOrder());
+    });
+
+    document.getElementById("budgetBulkMergeBtn")!.addEventListener("click", () => {
+      openMergeModal(selectedInOrder());
+    });
+
+    document.getElementById("budgetBulkRefundBtn")!.addEventListener("click", () => {
+      refundLedgerEntries(selectedInOrder());
+    });
+
+    document.getElementById("budgetBulkDeleteBtn")!.addEventListener("click", () => {
+      openBulkDeleteModal(selectedInOrder());
     });
 
     // Mark Paid / Edit Payment modal

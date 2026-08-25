@@ -2428,11 +2428,25 @@
               <div class="panel panel-accent-entries budget-entries-panel">
                 <div class="entries-header-row">
                   <span id="budgetEntriesHeader">Ledger</span>
-                  <select id="budgetLedgerSortSelect" class="budget-ledger-sort-select" title="Change ledger grouping">
-                    <option value="chrono">Chronological</option>
-                    <option value="grouped">Income / Bill / Expense</option>
-                    <option value="alpha-source">By Source</option>
-                  </select>
+                  <span class="budget-ledger-header-actions">
+                    <button id="budgetSelectModeBtn" class="toggle-btn budget-select-mode-btn" type="button"
+                      title="Select entries to clone, merge, refund, or delete in bulk">Select</button>
+                    <select id="budgetLedgerSortSelect" class="budget-ledger-sort-select" title="Change ledger grouping">
+                      <option value="chrono">Chronological</option>
+                      <option value="grouped">Income / Bill / Expense</option>
+                      <option value="alpha-source">By Source</option>
+                    </select>
+                  </span>
+                </div>
+                <div id="budgetSelectionBar" class="budget-selection-bar" style="display:none;">
+                  <span id="budgetSelectionCount" class="budget-selection-count">0 selected</span>
+                  <button id="budgetSelectAllBtn" class="budget-selection-btn" type="button">All</button>
+                  <button id="budgetSelectNoneBtn" class="budget-selection-btn" type="button">None</button>
+                  <span class="budget-selection-spacer"></span>
+                  <button id="budgetBulkCloneBtn" class="budget-selection-btn" type="button" title="Duplicate the selected entries">Clone</button>
+                  <button id="budgetBulkMergeBtn" class="budget-selection-btn" type="button" title="Combine the selected entries into one">Merge</button>
+                  <button id="budgetBulkRefundBtn" class="budget-selection-btn" type="button" title="Book the selected entries back onto today as credits">Refund</button>
+                  <button id="budgetBulkDeleteBtn" class="budget-selection-btn budget-selection-btn-danger" type="button" title="Delete the selected entries">Delete</button>
                 </div>
                 <div id="budgetEntries"></div>
               </div>
@@ -4864,6 +4878,109 @@
         <div class="exit-modal-actions">
           <button id="budgetDeleteConfirmBtn" class="danger-btn">Delete Entry</button>
           <button id="budgetDeleteCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       BUDGET TRACKER: BULK DELETE CONFIRM
+       Always confirms, even with Quick Delete on: that setting exists to skip
+       a dialog for ONE row, and losing a whole selection is a different order
+       of mistake.
+  ====================================================================== -->
+  <div id="budgetBulkDeleteBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Delete Entries</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="budgetBulkDeleteMessage">Delete the selected entries?</p>
+        <div class="exit-modal-actions">
+          <button id="budgetBulkDeleteConfirmBtn" class="danger-btn">Delete Entries</button>
+          <button id="budgetBulkDeleteCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       BUDGET TRACKER: SPLIT ENTRY
+       The budget analogue of the Time Tracker's Break-In Tasks: one entry is
+       the host, each part is carved out of its amount, and whatever is left
+       stays on the original row. See the SPLIT section in budget.ts.
+  ====================================================================== -->
+  <div id="budgetSplitBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal budget-split-modal">
+      <div class="modal-header">
+        <span>Split Entry</span>
+        <button id="budgetSplitCloseBtn" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div id="budgetSplitContext" class="budget-modal-context"></div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <p id="budgetSplitIntro" class="budget-split-intro"></p>
+
+        <div id="budgetSplitRows" class="budget-split-rows"></div>
+        <button id="budgetSplitAddRowBtn" class="setup-new-btn" type="button">+ Add another part</button>
+
+        <div class="budget-split-preview-title">Result</div>
+        <div id="budgetSplitPreview" class="budget-split-preview"></div>
+
+        <div class="setup-actions">
+          <button id="budgetSplitApplyBtn" type="button">Apply</button>
+          <button id="budgetSplitCancelBtn" class="modal-cancel-btn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       BUDGET TRACKER: MERGE ENTRIES
+       Collapses a selection of ledger entries into one. Every field the merged
+       entry can only take one value of (date, category, source, notes) gets a
+       dropdown; the amount is always the sum, shown up front because a
+       selection that mixes charges and credits nets out rather than adding up.
+  ====================================================================== -->
+  <div id="budgetMergeBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal budget-merge-modal">
+      <div class="modal-header">
+        <span>Merge Entries</span>
+        <button id="budgetMergeCloseBtn" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div id="budgetMergeContext" class="budget-modal-context"></div>
+      <div class="modal-body setup-body" style="text-align:left;">
+        <div id="budgetMergeSummary" class="budget-merge-summary"></div>
+        <div id="budgetMergeWarning" class="budget-merge-warning" style="display:none;"></div>
+
+        <div class="setup-form">
+          <div class="setup-field">
+            <label for="budgetMergeDate">Date</label>
+            <select id="budgetMergeDate"></select>
+          </div>
+          <div class="setup-field" id="budgetMergeCategoryField">
+            <label for="budgetMergeCategory">Keep category</label>
+            <select id="budgetMergeCategory"></select>
+          </div>
+          <div class="setup-field">
+            <label for="budgetMergeSource" id="budgetMergeSourceLabel">Keep source</label>
+            <select id="budgetMergeSource"></select>
+          </div>
+          <div class="setup-field">
+            <label for="budgetMergeNotes">Notes</label>
+            <select id="budgetMergeNotes"></select>
+          </div>
+        </div>
+
+        <div class="budget-merge-list-title">Merging</div>
+        <div id="budgetMergeList" class="budget-merge-list"></div>
+
+        <div class="setup-actions">
+          <button id="budgetMergeConfirmBtn" type="button">Merge Entries</button>
+          <button id="budgetMergeCancelBtn" class="modal-cancel-btn" type="button">Cancel</button>
         </div>
       </div>
     </div>
