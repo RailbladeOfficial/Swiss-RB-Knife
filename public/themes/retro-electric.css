@@ -10,7 +10,7 @@
 
   /* --color-btn is consumed across the shell as the BRIGHT accent, tool-card
      icons, the About-icon pulse, the Home "Update Available" line, active
-     borders, filled active states, and modal links all colour themselves from
+     borders, filled active states, and modal links all color themselves from
      it. It must be vivid, NOT the dark navy the outlined buttons use: those
      buttons are hardcoded further down and never read this var, so a cyan value
      here lights up the accents without touching the button look. */
@@ -456,7 +456,7 @@ input:range .img-slider {
 
 /* Image CCR. Resize: the "N images found" count value uses var(--color-btn-text)
    in the tool CSS, which is this theme's dark ink (#04121c) → unreadable on the
-   dark stat background. Recolour just that count to cyan. */
+   dark stat background. Recolor just that count to cyan. */
 .resize-stat-count .resize-stat-val {
   color: #00dfff;
 }
@@ -467,7 +467,7 @@ input:range .img-slider {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {
@@ -482,7 +482,7 @@ input:range .img-slider {
 }
 
 /* Cyan-on-cyan needs the winner to separate from the accent, a magenta
-   under-glow does it without leaving the two-colour palette. */
+   under-glow does it without leaving the two-color palette. */
 .gs-score-chip.leader,
 .gs-tile.gs-tile-alert {
   box-shadow: 0 0 14px rgba(0, 223, 255, 0.28);

@@ -794,6 +794,29 @@ pub fn run() {
             tools::countdown::load_countdown_data,
             tools::countdown::countdown_start_ticker,
             tools::countdown::countdown_stop_ticker,
+            // RNGesus (random number generator)
+            tools::rng::save_rng_data,
+            tools::rng::load_rng_data,
+            // Kanban Boards
+            tools::kanban::save_kanban_settings,
+            tools::kanban::load_kanban_settings,
+            tools::kanban::save_kanban_index,
+            tools::kanban::load_kanban_index,
+            tools::kanban::save_kanban_board,
+            tools::kanban::load_kanban_board,
+            tools::kanban::delete_kanban_board,
+            tools::kanban::kanban_lock_status,
+            tools::kanban::kanban_verify_password,
+            tools::kanban::kanban_decrypt_board,
+            tools::kanban::kanban_save_board_encrypted,
+            tools::kanban::kanban_encrypt_board,
+            tools::kanban::kanban_decrypt_board_to_plain,
+            tools::kanban::kanban_decrypt_envelope,
+            tools::kanban::list_kanban_backups,
+            tools::kanban::read_kanban_backup,
+            tools::kanban::import_kanban_image,
+            tools::kanban::delete_kanban_image,
+            tools::kanban::export_kanban_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

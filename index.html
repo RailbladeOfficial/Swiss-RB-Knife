@@ -5,28 +5,31 @@
   <meta charset="UTF-8" />
   <title>Swiss RB Knife</title>
   <meta name="description" content="A Multi-Tool Application." />
-  <link rel="stylesheet" href="src/shell.css" />
-  <link rel="stylesheet" href="src/modal.css" />
-  <link rel="stylesheet" href="src/docs.css" />
-  <link rel="stylesheet" href="src/landing.css" />
-  <link rel="stylesheet" href="src/lockscreen.css" />
-  <link rel="stylesheet" href="src/theme-editor.css" />
-  <link rel="stylesheet" href="src/tools/time-tracker.css" />
-  <link rel="stylesheet" href="src/tools/image-ccr.css" />
-  <link rel="stylesheet" href="src/tools/file-gen.css" />
-  <link rel="stylesheet" href="src/tools/auto-backup.css" />
-  <link rel="stylesheet" href="src/tools/budget.css" />
-  <link rel="stylesheet" href="src/tools/game-stats.css" />
-  <link rel="stylesheet" href="src/tools/tts-repeater.css" />
-  <link rel="stylesheet" href="src/tools/days-between.css" />
-  <link rel="stylesheet" href="src/tools/countdown.css" />
+  <link rel="stylesheet" href="src/core/shell.css" />
+  <link rel="stylesheet" href="src/modal/modal.css" />
+  <link rel="stylesheet" href="src/menu/menu.css" />
+  <link rel="stylesheet" href="src/core/docs.css" />
+  <link rel="stylesheet" href="src/core/landing.css" />
+  <link rel="stylesheet" href="src/core/lockscreen.css" />
+  <link rel="stylesheet" href="src/theme/theme-editor.css" />
+  <link rel="stylesheet" href="src/tool/time-tracker.css" />
+  <link rel="stylesheet" href="src/tool/image-ccr.css" />
+  <link rel="stylesheet" href="src/tool/file-gen.css" />
+  <link rel="stylesheet" href="src/tool/auto-backup.css" />
+  <link rel="stylesheet" href="src/tool/budget.css" />
+  <link rel="stylesheet" href="src/tool/game-stats.css" />
+  <link rel="stylesheet" href="src/tool/tts-repeater.css" />
+  <link rel="stylesheet" href="src/tool/days-between.css" />
+  <link rel="stylesheet" href="src/tool/countdown.css" />
+  <link rel="stylesheet" href="src/tool/rng.css" />
+  <link rel="stylesheet" href="src/tool/kanban.css" />
   <!-- Boot-time palette only. applyTheme() swaps this href as soon as settings
        load, so this is just what paints for the first frame; keep it pointing at
        DEFAULT_THEME_ID (theme-core.ts) so a fresh install has nothing to swap and
        shows no flash. Must be a file that always exists, an unresolvable href
        here means no --color-* vars at all until JS runs. -->
   <link id="themeLink" rel="stylesheet" href="/themes/dark.css" />
-  <script type="module" src="src/shell.ts"></script>
+  <script type="module" src="src/core/shell.ts"></script>
 </head>
 
 <body>
@@ -170,6 +173,27 @@
           <span class="nav-label">Time Tracker</span>
         </li>
 
+        <li class="nav-item" data-section="utility" data-tool="kanban" title="Kanban">
+          <span class="nav-icon">
+            <!-- Three columns of unequal fill: the shape of a board mid-flow,
+                 not three identical boxes. Left column full, middle two cards,
+                 right one, which reads left-to-right as work moving across. -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <rect x="2.5" y="3" width="5.5" height="18" rx="1.5" />
+              <rect x="9.25" y="3" width="5.5" height="18" rx="1.5" />
+              <rect x="16" y="3" width="5.5" height="18" rx="1.5" />
+              <line x1="4.5" y1="7" x2="6" y2="7" />
+              <line x1="4.5" y1="10.5" x2="6" y2="10.5" />
+              <line x1="4.5" y1="14" x2="6" y2="14" />
+              <line x1="11.25" y1="7" x2="12.75" y2="7" />
+              <line x1="11.25" y1="10.5" x2="12.75" y2="10.5" />
+              <line x1="18" y1="7" x2="19.5" y2="7" />
+            </svg>
+          </span>
+          <span class="nav-label">Kanban</span>
+        </li>
+
         <li class="nav-item" data-section="files" data-tool="auto-backup" title="Auto-Backup">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -265,6 +289,21 @@
             </svg>
           </span>
           <span class="nav-label">Days Between Dates</span>
+        </li>
+
+        <li class="nav-item" data-section="utility" data-tool="rng" title="RNGesus (random number generator)">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3" ry="3" />
+              <circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <span class="nav-label">RNGesus</span>
         </li>
 
         <!-- =================================================================
@@ -414,6 +453,26 @@
               export.</div>
           </div>
 
+          <div class="tool-card" data-section="utility" data-tool="kanban">
+            <div class="tool-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="2.5" y="3" width="5.5" height="18" rx="1.5" />
+                <rect x="9.25" y="3" width="5.5" height="18" rx="1.5" />
+                <rect x="16" y="3" width="5.5" height="18" rx="1.5" />
+                <line x1="4.5" y1="7" x2="6" y2="7" />
+                <line x1="4.5" y1="10.5" x2="6" y2="10.5" />
+                <line x1="4.5" y1="14" x2="6" y2="14" />
+                <line x1="11.25" y1="7" x2="12.75" y2="7" />
+                <line x1="11.25" y1="10.5" x2="12.75" y2="10.5" />
+                <line x1="18" y1="7" x2="19.5" y2="7" />
+              </svg>
+            </div>
+            <div class="tool-card-name">Kanban</div>
+            <div class="tool-card-desc">Boards, columns and task cards you drag across them, with tags, subtasks,
+              stage dates and per-board backgrounds.</div>
+          </div>
+
           <div class="tool-card" data-section="files" data-tool="auto-backup">
             <div class="tool-card-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -521,6 +580,23 @@
             <div class="tool-card-name">Days Between Dates</div>
             <div class="tool-card-desc">Pick two dates and get the elapsed days broken down by calendar, weeks,
               weekdays and more.</div>
+          </div>
+
+          <div class="tool-card" data-section="utility" data-tool="rng">
+            <div class="tool-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3" ry="3" />
+                <circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+            </svg>
+            </div>
+            <div class="tool-card-name">RNGesus</div>
+            <div class="tool-card-desc">Draw numbers in any range, whole or fractional, one at a time or a hundred
+              at once, keeping the run or replacing it.</div>
           </div>
 
         </div>
@@ -1113,6 +1189,9 @@
                 <button id="cd-start-btn">Start</button>
                 <button id="cd-pause-btn" class="modal-cancel-btn" style="display:none;">Pause</button>
                 <button id="cd-stop-btn" class="danger-btn" style="display:none;">Stop</button>
+                <!-- Shown only while a session is live; see render(). -->
+                <button id="cd-display-btn" style="display:none;"
+                  title="Show just the clock, full screen">Display View</button>
               </div>
 
               <div id="cd-extend-row" class="cd-extend-row" style="display:none;">
@@ -1245,6 +1324,263 @@
 
           </div>
         </div><!-- /utility-tool-days-between -->
+
+        <!-- =================================================================
+             RNGESUS  (random number generator)
+             Draws from the WebView's CSPRNG rather than Math.random(); see the
+             randomUnit() note in rng.ts. The pool of results is the tool's
+             state and is persisted, because a number you cannot reconstruct is
+             exactly the kind of thing that must not vanish with the window.
+        ================================================================== -->
+        <div id="utility-tool-rng" class="tool-view" style="display:none;">
+          <div class="tool-view-header">
+            <button class="tool-back-btn" data-section="home" title="Back to Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span class="tool-view-title">RNGesus</span>
+            <button id="rng-reset" class="tool-view-header-action"
+              title="Restore the default range and options">Reset</button>
+          </div>
+
+          <!-- Two columns: everything you SET on the left, everything you GOT
+               on the right. The numbers are the output the tool exists for, so
+               they get the wide half and the full height of the row rather than
+               a strip under the controls. Copy All and Clear travel with them:
+               they act on the pool, not on the settings.
+               Collapses to one column below 1000px; see .rng-body. -->
+          <div class="rng-body">
+
+            <div class="rng-settings-col">
+
+              <div class="panel panel-accent-input">
+                <div class="rng-range-row">
+                  <div class="rng-field">
+                    <label class="rng-label" for="rng-min">Minimum</label>
+                    <input id="rng-min" class="rng-number-input" type="number" step="any" value="1"
+                      autocomplete="off" />
+                  </div>
+                  <!-- Bounds are read lowest-first at generation time, so a
+                       reversed pair still works; this is for tidiness, and for
+                       seeing which way round they are. -->
+                  <button id="rng-swap" class="rng-swap-btn modal-cancel-btn"
+                    title="Swap minimum and maximum">&#8646;</button>
+                  <div class="rng-field">
+                    <label class="rng-label" for="rng-max">Maximum</label>
+                    <input id="rng-max" class="rng-number-input" type="number" step="any" value="100"
+                      autocomplete="off" />
+                  </div>
+                </div>
+                <span class="rng-note">Both ends are included. Negatives are fine, and so is a reversed pair.</span>
+              </div>
+
+              <div class="panel panel-accent-view">
+                <div class="rng-options-row">
+
+                  <div class="rng-field">
+                    <span class="rng-label">Decimals</span>
+                    <div class="rng-toggle-row">
+                      <div class="rng-toggle-label">
+                        <span>Include decimals</span>
+                        <span class="rng-toggle-note">Off draws whole numbers.</span>
+                      </div>
+                      <label class="toggle-switch">
+                        <input type="checkbox" id="rng-decimals" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                    <!-- Shown only while decimals are on; see syncDerivedUI(). -->
+                    <div id="rng-places-field" class="rng-inline-row" style="display:none;">
+                      <input id="rng-places" class="rng-places-input" type="number" min="1" max="8" step="1" value="2"
+                        autocomplete="off" />
+                      <span class="rng-note">decimal places</span>
+                    </div>
+                  </div>
+
+                  <div class="rng-field">
+                    <label class="rng-label" for="rng-count">How Many</label>
+                    <div class="rng-inline-row">
+                      <input id="rng-count" class="rng-count-input" type="number" min="1" max="1000" step="1" value="1"
+                        autocomplete="off" />
+                      <span class="rng-note">per generation</span>
+                    </div>
+                  </div>
+
+                  <div class="rng-field">
+                    <span class="rng-label">History</span>
+                    <div class="rng-toggle-row">
+                      <div class="rng-toggle-label">
+                        <span>Keep previous numbers</span>
+                        <!-- Rewritten from the toggle so the OTHER position is
+                             explained too; see syncDerivedUI(). -->
+                        <span id="rng-history-note" class="rng-toggle-note"></span>
+                      </div>
+                      <label class="toggle-switch">
+                        <input type="checkbox" id="rng-keep-history" />
+                        <span class="toggle-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="rng-field">
+                    <span class="rng-label">View</span>
+                    <div id="rng-output-mode" class="rng-seg-group">
+                      <button class="toggle-btn active" data-value="grid"
+                        title="One comma-separated run that wraps">Grid</button>
+                      <button class="toggle-btn" data-value="rows"
+                        title="A scrolling list, one number per row, each removable">Rows</button>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Outside the panels and full width of the column: the one
+                   control here that is pressed over and over, so it is the one
+                   you should never have to aim for. -->
+              <button id="rng-generate-btn">Generate</button>
+
+            </div>
+
+            <div class="panel panel-accent-entries rng-results-panel">
+              <div class="rng-results-header">
+                <div class="rng-results-heading">
+                  <span class="rng-label">Results</span>
+                  <span id="rng-summary" class="rng-summary"></span>
+                </div>
+                <div class="rng-results-actions">
+                  <button id="rng-copy-btn" class="modal-cancel-btn"
+                    title="Copy every number, comma-separated">Copy All</button>
+                  <button id="rng-clear-btn" class="danger-btn" title="Remove every number">Clear</button>
+                </div>
+              </div>
+              <p id="rng-empty" class="placeholder-text">No numbers yet. Set a range on the left and press Generate.</p>
+              <div id="rng-grid" class="rng-grid" style="display:none;"></div>
+              <div id="rng-rows" class="rng-rows" style="display:none;"></div>
+            </div>
+
+          </div>
+        </div><!-- /utility-tool-rng -->
+
+        <!-- =================================================================
+             KANBAN BOARDS
+             -----------------------------------------------------------------
+             Two views inside one tool, swapped by showKbView() in kanban.ts
+             and recorded in that file's own back/forward stack (same
+             arrangement Game Stats uses):
+
+               #kbViewBoards   the board gallery
+               #kbViewBoard    one board's columns
+
+             The board view's background image layer (#kbBoardBg) is a sibling
+             of the chrome rather than a background on it, because it carries a
+             CSS filter (blur + brightness) and a filter applies to an element's
+             whole subtree; painting it on the container would blur the cards
+             sitting on top of it too.
+        ================================================================== -->
+        <div id="utility-tool-kanban" class="tool-view" style="display:none;">
+          <div class="tool-view-header">
+            <button class="tool-back-btn" data-section="home" title="Back to Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span class="tool-view-title">Kanban</span>
+            <div class="tool-header-notice-wrap" id="kbHeaderNoticeWrap" style="display:none;">
+              <span id="kbHeaderNotice" class="tool-header-notice"></span>
+            </div>
+            <nav class="tool-view-header-actions">
+              <button id="kbBoardSetupBtn" style="display:none;"
+                title="This board's own settings: background, its tags, and the preferences it overrides">Board
+                Setup</button>
+              <button id="kbSetupBtn" title="Kanban setup: default tags, default preferences, security, data">Setup</button>
+            </nav>
+          </div>
+
+          <!-- TOOL LOCK GATE
+               Shown instead of the views (never merely over them: a board
+               rendered behind a gate is a board whose card titles are one
+               screenshot away) when the Ask-on-Open preference is set and a
+               password exists. Passing it holds the password for the visit,
+               which is also what unlocks the encrypted boards behind it. -->
+          <div id="kbAuthView" class="kb-auth-view" style="display:none;">
+            <div class="kb-auth-card panel panel-accent-input">
+              <span class="kb-auth-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4" y="10.5" width="16" height="10.5" rx="2" />
+                  <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+                  <circle cx="12" cy="15.5" r="1.4" />
+                </svg>
+              </span>
+              <h2 class="kb-auth-title">Kanban is locked</h2>
+              <p class="kb-auth-note">Enter the Kanban password. This is the same password your encrypted boards
+                use, so entering it here opens them for this visit too.</p>
+              <input type="password" id="kbAuthInput" class="kb-auth-input" autocomplete="off" spellcheck="false"
+                placeholder="Password" />
+              <p id="kbAuthError" class="kb-password-error"></p>
+              <button id="kbAuthSubmitBtn">Unlock</button>
+            </div>
+          </div>
+
+          <!-- VIEW: BOARD GALLERY -->
+          <div id="kbViewBoards" class="kb-view">
+            <div class="kb-gallery-bar panel panel-accent-input">
+              <input id="kbBoardSearch" class="kb-search-input" type="search" placeholder="Search boards"
+                spellcheck="false" autocomplete="off" />
+              <span id="kbGallerySummary" class="kb-gallery-summary"></span>
+              <button id="kbNewBoardBtn">+ New Board</button>
+            </div>
+            <div id="kbBoardGrid" class="kb-board-grid"></div>
+            <p id="kbBoardsEmpty" class="placeholder-text kb-empty" style="display:none;">No boards yet. Make one and
+              give it a background so you can tell it apart at a glance.</p>
+          </div>
+
+          <!-- VIEW: ONE BOARD -->
+          <div id="kbViewBoard" class="kb-view kb-view-board" style="display:none;">
+            <div id="kbBoardBg" class="kb-board-bg"></div>
+            <div class="kb-board-chrome">
+
+              <div class="kb-board-bar">
+                <button id="kbBoardBackBtn" class="kb-icon-btn" title="Back to all boards">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+                <span id="kbBoardTitle" class="kb-board-title"></span>
+                <span id="kbBoardCounts" class="kb-board-counts"></span>
+                <div class="kb-board-bar-right">
+                  <input id="kbCardSearch" class="kb-search-input" type="search" placeholder="Filter cards"
+                    spellcheck="false" autocomplete="off" />
+                  <button id="kbFilterBtn" class="toggle-btn" title="Filter by tag and due date">Filters</button>
+                  <button id="kbAddColumnBtn" title="Add a column to this board">+ Column</button>
+                  <button id="kbBoardMenuBtn" class="kb-icon-btn" title="Board actions">
+                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                      <circle cx="12" cy="5" r="1.7" />
+                      <circle cx="12" cy="12" r="1.7" />
+                      <circle cx="12" cy="19" r="1.7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tag chips + a due filter. Built by renderFilterBar(); hidden
+                   until the Filters button is pressed, and force-shown while
+                   any filter is active so a filtered board can never look like
+                   an empty one. -->
+              <div id="kbFilterBar" class="kb-filter-bar" style="display:none;"></div>
+
+              <div id="kbColumns" class="kb-columns"></div>
+              <p id="kbColumnsEmpty" class="placeholder-text kb-empty" style="display:none;">This board has no columns
+                yet. Add one to start.</p>
+            </div>
+          </div>
+
+        </div><!-- /utility-tool-kanban -->
       </section>
 
       <!-- =================================================================
@@ -2975,6 +3311,28 @@
               </div>
             </div>
 
+            <!-- The same three stages F11 cycles through. Deliberately NOT a
+                 saved preference: Spacious already hides the top bar, which is
+                 this window's only close button and only drag handle, so
+                 restoring either mode at launch would open the app with no
+                 visible way out. The info bubble says so, and says how to get
+                 back. -->
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>View Mode (F11):</span>
+                <button type="button" class="info-trigger-btn settings-info-btn"
+                  data-tooltip="Press F11 at any time to step through these three in order and back around to Standard. That is the only way back once this window is closed, because Spacious hides the top bar and the sidebar, which is where Settings lives, and Fullscreen hides the tool's own header bar on top of that. This is not saved, so the app always starts in Standard.">&#8505;</button>
+              </div>
+              <div id="viewModeGroup" class="settings-seg-group">
+                <button class="toggle-btn active" data-value="0"
+                  title="The normal window. Everything visible.">Standard</button>
+                <button class="toggle-btn" data-value="1"
+                  title="Hides the top bar and the sidebar.">Spacious</button>
+                <button class="toggle-btn" data-value="2"
+                  title="Also hides the tool's header bar.">Fullscreen</button>
+              </div>
+            </div>
+
             <div class="settings-row">
               <div class="settings-label-col">
                 <span>Theme:</span>
@@ -3097,6 +3455,7 @@
                 <optgroup label="Specific Tool">
                   <option value="finance:budget">Budget Tracker</option>
                   <option value="utility:time-tracker">Time Tracker</option>
+                  <option value="utility:kanban">Kanban</option>
                   <option value="files:auto-backup">Auto-Backup</option>
                   <option value="utility:countdown">Countdown Timer</option>
                   <option value="games:game-stats">Game Stats</option>
@@ -3104,6 +3463,7 @@
                   <option value="utility:days-between">Days Between Dates</option>
                   <option value="utility:tts-repeater">TTS Repeater</option>
                   <option value="files:dummy-file-generator">Dummy File Generator</option>
+                  <option value="utility:rng">RNGesus</option>
                 </optgroup>
               </select>
             </div>
@@ -3138,7 +3498,7 @@
 
             <div class="settings-row">
               <div class="settings-label-col">
-                <span>Sidebar:</span>
+                <span>Home/Sidebar:</span>
                 <span id="sidebarHiddenBadge" class="settings-status-badge" style="display:none;"></span>
               </div>
               <button id="sidebarEditBtn" class="settings-action-btn">Customize</button>
@@ -3181,7 +3541,7 @@
         <button id="sidebarEditBack" class="nav-back-btn modal-header-left" title="Back to Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
-        <span>Edit Sidebar</span>
+        <span>Edit Home/Sidebar</span>
         <button id="sidebarEditClose" class="modal-close-btn modal-header-right" title="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
@@ -3807,7 +4167,7 @@
         </button>
       </div>
       <!-- .modal-tabs / .modal-tab: the app-wide modal tab strip (modal.css),
-           same as every Setup/Settings modal. It draws its colours from theme
+           same as every Setup/Settings modal. It draws its colors from theme
            variables, so it follows built-in AND custom themes with nothing
            restated per theme. .licensing-tabs rides along purely for this
            strip's own padding. Driven by ModalTabs in docs.ts. -->
@@ -4495,7 +4855,7 @@
        COUNTDOWN: SETUP
   ====================================================================== -->
   <div id="cd-setup-backdrop" class="modal-backdrop" style="display: none;">
-    <div class="modal modal-scrollable cd-setup-modal">
+    <div id="cdSetupModal" class="modal setup-modal">
       <div class="modal-header">
         <span>Countdown Timer Setup</span>
         <button id="cd-setup-close" class="modal-close-btn modal-header-right" title="Close">
@@ -4505,7 +4865,18 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body" style="text-align:left;">
+      <div class="modal-body setup-body">
+
+        <!-- Two tabs rather than two halves of one scroll: the timer's
+             behaviour and how it looks on someone else's screen are set at
+             different times and have nothing to say to each other. Each pane
+             ends with its own Reset for the same reason. -->
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-cd-tab="timer">Timer</button>
+          <button class="modal-tab" data-cd-tab="display">Display View</button>
+        </div>
+
+        <div id="cdTabTimer" class="modal-tab-pane">
 
         <div class="cd-setup-field">
           <span class="cd-label">Progress Style</span>
@@ -4523,6 +4894,16 @@
             <button class="toggle-btn active" data-value="colon">00:10:00</button>
             <button class="toggle-btn" data-value="units">0h 10m 0s</button>
           </div>
+        </div>
+
+        <div class="cd-setup-field">
+          <label class="cd-label" for="cd-clock-font">Clock Font</label>
+          <!-- Filled from CLOCK_FONTS (countdown.ts), each option drawn in the
+               face it names. Applies to the clock, the duration editor it turns
+               into, and the Display View. -->
+          <select id="cd-clock-font" class="cd-font-select"></select>
+          <span class="cd-setup-note">Fixed-width faces keep the digits from shifting as they count down, which is
+            very visible to an audience. A face this machine doesn't have falls back to the next one like it.</span>
         </div>
 
         <div class="cd-setup-field">
@@ -4582,9 +4963,211 @@
         </div>
 
         <div class="cd-setup-actions">
-          <button id="cd-setup-reset" class="modal-cancel-btn" title="Restore default Countdown Timer settings">Reset to
-            Defaults</button>
+          <button id="cd-setup-reset" class="modal-cancel-btn"
+            title="Restore the default timer behaviour. Leaves Display View alone.">Reset Timer Settings</button>
         </div>
+
+        </div><!-- /cdTabTimer -->
+
+        <!-- ── Display View ──────────────────────────────────────────────
+             Same options, same order and the same wording as the TTS
+             Repeater's Setup modal, because it is the same overlay wearing
+             different content. Only the Elements group below is new, since a
+             countdown card has more than one thing on it. -->
+        <div id="cdTabDisplay" class="modal-tab-pane" style="display:none;">
+
+        <p class="cd-setup-intro">Display View shows only your clock, filling the whole window: no sidebar, no
+          controls, nothing else. Available while a countdown is running. Press <strong>Esc</strong> to leave it.</p>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Colors</span>
+          <div id="cd-display-look" class="cd-seg-group">
+            <button class="toggle-btn active" data-value="theme">Follow theme</button>
+            <button class="toggle-btn" data-value="custom">Custom</button>
+          </div>
+        </div>
+
+        <!-- Shown only in Follow-theme mode; see syncSetupUI(). Custom colors
+             are deliberately flat. You picked two exact colors, so it shows
+             two exact colors. -->
+        <div id="cd-display-effects-row" class="cd-setup-field">
+          <span class="cd-label">Theme Effects</span>
+          <div class="cd-effect-row">
+            <div class="cd-effect-label">
+              <span>Glow</span>
+              <span id="cd-glow-note" class="cd-effect-note"></span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="cd-display-glow" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="cd-effect-row">
+            <div class="cd-effect-label">
+              <span>Animations</span>
+              <span id="cd-animate-note" class="cd-effect-note"></span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="cd-display-animate" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Shown only in Custom mode; see syncSetupUI(). -->
+        <div id="cd-display-custom-row" class="cd-setup-field" style="display:none;">
+          <div class="cd-color-row">
+            <label class="cd-color-field">
+              <span>Background</span>
+              <input id="cd-display-bg" type="color" value="#000000" />
+            </label>
+            <label class="cd-color-field">
+              <span>Text</span>
+              <input id="cd-display-fg" type="color" value="#ffffff" />
+            </label>
+          </div>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Elements</span>
+          <div class="cd-effect-row">
+            <div class="cd-effect-label">
+              <span>Memo</span>
+              <span class="cd-effect-note">Hidden when the session has none.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="cd-display-show-memo" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="cd-effect-row">
+            <div class="cd-effect-label">
+              <span>Ending time</span>
+              <span class="cd-effect-note">"Back at half past" reads from further away.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="cd-display-show-ends-at" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="cd-effect-row">
+            <div class="cd-effect-label">
+              <span>Pause / Stop buttons</span>
+              <span class="cd-effect-note">Drive the countdown without leaving the card.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="cd-display-show-controls" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Progress Figure</span>
+          <div id="cd-display-progress" class="cd-seg-group">
+            <button class="toggle-btn" data-value="none">None</button>
+            <button class="toggle-btn active" data-value="bar">Bar</button>
+            <button class="toggle-btn" data-value="ring">Ring</button>
+            <button class="toggle-btn" data-value="hourglass">Hourglass</button>
+          </div>
+          <span class="cd-setup-note">The card's own figure, separate from the Timer tab's. What reads best
+            across a room is rarely what reads best beside the controls.</span>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Alignment</span>
+          <div id="cd-display-align" class="cd-seg-group">
+            <button class="toggle-btn" data-value="left">Left</button>
+            <button class="toggle-btn active" data-value="center">Center</button>
+            <button class="toggle-btn" data-value="right">Right</button>
+          </div>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Clock Size</span>
+          <div class="cd-slider-grid">
+            <span class="cd-slider-label">Size</span>
+            <input id="cd-display-size" type="range" min="40" max="400" step="1" value="200" />
+            <span class="cd-slider-readout">
+              <span id="cd-display-size-value" class="cd-slider-value"
+                title="Double-click to type an exact value">200px</span>
+              <input id="cd-display-size-entry" class="cd-slider-entry" type="number" min="40" max="400" step="1"
+                hidden />
+            </span>
+          </div>
+          <span class="cd-setup-note">Everything else on the card is sized against the clock, so this one slider
+            scales the whole thing.</span>
+        </div>
+
+        <div class="cd-setup-field">
+          <span class="cd-label">Preview</span>
+          <div id="cd-display-preview" class="cd-display-preview">
+            <div id="cd-display-preview-chrome" class="tool-view-header" aria-hidden="true"></div>
+            <div id="cd-display-preview-stack" class="cd-display-stack tool-view-title">
+              <div class="cd-display-clock-row">
+                <svg id="cd-display-preview-hourglass" class="cd-hourglass" viewBox="0 0 40 80" aria-hidden="true"
+                  style="display:none;">
+                  <defs>
+                    <clipPath id="cd-display-preview-hg-top-clip">
+                      <path id="cd-display-preview-hg-top-clip-path" />
+                    </clipPath>
+                    <clipPath id="cd-display-preview-hg-bottom-clip">
+                      <path id="cd-display-preview-hg-bottom-clip-path" />
+                    </clipPath>
+                    <clipPath id="cd-display-preview-hg-stream-clip">
+                      <rect id="cd-display-preview-hg-stream-rect" class="cd-hg-stream-clip" x="17" width="6" y="38" height="0" />
+                    </clipPath>
+                  </defs>
+                  <rect id="cd-display-preview-hg-top-sand" class="cd-hg-sand" x="0" width="40" y="7" height="31"
+                    clip-path="url(#cd-display-preview-hg-top-clip)" />
+                  <rect id="cd-display-preview-hg-bottom-sand" class="cd-hg-sand" x="0" width="40" y="73" height="0"
+                    clip-path="url(#cd-display-preview-hg-bottom-clip)" />
+                  <g id="cd-display-preview-hg-stream" class="cd-hg-stream" clip-path="url(#cd-display-preview-hg-stream-clip)"
+                    style="display:none;">
+                    <circle class="cd-hg-grain" cx="20" cy="26" r="0.55" />
+                    <circle class="cd-hg-grain" cx="19.7" cy="32" r="0.5" />
+                    <circle class="cd-hg-grain" cx="20.3" cy="38" r="0.6" />
+                    <circle class="cd-hg-grain" cx="19.85" cy="44" r="0.5" />
+                    <circle class="cd-hg-grain" cx="20.2" cy="50" r="0.6" />
+                    <circle class="cd-hg-grain" cx="19.75" cy="56" r="0.55" />
+                    <circle class="cd-hg-grain" cx="20.25" cy="62" r="0.5" />
+                    <circle class="cd-hg-grain" cx="20" cy="68" r="0.6" />
+                    <circle class="cd-hg-grain" cx="19.8" cy="74" r="0.55" />
+                  </g>
+                  <path id="cd-display-preview-hg-frame" class="cd-hg-frame" />
+                  <line class="cd-hg-frame" x1="4" y1="6" x2="36" y2="6" />
+                  <line class="cd-hg-frame" x1="4" y1="74" x2="36" y2="74" />
+                </svg>
+                <div id="cd-display-preview-clock-wrap" class="cd-display-clock-wrap">
+                  <svg id="cd-display-preview-ring" class="cd-ring" aria-hidden="true" style="display:none;">
+                    <rect id="cd-display-preview-ring-track" class="cd-ring-track" />
+                    <rect id="cd-display-preview-ring-progress" class="cd-ring-progress" />
+                  </svg>
+                  <div id="cd-display-preview-clock" class="cd-display-clock">10:00</div>
+                </div>
+              </div>
+              <div id="cd-display-preview-memo" class="cd-display-memo">Break</div>
+              <div id="cd-display-preview-ends-at" class="cd-display-ends-at">Ends at 2:30pm</div>
+              <div id="cd-display-preview-bar-wrap" class="cd-display-bar-wrap" style="display:none;">
+                <div id="cd-display-preview-bar" class="cd-display-bar"></div>
+              </div>
+              <!-- Shape only. These are not the countdown's controls, they are
+                   a picture of them, so they carry no ids, take no focus and
+                   are given pointer-events:none in countdown.css. -->
+              <div id="cd-display-preview-controls" class="cd-display-controls" style="display:none;">
+                <button class="cd-display-ctl-btn" type="button" tabindex="-1" aria-hidden="true">Pause</button>
+                <button class="cd-display-ctl-btn" type="button" tabindex="-1" aria-hidden="true">Stop</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cd-setup-actions">
+          <button id="cd-display-reset" class="modal-cancel-btn"
+            title="Restore the default Display View appearance">Reset Display View</button>
+        </div>
+
+        </div><!-- /cdTabDisplay -->
 
       </div>
     </div>
@@ -4768,7 +5351,7 @@
          active theme gives its top bar. Most themes put a gradient there, and
          that's the theme's own character rather than something invented here.
          Every layout property of that class is neutralised in
-         tts-repeater.css; this element is a colour layer and nothing else. -->
+         tts-repeater.css; this element is a color layer and nothing else. -->
     <div id="tts-display-chrome" class="tool-view-header" aria-hidden="true"></div>
     <button id="tts-display-exit" title="Exit Display View (Esc)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -4777,15 +5360,104 @@
       </svg>
     </button>
     <!-- Same trick for the text: .tool-view-title is where each theme sets its
-         header colour AND, on the themes that have one, its glow (neon's cyan
+         header color AND, on the themes that have one, its glow (neon's cyan
          bloom, terminal's green, Halloween's orange). Inheriting it means Glow
          is genuinely the theme's glow, not an imitation. -->
     <div id="tts-display-text" class="tool-view-title"></div>
   </div>
 
-  <!-- Off-screen probe carrying the same title class, so the Setup modal can
-       ask whether the CURRENT theme actually has a glow to toggle. -->
-  <span id="tts-glow-probe" class="tool-view-title" aria-hidden="true"></span>
+  <!-- =====================================================================
+       COUNTDOWN: DISPLAY VIEW
+       Twin of the TTS Repeater's overlay above, and stacked the same way:
+       ABOVE #toastContainer (z-index 10000), because a toast popping up over a
+       "back at half past" card is exactly what this exists to prevent. Only
+       one of the two overlays can be open at a time, since each covers every
+       way of reaching the other.
+  ====================================================================== -->
+  <div id="cd-display-overlay" style="display:none;">
+    <!-- Wears .tool-view-header purely to inherit whatever background the
+         active theme gives its top bar; every layout property of that class is
+         neutralised in countdown.css. This element is a color layer, nothing
+         else. Same trick as the TTS overlay; see the theming note at the top
+         of tts-repeater.css. -->
+    <div id="cd-display-chrome" class="tool-view-header" aria-hidden="true"></div>
+    <button id="cd-display-exit" title="Exit Display View (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
+    <!-- .tool-view-title is where each theme sets its header color and, on the
+         themes that have one, its glow, so Glow is genuinely the theme's glow
+         rather than an imitation. It sits on the STACK rather than the clock so
+         the memo and the ending time are painted by it too; text-shadow is an
+         inherited property, so the glow reaches them on its own. -->
+    <div id="cd-display-stack" class="cd-display-stack tool-view-title">
+      <!-- The clock and, beside it, the hourglass. Which of the three figures
+           shows is the tool's one Progress Style setting; this card follows the
+           clock panel rather than having a preference of its own. The markup is
+           a third copy of the panel's because a clipPath is addressed by id, so
+           the three cannot share one. See ProgressFigure in countdown.ts. -->
+      <div class="cd-display-clock-row">
+        <svg id="cd-display-hourglass" class="cd-hourglass" viewBox="0 0 40 80" aria-hidden="true"
+          style="display:none;">
+          <defs>
+            <clipPath id="cd-display-hg-top-clip">
+              <path id="cd-display-hg-top-clip-path" />
+            </clipPath>
+            <clipPath id="cd-display-hg-bottom-clip">
+              <path id="cd-display-hg-bottom-clip-path" />
+            </clipPath>
+            <clipPath id="cd-display-hg-stream-clip">
+              <rect id="cd-display-hg-stream-rect" class="cd-hg-stream-clip" x="17" width="6" y="38" height="0" />
+            </clipPath>
+          </defs>
+          <rect id="cd-display-hg-top-sand" class="cd-hg-sand" x="0" width="40" y="7" height="31"
+            clip-path="url(#cd-display-hg-top-clip)" />
+          <rect id="cd-display-hg-bottom-sand" class="cd-hg-sand" x="0" width="40" y="73" height="0"
+            clip-path="url(#cd-display-hg-bottom-clip)" />
+          <g id="cd-display-hg-stream" class="cd-hg-stream" clip-path="url(#cd-display-hg-stream-clip)"
+            style="display:none;">
+            <circle class="cd-hg-grain" cx="20" cy="26" r="0.55" />
+            <circle class="cd-hg-grain" cx="19.7" cy="32" r="0.5" />
+            <circle class="cd-hg-grain" cx="20.3" cy="38" r="0.6" />
+            <circle class="cd-hg-grain" cx="19.85" cy="44" r="0.5" />
+            <circle class="cd-hg-grain" cx="20.2" cy="50" r="0.6" />
+            <circle class="cd-hg-grain" cx="19.75" cy="56" r="0.55" />
+            <circle class="cd-hg-grain" cx="20.25" cy="62" r="0.5" />
+            <circle class="cd-hg-grain" cx="20" cy="68" r="0.6" />
+            <circle class="cd-hg-grain" cx="19.8" cy="74" r="0.55" />
+          </g>
+          <path id="cd-display-hg-frame" class="cd-hg-frame" />
+          <line class="cd-hg-frame" x1="4" y1="6" x2="36" y2="6" />
+          <line class="cd-hg-frame" x1="4" y1="74" x2="36" y2="74" />
+        </svg>
+        <div id="cd-display-clock-wrap" class="cd-display-clock-wrap">
+          <svg id="cd-display-ring" class="cd-ring" aria-hidden="true" style="display:none;">
+            <rect id="cd-display-ring-track" class="cd-ring-track" />
+            <rect id="cd-display-ring-progress" class="cd-ring-progress" />
+          </svg>
+          <div id="cd-display-clock" class="cd-display-clock"></div>
+        </div>
+      </div>
+      <div id="cd-display-memo" class="cd-display-memo" style="display:none;"></div>
+      <div id="cd-display-ends-at" class="cd-display-ends-at" style="display:none;"></div>
+      <div id="cd-display-bar-wrap" class="cd-display-bar-wrap" style="display:none;">
+        <div id="cd-display-bar" class="cd-display-bar"></div>
+      </div>
+      <!-- Opt-in, and wired to the same two functions as the panel's pair; see
+           the Display View listeners in countdown.ts. -->
+      <div id="cd-display-controls" class="cd-display-controls" style="display:none;">
+        <button id="cd-display-pause" class="cd-display-ctl-btn">Pause</button>
+        <button id="cd-display-stop" class="cd-display-ctl-btn">Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Off-screen probe carrying the same title class, so a Setup modal can ask
+       whether the CURRENT theme actually has a glow to toggle. Shared by the
+       TTS Repeater and the Countdown Timer; see themeHasTitleGlow(). -->
+  <span id="theme-glow-probe" class="tool-view-title" aria-hidden="true"></span>
 
   <!-- =====================================================================
        TTS REPEATER: PRESET DELETE CONFIRM
@@ -5106,7 +5778,7 @@
               <div class="settings-row" id="budgetReminderMonthDaysRow" style="display:none;">
                 <span>Remind on day:</span>
                 <input type="text" id="budgetReminderMonthDays" class="budget-reminder-monthdays-field"
-                  placeholder="1, 15" spellcheck="false" />
+                  placeholder="1, 15" spellcheck="false" autocomplete="off" />
               </div>
 
               <div class="settings-row">
@@ -5948,7 +6620,7 @@
           <div class="settings-row" id="ab-setup-reminder-monthdays-row" style="display:none;">
             <span>Remind on day:</span>
             <input type="text" id="ab-setup-reminder-monthdays" class="ab-reminder-monthdays-field" placeholder="1, 15"
-              spellcheck="false" />
+              spellcheck="false" autocomplete="off" />
           </div>
           <div class="settings-row">
             <span class="ab-setup-label-with-info">
@@ -7171,7 +7843,1040 @@
       </div>
     </div>
   </div>
+  <!-- =====================================================================
+       KANBAN: SETUP MODAL
+       Tabs: Boards, Tags, Preferences, Security, Data.
+
+       Wider than the shared .setup-modal (see .kb-setup-modal) because the
+       rows here carry a control AND a label long enough to say what it does,
+       and the two were crushing each other at 720px.
+
+       Every explanation is behind an ℹ button rather than sitting under its
+       row as a paragraph. Same reason: five paragraphs of subtext turned a
+       four-row tab into a page you had to scroll to find the fifth setting.
+  ====================================================================== -->
+  <div id="kbSetupBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbSetupModal" class="modal setup-modal kb-setup-modal">
+      <div class="modal-header">
+        <span>Kanban Setup</span>
+        <button id="kbSetupClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-kb-tab="boards">Boards</button>
+          <button class="modal-tab" data-kb-tab="tags">Tags</button>
+          <button class="modal-tab" data-kb-tab="preferences">Preferences</button>
+          <button class="modal-tab" data-kb-tab="security">Security</button>
+          <button class="modal-tab" data-kb-tab="data">Data</button>
+        </div>
+
+        <!-- BOARDS
+             What a NEW board is made of. Not a list of the boards you have:
+             those are managed from inside themselves, in Board Setup. -->
+        <div id="kbTabBoards" class="modal-tab-pane">
+          <p class="subhint kb-tab-lead">What a new board starts out as. Changing these never touches a board that
+            already exists.</p>
+          <div class="setup-preferences-list">
+
+            <div class="setup-field">
+              <label for="kbDefaultBoardNameInput">Default Board Name</label>
+              <input type="text" id="kbDefaultBoardNameInput" class="kb-wide-input" spellcheck="false"
+                autocomplete="off" placeholder="Leave empty for no suggestion" />
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Default Columns
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="The columns a new board is created with, in order. Drag to rearrange. Exactly one can be marked as meaning done: that is the column throughput is counted from, and the one that can stamp a card complete when you drop into it.">&#8505;</button>
+              </span>
+              <div class="kb-default-column-actions">
+                <button id="kbResetDefaultColumnsBtn" class="settings-action-btn">Reset</button>
+                <button id="kbAddDefaultColumnBtn" class="settings-action-btn">+ Column</button>
+              </div>
+            </div>
+            <div id="kbDefaultColumnsList" class="kb-default-columns"></div>
+
+          </div>
+        </div>
+
+        <!-- DEFAULT TAGS
+             A category is a heading with its own tags under it, rather than a
+             flat list with a category column: the whole point of the grouping
+             is that "v0.2.0" only means anything under "Versions", and a flat
+             list would put that relationship in a column you have to read.
+
+             These are TEMPLATES. No card wears them. A board copies them in
+             (Board Setup > Tags) and owns its copies from then on. -->
+        <div id="kbTabTags" class="modal-tab-pane" style="display:none;">
+          <p class="subhint kb-tab-lead">Templates a board can copy in. Cards wear their own board's
+            tags, so two boards can hold completely different versions under the same category.</p>
+          <button id="kbNewTagCategoryBtn" class="setup-new-btn">+ New Tag Category</button>
+          <div id="kbTagCategoriesList" class="kb-tagcat-list"></div>
+        </div>
+
+        <!-- PREFERENCES -->
+        <div id="kbTabPreferences" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <span>Confirm Before Deleting a Card</span>
+              <div class="toggle-with-label">
+                <span id="kbConfirmDeleteLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbConfirmDeleteToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Stamp Complete on Drop into a Done Column
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="A column marked 'this column means done' (in its own settings) stamps a card's Complete date the moment you drop a card into it, so the dates stay right without you filling them in. The stamp is editable afterwards like any other, and dragging a card back out never removes one.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbAutoCompleteLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbAutoCompleteToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <span>Show Tags on Cards</span>
+              <div class="toggle-with-label">
+                <span id="kbShowTagsLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowTagsToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span>Show Subtask Progress on Cards</span>
+              <div class="toggle-with-label">
+                <span id="kbShowSubtasksLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowSubtasksToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span>Show Dates on Cards</span>
+              <div class="toggle-with-label">
+                <span id="kbShowDatesLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowDatesToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span>Show Card Numbers</span>
+              <div class="toggle-with-label">
+                <span id="kbShowNumbersLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowNumbersToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Show a Delete Button on Cards
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Puts a small bin in the top corner of every card on the board, for throwing one away without opening it. Off by default: it sits under the cursor on a surface whose main gesture is dragging, and a mis-click there costs a card. It still asks first unless you have turned off delete confirmations.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbShowCardDeleteLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowCardDeleteToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Due Date
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="The due date block on a card, and the due chip on the card face. Separate from stage dates, and separately optional: a due date is a target rather than a record of something that happened. Switching this off also leaves the overdue warning with nothing to report.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbShowDueLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowDueToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Stage Dates
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="The Work Started / Testing Started / Completed dates, the button that stamps the next one, and the durations the card and board stats compute from them. Turn it off for a board you just want to move cards around on. The DUE date is not part of this and stays available either way: it is a target rather than a record of something that happened, and it is what the overdue warning reads.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbShowStagesLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowStagesToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span>Card Size</span>
+              <select id="kbCardSizeSelect" class="settings-select">
+                <option value="comfortable">Comfortable</option>
+                <option value="compact">Compact</option>
+              </select>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Card Color From
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="What a card takes its color from, unless that card says otherwise in its own Card Color sheet. From its top tag walks the tag categories in the order the board ranks them and takes the first color it finds; from its priority uses the priority level colors below.">&#8505;</button>
+              </span>
+              <select id="kbCardColorModeDefaultSelect" class="settings-select">
+                <option value="manual">A color set on the card</option>
+                <option value="tag">Its top tag</option>
+                <option value="priority">Its priority</option>
+              </select>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Priority Colors
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="One color per level, shared by every board. A priority level has to look the same everywhere or it stops being a scale you can read across boards. None has no color: a card with no priority set is not painted as though grey were a priority.">&#8505;</button>
+              </span>
+            </div>
+            <div id="kbPriorityColorsRow" class="kb-priority-colors"></div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Card Layout
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="The order the blocks appear in when a card is opened. Drag to rearrange. The title and the board/column row are always first, because they are what tells you which card you are looking at. A board can rearrange these for itself in Board Setup > Preferences.">&#8505;</button>
+              </span>
+            </div>
+            <div id="kbSectionOrderList" class="kb-section-order"></div>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Warn on Overdue Cards
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Pulses the Kanban sidebar icon and puts a count in the tool header while any card is past its due date, the same way Auto-Backup and Budget flag themselves. Cards on locked boards are not counted, because their due dates are not readable while they are locked.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbOverdueWarnLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbOverdueWarnToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- SECURITY
+             One password for the whole tool; each board opts in individually.
+             The tool lock is a door in front of that same password, not a
+             second layer of encryption, which is what keeps "three encrypted
+             boards plus a locked tool" from meaning anything is encrypted
+             twice. -->
+        <div id="kbTabSecurity" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Kanban Password
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="One password covers this tool. Each board chooses whether to use it. The password itself is never stored: only an Argon2id hash of it, for checking, and every encrypted board holds its own complete copy of that hash and its own salt, so no board's readability depends on another file surviving.">&#8505;</button>
+                </span>
+                <span id="kbSecurityStatus" class="settings-status-badge">Not set</span>
+              </div>
+              <button id="kbLockNowBtn" class="settings-action-btn" disabled>Lock Now</button>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Ask for the Password on Opening Kanban
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Puts a gate in front of the whole tool. It asks for the SAME password the boards use, so turning it on encrypts nothing extra and no board has to be decrypted first: your encrypted boards stay exactly as they are and the gate is simply a door in front of them. Passing it once also unlocks those boards for the visit. Needs at least one encrypted board, since otherwise there is no password to ask for.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbLockOnOpenLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbLockOnOpenToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Boards
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Encryption is switched on and off per board, in that board's own settings. An encrypted board's name, description and background stay readable so the gallery can still list it; its columns and cards are ciphertext on disk and are decrypted into memory only when you open it.">&#8505;</button>
+              </span>
+            </div>
+            <div id="kbSecurityBoardsList" class="setup-list"></div>
+
+          </div>
+        </div>
+
+        <!-- DATA -->
+        <div id="kbTabData" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Export Everything
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Writes every board, column, card and tag to a dated .json file in your Downloads folder, in one self-contained file. Board background images are not inside it; they live as ordinary files in the app's data folder. A board that is locked right now is listed by name and left out, and the export says so.">&#8505;</button>
+                </span>
+                <span id="kbExportSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbExportBtn" class="settings-action-btn">Export JSON</button>
+            </div>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Snapshots
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Every save first captures the file it is about to overwrite, grouped by the hour. Because each board is its own file, an afternoon on one board snapshots that board and nothing else. Restoring is per board: it puts that board's columns and cards back and leaves every other board alone. What is there now is captured on the way past, so a restore you did not mean is undone by restoring the newest entry.">&#8505;</button>
+                </span>
+                <span id="kbBackupSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbBackupRefreshBtn" class="settings-action-btn">Refresh</button>
+            </div>
+            <div id="kbBackupList" class="kb-backup-list"></div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: PASSWORD PROMPT
+       One modal for every moment a password is needed: unlocking a board,
+       establishing the password, encrypting, decrypting, opening an encrypted
+       snapshot. Parameterised by promptForPassword() in kanban.ts, which
+       resolves a promise, so the callers read as straight-line code rather
+       than as a chain of callbacks.
+  ====================================================================== -->
+  <div id="kbPasswordBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbPasswordModal" class="modal">
+      <div class="modal-header">
+        <span id="kbPasswordTitle">Unlock</span>
+        <button id="kbPasswordCloseBtn" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="setup-form">
+          <p id="kbPasswordMessage" class="kb-password-message"></p>
+          <div class="setup-field">
+            <label for="kbPasswordInput">Password</label>
+            <input type="password" id="kbPasswordInput" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="setup-field" id="kbPasswordConfirmRow" style="display:none;">
+            <label for="kbPasswordConfirmInput">Confirm Password</label>
+            <input type="password" id="kbPasswordConfirmInput" autocomplete="off" spellcheck="false" />
+          </div>
+          <p id="kbPasswordError" class="kb-password-error"></p>
+          <div class="setup-actions">
+            <button id="kbPasswordOkBtn">Unlock</button>
+            <button id="kbPasswordCancelBtn" class="modal-cancel-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: NEW BOARD
+       Just the name and description. Everything else about a board is edited
+       live in Board Setup, which needs a board to exist first; this is the one
+       moment where a board does not yet exist, so it is the one form with a
+       Create button.
+  ====================================================================== -->
+  <div id="kbNewBoardBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbNewBoardModal" class="modal">
+      <div class="modal-header">
+        <span>New Board</span>
+        <button id="kbNewBoardClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label for="kbNewBoardNameInput">Board Name</label>
+            <input type="text" id="kbNewBoardNameInput" spellcheck="false" autocomplete="off"
+              placeholder="Name this board" />
+          </div>
+          <div class="setup-field">
+            <label for="kbNewBoardDescInput">Description (optional)</label>
+            <input type="text" id="kbNewBoardDescInput" spellcheck="true" autocomplete="off"
+              placeholder="What this board is for" />
+          </div>
+          <div class="setup-actions">
+            <button id="kbNewBoardCreateBtn">Create Board</button>
+            <button id="kbNewBoardCancelBtn" class="modal-cancel-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: BOARD SETUP
+       Everything about ONE board: what it is, its own tag vocabulary, and the
+       settings it disagrees with the defaults about.
+
+       Separate from the tool's Setup on purpose. The tool's Setup is for things
+       that are true of the whole tool (the default tags, the default
+       preferences, the password, the data). This is for things that are true of
+       the board you are standing in, and it is only reachable from inside one.
+
+       Every field here applies as you change it. There is no Save button
+       because there is nothing to save: the board already exists (it was
+       created by the New Board form), so an edit is an edit.
+  ====================================================================== -->
+  <div id="kbBoardSetupBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbBoardSetupModal" class="modal setup-modal kb-setup-modal">
+      <div class="modal-header">
+        <button id="kbBoardSetupBack" class="nav-back-btn modal-header-left" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbBoardSetupTitle">Board Setup</span>
+        <button id="kbBoardSetupClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-kb-board-tab="board">Board</button>
+          <button class="modal-tab" data-kb-board-tab="tags">Tags</button>
+          <button class="modal-tab" data-kb-board-tab="preferences">Preferences</button>
+        </div>
+
+        <!-- BOARD -->
+        <div id="kbBoardTabBoard" class="modal-tab-pane">
+          <div class="setup-form">
+
+            <div class="setup-field">
+              <label for="kbBoardNameInput">Board Name</label>
+              <input type="text" id="kbBoardNameInput" spellcheck="false" autocomplete="off" />
+            </div>
+
+            <div class="setup-field">
+              <label for="kbBoardDescInput">Description (optional)</label>
+              <input type="text" id="kbBoardDescInput" spellcheck="true" autocomplete="off" />
+            </div>
+
+            <div class="settings-section-divider"></div>
+
+            <!-- The preview is the control. Blur and brightness are the kind of
+                 setting nobody can predict from a number, so the sliders move a
+                 real sample of the board rather than a swatch. -->
+            <div class="setup-field">
+              <label>Background</label>
+              <div id="kbBoardBgPreview" class="kb-bg-preview">
+                <div id="kbBoardBgPreviewImg" class="kb-bg-preview-img"></div>
+                <div class="kb-bg-preview-cards">
+                  <span class="kb-bg-preview-card"></span>
+                  <span class="kb-bg-preview-card"></span>
+                  <span class="kb-bg-preview-card"></span>
+                </div>
+                <span id="kbBoardBgPreviewEmpty" class="kb-bg-preview-empty">No background image</span>
+              </div>
+              <div class="kb-bg-actions">
+                <button id="kbBoardBgPickBtn" class="settings-action-btn">Choose Image</button>
+                <button id="kbBoardBgClearBtn" class="modal-cancel-btn">Remove</button>
+              </div>
+            </div>
+
+            <div class="setup-field">
+              <label for="kbBoardBlurRange">Blur <span id="kbBoardBlurValue" class="kb-range-value">0px</span></label>
+              <input type="range" id="kbBoardBlurRange" min="0" max="24" step="1" value="0" />
+            </div>
+
+            <div class="setup-field">
+              <label for="kbBoardBrightnessRange">Brightness <span id="kbBoardBrightnessValue"
+                  class="kb-range-value">100%</span></label>
+              <input type="range" id="kbBoardBrightnessRange" min="15" max="150" step="5" value="100" />
+            </div>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Encrypt This Board
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Turns this board's columns, cards and tag names into ciphertext on disk, decrypted into memory only while you have it open. Its board name, description and background stay readable so the gallery can still list it. Every encrypted board on this install shares one password, set the first time you switch this on for any board. Lose it and this board cannot be read by anything, including this app.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbBoardEncryptLabel">No</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbBoardEncryptToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setup-actions">
+              <button id="kbBoardEditDelete" class="danger-btn">Delete Board</button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TAGS -->
+        <div id="kbBoardTabTags" class="modal-tab-pane" style="display:none;">
+          <div class="settings-row">
+            <span class="kb-label-with-info">This Board's Tags
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="Cards wear tags from THIS board's vocabulary, not from the defaults. Copying the defaults in gives this board its own copies, which you can then add to, rename and recolor freely: two boards can both have a Versions category holding completely different versions. Editing a default afterwards never reaches back into a board that already copied it.">&#8505;</button>
+            </span>
+            <button id="kbBoardCopyDefaultTagsBtn" class="settings-action-btn">Copy in Defaults</button>
+          </div>
+          <button id="kbBoardNewTagCategoryBtn" class="setup-new-btn">+ New Tag Category</button>
+          <div id="kbBoardTagCategoriesList" class="kb-tagcat-list"></div>
+        </div>
+
+        <!-- PREFERENCES -->
+        <div id="kbBoardTabPreferences" class="modal-tab-pane" style="display:none;">
+          <div class="settings-row">
+            <span class="kb-label-with-info">Overrides
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="Each row starts on Default, meaning it follows whatever Setup > Preferences says and keeps following it when you change that later. Setting a row to On or Off pins it for this board only. Only what you actually change is stored, which is what lets a new default reach every board that never disagreed with it.">&#8505;</button>
+            </span>
+            <button id="kbBoardResetPrefsBtn" class="settings-action-btn">Reset All to Default</button>
+          </div>
+          <div id="kbBoardPrefsList" class="setup-preferences-list"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: COLUMN ADD / EDIT
+       The WIP limit lives here rather than in Preferences because it is a
+       property of one column's capacity, which is the whole idea Kanban is
+       built on: the limit is the thing that makes the board tell you
+       something instead of just holding cards.
+  ====================================================================== -->
+  <div id="kbColumnEditBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbColumnEditModal" class="modal">
+      <div class="modal-header">
+        <span id="kbColumnEditTitle">New Column</span>
+        <button id="kbColumnEditClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="setup-form">
+
+          <div class="setup-field">
+            <label for="kbColumnNameInput">Column Title</label>
+            <input type="text" id="kbColumnNameInput" spellcheck="false" autocomplete="off"
+              placeholder="Name this column" />
+          </div>
+
+          <div class="settings-row">
+            <span class="kb-label-with-info">Limit Work in Progress
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="The column keeps accepting cards past the limit, it just says so loudly. A limit that refuses the drop makes you park the work somewhere worse; a limit you can see is the one that changes what you do next.">&#8505;</button>
+            </span>
+            <div class="toggle-with-label">
+              <span id="kbColumnWipLabel">No</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="kbColumnWipToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div id="kbColumnWipField" class="subsettings" style="max-height: 0;">
+            <div class="settings-row">
+              <span>Maximum cards:</span>
+              <input type="number" id="kbColumnWipInput" min="1" max="999" step="1" value="3" class="kb-number-input" />
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <span class="kb-label-with-info">This Column Means Done
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="Cards dropped here can be stamped complete automatically (see Preferences), and this is the column board stats count throughput from.">&#8505;</button>
+            </span>
+            <div class="toggle-with-label">
+              <span id="kbColumnDoneLabel">No</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="kbColumnDoneToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setup-actions">
+            <button id="kbColumnEditSave">Save</button>
+            <button id="kbColumnEditCancel" class="modal-cancel-btn">Cancel</button>
+            <button id="kbColumnEditDelete" class="danger-btn" style="display:none;">Delete Column</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: CARD
+       The card's own screen. Every edit applies as you make it and saves on a
+       debounce: a card is a thing you poke at repeatedly (tick a subtask, add
+       a tag, stamp a stage), and there is no moment in that where a Save
+       button would be doing anything except giving you a way to lose work.
+       So there is no Save button, and no footer.
+
+       Everything that is an ACTION on the card rather than a field of it
+       (color, stats, duplicate, archive, delete) lives in the three-dot menu
+       in the header, so the body is only ever the card itself.
+
+       The four blocks below carry data-kb-section and are reordered at open
+       time by renderCardModal(), from the Card Layout preference. The title and
+       the board/column row are deliberately outside that: they are what tells
+       you which card you are looking at, so they are always first.
+  ====================================================================== -->
+  <div id="kbCardBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbCardModal" class="modal modal-scrollable kb-card-modal">
+      <div class="modal-header">
+        <button id="kbCardMenuBtn" class="modal-close-btn modal-header-left" title="More actions">
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <circle cx="5" cy="12" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="19" cy="12" r="1.8" />
+          </svg>
+        </button>
+        <span id="kbCardHeaderLabel">Card</span>
+        <button id="kbCardClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body kb-card-body">
+
+        <input type="text" id="kbCardTitleInput" class="kb-card-title-input" spellcheck="true" autocomplete="off"
+          placeholder="Card title" />
+
+        <div class="kb-card-row">
+          <div class="setup-field kb-card-field">
+            <label for="kbCardColumnSelect">Column</label>
+            <select id="kbCardColumnSelect" class="settings-select"></select>
+          </div>
+          <div class="setup-field kb-card-field">
+            <label for="kbCardBoardSelect">Board</label>
+            <select id="kbCardBoardSelect" class="settings-select"></select>
+          </div>
+          <div class="setup-field kb-card-field">
+            <label for="kbCardPrioritySelect">Priority</label>
+            <select id="kbCardPrioritySelect" class="settings-select"></select>
+          </div>
+        </div>
+
+        <!-- The reorderable blocks. -->
+        <div id="kbCardSections" class="kb-card-sections">
+
+          <!-- DUE DATE
+               Its own block, separately optional from the stage dates: a due
+               date is a target rather than a record of something that happened,
+               and it is what the overdue warning reads, so a board can want one
+               without the other in either direction. -->
+          <div class="kb-section" data-kb-section="due" id="kbCardDueSection">
+            <div class="kb-section-head">
+              <span class="kb-section-title">Due Date</span>
+              <span id="kbCardDueNote" class="kb-section-note"></span>
+            </div>
+            <div class="kb-inline-row">
+              <input type="date" id="kbCardDueInput" />
+              <button id="kbCardDueClearBtn" class="modal-cancel-btn">Clear</button>
+            </div>
+          </div>
+
+          <div class="kb-section" data-kb-section="description">
+            <div class="kb-section-head">
+              <span class="kb-section-title">Description</span>
+            </div>
+            <textarea id="kbCardDescInput" class="kb-card-desc" rows="4" spellcheck="true"
+              placeholder="What this card actually is. Anything you would otherwise have to reconstruct later."></textarea>
+          </div>
+
+          <div class="kb-section" data-kb-section="tags">
+            <div class="kb-section-head">
+              <span class="kb-section-title">Tags</span>
+              <button id="kbCardManageTagsBtn" class="settings-action-btn">Manage Tags</button>
+            </div>
+            <div id="kbCardTagPicker" class="kb-tag-picker"></div>
+          </div>
+
+          <div class="kb-section" data-kb-section="subtasks">
+            <div class="kb-section-head">
+              <span class="kb-section-title">Subtasks</span>
+              <span id="kbCardSubtaskSummary" class="kb-section-note"></span>
+            </div>
+            <div class="progress-bar-track kb-subtask-track">
+              <div id="kbCardSubtaskBar" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div id="kbCardSubtaskList" class="kb-subtask-list"></div>
+            <div class="kb-inline-row">
+              <input type="text" id="kbCardSubtaskInput" class="kb-wide-input" spellcheck="true" autocomplete="off"
+                placeholder="Add a subtask, then Enter" />
+              <button id="kbCardSubtaskAddBtn">Add</button>
+            </div>
+          </div>
+
+          <div class="kb-section" data-kb-section="stages" id="kbCardStagesSection">
+            <div class="kb-section-head">
+              <span class="kb-section-title">Stage Dates</span>
+              <span id="kbCardStageSummary" class="kb-section-note"></span>
+            </div>
+            <div id="kbCardStages" class="kb-stage-grid"></div>
+            <div class="kb-stage-actions">
+              <button id="kbCardAdvanceBtn">Start Work</button>
+              <button id="kbCardUndoStageBtn" class="modal-cancel-btn">Undo</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: CARD COLOR
+       Reached from the card's three-dot menu. A color is something you do TO
+       a card rather than a field of it, and it was taking a whole block of the
+       card's own screen to say so.
+
+       One control for "no color": the dashed swatch at the head of the row.
+       There used to be a second button underneath saying the same thing, which
+       is one more way to do it than there are things to do.
+  ====================================================================== -->
+  <div id="kbCardColorBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbCardColorModal" class="modal">
+      <div class="modal-header">
+        <button id="kbCardColorBack" class="nav-back-btn modal-header-left" title="Back to the card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbCardColorTitle">Card Color</span>
+        <button id="kbCardColorClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="setup-form">
+
+          <div class="settings-row">
+            <span class="kb-label-with-info">Color Source
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="Where this card's color comes from. Follow the board uses whatever the board is set to, so changing the board later moves this card with it. From its top tag walks the tag categories in the order the board ranks them and takes the first color it finds. From its priority uses the priority level's color. A card with nothing to take a color from just stays the theme's own card color.">&#8505;</button>
+            </span>
+            <select id="kbCardColorModeSelect" class="settings-select">
+              <option value="default">Follow the board</option>
+              <option value="manual">Pick a color</option>
+              <option value="tag">From its top tag</option>
+              <option value="priority">From its priority</option>
+            </select>
+          </div>
+
+          <div id="kbCardColorManualRow">
+            <p class="kb-section-note kb-color-note">The dashed swatch means no color: the card follows the theme.
+            </p>
+            <div id="kbCardColorRow" class="kb-color-row"></div>
+            <div class="kb-inline-row">
+              <label for="kbCardColorCustom" class="kb-section-title">Custom</label>
+              <input type="color" id="kbCardColorCustom" class="kb-color-input" value="#4c8dff"
+              title="Pick any color" />
+            </div>
+          </div>
+
+          <div class="settings-section-divider"></div>
+
+          <div class="settings-row">
+            <span class="kb-label-with-info">Text Color
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="Contrast measures the card color and picks whichever of black or white reads better on it, which is almost always what you want. Forcing white or black is for when a run of cards should match each other more than each should be individually readable.">&#8505;</button>
+            </span>
+            <select id="kbCardTextColorSelect" class="settings-select">
+              <option value="auto">Contrast (pick automatically)</option>
+              <option value="light">White</option>
+              <option value="dark">Black</option>
+            </select>
+          </div>
+
+          <div class="setup-field">
+            <label>Preview</label>
+            <div id="kbCardColorPreview" class="kb-card kb-color-preview">
+              <div class="kb-card-top"><span class="kb-card-number">#0</span></div>
+              <div class="kb-card-title" id="kbCardColorPreviewTitle">Card title</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: CARD STATS
+       Reached from the card's own three-dot menu. Reads only from the card's
+       stamps, so anything it cannot work out it says is missing rather than
+       inventing a duration from a date that was never set.
+  ====================================================================== -->
+  <div id="kbCardStatsBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbCardStatsModal" class="modal modal-scrollable">
+      <div class="modal-header">
+        <button id="kbCardStatsBack" class="nav-back-btn modal-header-left" title="Back to the card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbCardStatsTitle">Card Stats</span>
+        <button id="kbCardStatsClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div id="kbCardStatsBody" class="kb-stats-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: BOARD STATS
+  ====================================================================== -->
+  <div id="kbBoardStatsBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbBoardStatsModal" class="modal modal-scrollable kb-board-stats-modal">
+      <div class="modal-header">
+        <span id="kbBoardStatsTitle">Board Stats</span>
+        <button id="kbBoardStatsClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div id="kbBoardStatsBody" class="kb-stats-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: ARCHIVED CARDS
+       Archiving exists so a Done column can be emptied without the work being
+       destroyed; this is where the archived cards are still reachable.
+  ====================================================================== -->
+  <div id="kbArchiveBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbArchiveModal" class="modal modal-scrollable kb-archive-modal">
+      <div class="modal-header">
+        <span id="kbArchiveTitle">Archived Cards</span>
+        <button id="kbArchiveClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div id="kbArchiveList" class="setup-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: TAG CATEGORY ADD / EDIT
+  ====================================================================== -->
+  <div id="kbTagCatEditBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbTagCatEditModal" class="modal">
+      <div class="modal-header">
+        <button id="kbTagCatEditBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbTagCatEditTitle">New Tag Category</span>
+        <button id="kbTagCatEditClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label for="kbTagCatNameInput">Category Name</label>
+            <input type="text" id="kbTagCatNameInput" spellcheck="false" autocomplete="off"
+              placeholder="Name this category" />
+          </div>
+          <div class="settings-row">
+            <span class="kb-label-with-info">Give This Category a Color
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="A tag in this category falls back to this color when it has not set one of its own. Leave it off and an uncolored tag here stays a plain outlined chip, which is the right answer for a category that is a label rather than a signal.">&#8505;</button>
+            </span>
+            <div class="toggle-with-label">
+              <span id="kbTagCatColorLabel">No</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="kbTagCatColorToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-row" id="kbTagCatColorField" style="display:none;">
+            <span>Category Color</span>
+            <input type="color" id="kbTagCatColorInput" class="kb-color-input" value="#4c8dff" />
+          </div>
+          <div class="setup-actions">
+            <button id="kbTagCatEditSave">Save</button>
+            <button id="kbTagCatEditCancel" class="modal-cancel-btn">Cancel</button>
+            <button id="kbTagCatEditRetire" class="modal-cancel-btn" style="display:none;">Retire</button>
+            <button id="kbTagCatEditDelete" class="danger-btn" style="display:none;">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: TAG ADD / EDIT
+  ====================================================================== -->
+  <div id="kbTagEditBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbTagEditModal" class="modal">
+      <div class="modal-header">
+        <button id="kbTagEditBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbTagEditTitle">New Tag</span>
+        <button id="kbTagEditClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label for="kbTagNameInput">Tag Name</label>
+            <input type="text" id="kbTagNameInput" spellcheck="false" autocomplete="off"
+              placeholder="Name this tag" />
+          </div>
+          <div class="setup-field">
+            <label for="kbTagCategorySelect">Category</label>
+            <select id="kbTagCategorySelect" class="settings-select"></select>
+          </div>
+          <div class="settings-row">
+            <span class="kb-label-with-info">Color
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="Inherit takes the category color and keeps taking it, so recoloring the category moves every tag that inherits. Setting one here pins this tag to it. A tag that inherits from a category with no color is a plain outlined chip.">&#8505;</button>
+            </span>
+            <select id="kbTagColorModeSelect" class="settings-select">
+              <option value="inherit">Inherit from category</option>
+              <option value="own">Set for this tag</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <span>Tag Color</span>
+            <div class="kb-inline-row">
+              <input type="color" id="kbTagColorInput" class="kb-color-input" value="#4c8dff" />
+              <span id="kbTagPreview" class="kb-tag-chip">Tag</span>
+            </div>
+          </div>
+          <div class="setup-actions">
+            <button id="kbTagEditSave">Save</button>
+            <button id="kbTagEditCancel" class="modal-cancel-btn">Cancel</button>
+            <button id="kbTagEditRetire" class="modal-cancel-btn" style="display:none;">Retire</button>
+            <button id="kbTagEditDelete" class="danger-btn" style="display:none;">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: CONFIRM
+       One confirm for every destructive action in this tool. The title, body
+       and button label are all set by the caller (see kbConfirm() in
+       kanban.ts), which is what makes one modal enough: the alternative is
+       eight near-identical copies that drift apart.
+  ====================================================================== -->
+  <div id="kbConfirmBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbConfirmModal" class="modal">
+      <div class="modal-header">
+        <span id="kbConfirmTitle">Are you sure?</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="kbConfirmMessage"></p>
+        <div class="exit-modal-actions">
+          <button id="kbConfirmOkBtn" class="danger-btn">Delete</button>
+          <button id="kbConfirmCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </body>
+
 
 </html>

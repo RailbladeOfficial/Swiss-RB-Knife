@@ -8,14 +8,14 @@
    This is why it is written entirely in var()/color-mix() rather than hex.
    Custom themes carry only the ~39 :root variables in RANDOM_VARS, never the
    structural rules, so every header, modal, panel and chart rule here has to
-   derive its colour from those variables in order to follow whatever palette
+   derive its color from those variables in order to follow whatever palette
    gets painted over it.
 
    It began as a copy of the old default.css, which used to do this job and be
    the "Default" theme at the same time. That file is now Midnight Blue; the
    two roles were split so the visible theme can be restyled freely without
    changing what every Custom theme is built on. Keep the var()/color-mix()
-   discipline here; a literal colour in this file cannot be overridden by a
+   discipline here; a literal color in this file cannot be overridden by a
    custom palette and will leak into every custom theme.
 ============================================================================= */
 
@@ -202,13 +202,13 @@ body:not(.solid-modals) .modal {
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: var(--color-accent); }
 
 /* ── Budget Tracker ── */
 
-/* Panel background tints, gradient from an accent wash into the panel colour */
+/* Panel background tints, gradient from an accent wash into the panel color */
 #finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-btn) 8%, transparent) 0%, var(--color-panel) 100%); }
 #finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 7%, transparent) 0%, var(--color-panel) 100%); }
 #finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 7%, transparent) 0%, var(--color-panel) 100%); }
@@ -255,7 +255,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {

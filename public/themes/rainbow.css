@@ -359,7 +359,7 @@ input { background: rgba(255, 255, 255, 0.8); border-color: #ccaaff; }
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: #ff2200; }
 
@@ -409,7 +409,7 @@ input { background: rgba(255, 255, 255, 0.8); border-color: #ccaaff; }
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {

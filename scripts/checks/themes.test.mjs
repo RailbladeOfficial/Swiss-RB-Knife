@@ -40,8 +40,8 @@ test("every stylesheet on disk is either pickable or the base sheet (no orphan f
   assert.deepEqual(orphans, [], "these theme files are dead weight, nothing can select them");
 });
 
-test("every theme defines the full palette (a partial one leaves parts of the UI colourless)", () => {
-  const block = slice("src/random-theme.ts", "export const RANDOM_VARS = [", "] as const");
+test("every theme defines the full palette (a partial one leaves parts of the UI colorless)", () => {
+  const block = slice("src/theme/random-theme.ts", "export const RANDOM_VARS = [", "] as const");
   const required = [...new Set([...block.matchAll(/"(--color-[a-z0-9-]+)"/g)].map((m) => m[1]))];
   assert.ok(
     required.length >= RANDOM_VAR_COUNT_MIN,
@@ -79,7 +79,7 @@ test("the theme editor offers every built-in theme as a starting point", () => {
 });
 
 test("renamed themes still resolve for anyone whose settings name the old id", () => {
-  const block = slice("src/theme-ids.ts", "THEME_ID_MIGRATIONS", "export function migrateThemeId");
+  const block = slice("src/theme/theme-ids.ts", "THEME_ID_MIGRATIONS", "export function migrateThemeId");
   const pairs = [...block.matchAll(/^\s*([a-z-]+):\s*"([a-z-]+)",/gm)].map((m) => ({
     from: m[1],
     to: m[2],
@@ -94,18 +94,18 @@ test("renamed themes still resolve for anyone whose settings name the old id", (
 test("the first paint uses the default theme (a wrong href here means a blank first frame)", () => {
   // index.html's <link> is what paints before any code runs. It is kept in sync
   // with DEFAULT_THEME_ID by hand, so this is the only thing checking it.
-  const ids = read("src/theme-ids.ts");
+  const ids = read("src/theme/theme-ids.ts");
   const def = /DEFAULT_THEME_ID = "([a-z-]+)"/.exec(ids)[1];
   const href = tagAttr("themeLink", "href");
   assert.equal(href, `/themes/${def}.css`, "index.html boot <link> does not match DEFAULT_THEME_ID");
   assert.ok(exists(`public/themes/${def}.css`), `default theme ${def}.css is missing`);
 });
 
-test("the coloured stripe on a tool panel is not silently overwritten with grey", () => {
-  // Budget, Time Tracker and Auto-Backup mark their panels with a coloured
+test("the colored stripe on a tool panel is not silently overwritten with grey", () => {
+  // Budget, Time Tracker and Auto-Backup mark their panels with a colored
   // left border. Nine themes declared that border and THEN declared a plain
   // `border-color` after it, and because border-color is a shorthand covering
-  // all four sides, it repainted the stripe grey. The colour was in the file,
+  // all four sides, it repainted the stripe grey. The color was in the file,
   // correct, and never once reached the screen.
   //
   // In CSS the later declaration wins, so border-color has to come FIRST.
@@ -121,11 +121,11 @@ test("the coloured stripe on a tool panel is not silently overwritten with grey"
       }
     }
   }
-  assert.deepEqual(problems, [], "these panel stripes render grey instead of their colour");
+  assert.deepEqual(problems, [], "these panel stripes render grey instead of their color");
 });
 
 test("the Special tab stays alphabetical", () => {
-  const block = slice("src/theme-ids.ts", 'tab: "special"', "];");
+  const block = slice("src/theme/theme-ids.ts", 'tab: "special"', "];");
   const labels = [...block.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);
   const sorted = [...labels].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   assert.deepEqual(labels, sorted, "Special tab themes are no longer in alphabetical order");

@@ -18,7 +18,7 @@
    Used by the Budget Tracker to re-lock itself on OS session lock when
    "re-auth on every entry" is the active encryption mode. The same way a
    password manager like Bitwarden re-locks its vault when the machine locks,
-   rather than only on next use. See src/tools/budget.ts's
+   rather than only on next use. See src/tool/budget.ts's
    "session-lock-changed" listener for the frontend half.
 
    Best-effort throughout: any failure here just means this one feature

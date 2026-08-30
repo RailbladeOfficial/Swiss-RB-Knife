@@ -199,13 +199,13 @@ body:not(.solid-modals) .modal {
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: var(--color-accent); }
 
 /* ── Budget Tracker ── */
 
-/* Panel background tints, gradient from an accent wash into the panel colour */
+/* Panel background tints, gradient from an accent wash into the panel color */
 #finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-btn) 8%, transparent) 0%, var(--color-panel) 100%); }
 #finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 7%, transparent) 0%, var(--color-panel) 100%); }
 #finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 7%, transparent) 0%, var(--color-panel) 100%); }
@@ -252,7 +252,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {

@@ -1,0 +1,376 @@
+/* =============================================================================
+   RNGESUS  (rng.css)
+   All color references use var(--color-*) from the active theme.
+   Tool-unique classes are prefixed `rng-`.
+
+   Segmented toggles reuse the shared .toggle-btn component from shell.css (the
+   documented Tier 3 pattern) with only a padding/font-size delta here, rather
+   than growing another private copy of it.
+
+   The two result views are the same data drawn two ways and are styled as
+   such: one shared type treatment for the numbers themselves (tabular figures,
+   the accent color) and then only the layout differs. A number should not
+   look like a different number for having been switched between views.
+============================================================================= */
+
+/* ── Two-column layout ─────────────────────────────────────────────────────
+   Settings left, results right, the pair spanning the full width so the
+   numbers stay pinned to the right edge of the view.
+
+   The RESULTS column is the capped one and the settings column is the
+   flexible 1fr, so every extra pixel of a wide window goes to the settings.
+   That is the way round it wants to be: the numbers are small and there are
+   commonly only a handful of them, and a field of them stretched across a
+   wide monitor is a longer sweep of the eye per row for no more information,
+   while the settings have four fields that would rather sit two-up than in
+   one tall stack. A long run still wraps to as many lines as it needs.
+
+   The 320px floor on the settings column is what stops the arrangement
+   inverting on a merely-wide window: without it, a 600px results panel would
+   eat most of the row and leave the controls in a sliver.
+
+   minmax(0, …) on the results track, not a bare 600px: a bare one's implicit
+   minimum is `auto`, which would let a long unwrapped run of numbers push the
+   column past the window edge instead of scrolling inside its own panel.
+
+   align-items: stretch (the default, left implicit) is what makes the results
+   panel run the full height of the row, so it reads as a panel with room in it
+   rather than a box that happens to be as tall as its contents.
+========================================================================== */
+
+.rng-body {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(0, 600px);
+  gap: 12px;
+}
+
+/* One column on narrow windows, settings first: on a screen this size the
+   results have nothing to gain from being beside anything. 1fr here rather
+   than the cap, because with nothing beside it the panel should use the width
+   it has instead of leaving a margin down one side. */
+@media (max-width: 1000px) {
+  .rng-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.rng-settings-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Column, so the scrolling result view can take whatever height is left over
+   after the header rather than being capped independently of it. */
+.rng-results-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.rng-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rng-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.rng-seg-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.rng-seg-group .toggle-btn {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
+.rng-note {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  line-height: 1.5;
+}
+
+/* ── Range row ─────────────────────────────────────────────────────────────
+   Min and max share the row with the swap button between them, so which way
+   round they are is a visible fact rather than something you have to read the
+   labels for.
+========================================================================== */
+
+.rng-range-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rng-range-row .rng-field {
+  flex: 1 1 130px;
+}
+
+.rng-number-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sits on the baseline of the two inputs it swaps rather than their labels. */
+.rng-swap-btn {
+  flex: 0 0 auto;
+  margin-bottom: 1px;
+}
+
+/* ── Options row ───────────────────────────────────────────────────────────── */
+
+/* Two-up wherever the settings column is wide enough for it, one-up when it
+   isn't, which auto-fit does without a breakpoint.
+
+   Grid rather than a wrapping flex row, and that is what keeps it tidy: two of
+   these four fields hold a label-and-switch row whose natural width is set by
+   how long its note happens to be, so under flex the columns came out ragged
+   and the switches landed at different distances from the left edge. Grid
+   tracks are equal by construction, so every switch lines up. */
+.rng-options-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px 24px;
+  align-items: start;
+}
+
+.rng-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rng-count-input,
+.rng-places-input {
+  width: 90px;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+.rng-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.rng-toggle-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* Says which of the two history modes is live, in words. A switch labelled
+   only "Keep history" leaves the OTHER position unexplained. */
+.rng-toggle-note {
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+/* ── Generate ──────────────────────────────────────────────────────────────
+   The reason the tool exists, pressed far more often than anything else here,
+   so it gets the full width of the settings column and sits alone at the foot
+   of it: nothing to aim for, and nothing destructive within reach of a finger
+   pressing it repeatedly. Copy and Clear are over with the pool they act on,
+   in the results header.
+========================================================================== */
+
+#rng-generate-btn {
+  width: 100%;
+  /* Capped, now that the settings column is the one that absorbs the width of
+     a wide window: full width of a 1300px column is not a more hittable
+     button, just a stranger-looking one. */
+  max-width: 420px;
+  padding: 12px 26px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.rng-summary {
+  font-size: 0.78rem;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Results, shared ───────────────────────────────────────────────────────── */
+
+.rng-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.rng-results-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rng-results-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Fills the stretched panel instead of sitting as one line under the header,
+   so an empty results panel reads as an empty panel rather than a broken one. */
+#rng-empty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  margin: 0;
+  text-align: center;
+}
+
+/* The one type treatment both views share. Tabular figures matter more here
+   than anywhere else in the app: a column of numbers that do not line up is
+   the difference between scanning a list and reading it. */
+.rng-value,
+.rng-row-value {
+  font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+
+/* ── Grid view ─────────────────────────────────────────────────────────────
+   One comma-separated run that wraps. Each number is its own cell so the comma
+   after it is a separate element, which is what keeps a double-click selecting
+   the value and not the punctuation stuck to it.
+========================================================================== */
+
+.rng-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px 8px;
+  /* min-height keeps the panel a panel when the pool is small or empty;
+     max-height is what it scrolls inside once the pool outgrows the window.
+     Both live on the view rather than the panel so the header above stays put
+     while the numbers scroll under it. */
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: 66vh;
+  overflow-y: auto;
+  line-height: 1.7;
+}
+
+.rng-cell {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.rng-cell:hover {
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+}
+
+.rng-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.rng-comma {
+  opacity: 0.4;
+}
+
+/* ── Rows view ─────────────────────────────────────────────────────────────
+   A scrolling list: id on the left, the number in the centre, remove on the
+   right. Capped in height rather than left to grow, so the Generate button
+   beside it never scrolls off, but capped generously: this is the view you use
+   when you are working through a run of numbers, and the more of them that fit
+   on screen at once the less of the work is scrolling.
+========================================================================== */
+
+.rng-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: 66vh;
+  overflow-y: auto;
+}
+
+/* Grid, not flex, and that is what centres the number.
+   `1fr auto 1fr` sizes the middle column to the number and splits everything
+   left over EQUALLY between the two outer columns, so the value sits on the
+   row's true centre line however long the id beside it or the button opposite
+   it happen to be. Flex would centre it only when those two matched. */
+.rng-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.rng-row:hover {
+  border-color: var(--color-accent);
+}
+
+/* The identifying furniture, gathered on the left so nothing lands between the
+   number and the button that removes it. */
+.rng-row-id {
+  justify-self: start;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rng-row-index {
+  font-size: 0.72rem;
+  opacity: 0.45;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Only rendered once a kept history holds more than one generation; a single
+   batch has nothing to distinguish itself from. */
+.rng-row-batch {
+  font-size: 0.68rem;
+  opacity: 0.45;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.rng-row-value {
+  justify-self: center;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.rng-row-remove {
+  justify-self: end;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}

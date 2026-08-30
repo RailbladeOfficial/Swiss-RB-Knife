@@ -4,7 +4,7 @@
    Saturated primaries on cream paper, every surface outlined in thick ink and
    dropped on a hard offset shadow. Deliberately zero gradients and zero glows:
    the whole point is that nothing has depth beyond the one flat shadow, so it
-   reads as a 2-D drawing rather than a lit 3-D UI. The ink colour (#171717) is
+   reads as a 2-D drawing rather than a lit 3-D UI. The ink color (#171717) is
    restated literally throughout rather than going through --color-border,
    because several shell rules use --color-border at 1px widths where the 3px
    outline would be wrong.
@@ -108,7 +108,7 @@
 }
 
 /* The header back-arrow rides the yellow title band, where the muted body
-   colour washes out. Ink, like the rest of the drawing. */
+   color washes out. Ink, like the rest of the drawing. */
 .tool-back-btn,
 .section-back-btn {
   color: #171717;
@@ -199,7 +199,7 @@ button:hover {
 /* Budget's summary tab strip is <button>s that clear their own border but not
    box-shadow, so without this they would carry the button treatment above
    with no button under it. Border is left alone here: .budget-summary-tab's
-   2px transparent bottom edge is what its active underline colours in. The
+   2px transparent bottom edge is what its active underline colors in. The
    app-wide .modal-tab needs no equivalent, it zeroes its own box-shadow in
    modal.css for exactly this reason. */
 .budget-summary-tab {
@@ -323,7 +323,7 @@ textarea:focus {
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: #e5162c; }
 
@@ -379,7 +379,7 @@ textarea:focus {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {

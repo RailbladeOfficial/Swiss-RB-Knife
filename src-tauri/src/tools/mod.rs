@@ -6,3 +6,5 @@ pub mod budget;
 pub mod game_stats;
 pub mod tts_repeater;
 pub mod countdown;
+pub mod rng;
+pub mod kanban;

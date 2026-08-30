@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * generate-sound-manifest.mjs
- * Generates src/sound-manifest.ts from whatever audio files are sitting in
+ * Generates src/sound/sound-manifest.ts from whatever audio files are sitting in
  * public/sounds/button-sounds/, public/sounds/modal-sounds/ and
  * public/sounds/timer-sounds/.
  * Run manually: node generate-sound-manifest.mjs
@@ -22,7 +22,7 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = resolve(__dirname, "..");
 const SOUNDS_DIR = join(ROOT_DIR, "public", "sounds");
-const OUTPUT_FILE = join(ROOT_DIR, "src", "sound-manifest.ts");
+const OUTPUT_FILE = join(ROOT_DIR, "src", "sound", "sound-manifest.ts");
 
 /* What counts as a playable cue. Anything else in the folder (an -attr.txt
    attribution note, a stray .md, an OS thumbnail file) is skipped rather than
@@ -149,5 +149,5 @@ writeFileSync(OUTPUT_FILE, output, "utf8");
 const counts = CATEGORIES.map(
   ({ folder, label, prefix }) => `${scan(folder, prefix).length} ${label.toLowerCase()}`,
 );
-console.log(`\n✅ Written to src/sound-manifest.ts`);
+console.log(`\n✅ Written to src/sound/sound-manifest.ts`);
 console.log(`   ${counts.join(", ")} sound(s) found\n`);

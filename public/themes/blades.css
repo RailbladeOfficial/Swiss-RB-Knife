@@ -7,7 +7,7 @@
    stack of blade edges those cards slide out from, so the app reads as one
    blade pulled forward over the others.
 
-   PER-TOOL COLOUR
+   PER-TOOL COLOR
    Every tool owns one of the five blades off the dashboard: Marketplace red,
    profile orange, Games green, Media blue, System purple. They are handed out
    by walking the Classic tool order (ALL_TOOLS in shell.ts) and cycling
@@ -16,7 +16,7 @@
 
    Each blade is eight custom properties: --bl-1…--bl-4 are the card's radial
    stops (light to dark), --bl-deep is the header band, --bl-rail the fill and
-   edge colour, --bl-ink the near-black used for text, --bl-tint the near-white
+   edge color, --bl-ink the near-black used for text, --bl-tint the near-white
    used for entry fields. :root holds the green as the default, and each tool
    re-declares all eight on FOUR selectors at once: its tool view, its sidebar
    row, its Home card, and any modal open while it is the active tool.
@@ -35,8 +35,8 @@
    the blade scopes, never at :root, because at :root it is the silver the
    whole app sits on.
 
-   Home cards rest in silver, not in their own colour: hovering one pulls that
-   blade forward into full colour, which is the whole gesture the dashboard was
+   Home cards rest in silver, not in their own color: hovering one pulls that
+   blade forward into full color, which is the whole gesture the dashboard was
    built around, and it only reads as a gesture if the resting state is neutral.
 
    Text is a neutral near-black, because it now has to sit on five hues, and
@@ -269,7 +269,7 @@ body[data-active-tool="files/dummy-file-generator"] .modal-backdrop {
 
    Note this deliberately does NOT include the sidebar rows or Home cards:
    those live on the silver and are painted directly from --bl-* further down,
-   so remapping the shared tokens there would recolour the blade stack itself.
+   so remapping the shared tokens there would recolor the blade stack itself.
 
    EVERY token whose value mentions --bl-* has to be declared HERE, not on
    :root. A custom property's var() references are substituted at computed-
@@ -304,11 +304,11 @@ body[data-active-tool] .modal-backdrop {
   --color-accent:    var(--bl-ink);
   --color-btn-hover: var(--bl-rail);
   --color-toggle-on: var(--bl-rail);
-  /* Silver hairlines vanish on a coloured card. */
+  /* Silver hairlines vanish on a colored card. */
   --color-border:    rgba(0, 0, 0, 0.22);
 
   /* The four panel rails, as steps of THIS blade rather than four fixed
-     hues: four colours inside one tool is the thing that stops a tool
+     hues: four colors inside one tool is the thing that stops a tool
      reading as "the red one". White / deep / rail / ink are far enough
      apart to tell four panels apart within a single hue. */
   --color-accent-input:   var(--bl-deep);
@@ -333,7 +333,7 @@ body[data-active-tool] .modal-backdrop {
    NO EASING
    -----------------------------------------------------------------------------
    The blade dashboard moved by sliding whole panels, never by cross-fading
-   colour. A row was lit or it wasn't, and it changed on the frame the
+   color. A row was lit or it wasn't, and it changed on the frame the
    selection did. Easing every hover into place reads as a modern web UI
    wearing the blades as a skin, so this theme snaps instead.
 
@@ -411,7 +411,7 @@ body {
 }
 
 /* Every tool's icon wears its own blade even at rest, so the collapsed
-   sidebar is a legible column of colours rather than nine grey glyphs. */
+   sidebar is a legible column of colors rather than nine grey glyphs. */
 .nav-item[data-tool] .nav-icon {
   color: var(--bl-rail);
 }
@@ -421,7 +421,7 @@ body {
   color: #1d1d1d;
 }
 
-/* The blade you have pulled forward: a glossy tab in the tool's own colour. */
+/* The blade you have pulled forward: a glossy tab in the tool's own color. */
 .nav-item.active,
 .nav-item.active:hover {
   background: linear-gradient(90deg, var(--bl-2) 0%, var(--bl-4) 55%, var(--bl-deep) 100%);
@@ -479,7 +479,7 @@ body {
     0 6px 16px rgba(30, 40, 50, 0.18);
 }
 
-/* …and hovering one pulls that blade forward, in its own colour. */
+/* …and hovering one pulls that blade forward, in its own color. */
 .tool-card:hover {
   background:
     linear-gradient(180deg,
@@ -532,7 +532,7 @@ body {
   color: var(--bl-ink);
 }
 
-/* ── Time Tracker panels. Widened from the shell's 4px; the colours come
+/* ── Time Tracker panels. Widened from the shell's 4px; the colors come
    from --color-accent-* above, so they are steps of this tool's own blade. ── */
 .panel-accent-input    { border-left: 5px solid var(--color-accent-input); }
 .panel-accent-view     { border-left: 5px solid var(--color-accent-view); }
@@ -665,7 +665,7 @@ button:hover {
 /* Budget's summary tab strip is <button>s that clear their own border but not
    box-shadow, so without this they would carry the pill treatment above
    with no pill under it. Border is left alone here: .budget-summary-tab's
-   2px transparent bottom edge is what its active underline colours in. The
+   2px transparent bottom edge is what its active underline colors in. The
    app-wide .modal-tab needs no equivalent, it zeroes its own box-shadow in
    modal.css for exactly this reason. */
 .budget-summary-tab {
@@ -810,7 +810,7 @@ textarea:focus {
    The four accent panels keep the tool's own blade (inherited from
    #finance-tool-budget) and are told apart by their rails, which come from
    --color-accent-* above. No background overrides here on purpose: setting
-   one would break the tool out of its colour. */
+   one would break the tool out of its color. */
 
 .budget-annual-stats-title-panel {
   border-left: 5px solid var(--bl-rail);
@@ -868,7 +868,7 @@ textarea:focus {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Pointed at the blade vars, so the tool
    paints itself from #games-tool-game-stats' own purple.
 

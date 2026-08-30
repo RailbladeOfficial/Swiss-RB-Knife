@@ -128,7 +128,7 @@ test("the Game Stats draft is actually saved, restored and cleared", () => {
   // Specifically pinned because this feature was plumbed and left unconnected
   // once already. Presence of the commands is not enough; all three moments
   // have to be wired or a draft either never appears or never goes away.
-  const src = read("src/tools/game-stats.ts");
+  const src = read("src/tool/game-stats.ts");
   assert.match(src, /invoke\("save_game_stats_draft"/, "nothing saves the draft");
   assert.match(src, /invoke<string>\("load_game_stats_draft"\)/, "nothing restores the draft");
   assert.match(src, /function clearGameStatsDraft/, "nothing clears the draft");

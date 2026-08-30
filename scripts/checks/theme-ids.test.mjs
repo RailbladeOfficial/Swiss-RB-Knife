@@ -19,7 +19,7 @@ import {
   DEFAULT_THEME_ID,
   THEME_SENTINELS,
   migrateThemeId,
-} from "../../src/theme-ids.ts";
+} from "../../src/theme/theme-ids.ts";
 
 const builtinIds = new Set(themeGroups().themes.map((t) => t.id));
 const isKnownBuiltin = (id) => id === BASE_THEME_ID || builtinIds.has(id);

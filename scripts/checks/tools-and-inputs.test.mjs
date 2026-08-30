@@ -19,7 +19,7 @@ import { read, exists, slice, filesUnder, htmlIds } from "./_source.mjs";
 
 /** The tool registry, the single list everything else is supposed to match. */
 function allTools() {
-  const block = slice("src/shell.ts", "const ALL_TOOLS", "];");
+  const block = slice("src/core/shell.ts", "const ALL_TOOLS", "];");
   return [...block.matchAll(
     /key: "([^"]+)", section: "([a-z-]+)", tool: "([a-z-]+)", label: "([^"]+)"/g,
   )].map((m) => ({ key: m[1], section: m[2], tool: m[3], label: m[4] }));
@@ -71,8 +71,8 @@ test("every tool has its own code and styling files", () => {
     // Dummy File Generator's files are named file-gen, so the check is that
     // SOME file pair exists for the tool, matched on either naming.
     const candidates = [t.tool, t.tool.replace(/^dummy-/, "").replace(/-generator$/, "-gen")];
-    const hasTs = candidates.some((c) => exists(`src/tools/${c}.ts`));
-    const hasCss = candidates.some((c) => exists(`src/tools/${c}.css`));
+    const hasTs = candidates.some((c) => exists(`src/tool/${c}.ts`));
+    const hasCss = candidates.some((c) => exists(`src/tool/${c}.css`));
     if (!hasTs) missing.push(`${t.label}: no .ts file`);
     if (!hasCss) missing.push(`${t.label}: no .css file`);
   }
@@ -84,9 +84,9 @@ test("every tool's stylesheet is actually loaded by the page", () => {
   // unstyled, which looks like a broken screen rather than a missing file.
   const html = read("index.html");
   const linked = new Set(
-    [...html.matchAll(/<link[^>]*href="(src\/tools\/[^"]+\.css)"/g)].map((m) => m[1]),
+    [...html.matchAll(/<link[^>]*href="(src\/tool\/[^"]+\.css)"/g)].map((m) => m[1]),
   );
-  const onDisk = filesUnder("src/tools", ".css");
+  const onDisk = filesUnder("src/tool", ".css");
   const unlinked = onDisk.filter((f) => !linked.has(f));
   assert.deepEqual(unlinked, [], "these tool stylesheets exist but are never loaded");
 });

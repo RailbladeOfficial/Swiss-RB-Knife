@@ -1,7 +1,7 @@
 /* =============================================================================
    AUDACIOUS
    -----------------------------------------------------------------------------
-   Flat black, thin type, and two colours doing very different jobs.
+   Flat black, thin type, and two colors doing very different jobs.
 
    Magenta is the interface: every control that can be pressed, focused,
    dragged onto, or is currently on wears it, so the hot pink off the wordmark
@@ -11,19 +11,19 @@
    Lime is reserved for the selection bar, the one full-bleed horizontal band
    that is near-black at both ends and blows out in the middle, with a fine
    diagonal hatch over it and a lit hairline top and bottom. It carries a
-   magenta leading edge so the two colours meet where the eye lands. Only
+   magenta leading edge so the two colors meet where the eye lands. Only
    "this one is selected" gets that band (the active nav row, the active tab,
    a hovered card, a view header), so it never competes with the magenta for
    meaning.
 
    Everything else is deliberately unstyled: no gradients on panels, no glow,
-   no shadow, 2px corners. The colour is the whole design, so any surface that
+   no shadow, 2px corners. The color is the whole design, so any surface that
    competes with it gets flattened out of the way.
 
    THE SUPPORTING PALETTE
    ----------------------
    Magenta and lime carry the interface. Everything that needs a category or
-   series colour (Budget's four panel stripes, its eight chart series) draws
+   series color (Budget's four panel stripes, its eight chart series) draws
    from a set taken off a DAW timeline:
 
      rose  #f84f5d    straw  #f5de47    green   #47e15b
@@ -40,7 +40,7 @@
    Two hues were nudged off their sampled values to stay tellable apart: the
    crimson (348) and the mauve (308) both sat within 20 degrees of magenta's
    326 and collapsed into it once saturated, so they became rose at 355 and
-   violet at 278. No two colours in the theme are now closer than 29 degrees.
+   violet at 278. No two colors in the theme are now closer than 29 degrees.
 
    Named Amuzed, then ezmuze, now this. No THEME_ID_MIGRATIONS entry for any of
    those, and none is warranted: this build has not been released, so no id in
@@ -59,7 +59,7 @@
   --color-text-muted:          #6f6f6f;
   --color-hover:               #171717;
 
-  /* --color-btn is the app-wide "this is interactive" colour: tool-card
+  /* --color-btn is the app-wide "this is interactive" color: tool-card
      icons, the active nav rail, focus rings, the About pulse, filled active
      states. Magenta here is what puts the wordmark's pink on nearly every
      screen. Lime takes --color-accent, which is the quieter of the two
@@ -216,7 +216,7 @@ textarea,
 
 /* ── Panel accent slots, flat black with a single saturated rail ── */
 /* One stripe per category, all four from the sampled set. These were the two
-   interface colours plus two of the new ones, and input/view were additionally
+   interface colors plus two of the new ones, and input/view were additionally
    swapped relative to --color-accent-input/-view, so a panel's stripe and its
    chart series disagreed. Now they match, and magenta and lime are left to do
    their own jobs (buttons, the selection band) rather than doubling as
@@ -242,7 +242,7 @@ textarea,
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-/* The header back-arrow rides the selection bar, where the muted body colour
+/* The header back-arrow rides the selection bar, where the muted body color
    disappears. White, like the title beside it. */
 .tool-back-btn,
 .section-back-btn {
@@ -269,7 +269,7 @@ body:not(.solid-modals) .modal {
    Solid magenta at rest, darkening on hover. This is the header's "magenta is
    the interface" claim taken literally: a control you can press is a magenta
    block, not an outline that becomes one once you find it. Matches how every
-   other theme treats a button, this one just does it in its own colour.
+   other theme treats a button, this one just does it in its own color.
    The quiet chips below (.tab-btn, .dir-btn, the chart controls) opt back out
    with an explicit transparent background; they are secondary controls and
    carry the lime selection band when active. ── */
@@ -419,7 +419,7 @@ textarea:focus {
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: #8fce2a; }
 
@@ -479,7 +479,7 @@ textarea:focus {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {

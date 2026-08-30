@@ -2,7 +2,7 @@
    LAVA
    -----------------------------------------------------------------------------
    A lava lamp: molten blobs rise, stall, and sink behind the app while the
-   whole wax colour drifts slowly through the warm end of the spectrum.
+   whole wax color drifts slowly through the warm end of the spectrum.
 
    Done in pure CSS rather than through the seasonal canvas in theme-core.ts,
    because the blobs belong INSIDE surfaces (panels, cards, the sidebar), not
@@ -10,7 +10,7 @@
    background layer and the motion is an animation on `background-position`,
    which lets a handful of layers drift independently while staying clipped to
    whatever element they are painted on. Only the backdrop layer carries the
-   hue-rotate that cycles the wax colour; putting a filter on .panel would make
+   hue-rotate that cycles the wax color; putting a filter on .panel would make
    it a containing block for any position:fixed descendant a tool renders, so
    panels get motion but keep the fixed palette.
 
@@ -104,7 +104,7 @@ body::before {
     38% 55%,
     88% 100%,
     52% -12%;
-  /* Sits under the wax colour cycle below; declared here so the layer still
+  /* Sits under the wax color cycle below; declared here so the layer still
      reads as molten when animations are switched off. */
   filter: saturate(1.15);
 }
@@ -120,8 +120,8 @@ body::before {
   75%  { background-position: 20% 46%,  64% 22%,  40% 52%,  82% 56%,  44% 40%; }
 }
 
-/* Wax colour cycle. Held to the warm arc, backwards into magenta and forwards
-   into gold, so the lamp never drifts to a colour the fixed palette (buttons,
+/* Wax color cycle. Held to the warm arc, backwards into magenta and forwards
+   into gold, so the lamp never drifts to a color the fixed palette (buttons,
    text, borders) would clash with. */
 @keyframes lava-lamp-hue {
   0%,
@@ -161,7 +161,7 @@ body:not(.theme-animations-off)::before {
 /* landing.css's `.tool-card:hover { background: var(--color-hover) }` is a
    shorthand, so it resets background-image to none and would blink the blobs
    out of a hovered card. Restated at matching specificity (later in the
-   cascade, so it wins) with the colour split off as background-color. */
+   cascade, so it wins) with the color split off as background-color. */
 .tool-card:hover {
   background-color: var(--color-hover);
   background-image:
@@ -203,6 +203,62 @@ body:not(.theme-animations-off) #sidebar {
   animation: lava-sidebar-drift 63s ease-in-out infinite;
 }
 
+/* ── The lamp on the Display Views ─────────────────────────────────────────
+   A Display View is a full-window overlay at z-index 10001 over an opaque
+   fill, so the lamp painted on body::before is behind it and nothing of it
+   comes through. Without this the app's most theme-forward screen would be
+   the one place the theme stops.
+
+   .theme-display-surface is the shared contract for that; see the note on
+   applyDisplaySurface() in theme-core.ts and the skeleton in landing.css.
+   Only backgrounds and animations here. The ambient slot (::before) paints
+   UNDER the card's content and under the overlay's own .tool-view-header
+   color layer, which puts the theme's header wash back on top of the blobs
+   exactly where body::before has it.
+
+   The full-window layer sizes rather than the smaller .panel ones: these are
+   full-window cards, and the lamp reads at the scale the screen is. In a
+   Setup preview box that means a slice of one blob rather than the whole
+   lamp, which is the honest thing for a 164px window onto a 100vmin lamp. */
+.theme-display-surface::before {
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(255, 106, 26, 0.55) 0%, rgba(255, 106, 26, 0.22) 42%, rgba(255, 106, 26, 0) 70%),
+    radial-gradient(circle at 50% 50%, rgba(255, 46, 99, 0.45) 0%, rgba(255, 46, 99, 0.18) 42%, rgba(255, 46, 99, 0) 70%),
+    radial-gradient(circle at 50% 50%, rgba(255, 176, 32, 0.42) 0%, rgba(255, 176, 32, 0.16) 42%, rgba(255, 176, 32, 0) 70%),
+    radial-gradient(circle at 50% 50%, rgba(176, 96, 255, 0.32) 0%, rgba(176, 96, 255, 0.12) 42%, rgba(176, 96, 255, 0) 70%),
+    radial-gradient(circle at 50% 50%, rgba(255, 90, 31, 0.38) 0%, rgba(255, 90, 31, 0.15) 42%, rgba(255, 90, 31, 0) 70%);
+  background-size:
+    78vmin 88vmin,
+    56vmin 68vmin,
+    46vmin 56vmin,
+    64vmin 60vmin,
+    38vmin 48vmin;
+  background-position:
+    12% 115%,
+    68% -20%,
+    38% 55%,
+    88% 100%,
+    52% -12%;
+  filter: saturate(1.15);
+}
+
+/* The same two animations body::before runs, at the same durations, so an
+   overlay opened over the app picks the lamp up mid-drift rather than
+   restarting it visibly out of step with what was on screen a moment ago.
+   The hue-rotate is safe on this element in a way it would not be on the
+   overlay itself: the pseudo-element has no descendants, so nothing but the
+   blobs is filtered and the clock keeps the color the theme gave it.
+
+   Two gates, and they mean different things. The body class is the app-wide
+   Theme Animations preference; .theme-display-still is that Display View's own
+   Animations switch. Either one off leaves the lamp lit and still, which is
+   what "animations off" means everywhere else in this file. */
+body:not(.theme-animations-off) .theme-display-surface:not(.theme-display-still)::before {
+  animation:
+    lava-lamp-drift 54s ease-in-out infinite,
+    lava-lamp-hue 71s ease-in-out infinite;
+}
+
 /* Reduced motion: keep the lamp, lose the movement. The blobs stay exactly
    where their 0% keyframe put them. */
 @media (prefers-reduced-motion: reduce) {
@@ -210,7 +266,8 @@ body:not(.theme-animations-off) #sidebar {
   body:not(.theme-animations-off)::before,
   body:not(.theme-animations-off) .panel,
   body:not(.theme-animations-off) .tool-card,
-  body:not(.theme-animations-off) #sidebar {
+  body:not(.theme-animations-off) #sidebar,
+  body:not(.theme-animations-off) .theme-display-surface::before {
     animation: none;
   }
 }
@@ -360,13 +417,13 @@ input:focus {
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: #ffb020; }
 
 /* ── Budget Tracker ── */
 
-/* Colour only, never the `background` shorthand: these are .panel elements and
+/* Color only, never the `background` shorthand: these are .panel elements and
    the shorthand would wipe the blob layers back off them. */
 #finance-tool-budget .panel-accent-input   { background-color: #2a0a0b; }
 #finance-tool-budget .panel-accent-view    { background-color: #2a1206; }
@@ -421,7 +478,7 @@ input:focus {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {

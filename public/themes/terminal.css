@@ -69,6 +69,30 @@ body::after {
   z-index: 9998;
 }
 
+/* ── Scanlines on the Display Views ────────────────────────────────────────
+   A Display View is a full-window overlay at z-index 10001, i.e. above the
+   9998 the scanline layer above sits at, so on those screens this theme was
+   reduced to its palette and the overlay came out flat.
+
+   .theme-display-surface is the shared contract that fixes it; see the note on
+   applyDisplaySurface() in theme-core.ts and the skeleton in landing.css. The
+   overlay slot (::after) puts these back OVER the card, the same relationship
+   they have to the rest of the app. No animation to declare, these never
+   moved; that card's Animations switch drops the whole slot anyway, which is
+   how you get a Display View with the palette and none of the glass.
+========================================================================== */
+
+.theme-display-surface::after {
+  background-repeat: repeat;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 0, 0.015) 2px,
+    rgba(0, 255, 0, 0.015) 4px
+  );
+}
+
 /* ── Panel accent slots, green shades, starkly left-bordered ── */
 .panel-accent-input { border-color: rgba(0, 255, 0, 0.25); border-left: 4px solid #00ff00; }
 .panel-accent-view { border-color: rgba(0, 204, 0, 0.2); border-left: 4px solid #00cc00; }
@@ -205,7 +229,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: #00ff00; }
 
@@ -263,7 +287,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {

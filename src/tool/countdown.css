@@ -1,0 +1,1122 @@
+/* =============================================================================
+   COUNTDOWN  (countdown.css)
+   All color references use var(--color-*) from the active theme.
+   Tool-unique classes are prefixed `cd-`.
+
+   The clock is sized to be read from across a room / through a screen share,
+   which is the whole reason this tool exists, hence the clamp()ed display
+   type rather than the app's usual body scale.
+
+   THE CLOCK FACE
+   -----------------------------------------------------------------------------
+   Every clock-shaped element here draws in --cd-clock-font, which countdown.ts
+   publishes on the document root from the user's pick (see applyClockFont and
+   CLOCK_FONTS). The fallback baked into each var() is the default face, so the
+   page is correct before any script runs and stays correct if the tool never
+   initialises. Two of the four readers (the Display View overlay, the Setup
+   preview) live outside the tool view entirely, which is why this is a root
+   variable rather than something set on .cd-body.
+
+   DISPLAY VIEW THEMING
+   -----------------------------------------------------------------------------
+   Identical in approach to the TTS Repeater's Display View; the long-form
+   explanation lives at the top of tts-repeater.css and is not repeated here.
+   The short version: "Follow theme" borrows .tool-view-header for the overlay's
+   paint and .tool-view-title for the clock's color and glow, so both are the
+   theme's ACTUAL ones rather than an imitation, and nothing is set inline in
+   that mode, which is what lets a theme change repaint an open overlay live.
+============================================================================= */
+
+.cd-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cd-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* ── The clock ─────────────────────────────────────────────────────────────── */
+
+.cd-clock-panel {
+  text-align: center;
+  padding: 22px 12px 18px;
+}
+
+/* Clock plus the hourglass figure beside it, centred as a pair. */
+.cd-clock-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+/* Positioning context for the ring, which is drawn to this box's exact pixel
+   size (see layoutRing) and sits behind the digits. Padding is what gives the
+   ring somewhere to run without touching the text. */
+.cd-clock-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 26px;
+  min-width: 0;
+}
+
+.cd-clock {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(3rem, 15vw, 8.5rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  /* Tabular figures alone don't stop the colon from shifting things around at
+     display sizes; a fixed-width font keeps the digits from dancing as they
+     count down, which is very visible to an audience. That is why the default
+     face is a mono one, and why the picker says so. The user can override it
+     (Setup › Clock Font) and tabular figures still do what they can for the
+     proportional faces that carry them. */
+  font-family: var(--cd-clock-font, "Cascadia Mono", Consolas, "Courier New", monospace);
+  color: var(--color-accent);
+}
+
+/* Only while idle, a live countdown is extended, not edited. */
+.cd-clock.cd-clock-editable {
+  cursor: text;
+  user-select: none;
+}
+
+/* The duration field the clock becomes on double-click. Matched to the clock's
+   own type so the swap doesn't jump the layout around. */
+.cd-clock-edit {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 8ch);
+  font-size: clamp(2.2rem, 10vw, 5.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  font-family: var(--cd-clock-font, "Cascadia Mono", Consolas, "Courier New", monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-clock-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  opacity: 0.55;
+}
+
+.cd-clock.cd-clock-paused {
+  opacity: 0.5;
+}
+
+.cd-clock.cd-clock-done {
+  color: var(--color-danger);
+}
+
+.cd-clock-memo {
+  display: block;
+  margin-top: 4px;
+  font-size: clamp(0.95rem, 2.4vw, 1.4rem);
+  font-weight: 600;
+  opacity: 0.8;
+  overflow-wrap: break-word;
+}
+
+/* ── Started / Ending readouts ─────────────────────────────────────────────── */
+
+.cd-times-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 32px;
+  margin-top: 16px;
+}
+
+.cd-time-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.cd-time-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  opacity: 0.5;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cd-time-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Progress figures ──────────────────────────────────────────────────────
+   All three read the same way: full at the start, empty at zero.
+========================================================================== */
+
+.cd-bar-wrap {
+  height: 8px;
+  margin: 14px auto 0;
+  max-width: 520px;
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cd-bar {
+  height: 100%;
+  width: 100%;
+  background: var(--color-accent);
+  border-radius: 999px;
+  /* Matches the tick interval, so the bar glides between ticks instead of
+     stepping four times a second. */
+  transition: width 0.25s linear;
+}
+
+/* Geometry comes from JS (see layoutRing) which sets a viewBox matching this
+   box's pixel size so the stroke stays an even width the whole way round.
+   No width/height attributes and no transform: an earlier version rotated the
+   rect to move the trace's start point, which on a wide, short box swung it
+   right out of the frame. The trace simply starts at the top-left corner
+   instead, which is where a rect path begins anyway. */
+.cd-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cd-ring-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
+.cd-ring-progress {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-linecap: butt;
+  transition: stroke-dashoffset 0.25s linear;
+}
+
+.cd-hourglass {
+  width: clamp(46px, 9vw, 74px);
+  height: auto;
+  flex-shrink: 0;
+}
+
+.cd-hg-frame {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-text) 45%, transparent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.cd-hg-sand {
+  fill: var(--color-accent);
+  transition: y 0.25s linear, height 0.25s linear;
+}
+
+/* The grain column scrolls by exactly one tile spacing and loops, so the seam
+   lands on itself and the stream reads as continuous. Nothing here depends on
+   how long the stream is, the clip rect handles that. */
+.cd-hg-stream {
+  animation: cd-hg-fall 0.55s linear infinite;
+}
+
+.cd-hg-grain {
+  fill: var(--color-accent);
+}
+
+/* Eased on the same curve as the sand itself, otherwise the stream's landing
+   point snaps to the new level a quarter second before the pile rises to meet
+   it, and the grains briefly stop short of the surface. */
+.cd-hg-stream-clip {
+  transition: height 0.25s linear;
+}
+
+/* While the first grains are still falling, the length is driven frame by
+   frame from elapsed time, so the transition above has to be out of the way:
+   a repaint every TICK_MS would keep retargeting it and stretch the drop into
+   a slow creep. See HG_FALL_MS in countdown.ts. */
+.cd-hg-stream-clip.cd-hg-dropping {
+  transition: none;
+}
+
+@keyframes cd-hg-fall {
+  from { transform: translateY(0); }
+  to   { transform: translateY(6px); }
+}
+
+/* Left in place but frozen: a static dotted line still reads as "sand is in
+   the neck", which is the information the stream carries. */
+@media (prefers-reduced-motion: reduce) {
+  .cd-hg-stream {
+    animation: none;
+  }
+}
+
+/* ── Setup ─────────────────────────────────────────────────────────────────── */
+
+.cd-unit {
+  font-size: 0.78rem;
+  opacity: 0.6;
+}
+
+/* Was overflowing its panel: the input inherits no width of its own, so
+   without an explicit box the flex parent let it push past the edge. */
+.cd-memo-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.cd-memo-field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.cd-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.cd-preset-btn,
+.cd-extend-btn,
+.cd-round-btn {
+  padding: 5px 11px;
+  font-size: 0.78rem;
+}
+
+.cd-round-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Divides the "Add" group from the "Round to" group without a hard rule that
+   would look heavy in a row of small buttons. */
+.cd-extend-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 6px;
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
+/* ── Actions ───────────────────────────────────────────────────────────────── */
+
+.cd-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  /* Clear of the progress bar above it. They were nearly touching. */
+  margin-top: 22px;
+}
+
+#cd-start-btn,
+#cd-pause-btn,
+#cd-stop-btn {
+  min-width: 120px;
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+#cd-pause-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cd-extend-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+/* ── Setup & Presets modals ────────────────────────────────────────────────── */
+
+/* The Setup modal is on the app's shared .setup-modal shell (720px, tabbed),
+   like Game Stats' and Time Tracker's. Presets keeps the narrower box: it is
+   one form and a list, with nothing to tab between. */
+.cd-presets-modal {
+  width: min(560px, 94vw);
+}
+
+.cd-setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.cd-seg-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cd-seg-group .toggle-btn {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
+.cd-setup-note {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  line-height: 1.5;
+}
+
+/* The picker doubles as its own specimen sheet: each option is drawn in the
+   face it names (set from CLOCK_FONTS in populateFontOptions). Only the closed
+   control is forced back to the app's font, so the row you are reading stays
+   the row you are reading and does not jump size as you scroll the menu. */
+.cd-font-select {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.cd-setup-intro {
+  margin: 0 0 16px;
+  font-size: 0.82rem;
+  opacity: 0.7;
+  line-height: 1.5;
+}
+
+.cd-color-row {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.cd-color-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cd-color-field input[type="color"] {
+  width: 42px;
+  height: 26px;
+  padding: 2px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* ── Size slider with raw entry ────────────────────────────────────────────
+   Double-clicking the read-out swaps it for a number box (bindSliderEntry).
+   Same component the TTS Repeater's Setup uses, same behaviour.
+========================================================================== */
+
+.cd-slider-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.cd-slider-label {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.cd-slider-grid input[type="range"] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cd-slider-readout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 64px;
+}
+
+.cd-slider-value {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+  cursor: text;
+  user-select: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.cd-slider-value:hover {
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+
+.cd-slider-entry {
+  width: 64px;
+  box-sizing: border-box;
+  padding: 2px 4px;
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+/* The pair swap places, so neither may keep its layout box while hidden. */
+.cd-slider-value[hidden],
+.cd-slider-entry[hidden] {
+  display: none;
+}
+
+.cd-effect-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.cd-effect-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cd-effect-note {
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+.cd-effect-row .toggle-switch input:disabled + .toggle-slider {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cd-alarm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cd-alarm-row select {
+  flex: 1;
+  min-width: 150px;
+}
+
+.cd-inline {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#cd-sound-repeats {
+  width: 64px;
+}
+
+.cd-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* ── Display View ──────────────────────────────────────────────────────────
+   Full-window overlay showing nothing but the clock. z-index deliberately
+   clears #toastContainer (10000), same as the TTS Repeater's overlay: this is
+   built to be screen-shared, and a toast sliding in over a "back at half past"
+   card is the exact thing it exists to prevent.
+========================================================================== */
+
+#cd-display-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5vmin;
+  overflow: auto;
+  cursor: default;
+}
+
+/* Applied once the pointer has been still (same timer as the exit button): a
+   cursor parked on the card is as much of a giveaway as the button. Any
+   movement clears it, so it never traps anyone. */
+#cd-display-overlay.cd-display-idle {
+  cursor: none;
+}
+
+/* The clock and everything under it, as one column. */
+.cd-display-stack {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The card's type, addressed by id rather than by class ON PURPOSE.
+
+   The stack wears .tool-view-title for the theme's title color and glow, and
+   a theme's stylesheet is the last one loaded, so several of them (audacious,
+   cartoon, blades, nostalgia) set a font-weight there that would otherwise win
+   over a class rule here and redraw the clock at a header's weight. Color and
+   glow are exactly what this element is borrowing and are left to the theme;
+   size, weight and opacity belong to the card, so they are claimed at a
+   specificity the theme cannot take back. Letter-spacing is claimed too, but
+   on the clock alone rather than here; see #cd-display-clock below.
+
+   --cd-display-size is the card's one dimension, published from the size
+   slider by applyDisplayAppearance(). Setting it as this element's font-size
+   is what lets every child below be sized in plain `em` against it, so one
+   slider scales the whole card and the proportions hold at every size. */
+#cd-display-stack,
+#cd-display-preview-stack {
+  font-size: var(--cd-display-size, 200px);
+  font-weight: 700;
+  opacity: 1;
+  /* The clock row below is an INLINE-level box, so the line it sits on carries
+     a strut as tall as this element's line-height. At the default `normal`
+     that is about 1.2x the clock size, i.e. tens of empty pixels above and
+     below a card whose whole job is to be as large as it can be. Every child
+     that wants breathing room states its own line-height instead. */
+  line-height: 1;
+}
+
+/* The clock and the hourglass beside it.
+
+   inline-flex, which is doing two jobs at once. Flex centres the glass against
+   the digits exactly, whatever their relative heights. Inline-level means the
+   row is placed by the stack's text-align, which is where the Alignment
+   setting lives, so there is no second alignment property to keep in step with
+   it. `vertical-align: top` keeps the row off the baseline, which would
+   otherwise reserve descender space under it. */
+.cd-display-clock-row {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: top;
+  max-width: 100%;
+}
+
+/* Positioning context for the ring, which is drawn to this box's exact pixel
+   size (see layoutRing) and sits behind the digits. The padding is what gives
+   the ring somewhere to run without touching the text, and is in em so it
+   tracks the size slider like everything else on the card. */
+.cd-display-clock-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.07em 0.13em;
+  min-width: 0;
+}
+
+.cd-display-clock {
+  position: relative;
+  z-index: 1;
+  font-size: 1em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--cd-clock-font, "Cascadia Mono", Consolas, "Courier New", monospace);
+  overflow-wrap: break-word;
+}
+
+/* Letter-spacing claimed back from the theme, for the clock only.
+
+   Four themes (audacious, cartoon, liminal, shadow) set letter-spacing on
+   .tool-view-title, which the stack wears and the clock inherits. On a header
+   that is typographic voice; on this element it is width. At 200px, liminal's
+   0.06em is 12px per glyph, so an eight-character clock is roughly 96px wider
+   under it than under a theme that sets none, and the ring, which is drawn to
+   this box's measured pixel size, is redrawn to match. Cycling themes then
+   visibly resizes a clock the size slider was supposed to pin, and pumps the
+   ring around it, on a countdown that may not even be running.
+
+   The memo and the ending time below still inherit it: they are prose, the
+   voice suits them, and nothing is measured from them. */
+#cd-display-clock,
+#cd-display-preview-clock {
+  letter-spacing: normal;
+}
+
+/* Sized against the clock rather than the viewport, unlike the panel copy: the
+   card has one dimension and everything on it is a fraction of that. 0.45em
+   makes the glass, whose viewBox is 1:2, a shade shorter than the digits it
+   stands beside. */
+#cd-display-hourglass,
+#cd-display-preview-hourglass {
+  width: 0.45em;
+  margin-right: 0.09em;
+}
+
+/* Both display figures paint in currentColor rather than the theme accent.
+
+   In Custom look the card's two colors are the whole design, and an accent
+   from the theme underneath it could land anywhere from invisible to garish
+   against a background the theme knows nothing about. In Follow-theme look it
+   means the figure is the same color as the clock it belongs to, which is
+   what the card wants anyway: one object, not a clock with a differently
+   colored gauge attached. The panel copy keeps the accent, because there it
+   sits among other accented furniture. */
+#cd-display-ring-progress,
+#cd-display-preview-ring-progress {
+  stroke: currentColor;
+}
+
+#cd-display-ring-track,
+#cd-display-preview-ring-track {
+  stroke: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+#cd-display-hourglass .cd-hg-sand,
+#cd-display-hourglass .cd-hg-grain,
+#cd-display-preview-hourglass .cd-hg-sand,
+#cd-display-preview-hourglass .cd-hg-grain {
+  fill: currentColor;
+}
+
+#cd-display-hourglass .cd-hg-frame,
+#cd-display-preview-hourglass .cd-hg-frame {
+  stroke: color-mix(in srgb, currentColor 45%, transparent);
+  /* The panel copy renders around 60px wide and takes a 2-unit stroke; this
+     one can be three times that, where 2 units reads as a heavy outline. */
+  stroke-width: 1.4;
+}
+
+.cd-display-memo {
+  margin-top: 0.12em;
+  font-size: 0.26em;
+  font-weight: 600;
+  line-height: 1.25;
+  opacity: 0.85;
+  overflow-wrap: break-word;
+}
+
+.cd-display-ends-at {
+  margin-top: 0.06em;
+  line-height: 1.3;
+  font-size: 0.17em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Not .cd-bar-wrap: that one is capped at 520px for the inline panel, which on
+   a full window would read as a stray line under a very large clock. This one
+   tracks the stack's own width. */
+.cd-display-bar-wrap {
+  height: 0.06em;
+  min-height: 4px;
+  margin-top: 0.14em;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cd-display-bar {
+  height: 100%;
+  width: 100%;
+  background: currentColor;
+  border-radius: 999px;
+  /* Matches the tick interval, so the bar glides between ticks instead of
+     stepping four times a second. */
+  transition: width 0.25s linear;
+}
+
+/* ── Pause / Stop on the card ──────────────────────────────────────────────
+   Off by default and shown only while a run is live; see renderDisplay().
+
+   inline-flex for the same reason the clock row is: an inline-level box is
+   placed by the stack's text-align, so the buttons follow the Alignment
+   setting with no second property to keep in step with it. */
+.cd-display-controls {
+  display: inline-flex;
+  vertical-align: top;
+  gap: 0.7em;
+  margin-top: 1.1em;
+  /* Sized against the clock, but not proportionally: every other element on
+     the card is type, and scales with it, while these are controls that have
+     to stay hittable at a 40px clock and stop short of being a wall of button
+     at a 400px one. The em term tracks the card between those two ends; the
+     rem clamps are the ends. NB the em here resolves against the STACK's
+     font-size, which is --cd-display-size, not against this element's. */
+  font-size: clamp(0.8rem, 0.1em, 1.4rem);
+  /* The stack carries the theme's title glow; a haloed button reads as a
+     mistake rather than as an effect. */
+  text-shadow: none;
+}
+
+.cd-display-ctl-btn {
+  min-width: 6em;
+  padding: 0.5em 1.4em;
+  font-family: inherit;
+  font-size: 1em;
+  font-weight: 600;
+  /* Both the fill and the outline are the clock's own color, so the pair
+     works on a theme gradient and on any custom background without either
+     needing to know what it is sitting on. */
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 0.4em;
+  opacity: 0.7;
+  /* Beats the overlay's `cursor: none` idle state on the buttons themselves,
+     so a hidden pointer reappears the moment it is over something to press. */
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.cd-display-ctl-btn:hover:not(:disabled) {
+  opacity: 1;
+  /* Neutral grey rather than currentColor: mixed at this alpha it lifts a
+     light button on a dark card and darkens a dark one on a light card, where
+     currentColor would wash the label out in the first case. */
+  background: rgba(127, 127, 127, 0.2);
+}
+
+.cd-display-ctl-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* The preview's copies are a picture of the controls, not the controls. */
+#cd-display-preview-controls {
+  pointer-events: none;
+}
+
+/* Paused and finished read the same way they do on the inline clock, so the
+   card never disagrees with the panel it came from. Finished uses the theme's
+   danger color rather than the inherited one, which is the one place the
+   overlay overrides its own text color, and the point of it. */
+.cd-display-clock.cd-display-paused {
+  opacity: 0.5;
+}
+
+.cd-display-clock.cd-display-done {
+  color: var(--color-danger);
+}
+
+/* ── "Follow theme" look ───────────────────────────────────────────────────
+   Applied by applyDisplayAppearance() to the overlay AND the Setup preview, so
+   what the preview shows is literally the rules the real thing runs.
+========================================================================== */
+
+/* Opaque base under the chrome layer: theme header gradients are mostly
+   semi-transparent, since they are designed to sit over the app background. */
+.cd-display-themed {
+  background: var(--color-bg);
+}
+
+/* The color layer. Carries .tool-view-header for the theme's gradient, with
+   every layout property that class brings along stripped back off. This is not
+   a header, it just wants a header's paint. */
+#cd-display-chrome,
+#cd-display-preview-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  padding: 0;
+  gap: 0;
+  border: none;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Custom look is flat by definition: the inline background is the whole
+   design, so the theme's gradient must not sit on top of it. */
+#cd-display-overlay:not(.cd-display-themed) #cd-display-chrome,
+#cd-display-preview:not(.cd-display-themed) #cd-display-preview-chrome {
+  display: none;
+}
+
+/* A theme's glow is tuned for a 1.1rem header row: neon's 16px/32px blur is a
+   bloom at that size and a thin outline at 200px. This adds a second, font-
+   RELATIVE halo in the clock's own color so the effect still reads as a glow
+   at display sizes. Applied only when the theme already has a text-shadow (see
+   themeHasTitleGlow), so it amplifies a glow and never invents one. */
+.cd-display-themeglow {
+  filter: drop-shadow(0 0 0.08em currentColor);
+}
+
+/* Glow off, and every custom-look case: strip whatever text-shadow the theme
+   contributed. Custom mode picks two exact colors and means them. */
+/* Both sit on the STACK, so one rule clears the glow from the clock, the memo
+   and the ending time together. The amplifier is a filter on the clock itself
+   and is removed by its own class not being applied, see
+   applyDisplayAppearance(). */
+.cd-display-noglow,
+#cd-display-overlay:not(.cd-display-themed) #cd-display-stack,
+#cd-display-preview:not(.cd-display-themed) #cd-display-preview-stack {
+  text-shadow: none;
+}
+
+#cd-display-exit {
+  position: absolute;
+  z-index: 1; /* above #cd-display-chrome's color layer */
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  /* Inherits the clock's color so it stays visible against any custom
+     background without needing its own contrast rule. */
+  color: inherit;
+  border: none;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+#cd-display-exit svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Added by nudgeDisplayExit() on pointer movement, removed once the pointer
+   has been still: an idle cursor shouldn't leave a button on the stream. */
+#cd-display-exit.cd-display-exit-visible {
+  opacity: 0.45;
+  pointer-events: auto;
+}
+
+#cd-display-exit.cd-display-exit-visible:hover {
+  opacity: 1;
+  background: transparent;
+}
+
+/* Live preview of the Display View settings. Fixed height with everything
+   scaled by one factor (PREVIEW_SCALE in countdown.ts) so it shows the look
+   without needing the window's real dimensions. */
+.cd-display-preview {
+  position: relative; /* containing block for the absolute chrome layer */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 164px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  /* Clipped rather than scrolled: the preview is judging color, alignment and
+     relative size, and a scrollbar in it would only be noise. */
+  overflow: hidden;
+}
+
+.cd-preset-form {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.cd-preset-form input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.cd-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.cd-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+/* The row currently loaded into the form above, so it's obvious what Save
+   will overwrite. */
+.cd-preset-row.cd-preset-editing {
+  border-color: var(--color-btn);
+}
+
+.cd-preset-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cd-preset-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cd-preset-duration {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-preset-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cd-preset-actions button {
+  padding: 4px 9px;
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.cd-preset-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── History log ───────────────────────────────────────────────────────────── */
+
+.cd-log-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.cd-log-header .cd-label {
+  margin-right: auto;
+}
+
+.cd-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cd-log-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.cd-log-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cd-log-memo {
+  font-weight: 600;
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cd-log-meta {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-log-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cd-log-track {
+  font-size: 0.76rem;
+  padding: 5px 10px;
+}
+
+.cd-log-track:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cd-log-delete {
+  padding: 5px 9px;
+  line-height: 1;
+}
+
+@media (max-width: 560px) {
+  .cd-log-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cd-log-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* ── Sidebar "running" indicator ───────────────────────────────────────────
+   Same role as the TTS Repeater's dot and deliberately the same shape, since
+   both answer the same question: is this tool still doing something while I'm
+   somewhere else in the app? Paused counts as not running, a frozen clock
+   isn't something you need chasing.
+========================================================================== */
+
+.nav-item.cd-running .nav-icon {
+  position: relative;
+}
+
+.nav-item.cd-running .nav-icon::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-panel);
+  animation: cd-running-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cd-running-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-item.cd-running .nav-icon::after {
+    animation: none;
+  }
+}

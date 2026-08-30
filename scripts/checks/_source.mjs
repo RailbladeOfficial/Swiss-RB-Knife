@@ -37,7 +37,7 @@ export function slice(rel, startMarker, endMarker) {
  *  Reads theme-ids.ts, which is where the registry lives so that the picker,
  *  cycle-theme and theme-core can all reach it without importing each other. */
 export function themeGroups() {
-  const text = read("src/theme-ids.ts");
+  const text = read("src/theme/theme-ids.ts");
   const block = text.slice(text.indexOf("export const THEME_GROUPS"));
   const themes = [...block.matchAll(/\{ id: "([a-z-]+)", label: "([^"]+)" \}/g)].map(
     (m) => ({ id: m[1], label: m[2] }),

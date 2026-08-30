@@ -19,7 +19,7 @@ test("the font size limit in code matches the limit on the input (text can't be 
   // whole app at ~520px, at which point the control that would undo it cannot
   // be read. The number input's min/max used to be the only thing enforcing it,
   // and a number input does not stop an out-of-range value being typed.
-  const shell = read("src/shell.ts");
+  const shell = read("src/core/shell.ts");
   const min = Number(/FONT_SCALE_MIN = (-?\d+)/.exec(shell)[1]);
   const max = Number(/FONT_SCALE_MAX = (-?\d+)/.exec(shell)[1]);
   assert.equal(min, Number(tagAttr("fontScaleValue", "min")), "code min != input min");
@@ -28,7 +28,7 @@ test("the font size limit in code matches the limit on the input (text can't be 
 });
 
 test("the font size is clamped when loaded from disk, not just when typed", () => {
-  const shell = read("src/shell.ts");
+  const shell = read("src/core/shell.ts");
   assert.match(
     shell,
     /fontScale: clampFontScale\(merged\.fontScale\)/,
@@ -50,7 +50,7 @@ test("every startup view the app offers actually leads somewhere", () => {
     [...html.matchAll(/id="section-([a-z-]+)"/g)].map((m) => m[1]),
   );
   const tools = new Set(
-    [...slice("src/shell.ts", "const ALL_TOOLS", "];").matchAll(
+    [...slice("src/core/shell.ts", "const ALL_TOOLS", "];").matchAll(
       /section: "([a-z-]+)", tool: "([a-z-]+)"/g,
     )].map((m) => `${m[1]}:${m[2]}`),
   );
@@ -67,7 +67,7 @@ test("every startup view the app offers actually leads somewhere", () => {
 
 test("the startup dropdown lists exactly the tools the app has", () => {
   // Kept in sync by hand: nothing in the app reconciles these two lists.
-  const tools = [...slice("src/shell.ts", "const ALL_TOOLS", "];").matchAll(
+  const tools = [...slice("src/core/shell.ts", "const ALL_TOOLS", "];").matchAll(
     /section: "([a-z-]+)", tool: "([a-z-]+)"/g,
   )].map((m) => `${m[1]}:${m[2]}`);
   const listed = selectOptions("startupSelect")
@@ -77,7 +77,7 @@ test("the startup dropdown lists exactly the tools the app has", () => {
 });
 
 test("every notification sound file the app references exists (otherwise alerts are silent)", () => {
-  const block = slice("src/shell.ts", "const SOUND_PACKS", "];");
+  const block = slice("src/core/shell.ts", "const SOUND_PACKS", "];");
   // Paths in source are URLs, so decode any escapes before looking on disk.
   const files = [...block.matchAll(/"(\/sounds\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
   assert.ok(files.length > 0, "no sound files parsed, the check is not looking at the right block");
@@ -86,7 +86,7 @@ test("every notification sound file the app references exists (otherwise alerts 
 });
 
 test("every button/modal cue the manifest lists exists on disk", () => {
-  const text = read("src/sound-manifest.ts");
+  const text = read("src/sound/sound-manifest.ts");
   const urls = [...text.matchAll(/url: "(\/sounds\/[^"]+)"/g)].map((m) => decodeURIComponent(m[1]));
   const missing = urls.filter((u) => !exists(`public${u}`));
   assert.deepEqual(missing, [], "these cue files are listed in the manifest but not on disk");
@@ -98,7 +98,7 @@ test("the sound manifest is in step with the three cue folders", () => {
   // and commits without running either. This catches that: the fix is to run
   // `node scripts/generate-sound-manifest.mjs`.
   const AUDIO = /\.(wav|mp3|ogg|m4a|flac|webm)$/i;
-  const text = read("src/sound-manifest.ts");
+  const text = read("src/sound/sound-manifest.ts");
 
   for (const [folder, constName] of [
     ["button-sounds", "BUTTON_SOUNDS"],
@@ -114,7 +114,7 @@ test("the sound manifest is in step with the three cue folders", () => {
           .sort()
       : [];
 
-    const block = slice("src/sound-manifest.ts", `export const ${constName}`, "];");
+    const block = slice("src/sound/sound-manifest.ts", `export const ${constName}`, "];");
     const listed = [...block.matchAll(/\{ id: "([^"]+)"/g)].map((m) => m[1]).sort();
 
     assert.deepEqual(
@@ -127,7 +127,7 @@ test("the sound manifest is in step with the three cue folders", () => {
 });
 
 test("every sound pack offers both a success and an error sound", () => {
-  const block = slice("src/shell.ts", "const SOUND_PACKS", "];");
+  const block = slice("src/core/shell.ts", "const SOUND_PACKS", "];");
   const packs = [...block.matchAll(/\{\s*id: "([a-z0-9-]+)"[\s\S]*?\}/g)];
   assert.ok(packs.length > 0, "no sound packs parsed");
   for (const [entry, id] of packs.map((m) => [m[0], m[1]])) {
@@ -144,12 +144,12 @@ test("no sound pack id shadows a reserved cue namespace", () => {
   // be read as "the cue named success in timer-sounds/", not as that pack.
   // Renaming the pack is the fix; the namespaces are baked into stored
   // settings and cannot move.
-  const reserved = [...read("src/sound.ts").matchAll(/if \(head === "([a-z]+)"\) return/g)].map(
+  const reserved = [...read("src/sound/sound.ts").matchAll(/if \(head === "([a-z]+)"\) return/g)].map(
     (m) => m[1],
   );
   assert.ok(reserved.length >= 3, "could not parse the reserved namespaces out of sound.ts");
 
-  const block = slice("src/shell.ts", "const SOUND_PACKS", "];");
+  const block = slice("src/core/shell.ts", "const SOUND_PACKS", "];");
   const packIds = [...block.matchAll(/\{\s*id: "([a-z0-9-]+)"/g)].map((m) => m[1]);
   assert.ok(packIds.length > 0, "no sound packs parsed");
 
@@ -161,18 +161,18 @@ test("the Countdown Timer's default alarm names a cue that exists", () => {
   // A default that points at a missing file is a timer that rings silently,
   // and nothing else would catch it: the id is just a string until it is
   // played. Renaming a file in timer-sounds/ is what breaks this.
-  const block = slice("src/tools/countdown.ts", "const DEFAULT_SETTINGS", "};");
+  const block = slice("src/tool/countdown.ts", "const DEFAULT_SETTINGS", "};");
   const m = /soundId: "([^"]+)"/.exec(block);
   assert.ok(m, "could not find the Countdown default soundId");
   const [head, ...rest] = m[1].split(":");
   const tail = rest.join(":");
 
-  const manifest = read("src/sound-manifest.ts");
-  const packs = slice("src/shell.ts", "const SOUND_PACKS", "];");
+  const manifest = read("src/sound/sound-manifest.ts");
+  const packs = slice("src/core/shell.ts", "const SOUND_PACKS", "];");
 
   if (["timer", "button", "modal"].includes(head)) {
     const constName = `${head.toUpperCase()}_SOUNDS`;
-    const listed = [...slice("src/sound-manifest.ts", `export const ${constName}`, "];").matchAll(
+    const listed = [...slice("src/sound/sound-manifest.ts", `export const ${constName}`, "];").matchAll(
       /\{ id: "([^"]+)"/g,
     )].map((x) => x[1]);
     assert.ok(
@@ -193,10 +193,10 @@ test("every renamed sound pack points at a pack that exists", () => {
   // RENAMED_SOUND_PACKS is what stops a folder rename from silently resetting
   // someone's sound pack and killing their timer alarm. A map entry that
   // points nowhere does none of that, and would fail just as quietly.
-  const block = slice("src/shell.ts", "const RENAMED_SOUND_PACKS", "};");
+  const block = slice("src/core/shell.ts", "const RENAMED_SOUND_PACKS", "};");
   const entries = [...block.matchAll(/^\s*([a-z0-9-]+): "([a-z0-9-]+)",/gm)].map((m) => [m[1], m[2]]);
 
-  const packBlock = slice("src/shell.ts", "const SOUND_PACKS", "];");
+  const packBlock = slice("src/core/shell.ts", "const SOUND_PACKS", "];");
   const packIds = [...packBlock.matchAll(/\{\s*id: "([a-z0-9-]+)"/g)].map((m) => m[1]);
 
   for (const [from, to] of entries) {
@@ -241,7 +241,7 @@ test("the Countdown alarm's Test button does not also fire the button cue", () =
   // outside the priority gate on purpose (a preview must never be suppressed).
   // Nothing else would stop the click cue landing on top of it, so the id is
   // listed by hand in BUTTON_CUE_EXCLUDE and has to keep matching the markup.
-  const exclude = slice("src/shell.ts", "const BUTTON_CUE_EXCLUDE", "].join");
+  const exclude = slice("src/core/shell.ts", "const BUTTON_CUE_EXCLUDE", "].join");
   assert.match(exclude, /#cd-sound-test/, "BUTTON_CUE_EXCLUDE no longer excludes the alarm preview");
   assert.match(
     read("index.html"),
@@ -262,14 +262,14 @@ test("every sound the app ships is credited in ATTRIBUTION.md", () => {
   const attribution = read("ATTRIBUTION.md");
   const missing = [];
 
-  const packBlock = slice("src/shell.ts", "const SOUND_PACKS", "];");
+  const packBlock = slice("src/core/shell.ts", "const SOUND_PACKS", "];");
   const packNames = [...packBlock.matchAll(/name: "([^"]+)"/g)].map((m) => m[1]);
   assert.ok(packNames.length > 0, "no sound packs parsed");
   for (const name of packNames) {
     if (!attribution.includes(`### Sound Pack: ${name}`)) missing.push(`sound pack "${name}"`);
   }
 
-  const cueNames = [...read("src/sound-manifest.ts").matchAll(/name: "([^"]+)"/g)].map((m) => m[1]);
+  const cueNames = [...read("src/sound/sound-manifest.ts").matchAll(/name: "([^"]+)"/g)].map((m) => m[1]);
   assert.ok(cueNames.length > 0, "no manifest cues parsed");
   for (const name of cueNames) {
     if (!attribution.includes(`**${name}**`)) missing.push(`cue "${name}"`);

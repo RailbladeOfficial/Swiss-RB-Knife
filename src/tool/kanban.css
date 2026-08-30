@@ -1,0 +1,1912 @@
+/* =============================================================================
+   KANBAN BOARDS  (kanban.css)
+   All color references use var(--color-*) from the active theme. Tool-unique
+   classes are prefixed `kb-`.
+
+   TWO THINGS IN THIS FILE ARE UNUSUAL FOR A TOOL HERE, both for the same
+   reason: a board can be painted over by a user-supplied image, and a card can
+   be painted a user-supplied color. Everywhere else in the app the theme owns
+   every surface, so text color can simply be inherited. It cannot here.
+
+     1. A card carrying a solid color gets `.kb-solid`, which switches its text
+        off the theme's palette and onto two custom properties set inline by
+        applySolidColor() in kanban.ts: --kb-ink-soft and --kb-ink-faint. Those
+        are washes of the ink that function already chose for contrast, so the
+        secondary text on a solid card is a fade of the SAME ink rather than
+        the theme's muted grey, which would be invisible on half the palette.
+
+     2. The board background sits in its own layer (#kbBoardBg) UNDER the board
+        chrome rather than as a background on it, because it carries a blur
+        filter and a filter applies to an element's whole subtree. The chrome
+        above it then leans on --color-panel with alpha so the image reads
+        through without the cards ever losing their own surface.
+
+   The board's columns scroll HORIZONTALLY as a group and each column scrolls
+   VERTICALLY on its own. That pairing is what makes a Kanban legible: the
+   column headers stay put while you read down one, and the board stays one
+   object while you move across it.
+============================================================================= */
+
+/* =============================================================================
+   TOOL VIEW SHELL
+   -----------------------------------------------------------------------------
+   A board only works if it has a HEIGHT: the columns have to scroll inside
+   themselves, with their headers and the board bar staying put, or reading down
+   one column scrolls the whole board away and you lose the other five.
+
+   Nothing above this tool supplies one. #mainContent scrolls the page and its
+   children are content-height all the way down, which is right for every other
+   tool here and wrong for this one. So the chain is bounded for the length of
+   this tool's visit, keyed on the data-active-tool attribute shell.ts already
+   puts on <body> (see switchSection). Scoping it that way means no other tool's
+   layout is touched, and the moment you navigate away it stops applying.
+
+   The gallery then takes its own scroll, since #mainContent no longer has one.
+========================================================================== */
+
+body[data-active-tool="utility/kanban"] #mainContent {
+  overflow: hidden;
+}
+
+body[data-active-tool="utility/kanban"] #section-utility,
+body[data-active-tool="utility/kanban"] #utility-tool-kanban {
+  flex: 1;
+  /* Without this a flex child refuses to shrink below its content, which is
+     exactly the overflow this whole block exists to prevent. */
+  min-height: 0;
+}
+
+.kb-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+}
+
+#kbViewBoards {
+  overflow-y: auto;
+}
+
+.kb-empty {
+  padding: 20px 4px;
+  text-align: center;
+}
+
+/* Shared small square button: the collapse chevron, the column gear, the board
+   menu, the subtask remove. Sized off the text so it tracks the font scale. */
+.kb-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  line-height: 1;
+  opacity: 0.65;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition),
+    opacity var(--hover-transition);
+}
+
+.kb-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.kb-icon-btn:hover {
+  background: var(--color-hover);
+  border-color: var(--color-border);
+  opacity: 1;
+}
+
+.kb-icon-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+  background: transparent;
+  border-color: transparent;
+}
+
+.kb-search-input {
+  min-width: 160px;
+  max-width: 280px;
+  flex: 1;
+}
+
+.kb-wide-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.kb-number-input {
+  width: 84px;
+  text-align: right;
+}
+
+.kb-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* The two states any number in this tool can be in. Kept as one pair of
+   classes rather than per-component colors so "this is over the line" looks
+   identical on a column badge, a due chip and a stats row. */
+.kb-stat-alert {
+  color: var(--color-danger);
+}
+
+.kb-stat-warn {
+  color: var(--color-accent);
+}
+
+/* =============================================================================
+   BOARD GALLERY
+============================================================================= */
+
+.kb-gallery-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kb-gallery-summary {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-right: auto;
+}
+
+.kb-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+/* A tile is mostly its background: the whole point of setting one is that you
+   recognise the board before you have read anything. The text block sits over
+   it in its own scrim so it stays readable on any image. */
+.kb-board-tile {
+  position: relative;
+  overflow: hidden;
+  min-height: 148px;
+  /* Flex, so the body stretches to the tile's full height. As a block, the
+     body's `height: 100%` would resolve against an auto-height parent and
+     collapse to its content, leaving the scrim short of the bottom edge on any
+     tile taller than its own text. */
+  display: flex;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-panel);
+  cursor: pointer;
+  transition:
+    border-color var(--hover-transition),
+    box-shadow var(--hover-transition),
+    transform var(--hover-transition);
+}
+
+.kb-board-tile:hover,
+.kb-board-tile:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.28);
+  outline: none;
+}
+
+.kb-board-tile-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  /* The scale is set inline, proportional to the blur, so a blurred image does
+     not fade out at the tile's own edges. See buildBoardTile() in kanban.ts. */
+  transform-origin: center;
+  pointer-events: none;
+}
+
+/* A board with no image still needs to look like a board rather than an empty
+   rectangle, so it gets a quiet diagonal wash off the theme's own accents. */
+.kb-board-tile-bg-empty {
+  background-image: linear-gradient(
+    135deg,
+    var(--color-accent-input) 0%,
+    var(--color-panel) 55%,
+    var(--color-accent-entries) 100%
+  );
+  opacity: 0.32;
+}
+
+.kb-board-tile-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  box-sizing: border-box;
+  padding: 12px 12px 10px;
+  text-align: left;
+  /* The scrim is the only thing guaranteeing the tile's text is readable, since
+     the image underneath is whatever the user picked. Strongest at the bottom,
+     where the text is. */
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.05) 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    rgba(0, 0, 0, 0.82) 100%
+  );
+  color: #ffffff;
+  justify-content: flex-end;
+}
+
+.kb-board-tile-name {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.kb-board-tile-desc {
+  font-size: 0.75rem;
+  opacity: 0.78;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* One bar per column, height proportional to that column's share of the
+   board's fullest column. A board's SHAPE is recognisable this way in a
+   glance; a total is not. */
+.kb-board-tile-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+  margin-top: 2px;
+}
+
+.kb-board-tile-bar {
+  flex: 1;
+  min-width: 4px;
+  height: var(--kb-bar, 0%);
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.kb-board-tile-bar-done {
+  background: var(--color-success);
+  opacity: 0.85;
+}
+
+.kb-board-tile-stats {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+/* The tile's own text is painted on a dark scrim regardless of theme, so an
+   alert inside it has to be a color that reads on dark rather than the
+   theme's --color-danger, which may itself be dark. */
+.kb-board-tile-stats.kb-stat-alert {
+  color: #ff9a9a;
+  opacity: 1;
+}
+
+.kb-tile-edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity var(--hover-transition);
+}
+
+.kb-board-tile:hover .kb-tile-edit-btn,
+.kb-board-tile:focus-within .kb-tile-edit-btn {
+  opacity: 1;
+}
+
+.kb-tile-edit-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* =============================================================================
+   BOARD VIEW
+============================================================================= */
+
+.kb-view-board {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+/* The image layer. A sibling of the chrome, not a background on it, because
+   the blur filter would otherwise apply to every card sitting on top. */
+.kb-board-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.kb-board-chrome {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+  padding: 10px;
+}
+
+/* With an image behind it, the chrome needs its own ground or the bar's text
+   sits directly on a photo. color-mix keeps it the theme's own panel color
+   rather than a grey, so every theme still recognisably owns the board. */
+.kb-has-bg .kb-board-bar,
+.kb-has-bg .kb-filter-bar {
+  /* Declared twice on purpose: an engine that cannot parse color-mix drops that
+     line and keeps the one above it, so the bar is a solid panel rather than a
+     transparent strip over a photo. */
+  background: var(--color-panel);
+  background: color-mix(in srgb, var(--color-panel) 82%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.kb-board-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.kb-board-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.kb-board-counts {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}
+
+.kb-board-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+/* =============================================================================
+   FILTER BAR
+============================================================================= */
+
+.kb-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.kb-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.kb-filter-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-right: 2px;
+}
+
+.kb-filter-chip {
+  padding: 2px 9px;
+  font-size: 0.74rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+}
+
+.kb-filter-chip:hover {
+  background: var(--color-hover);
+}
+
+/* A selected tag chip is painted its own color inline; a selected due chip
+   has no color of its own, so it borrows the theme's button. The due group
+   carries its own class rather than being addressed as the last group, which
+   would silently move the moment another group is added after it. */
+.kb-filter-chip.active {
+  border-color: var(--color-accent);
+}
+
+.kb-filter-group-due .kb-filter-chip.active {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+}
+
+.kb-filter-clear {
+  margin-left: auto;
+  font-size: 0.74rem;
+  padding: 3px 10px;
+}
+
+/* =============================================================================
+   COLUMNS
+============================================================================= */
+
+/* One horizontally scrolling row of fixed-width columns. Fixed rather than
+   flexible on purpose: a card's width is what its title wraps against, and a
+   board whose cards reflow every time a column is added is a board you have to
+   re-read. */
+.kb-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+}
+
+.kb-column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 268px;
+  width: 268px;
+  max-height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  transition:
+    background var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.kb-has-bg .kb-column {
+  background: var(--color-panel);
+  background: color-mix(in srgb, var(--color-panel) 88%, transparent);
+}
+
+/* A done column earns a quiet rail rather than a different fill: it is still a
+   column, it just means something specific. */
+.kb-column-done {
+  border-left: 3px solid var(--color-success);
+}
+
+/* Over the WIP limit is the one state this tool is loud about. It is the whole
+   reason a limit exists. */
+.kb-column-over-wip {
+  border-color: var(--color-danger);
+  box-shadow: inset 0 0 0 1px var(--color-danger-subtle);
+}
+
+.kb-column-dragging {
+  opacity: 0.5;
+}
+
+.kb-column-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 6px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.kb-column-grip {
+  cursor: grab;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.kb-column-grip:active {
+  cursor: grabbing;
+}
+
+.kb-column-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-column-count {
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.kb-column-btn {
+  width: 22px;
+  height: 22px;
+  font-size: 0.8rem;
+}
+
+/* min-height:0 on a flex child is what lets it scroll instead of growing past
+   its parent; without it the column body pushes the whole board taller. */
+.kb-column-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  overflow-y: auto;
+  min-height: 60px;
+  flex: 1 1 auto;
+}
+
+.kb-column-empty {
+  margin: 0;
+  padding: 10px 4px;
+  font-size: 0.76rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  /* Never a drop target itself, or dropping onto an empty column lands the
+     card in the wrong place in the DOM. */
+  pointer-events: none;
+}
+
+.kb-column-collapsed .kb-column-body,
+.kb-column-collapsed .kb-column-footer {
+  display: none;
+}
+
+.kb-column-collapsed {
+  flex: 0 0 200px;
+  width: 200px;
+}
+
+.kb-column-footer {
+  padding: 6px 8px 8px;
+  flex-shrink: 0;
+}
+
+.kb-column-add {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 0.78rem;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border-dashed);
+  border-radius: 6px;
+}
+
+.kb-column-add:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* Quick add: the form stays open after each Enter, so this is a place you sit
+   for a minute rather than a dialog you dismiss. */
+.kb-quick-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kb-quick-add-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-size: 0.82rem;
+}
+
+.kb-quick-add-row {
+  display: flex;
+  gap: 6px;
+}
+
+.kb-quick-add-row button {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+}
+
+/* =============================================================================
+   CARDS
+============================================================================= */
+
+.kb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 9px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  /* Not `grab`: the card is primarily a thing you click to open, and dragging
+     it is the secondary gesture. */
+  transition:
+    border-color var(--hover-transition),
+    background var(--hover-transition),
+    box-shadow var(--hover-transition);
+}
+
+.kb-card:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.kb-card.kb-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.kb-card-compact {
+  gap: 3px;
+  padding: 5px 8px;
+}
+
+/* A rail rather than a left border, because a solid card carries an INLINE
+   border-color (chosen for contrast against its own fill) and an inline style
+   beats any rule here. A pseudo-element sits outside that fight, so an overdue
+   card is flagged whether it is colored or not. */
+.kb-card-overdue {
+  position: relative;
+}
+
+.kb-card-overdue::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 8px 0 0 8px;
+  background: var(--color-danger);
+  pointer-events: none;
+}
+
+/* ── Solid cards ───────────────────────────────────────────────────────────
+   The card is painted a color the theme knows nothing about, so every piece
+   of text on it moves onto the ink applySolidColor() chose. --kb-ink-soft and
+   --kb-ink-faint are washes of that same ink, set inline. Using the theme's
+   muted color here is what would make a card's subtitle disappear on half the
+   palette. */
+.kb-card.kb-solid .kb-card-number,
+.kb-card.kb-solid .kb-card-sub-count,
+.kb-card.kb-solid .kb-card-due {
+  color: var(--kb-ink-soft);
+}
+
+.kb-card.kb-solid .kb-card-due,
+.kb-card.kb-solid .kb-card-stage-chip {
+  border-color: var(--kb-ink-faint);
+  background: transparent;
+  color: var(--kb-ink-soft);
+}
+
+.kb-card.kb-solid .kb-card-sub-track {
+  background: var(--kb-ink-faint);
+}
+
+.kb-card.kb-solid .kb-card-sub-fill,
+.kb-card.kb-solid .kb-card-sub-fill-complete {
+  background: var(--kb-ink-soft);
+}
+
+.kb-card.kb-solid {
+  border-color: var(--kb-ink-border);
+}
+
+.kb-card.kb-solid:hover {
+  /* The accent border would be a third color on a card that already has two.
+     A brighter rim of its own ink says "hover" without introducing one. This
+     only works because applySolidColor hands the idle border over as a custom
+     property rather than as an inline border-color, which would outrank it. */
+  border-color: var(--kb-ink-soft);
+}
+
+.kb-card-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.kb-card-number {
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.kb-card-title {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.kb-card-compact .kb-card-title {
+  font-size: 0.8rem;
+  line-height: 1.25;
+  /* Two lines then an ellipsis: compact mode is for scanning forty cards, and
+     one long title should not push the rest off the screen. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.kb-card-due,
+.kb-card-stage-chip {
+  font-size: 0.66rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.kb-card-due-over {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+.kb-card-due-soon {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.kb-card-due-done {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.kb-card-stage-done {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.kb-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.kb-card-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-card-sub-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.kb-card-sub-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-btn);
+  transition: width var(--hover-transition);
+}
+
+.kb-card-sub-fill-complete {
+  background: var(--color-success);
+}
+
+.kb-card-sub-count {
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   TAG CHIPS
+   Painted their own color inline, with the ink chosen for contrast in
+   kanban.ts. Nothing here may set `color` or `background`, or it would fight
+   that choice.
+============================================================================= */
+
+.kb-tag-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  font-size: 0.66rem;
+  line-height: 1.5;
+  border-radius: 999px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A retired tag is still shown on the cards that carry it, dimmed and
+   outlined, so it reads as history rather than as a live choice. */
+.kb-tag-chip-retired {
+  opacity: 0.6;
+  border: 1px dashed currentColor;
+}
+
+.kb-tag-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-tag-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.kb-tag-group-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  min-width: 84px;
+}
+
+.kb-tag-toggle {
+  padding: 2px 9px;
+  font-size: 0.74rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+}
+
+/* Brightness only. Every one of these carries its tag's color as an INLINE
+   background (or an inline "transparent" when unselected), and an inline style
+   beats any background rule written here, so a hover wash would either do
+   nothing or, worse, have to fight the tag's own color. */
+.kb-tag-toggle:hover,
+.kb-tag-edit-chip:hover {
+  filter: brightness(1.15);
+}
+
+/* =============================================================================
+   CARD MODAL
+============================================================================= */
+
+.kb-card-modal {
+  width: min(680px, 94vw);
+}
+
+.modal-body.kb-card-body {
+  gap: 14px;
+}
+
+.kb-card-title-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 8px 10px;
+}
+
+.kb-card-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 620px) {
+  .kb-card-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kb-card-field select {
+  width: 100%;
+}
+
+/* Each block of the card modal is a small titled section rather than a run of
+   fields: a card has six unrelated things on it and a flat form makes them all
+   look like one. */
+.kb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
+.kb-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kb-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.kb-section-note {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+  text-align: right;
+}
+
+/* ── Stages ── */
+
+.kb-stage-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.kb-stage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kb-stage-label {
+  flex: 0 0 130px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.kb-stage-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.kb-stage-fixed {
+  flex: 1;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.kb-stage-clear {
+  width: 24px;
+  height: 24px;
+}
+
+.kb-stage-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kb-stage-actions button {
+  flex: 1;
+}
+
+.kb-due-field {
+  margin-top: 2px;
+}
+
+/* ── Color ── */
+
+.kb-color-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kb-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.kb-swatch:hover {
+  filter: brightness(1.15);
+}
+
+.kb-swatch.active {
+  /* An outline rather than a border, so the swatch's own color keeps its full
+     size and the ring reads as selection rather than as part of the color. */
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.kb-swatch-none {
+  background: transparent;
+  border: 1px dashed var(--color-border-dashed);
+  color: var(--color-text-muted);
+}
+
+.kb-swatch-none:hover {
+  background: var(--color-hover);
+  filter: none;
+}
+
+/* Scoped to this tool's rows. A bare input[type="color"] rule would resize
+   every color picker in the app, the Theme Editor's included. */
+.kb-inline-row input[type="color"] {
+  width: 44px;
+  height: 30px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+/* ── Description ── */
+
+.kb-card-desc {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* ── Subtasks ── */
+
+.kb-subtask-track {
+  height: 6px;
+}
+
+.kb-subtask-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kb-subtask-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kb-subtask-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  background: transparent;
+  border-color: transparent;
+}
+
+.kb-subtask-text:hover,
+.kb-subtask-text:focus {
+  background: var(--color-input-bg);
+  border-color: var(--color-border);
+}
+
+/* A ticked subtask stays fully readable, just struck through. Fading it out is
+   the common choice and it is wrong here: the point of the list is that you
+   can still see what the finished parts were. */
+.kb-subtask-done .kb-subtask-text {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+/* =============================================================================
+   SETUP: TAGS TAB
+============================================================================= */
+
+.kb-tagcat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-tagcat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.kb-tagcat-retired {
+  opacity: 0.72;
+}
+
+.kb-tagcat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.kb-tagcat-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.kb-tagcat-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.kb-tagcat-head .setup-item-count {
+  margin-left: auto;
+}
+
+.kb-tagcat-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+/* =============================================================================
+   SETUP: BOARD EDITOR
+============================================================================= */
+
+.kb-board-edit-modal {
+  width: min(560px, 94vw);
+}
+
+/* The preview is the control: nobody can predict what "blur 9, brightness 70"
+   looks like, so the sliders move a real sample of a board rather than a
+   swatch. The mock cards are what make it a sample rather than a photo. */
+.kb-bg-preview {
+  position: relative;
+  height: 130px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
+.kb-bg-preview-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transform-origin: center;
+}
+
+.kb-bg-preview-cards {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+}
+
+.kb-bg-preview-card {
+  width: 68px;
+  height: 78px;
+  border-radius: 6px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  opacity: 0.94;
+}
+
+.kb-bg-preview-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+}
+
+.kb-bg-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kb-range-value {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+/* =============================================================================
+   STATS
+============================================================================= */
+
+.kb-board-stats-modal {
+  width: min(620px, 94vw);
+}
+
+.kb-stats-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.kb-stats-heading {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.kb-stat-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Three columns, not two: the note ("median of 12", "still open") is what
+   stops a number being read as more certain than it is, so it needs a place of
+   its own rather than being tacked onto the value. */
+.kb-stat-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.3fr) minmax(70px, 0.7fr) minmax(0, 1.4fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kb-stat-row:last-child {
+  border-bottom: none;
+}
+
+.kb-stat-row:nth-child(odd) {
+  background: var(--color-bg);
+}
+
+.kb-stat-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.kb-stat-value {
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-stat-note {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .kb-stat-row {
+    grid-template-columns: 1fr auto;
+  }
+  .kb-stat-note {
+    grid-column: 1 / -1;
+  }
+}
+
+.kb-stats-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kb-stats-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kb-stats-tag-count {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+/* =============================================================================
+   ARCHIVE + BACKUPS
+============================================================================= */
+
+.kb-archive-modal {
+  width: min(620px, 94vw);
+}
+
+.kb-archive-row .setup-item-name,
+.kb-backup-row .setup-item-name {
+  cursor: default;
+}
+
+.kb-archive-row,
+.kb-backup-row {
+  cursor: default;
+  gap: 8px;
+}
+
+.kb-archive-row:hover,
+.kb-backup-row:hover {
+  background: var(--color-bg);
+}
+
+.kb-backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  /* Thirty snapshots is the retention cap (BACKUP_KEEP_COUNT in lib.rs), which
+     is a long list inside a settings pane; it gets its own scroll rather than
+     pushing the rest of the tab off the bottom. */
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+/* =============================================================================
+   WIDER SETUP MODAL
+   -----------------------------------------------------------------------------
+   The shared .setup-modal is 720px, which suits a tab that is a list of names.
+   This one's tabs are settings rows carrying a control AND a label long enough
+   to say what the control does, and at 720px the two were crushing each other
+   and wrapping mid-phrase. Overridden here rather than widening the shared
+   class, because every other tool's setup modal is the right size already.
+========================================================================== */
+
+.kb-setup-modal {
+  width: min(880px, 95vw);
+}
+
+/* =============================================================================
+   INFO BUTTONS + TOOLTIP
+   -----------------------------------------------------------------------------
+   These replaced the paragraphs of subtext that used to sit under half the
+   settings rows. The words were worth keeping; the vertical space they took was
+   not, and a tab you have to scroll to reach the fifth setting in is a tab
+   whose fifth setting nobody finds.
+========================================================================== */
+
+.kb-label-with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Wraps rather than pushing the control off the row on a narrow window. */
+  flex-wrap: wrap;
+}
+
+.kb-info-btn {
+  padding: 1px 8px;
+  font-size: 0.72rem;
+}
+
+.kb-info-tooltip {
+  position: fixed;
+  /* Above the modal stack: these open from inside a modal. */
+  z-index: 10000;
+  max-width: 320px;
+  padding: 8px 10px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.kb-info-tooltip.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* =============================================================================
+   ENCRYPTION: THE TOOL-LOCK GATE
+========================================================================== */
+
+.kb-auth-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 320px;
+  padding: 20px;
+}
+
+.kb-auth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(420px, 100%);
+  padding: 24px 22px;
+  text-align: center;
+}
+
+.kb-auth-icon {
+  display: block;
+  color: var(--color-accent);
+  opacity: 0.85;
+}
+
+.kb-auth-icon svg {
+  width: 40px;
+  height: 40px;
+}
+
+.kb-auth-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.kb-auth-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.kb-auth-input {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  letter-spacing: 0.12em;
+}
+
+.kb-password-message {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
+/* Empty unless something went wrong, so it takes no space until it has to. */
+.kb-password-error:empty {
+  display: none;
+}
+
+.kb-password-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-danger);
+  text-align: left;
+}
+
+/* =============================================================================
+   LOCKED BOARDS
+   A locked tile is dimmed but never hidden: the point of keeping board names in
+   the plaintext index is that you can still find the board you want to unlock.
+========================================================================== */
+
+.kb-board-tile-locked .kb-board-tile-bars {
+  /* A locked board has no columns in memory, so there are no bars to draw and
+     an empty 22px strip would just read as a rendering fault. */
+  display: none;
+}
+
+.kb-board-tile-lock {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+.kb-board-tile-lock svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* =============================================================================
+   SNAPSHOT LIST
+   Grouped by the hour bucket, with one row per captured file, since a bucket
+   now holds only the boards that were actually touched in that hour.
+========================================================================== */
+
+.kb-backup-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kb-backup-group:last-child {
+  border-bottom: none;
+}
+
+.kb-backup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.kb-backup-when {
+  font-variant-numeric: tabular-nums;
+}
+
+/* =============================================================================
+   THE DELETE BUTTON ON A CARD
+   -----------------------------------------------------------------------------
+   Off by default, and hidden until the card is hovered even when on. It sits on
+   a surface whose main gesture is dragging, so a permanently visible bin under
+   the cursor is a card lost to a mis-grab. Revealed on hover, it is still one
+   deliberate click away and still goes through the confirmation.
+========================================================================== */
+
+.kb-card-delete {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  opacity: 0;
+  transition:
+    opacity var(--hover-transition),
+    background var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.kb-card-delete svg {
+  width: 13px;
+  height: 13px;
+}
+
+.kb-card:hover .kb-card-delete,
+.kb-card-delete:focus-visible {
+  opacity: 0.75;
+}
+
+.kb-card-delete:hover {
+  opacity: 1;
+  background: var(--color-danger-subtle);
+  border-color: var(--color-danger);
+}
+
+/* On a solid card the theme's danger color may be invisible against the fill,
+   so the bin uses the card's own chosen ink and leans on the hover wash to say
+   what it is. */
+.kb-card.kb-solid .kb-card-delete {
+  color: var(--kb-ink-soft);
+}
+
+.kb-card.kb-solid .kb-card-delete:hover {
+  border-color: var(--kb-ink-soft);
+  background: transparent;
+}
+
+/* =============================================================================
+   CARD MODAL: THE REORDERABLE BLOCKS
+========================================================================== */
+
+.kb-card-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kb-color-note {
+  margin: 0 0 4px;
+  text-align: left;
+  margin-left: 0;
+}
+
+/* =============================================================================
+   CARD LAYOUT ORDER
+   The drag-reorderable list of card blocks, used for the default and again for
+   a board's override.
+========================================================================== */
+
+.kb-section-order {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 2px;
+}
+
+.kb-section-order-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: grab;
+  font-size: 0.82rem;
+}
+
+.kb-section-order-row:active {
+  cursor: grabbing;
+}
+
+.kb-section-order-row.kb-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.kb-section-order-label {
+  flex: 1;
+  min-width: 0;
+}
+
+/* =============================================================================
+   PER-BOARD OVERRIDES
+   -----------------------------------------------------------------------------
+   A row that has been pinned for this board gets a rail, so "what has this
+   board changed" is answerable by looking rather than by reading every select.
+========================================================================== */
+
+.kb-override-select {
+  min-width: 170px;
+}
+
+.settings-row.kb-override-set {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 7px;
+  margin-left: -10px;
+}
+
+/* Lead-in line at the top of a tab, where the tab needs a sentence of framing
+   that is not attached to any one row. */
+.kb-tab-lead {
+  margin: 0 0 8px;
+}
+
+/* =============================================================================
+   PRIORITY
+========================================================================== */
+
+.kb-card-priority {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.kb-priority-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 2px 0 6px;
+}
+
+.kb-priority-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.kb-priority-color input[type="color"] {
+  width: 38px;
+  height: 26px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+/* =============================================================================
+   TAGS WITHOUT A COLOR
+   -----------------------------------------------------------------------------
+   A tag may decline a color, and so may its category. That is a choice, not a
+   gap, so the chip is drawn in the theme's own palette rather than being handed
+   an arbitrary color to stand in.
+========================================================================== */
+
+.kb-tag-plain {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: transparent;
+}
+
+.kb-tag-plain-filled {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+/* Same idea for the little square beside a category's name in Setup. */
+.kb-tagcat-swatch-none {
+  background: transparent;
+  border: 1px dashed var(--color-border-dashed);
+}
+
+/* =============================================================================
+   TAG CATEGORY RANK
+   Position is rank, so the buttons that move a category are what set it.
+========================================================================== */
+
+.kb-tagcat-rank {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.kb-tagcat-rank .kb-icon-btn {
+  width: 20px;
+  height: 20px;
+  font-size: 0.6rem;
+}
+
+/* The count used to claim the auto margin; the rank block does now, so the
+   count sits with the name it belongs to. */
+.kb-tagcat-head .setup-item-count {
+  margin-left: 0;
+}
+
+/* =============================================================================
+   DEFAULT COLUMNS  (Setup > Boards)
+========================================================================== */
+
+.kb-default-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 2px;
+}
+
+.kb-default-column-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.kb-default-column-row.kb-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.kb-default-column-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+/* The column that means done, marked rather than merely selected: it is a
+   property of the set, and you should be able to see which one holds it without
+   reading every button. */
+.kb-default-column-row .settings-action-btn.active {
+  background: var(--color-success);
+  color: var(--color-btn-text);
+  border-color: var(--color-success);
+}
+
+/* =============================================================================
+   THE ADD BUTTON IN A COLUMN HEADER
+========================================================================== */
+
+.kb-column-add-inline {
+  width: 20px;
+  height: 20px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  opacity: 0.5;
+}
+
+.kb-column:hover .kb-column-add-inline {
+  opacity: 0.9;
+}
+
+/* =============================================================================
+   CARD COLOR SHEET
+========================================================================== */
+
+/* A real card, at its real size, so the derived modes ("from its priority")
+   have something to show: they have no swatch to point at. */
+.kb-color-preview {
+  cursor: default;
+  max-width: 240px;
+}
+
+.kb-color-preview:hover {
+  box-shadow: none;
+  border-color: var(--color-border);
+}
+
+.kb-color-preview.kb-solid:hover {
+  border-color: var(--kb-ink-border);
+}
+
+/* =============================================================================
+   COLOR INPUTS
+   -----------------------------------------------------------------------------
+   shell.css gives every input inside a .setup-field width:100%, which is right
+   for a text field and absurd for a color well: the category color box was
+   stretching the full width of the modal like a paint sample.
+
+   A class rather than a container-scoped rule, because these appear in three
+   different kinds of row and the size should not depend on which.
+========================================================================== */
+
+.kb-color-input {
+  width: 44px;
+  height: 30px;
+  min-width: 44px;
+  padding: 2px;
+  flex: none;
+  cursor: pointer;
+}
+
+/* The two actions above the default column list, kept together at the right so
+   Reset does not read as belonging to the row above it. */
+.kb-default-column-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}

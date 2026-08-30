@@ -64,6 +64,30 @@ body::after {
   z-index: 9998;
 }
 
+/* ── Scanlines on the Display Views ────────────────────────────────────────
+   A Display View is a full-window overlay at z-index 10001, i.e. above the
+   9998 the scanline layer above sits at, so on those screens this theme was
+   reduced to its palette and the overlay came out flat.
+
+   .theme-display-surface is the shared contract that fixes it; see the note on
+   applyDisplaySurface() in theme-core.ts and the skeleton in landing.css. The
+   overlay slot (::after) puts these back OVER the card, the same relationship
+   they have to the rest of the app. No animation to declare, these never
+   moved; that card's Animations switch drops the whole slot anyway, which is
+   how you get a Display View with the palette and none of the glass.
+========================================================================== */
+
+.theme-display-surface::after {
+  background-repeat: repeat;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
 /* ── Panel accent slots ── */
 .panel-accent-input { border-color: #00ffff88; border-left: 4px solid #00ffff; box-shadow: 0 0 18px #00ffff55, inset 0 0 8px #00ffff11; }
 .panel-accent-view { border-color: #39ff1488; border-left: 4px solid #39ff14; box-shadow: 0 0 18px #39ff1455, inset 0 0 8px #39ff1411; }
@@ -202,7 +226,7 @@ body.solid-modals .modal {
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: #00ffff; }
 
@@ -274,7 +298,7 @@ body.solid-modals .modal {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {

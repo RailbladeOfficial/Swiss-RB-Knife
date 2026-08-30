@@ -15,15 +15,15 @@
    every other theme.
 
    NOTE ON --color-bg
-   Three colours do the work of one token here, so read this before changing
+   Three colors do the work of one token here, so read this before changing
    any of them.
 
-   The desktop colour is painted on `body` and #lockScreen directly rather
+   The desktop color is painted on `body` and #lockScreen directly rather
    than through --color-bg, because the shell reuses --color-bg for every
    RECESSED surface inside a panel, not just for the window behind everything:
    Time Tracker's totals block and entry rows, Budget's ledger and setup rows,
    Game Stats' tiles, chips and sticky history headers. Setting the token to
-   the true desktop blue painted all of those in the same colour as the
+   the true desktop blue painted all of those in the same color as the
    background they sit on, collapsing the contrast a 9x list view is built on.
 
    The token keeps the lighter #8fb3d4, but the solid recessed rows no longer
@@ -46,7 +46,7 @@
 :root {
   /* The lighter blue. Now only the Game Stats washes and the theme picker's
      preview tile; solid recessed rows are white. See "NOTE ON --color-bg" in
-     the header, which explains why all three colours exist. */
+     the header, which explains why all three colors exist. */
   --color-bg:                  #8fb3d4;
   --color-panel:               #d4d0c8;
   --color-input-bg:            #ffffff;
@@ -89,7 +89,7 @@
   --color-toast-error-border:  #a00000;
   --color-toast-error-text:    #400000;
 
-  /* ── Budget chart palette ── The 16-colour VGA workhorses: navy / teal / maroon / olive / purple / green / steel / sienna */
+  /* ── Budget chart palette ── The 16-color VGA workhorses: navy / teal / maroon / olive / purple / green / steel / sienna */
   --color-chart-1:             #000080;
   --color-chart-2:             #008080;
   --color-chart-3:             #800000;
@@ -329,7 +329,7 @@ button:active {
 /* Budget's summary tab strip is <button>s that clear their own border but not
    box-shadow, so without this they would carry the button treatment above
    with no button under it. Border is left alone here: .budget-summary-tab's
-   2px transparent bottom edge is what its active underline colours in. The
+   2px transparent bottom edge is what its active underline colors in. The
    app-wide .modal-tab needs no equivalent, it zeroes its own box-shadow in
    modal.css for exactly this reason. */
 .budget-summary-tab {
@@ -385,7 +385,7 @@ button:active {
 
 /* ── Checkboxes, the one place the native control is the RIGHT answer ──
    shell.css draws every real checkbox as a themed circle with a masked tick,
-   because the native box ignores nearly every colour a theme sets. Here that
+   because the native box ignores nearly every color a theme sets. Here that
    trade runs backwards: a square, sunken, hard-cornered checkbox IS the period
    look, and the platform draws it for free.
 
@@ -454,7 +454,7 @@ input[type="checkbox"]:not(.toggle-switch input)::before {
   font-weight: 700;
 }
 
-/* The header back-arrow rides the navy title bar, where the muted body colour
+/* The header back-arrow rides the navy title bar, where the muted body color
    disappears. White, like the title beside it. */
 .tool-back-btn,
 .section-back-btn {
@@ -467,7 +467,7 @@ input[type="checkbox"]:not(.toggle-switch input)::before {
    of things render straight onto body's #3a6ea5 with nothing beneath them, and
    against that blue the same grey collapses to 1.6:1. White is both the
    readable answer (5.3:1, the most the blue allows) and the period-correct
-   one: 9x painted desktop labels white over exactly this colour.
+   one: 9x painted desktop labels white over exactly this color.
 
    Every selector here has been checked to have NO background of its own.
    Anything on a panel, card, tile or title bar stays on the muted token, which
@@ -515,7 +515,7 @@ input[type="checkbox"]:not(.toggle-switch input)::before {
 /* Exit App is a transparent button with a #808080 outline, which on the blue
    is a grey label in a grey box on blue. Give it a real 9x face instead, which
    fixes the contrast by putting a surface under the text rather than by
-   recolouring it. The hover matches .danger-btn's. */
+   recoloring it. The hover matches .danger-btn's. */
 .lock-exit-btn {
   background: #d4d0c8;
   color: #000000;
@@ -654,7 +654,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Update-notifier accents ──
    The Home top-bar "Update Available" line inherits the theme accent
-   (--color-btn); this gives its version link a hover colour so the
+   (--color-btn); this gives its version link a hover color so the
    clickable part reacts. */
 .home-update-notice a:hover { color: #800080; }
 
@@ -715,13 +715,13 @@ body:not(.solid-modals) .modal {
 
 /* ── Game Stats ──
    The whole tool re-skins through the --gs-* hooks declared at the top of
-   src/tools/game-stats.css (rails, tiles, scoreboard, round grid, comparison
+   src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component.
 
    --gs-accent-soft is used as TEXT throughout the tool (tile values, section
    titles, card labels). The teal it used to hold sat at about 3:1 on the grey
-   chrome; navy, the same colour the fills use, is the readable answer and
+   chrome; navy, the same color the fills use, is the readable answer and
    costs nothing since the two are never adjacent. --gs-win is likewise a
    darker green than the VGA #008000 for the same reason: it is read as text
    far more often than as a fill. */

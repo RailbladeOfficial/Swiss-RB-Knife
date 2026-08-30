@@ -28,7 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ROOT, read } from "./_source.mjs";
 
-/** Every TypeScript source file under src/, as module ids like "src/shell". */
+/** Every TypeScript source file under src/, as module ids like "src/core/shell". */
 function moduleIds(dir = "src", acc = []) {
   for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
     const rel = `${dir}/${entry.name}`;
@@ -50,8 +50,14 @@ function parseImports(id) {
   const text = stripComments(read(`${id}.ts`));
   const imported = [];
   const bindings = new Map();
-  for (const m of text.matchAll(/import\s+([\s\S]*?)\s+from\s+"\.\/([a-z-]+)"/g)) {
-    const target = `src/${m[2]}`;
+  for (const m of text.matchAll(/import\s+([\s\S]*?)\s+from\s+"(\.[a-z0-9./-]+)"/g)) {
+    // `import type` is erased before the browser ever sees it, so it cannot
+    // put two files in a load-order loop and must not be counted as one.
+    if (/^type\b/.test(m[1].trim())) continue;
+    // Source files sit in src/core, src/theme, src/tool and so on, so a
+    // specifier is resolved against the importing file's own folder rather
+    // than assumed to name a sibling at the top of src/.
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(id), m[2]));
     imported.push(target);
     // Named bindings only; a default or namespace import can't be a bare const.
     const named = /\{([\s\S]*?)\}/.exec(m[1]);
@@ -186,7 +192,7 @@ test("no file reads a shared value from a circular import while it loads (blank-
     problems,
     [],
     "These will open the app to a blank window. Move the value into a file that " +
-      "imports nothing (see src/theme-ids.ts), then import it from there.",
+      "imports nothing (see src/theme/theme-ids.ts), then import it from there.",
   );
 });
 
@@ -194,7 +200,7 @@ test("the file holding the theme startup values still imports nothing", () => {
   // This is what GUARANTEES the check above stays satisfiable rather than
   // leaving it to luck. A file with no imports is never in a loop, so it is
   // always fully loaded before anything that reads it.
-  const imports = [...read("src/theme-ids.ts").matchAll(/^\s*import\s/gm)];
+  const imports = [...read("src/theme/theme-ids.ts").matchAll(/^\s*import\s/gm)];
   assert.deepEqual(
     imports.map((m) => m[0].trim()),
     [],
@@ -205,18 +211,36 @@ test("the file holding the theme startup values still imports nothing", () => {
 test("the import loops this project has are the ones we know about", () => {
   // Not a failure on its own, loops are legal. This pins the shape of the app
   // so a NEW loop shows up as a deliberate decision rather than a surprise.
+  //
+  // Every tool is in a loop with shell, and always has been: shell imports the
+  // tool's init function, the tool imports shell's shared helpers back. They
+  // only started showing up here once parseImports learned to resolve a
+  // specifier against the importing file's folder — before that a tool's
+  // "../core/shell" resolved to a module id nothing else used, so the edge
+  // silently went nowhere and the loop never formed in the graph.
   assert.deepEqual(
     [...cyclic].sort(),
     [
-      "src/cycle-theme",
-      "src/docs",
-      "src/lockscreen",
-      "src/shell",
-      "src/sidebar-edit",
-      "src/sound",
-      "src/theme-core",
-      "src/theme-editor",
-      "src/theme-picker",
+      "src/core/docs",
+      "src/core/lockscreen",
+      "src/core/shell",
+      "src/core/sidebar-edit",
+      "src/sound/sound",
+      "src/theme/cycle-theme",
+      "src/theme/theme-core",
+      "src/theme/theme-editor",
+      "src/theme/theme-picker",
+      "src/tool/auto-backup",
+      "src/tool/budget",
+      "src/tool/countdown",
+      "src/tool/days-between",
+      "src/tool/file-gen",
+      "src/tool/game-stats",
+      "src/tool/image-ccr",
+      "src/tool/kanban",
+      "src/tool/rng",
+      "src/tool/time-tracker",
+      "src/tool/tts-repeater",
     ],
     "the set of files importing each other in a loop has changed",
   );
@@ -226,7 +250,7 @@ test("the top-level scan can actually see code (guards the checks above)", () =>
   // If the formatting assumption in immediatelyRunCode() ever breaks, the main
   // check would silently pass by finding nothing. This proves it still reads
   // real statements, and still excludes function bodies.
-  const code = immediatelyRunCode("src/theme-editor");
+  const code = immediatelyRunCode("src/theme/theme-editor");
   assert.match(code, /_tePrevTheme/, "top-level declarations are not being seen");
   assert.ok(
     !/function tePopulateSwatches/.test(code),

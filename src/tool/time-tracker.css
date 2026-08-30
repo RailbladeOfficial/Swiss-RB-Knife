@@ -1,0 +1,1209 @@
+/* =============================================================================
+   TIME TRACKER: COMPONENT STYLES
+   Shell-level styles (body, buttons, inputs, modals, toasts, title bar,
+   scrollbars, toggles, settings rows) all live in shell.css.
+   Everything here is specific to the Time Tracker tool.
+============================================================================= */
+
+/* =============================================================================
+   DURATION PREVIEW
+============================================================================= */
+
+/* Takes up the free space to the right of the Start/End rows and centers
+   the (fixed-size) duration box within it. The box itself doesn't stretch,
+   it just floats mid-way through whatever room is left. */
+.duration-preview-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 150px;
+  align-self: stretch;
+}
+
+#durationPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--color-text-muted);
+  min-width: 150px;
+  padding: 10px 20px;
+  margin: 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#durationPreview.visible {
+  opacity: 1;
+}
+
+.tt-duration-time {
+  font-size: 1.5rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.tt-duration-days {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
+/* =============================================================================
+   PANEL LAYOUT
+   -----------------------------------------------------------------------------
+   The accent colors these panels used to declare for themselves now come
+   from the shared .panel-accent-* classes in shell.css, which every tool
+   uses. What's left here is only the layout each panel needs; the tt- prefix
+   keeps it off the panels in other tools that share the same accent slot.
+============================================================================= */
+
+.tt-entries-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.tt-controls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* =============================================================================
+   CONTROLS PANEL
+============================================================================= */
+
+.controls-date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.controls-label {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.controls-to {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.controls-date-range input {
+  width: 120px;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  margin: 0;
+}
+
+.date-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.date-nav-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 2px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.65rem;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.date-nav-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.controls-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#payPeriodPresets {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+/* Size delta only; shared look (.toggle-btn) is in shell.css. */
+.preset-btn {
+  padding: 3px 8px;
+  font-size: 0.7rem;
+}
+
+.export-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  margin-left: auto;
+}
+
+.export-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* =============================================================================
+   INPUT PANEL: LAYOUT
+   -----------------------------------------------------------------------------
+   The form flows top-to-bottom as a single logical sequence: what/when (date +
+   activity) → time range → notes → smart entry shortcut → submit actions.
+   Each row is spaced with a consistent gap on .tt-input-panel itself rather
+   than per-row margins, so the rhythm stays even regardless of which rows are
+   present.
+============================================================================= */
+
+.tt-input-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tt-form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tt-field-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.tt-field input,
+.tt-field textarea {
+  box-sizing: border-box;
+}
+
+.tt-field-date {
+  width: 160px;
+  max-width: 100%;
+}
+
+.tt-field-date input {
+  width: 100%;
+}
+
+.tt-field-activity {
+  flex: 1;
+  min-width: 200px;
+}
+
+.tt-field-activity input {
+  width: 100%;
+}
+
+.tt-field-project {
+  width: 200px;
+  max-width: 100%;
+}
+
+.tt-field-project input {
+  width: 100%;
+}
+
+/* =============================================================================
+   INPUT PANEL: TIME FIELDS
+============================================================================= */
+
+.time-fields {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  /* Without an explicit width, this flex item (the sole child of
+     .tt-form-row) shrinks to fit its content instead of filling the row,
+     which would leave .duration-preview-wrap's flex:1 with no actual free
+     space to center within. */
+  width: 100%;
+  /* Wrap instead of forcing horizontal page-scroll when the panel is too
+     narrow to hold both time fields + the duration preview on one line
+     (e.g. 800px window with the sidebar expanded). On wider layouts nothing
+     wraps, so the row looks exactly as before. */
+  flex-wrap: wrap;
+}
+
+/* Start Date/Time and End Date/Time stack as two parallel rows, with the
+   live duration box (a sibling of this element) centered vertically
+   alongside both. */
+.time-fields-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.time-fields-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.time-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Allow the column to shrink below its input's natural width so
+     max-width:100% on the input can engage in the rare case a single field
+     is still wider than the available line. */
+  min-width: 0;
+}
+
+.time-field-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.time-field input {
+  width: 160px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Same look as .tt-add-btn (the base themed button), just narrower, since
+   "Now" is a short label. */
+.tt-now-btn {
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   NOTES FIELD
+============================================================================= */
+
+.notes-field textarea {
+  width: 100%;
+  max-width: 100%;
+  resize: vertical;
+}
+
+/* =============================================================================
+   FORM ACTIONS
+============================================================================= */
+
+.tt-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+.tt-add-btn {
+  padding: 6px 18px;
+  font-weight: 600;
+}
+
+/* =============================================================================
+   SUMMARY PANEL  (tabbed: Totals / Stats)
+   -----------------------------------------------------------------------------
+   Replaces the old side-by-side "Totals | Stats" split. That layout gave each
+   half ~50% of the width and stacked everything vertically inside it, so the
+   panel grew tall fast on any view wider than a single day. Tabs let each pane
+   use the FULL panel width and spread horizontally instead: Totals runs two
+   breakdown tables side by side under a headline strip, Stats runs three
+   columns. Same idiom as Budget's summary panel (.budget-summary-tabs), kept
+   as its own tt- rule for the same reason Budget keeps its own: a presentational
+   tab strip is not something to share across tools by class name.
+
+   Why exactly two tabs: Totals answers "where did the time go" (the numbers you
+   read every day), Stats answers "what shape is my time" (superlatives you
+   glance at occasionally). A third tab was considered for a per-project deep
+   dive, but every number it would carry already belongs in one of these two, so
+   it would have been the same data behind an extra click. Project figures live
+   in the By Project table (Totals) and the Projects column (Stats) instead.
+============================================================================= */
+
+.tt-summary-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 !important; /* tabs bleed to the panel edges; panes pad themselves */
+}
+
+.tt-summary-tabs {
+  display: flex;
+  width: 100%;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* Equal-width, centered, underlined-when-active. Mirrors .budget-summary-tab. */
+.tt-summary-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color var(--hover-transition), border-color var(--hover-transition);
+  margin-bottom: -1px;
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 0.75rem;
+  padding: 7px 4px;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.tt-summary-tab:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+.tt-summary-tab.active {
+  color: var(--color-btn);
+  border-bottom-color: var(--color-btn);
+  /* Themes override this with their own hex; the mix is the Custom-theme
+     fallback. See .modal-tab.active in modal.css. */
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
+}
+
+.tt-summary-pane {
+  padding: 12px;
+}
+
+/* =============================================================================
+   SUMMARY: TOTALS PANE
+============================================================================= */
+
+.tt-totals-headline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  margin-bottom: 12px;
+}
+
+#dayTotal {
+  font-size: 1.1rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+/* The at-a-glance figures that used to be buried in the Stats list. Chips
+   rather than rows so they take one line instead of six. */
+.tt-headline-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.tt-headline-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.tt-headline-chip-value {
+  font-weight: 700;
+}
+
+.tt-headline-chip-label {
+  opacity: 0.6;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* By Activity | By Project, side by side. Collapses to one column when the
+   panel is too narrow to give each table a readable width. */
+.tt-breakdown-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px 18px;
+  align-items: start;
+}
+
+.tt-breakdown-col {
+  min-width: 0;
+}
+
+.tt-breakdown-title {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tt-breakdown-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Grid rather than flex so the numeric columns line up across every row
+   regardless of how long the names are. */
+.tt-breakdown-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.5rem 6.5rem 3.5rem;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  /* Share-of-total bar, painted as a background so it costs no extra element.
+     --share is set per row by buildBreakdownRow(). */
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-btn) 16%, transparent) var(--share, 0%),
+      transparent var(--share, 0%)
+    );
+}
+
+.tt-breakdown-row-header {
+  background: none;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+  font-weight: 700;
+  padding-bottom: 2px;
+}
+
+.tt-breakdown-row-total {
+  background: none;
+  border-top: 1px solid var(--color-border);
+  margin-top: 4px;
+  padding-top: 6px;
+  font-weight: 700;
+}
+
+.tt-breakdown-col-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* An entry with no project still needs a visible label in the By Project
+   table rather than a blank first column. */
+.tt-breakdown-unassigned {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.tt-breakdown-col-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tt-breakdown-col-share {
+  text-align: right;
+  white-space: nowrap;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =============================================================================
+   SUMMARY: STATS PANE
+   Three columns (Activities / Projects / Days & Times) so the whole set fits in
+   roughly a third of the height the single list used to need.
+============================================================================= */
+
+.tt-stats-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px 20px;
+  align-items: start;
+}
+
+.tt-stats-group {
+  min-width: 0;
+}
+
+.tt-stats-group-title {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8rem;
+  padding: 2px 0;
+  min-width: 0;
+}
+
+.stat-label {
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.stat-value {
+  text-align: right;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =============================================================================
+   ENTRIES LIST  (Time Tracker specific, column layout only)
+   -----------------------------------------------------------------------------
+   Shared ledger row primitives (.entries-header-row, .entry-date-subheader,
+   .entry-row, .entry-field, .entry-edit-input, .entry-cal-btn,
+   .entry-date-picker, .entry-delete-btn) are promoted to shell.css. Budget's
+   ledger uses them directly too. Only Time Tracker's own column types
+   (.entry-col-project/-activity/-time/-duration) stay here.
+============================================================================= */
+
+.entries-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+#entriesHeader {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+#entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.entry-col-project {
+  flex-shrink: 0;
+  width: 8rem;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.85;
+  transition: background var(--hover-transition);
+}
+
+.entry-col-project:hover {
+  background: var(--color-hover);
+}
+
+/* Project is optional, an empty value still needs a visible, clickable
+   target rather than a blank gap in the row. */
+.entry-col-project:empty::before {
+  content: "—";
+  opacity: 0.4;
+}
+
+.entry-col-activity {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+  cursor: default;
+  padding: 2px 4px;
+  border-radius: 4px;
+  align-self: flex-start;
+  transition: background var(--hover-transition);
+}
+
+.entry-col-activity:hover {
+  background: var(--color-hover);
+}
+
+.entry-col-time {
+  flex-shrink: 0;
+  width: 4.5rem;
+  text-align: center;
+  cursor: default;
+  padding: 2px 4px;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: background var(--hover-transition);
+}
+
+/* End time carrying a "(+1d)" / "(+2d)" span indicator needs more room than
+   the fixed 4.5rem start/end column width. */
+.entry-col-time--spans {
+  width: auto;
+  min-width: 4.5rem;
+}
+
+.entry-col-time:hover {
+  background: var(--color-hover);
+}
+
+.entry-col-duration {
+  flex-shrink: 0;
+  width: 4.5rem;
+  text-align: center;
+  opacity: 0.7;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+
+.entry-col-notes {
+  flex: 1;
+  min-width: 0;
+  opacity: 0.7;
+  font-size: 0.85rem;
+  font-style: italic;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: default;
+  padding: 2px 4px;
+  border-radius: 4px;
+  align-self: flex-start;
+  transition: background var(--hover-transition);
+}
+
+.entry-col-notes:hover {
+  background: var(--color-hover);
+}
+
+/* Notes is optional, an empty value still needs a normal-height, visible
+   clickable target rather than collapsing to a thin blank strip. */
+.entry-col-notes:empty::before {
+  content: "—";
+  opacity: 0.4;
+}
+
+/* =============================================================================
+   SETTINGS: TIME TRACKER SPECIFIC
+   (The collapsible .subsettings primitive used here lives in shell.css, since
+   it's shared with the General Settings modal and the Budget setup modals.
+   The Period Length dropdown likewise wears shell.css's .settings-select, the
+   shared compact settings-row select, rather than the byte-identical private
+   copy of it that used to sit here.)
+============================================================================= */
+
+/* =============================================================================
+   EDIT NOTES MODAL: CONTEXT SUBLINE
+============================================================================= */
+
+.tt-notes-edit-context {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: -10px 0 16px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.tt-context-line {
+  color: inherit;
+}
+
+/* =============================================================================
+   EDIT DATES MODAL: TIME VALUES (Input Panel layout: Date+Time per row)
+============================================================================= */
+
+.tt-date-edit-time-value {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: default;
+  box-sizing: border-box;
+  min-width: 120px;
+  transition: background var(--hover-transition);
+}
+
+.tt-date-edit-time-value:hover {
+  background: var(--color-hover);
+}
+
+/* =============================================================================
+   SETTINGS: LABEL + STATUS BADGE ROW
+   Same look as Budget's encryption row (.budget-encrypt-label-col /
+   .budget-encrypt-status-badge in budget.css), duplicated here rather than
+   shared across tool stylesheets to keep each tool's CSS self-contained.
+============================================================================= */
+
+.tt-settings-label-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tt-settings-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+/* =============================================================================
+   CSV IMPORT MODAL
+============================================================================= */
+
+.tt-csv-import-last {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  margin: 4px 0 14px;
+}
+
+.tt-csv-import-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tt-csv-import-filename {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tt-csv-import-result {
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+
+.tt-csv-import-result.success {
+  background: var(--color-toast-success-bg);
+  border: 1px solid var(--color-toast-success-border);
+  color: var(--color-toast-success-text);
+}
+
+.tt-csv-import-result.error {
+  background: var(--color-toast-error-bg);
+  border: 1px solid var(--color-toast-error-border);
+  color: var(--color-toast-error-text);
+}
+
+
+/* =============================================================================
+   FORM ACTIONS: BREAK IN / RESUME
+   -----------------------------------------------------------------------------
+   Both only exist while there is something to pivot away from or back to, so
+   JS toggles their display and this file only describes the look. Resume sits
+   hard left (margin-right:auto against .tt-form-actions' flex-end) because it
+   is a "go back" action, not a submit, and shouldn't be adjacent to Add Entry
+   where a mis-click would cost you the entry you were typing.
+============================================================================= */
+
+.tt-resume-btn {
+  margin-right: auto;
+  background: transparent;
+  color: var(--color-btn);
+  border: 1px dashed var(--color-btn);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tt-resume-btn:hover {
+  background: color-mix(in srgb, var(--color-btn) 14%, transparent);
+  color: var(--color-btn);
+}
+
+.tt-break-in-now-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tt-break-in-now-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+/* =============================================================================
+   ENTRIES: BULK SELECTION
+   -----------------------------------------------------------------------------
+   Selection is opt-in (the Select button in the entries header) so the default
+   ledger keeps its full width for content. Turning it on inserts a checkbox
+   column into every row and reveals the action bar below the header.
+============================================================================= */
+
+.tt-select-mode-btn {
+  padding: 3px 10px;
+  font-size: 0.7rem;
+}
+
+/* Pinned to the top of the scroll area (#mainContent) while the entries panel
+   is on screen, so the actions stay reachable partway down a long ledger
+   instead of forcing a scroll back up to the header. Sticks within its own
+   panel, so it releases once the ledger scrolls past.
+
+   Opaque background is not optional here: rows pass underneath it, and the
+   shared --color-bg it already wore is what those rows are painted in too,
+   hence the shadow to separate the two. Same rule the Game Stats sticky
+   headers follow (.gs-round-grid thead th). */
+.tt-selection-bar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+}
+
+.tt-selection-count {
+  font-size: 0.78rem;
+  font-weight: 700;
+  opacity: 0.8;
+  margin-right: 4px;
+}
+
+.tt-selection-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.tt-selection-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.tt-selection-btn:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.tt-selection-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.tt-selection-btn-danger {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.tt-selection-btn-danger:hover:not(:disabled) {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.tt-entry-check {
+  flex-shrink: 0;
+  margin: 2px 2px 0 0;
+  align-self: flex-start;
+}
+
+.entry-row.tt-entry-selected {
+  border-color: var(--color-btn);
+  background: color-mix(in srgb, var(--color-btn) 10%, var(--color-bg));
+}
+
+/* =============================================================================
+   ENTRIES: PER-ROW ACTION BUTTONS
+   Clone and Break In sit beside the existing calendar button and wear the same
+   look (.entry-cal-btn in shell.css), minus its trailing margin, so the three
+   read as one action cluster ahead of the delete button.
+============================================================================= */
+
+.tt-entry-action-btn {
+  margin-right: 0;
+}
+
+/* =============================================================================
+   BREAK-IN MODAL
+   -----------------------------------------------------------------------------
+   Wider than a stock modal: each break-in row is activity + project + start +
+   length on one line, and wrapping those onto two lines each would make a
+   three-interruption afternoon unreadable.
+============================================================================= */
+
+.tt-break-in-modal {
+  width: min(760px, 95vw);
+}
+
+.tt-break-in-intro {
+  font-size: 0.82rem;
+  opacity: 0.7;
+  margin: 0 0 12px;
+}
+
+.tt-break-in-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tt-break-in-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 6.5rem 6.5rem auto;
+  gap: 8px;
+  align-items: end;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+}
+
+/* A host entry that crosses midnight gets an extra Day column, so a break-in
+   can be placed on the right side of the boundary. */
+.tt-break-in-row--multiday {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 8rem 6.5rem 6.5rem auto;
+}
+
+/* One column of the row: its label sits above its control. */
+.tt-break-in-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tt-break-in-cell input,
+.tt-break-in-cell select {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  margin: 0;
+}
+
+.tt-break-in-remove {
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  align-self: end;
+  margin-bottom: 1px;
+}
+
+.tt-break-in-remove:hover {
+  background: var(--color-danger-subtle);
+}
+
+/* The last remaining row can't be removed, see renderBreakInRows(). */
+.tt-break-in-remove:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Apply stays dead until the drafts describe a valid split. */
+#ttBreakInApply:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.tt-break-in-preview-title,
+.tt-merge-list-title {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin: 16px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tt-break-in-preview,
+.tt-merge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tt-break-in-preview-row,
+.tt-merge-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 13rem 6.5rem;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+/* The carved-out interruption, versus the host task's own segments. */
+.tt-break-in-preview-row.is-break {
+  background: color-mix(in srgb, var(--color-btn) 14%, var(--color-bg));
+}
+
+.tt-break-in-preview-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.tt-break-in-preview-span,
+.tt-break-in-preview-dur {
+  opacity: 0.75;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-break-in-preview-dur {
+  text-align: right;
+}
+
+.tt-break-in-error {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: var(--color-toast-error-bg);
+  border: 1px solid var(--color-toast-error-border);
+  color: var(--color-toast-error-text);
+}
+
+/* =============================================================================
+   MERGE ENTRIES MODAL
+============================================================================= */
+
+.tt-merge-entries-modal {
+  width: min(620px, 94vw);
+}
+
+.tt-merge-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  font-size: 0.85rem;
+}
+
+.tt-merge-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tt-merge-summary-label {
+  opacity: 0.65;
+}
+
+.tt-merge-summary-value {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Two registers share this box. Bare, it is a warning: the merge is about to
+   change your tracked total. With .tt-merge-note it is just information about
+   a merge that keeps the total intact, and shouting in red would train you to
+   ignore it in the cases that matter. */
+.tt-merge-warning {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: var(--color-toast-error-bg);
+  border: 1px solid var(--color-toast-error-border);
+  color: var(--color-toast-error-text);
+}
+
+.tt-merge-warning.tt-merge-note {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+/* The duration and notes dropdowns both collapse to a single, self-explaining
+   option when the selection leaves nothing to choose. */
+.setup-field select:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

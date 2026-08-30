@@ -170,10 +170,10 @@ pub async fn get_image_info(path: String) -> Result<ImageInfo, String> {
 //  COMBINE: shared compositing logic
 // =============================================================================
 
-/// Parse a colour spec into [r, g, b, a].
+/// Parse a color spec into [r, g, b, a].
 ///
 /// Accepts a CSS hex string (#RRGGBB or #RGB), which parses to an opaque
-/// colour (a = 255), OR the literal sentinel "transparent" (case-insensitive)
+/// color (a = 255), OR the literal sentinel "transparent" (case-insensitive)
 /// / an empty string, which parses to a fully transparent fill (a = 0).
 ///
 /// Transparency only survives in a format that has an alpha channel: saving an
@@ -337,10 +337,10 @@ fn plan_combine(
 /// well over a gigabyte before compositing even began.
 ///
 /// The border is handled by insetting the draw offsets into a canvas that was
-/// allocated at full size from the start, pre-filled with the border colour.
+/// allocated at full size from the start, pre-filled with the border color.
 /// The old code composited at inner size and then copied the whole thing into
 /// a second, larger canvas, briefly holding two full-size images to add what
-/// is just a coloured margin.
+/// is just a colored margin.
 ///
 /// Images are NOT rotated to match orientation; mismatched sizes are padded
 /// with canvas_rgba so they align correctly (centred on the cross-axis).
@@ -353,8 +353,8 @@ fn composite_streaming(
     border_rgba: [u8; 4],
 ) -> Result<DynamicImage, String> {
     // One allocation for the whole output. Without a border the composited
-    // region IS the whole canvas, so it can be filled with the canvas colour
-    // outright; with one, fill with the border colour and repaint the inner
+    // region IS the whole canvas, so it can be filled with the canvas color
+    // outright; with one, fill with the border color and repaint the inner
     // rect below.
     let mut canvas = image::RgbaImage::from_pixel(
         plan.canvas_w,
@@ -365,11 +365,11 @@ fn composite_streaming(
     // Repaint the composited region, row by row into the existing buffer.
     // No second full-size image is allocated to do it.
     //
-    // Skipped when the canvas colour is transparent, which preserves the old
+    // Skipped when the canvas color is transparent, which preserves the old
     // two-pass build's result exactly: that version composited onto a
     // transparent inner canvas and then overlaid the whole thing onto the
     // border canvas, and overlaying fully transparent pixels is a no-op, so
-    // the border colour showed through there as well.
+    // the border color showed through there as well.
     if border_px > 0 && canvas_rgba[3] != 0 {
         let stride = plan.canvas_w as usize;
         let buf = canvas.as_mut();
@@ -1216,7 +1216,7 @@ mod tests {
     const WHITE: [u8; 4] = [255, 255, 255, 255];
     const BLACK: [u8; 4] = [0, 0, 0, 255];
 
-    /// Writes a solid-colour PNG into a fresh temp dir and returns its path.
+    /// Writes a solid-color PNG into a fresh temp dir and returns its path.
     fn solid(dir: &Path, name: &str, w: u32, h: u32, rgba: [u8; 4]) -> String {
         let img = image::RgbaImage::from_pixel(w, h, image::Rgba(rgba));
         let p = dir.join(name);
@@ -1248,8 +1248,8 @@ mod tests {
         assert_eq!(out.dimensions(), (30, 29));
 
         assert_eq!(px(&out, 10, 0), RED, "first image starts at centred x offset");
-        assert_eq!(px(&out, 0, 0), WHITE, "cross-axis padding uses the canvas colour");
-        assert_eq!(px(&out, 0, 21), WHITE, "gap band uses the canvas colour");
+        assert_eq!(px(&out, 0, 0), WHITE, "cross-axis padding uses the canvas color");
+        assert_eq!(px(&out, 0, 21), WHITE, "gap band uses the canvas color");
         assert_eq!(px(&out, 0, 24), BLUE, "second image starts after the gap");
     }
 
@@ -1292,14 +1292,14 @@ mod tests {
         assert_eq!((plan.canvas_w, plan.canvas_h), (14, 22)); // 8+6 x 16+6
 
         let out = composite_streaming(&plan, "below", 0, WHITE, 3, BLACK).unwrap();
-        assert_eq!(px(&out, 0, 0), BLACK, "corner is border colour");
+        assert_eq!(px(&out, 0, 0), BLACK, "corner is border color");
         assert_eq!(px(&out, 13, 21), BLACK, "opposite corner too");
         assert_eq!(px(&out, 3, 3), RED, "composite starts inside the border");
         assert_eq!(px(&out, 3, 11), BLUE);
     }
 
     #[test]
-    fn border_region_uses_the_canvas_colour_where_sources_do_not_reach() {
+    fn border_region_uses_the_canvas_color_where_sources_do_not_reach() {
         let d = scratch("borderpad");
         // Narrower than the widest source, so there is cross-axis padding
         // INSIDE the border. The region repainted by the row-fill path.

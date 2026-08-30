@@ -1,0 +1,1055 @@
+/* =============================================================================
+   AUTO-BACKUP: tool-scoped styles
+   All colors reference CSS custom properties from the active theme.
+   No hardcoded values.
+============================================================================= */
+
+/* =============================================================================
+   LAYOUT: two-column config grid (sources | destinations)
+============================================================================= */
+
+.ab-config-grid {
+  display: grid;
+  /* minmax(0, 1fr), NOT bare 1fr: a bare 1fr's implicit minimum is `auto`,
+     which lets one long unbreakable path push its column (and the whole
+     panel) past the window edge. minmax(0, …) makes the columns actually
+     honor their share of the width. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 860px) {
+  .ab-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =============================================================================
+   PANEL HEADERS  (reused inside each panel)
+============================================================================= */
+
+.ab-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.ab-panel-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+/* =============================================================================
+   INPUT ROW  (text input + add button, used for both sources and destinations)
+============================================================================= */
+
+.ab-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ab-input-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  padding: 5px 8px;
+  margin: 0;
+}
+
+.ab-input-row button {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+/* =============================================================================
+   FOLDER LIST  (scrollable list of added paths)
+============================================================================= */
+
+.ab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  min-height: 40px;
+}
+
+.ab-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  animation: abRowIn 0.15s ease;
+}
+
+@keyframes abRowIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ab-list-path {
+  flex: 1;
+  /* Without min-width: 0, a flex child refuses to shrink below its content
+     width. The ellipsis styling this rule used to carry never actually
+     engaged, and long paths just widened the row off-screen. */
+  min-width: 0;
+  font-size: 0.78rem;
+  font-family: monospace;
+  opacity: 0.85;
+  /* Long paths WRAP to extra lines rather than truncating: for paths the
+     tail (the leaf folder) is the informative part, and it's exactly what
+     an ellipsis would hide. break-all because path segments have no natural
+     break points. */
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: normal;
+}
+
+.ab-list-size {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ab-list-remove {
+  /* Override the global danger-btn defaults to be icon-sized */
+  width: 22px !important;
+  height: 22px !important;
+  padding: 3px !important;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ab-list-remove svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ab-list-empty {
+  font-size: 0.78rem;
+  opacity: 0.4;
+  padding: 8px;
+  font-style: italic;
+}
+
+/* Inline edit input, replaces the path label on double-click */
+.ab-edit-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-family: monospace;
+  padding: 2px 5px;
+  margin: 0;
+  border-radius: 4px;
+}
+
+/* Browse/replace button on each row (the "…" button) */
+.ab-list-browse {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 2px 6px !important;
+  min-width: 24px;
+  height: 22px;
+  line-height: 1;
+}
+
+/* =============================================================================
+   SUMMARY PANEL  (total size, est. time, free space, speed)
+============================================================================= */
+
+.ab-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+/* Sub-group titles inside the Summary panel ("Sources" / "Next Backup…").
+   The second group gets breathing room from the grid above it. */
+.ab-summary-subtitle {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.45;
+  margin-bottom: 8px;
+}
+
+.ab-summary-grid + .ab-summary-subtitle {
+  margin-top: 14px;
+}
+
+/* Inline "scanning…" chip beside the Next Backup subtitle while a
+   robocopy /L estimate pass is running. */
+.ab-summary-status {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  font-style: italic;
+  opacity: 0.8;
+  margin-left: 6px;
+}
+
+/* Second row of the Next Backup group (Estimated Time / Free Space / Speed)
+   sits directly under the first without a repeated subtitle. */
+.ab-summary-grid + .ab-summary-grid {
+  margin-top: 10px;
+}
+
+/* =============================================================================
+   INFO BUTTON + INFO MODAL  (mirrors the Image Resizer's resize-info pattern)
+============================================================================= */
+
+/* Run Estimate button, lives in the Summary panel header */
+.ab-estimate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  padding: 4px 14px;
+}
+
+.ab-estimate-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Small spinner ring for buttons ("⟳ Estimating…" / "⟳ Backing up…") */
+@keyframes ab-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ab-btn-spinner {
+  width: 11px;
+  height: 11px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: ab-spin 0.7s linear infinite;
+}
+
+/* Value + inline ℹ button row (e.g. Dirs to Copy's conditional info button) */
+.ab-value-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Small ℹ button, size delta only; shared look (.info-trigger-btn) and hover
+   are in shell.css. Also serves as the query hook for the Setup modal's
+   click-to-toggle tooltip buttons (auto-backup.ts queries
+   .ab-info-btn[data-tooltip] directly), kept as its own class for that
+   reason even though its own CSS is now just two properties. */
+.ab-info-btn {
+  padding: 1px 8px;
+  font-size: 0.72rem;
+}
+
+.ab-setup-modal {
+  width: min(480px, 92vw);
+}
+
+.ab-setup-body {
+  text-align: left;
+  gap: 10px;
+}
+
+.ab-setup-body .settings-row {
+  margin: 0;
+}
+
+/* Groups a settings-row label with its (i) button so justify-content:
+   space-between on .settings-row still only sees two flex items. The
+   label+icon group on the left, the control on the right. */
+.ab-setup-label-with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ab-reminder-days-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+#ab-setup-reminder-days {
+  width: 60px;
+  text-align: right;
+  margin: 0;
+}
+
+/* Free-text day-of-month list ("1, 15"), wider than the days field since it
+   holds several numbers. Matches Budget's equivalent field. */
+.ab-reminder-monthdays-field {
+  width: 110px;
+  text-align: right;
+  margin: 0;
+}
+
+/* Hide the up/down spinner arrows on the reminder-days field, per spec. */
+#ab-setup-reminder-days::-webkit-inner-spin-button,
+#ab-setup-reminder-days::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+#ab-setup-reminder-days {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+/* Click-to-toggle info popover for Setup modal (i) buttons, floats above
+   everything (including the modal), positioned in JS under whichever icon
+   was clicked. Not a tooltip-on-hover: stays open until dismissed. */
+.ab-info-tooltip {
+  position: fixed;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  max-width: 260px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.ab-info-tooltip.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ab-summary-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ab-summary-label {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ab-summary-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-accent-totals);
+}
+
+/* Speed input inline with its label */
+.ab-speed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ab-speed-row input {
+  width: 56px;
+  text-align: center;
+  font-size: 0.9rem;
+  padding: 3px 6px;
+  margin: 0;
+}
+
+.ab-speed-unit {
+  font-size: 0.75rem;
+  opacity: 0.55;
+}
+
+/* =============================================================================
+   ACTION ROW  (Run / Cancel buttons)
+============================================================================= */
+
+.ab-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ab-run-btn {
+  font-size: 0.9rem;
+  padding: 7px 20px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ab-run-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+#ab-cancel-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Details/fast toggle sits at the far right of the action row. margin-left
+   auto pushes it there regardless of the run/cancel buttons' width. The
+   switch itself (.toggle-switch / .toggle-slider) is styled globally. */
+.ab-details-toggle-wrap {
+  margin-left: auto;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+/* Locked state (while a backup runs): dim the whole control and never show
+   the click-hand cursor. The switch's own :disabled styling lives in the
+   global stylesheet, but that doesn't cover this wrapper's text/label or the
+   pointer cursor the toggle-switch label sets, so scope it here. The wrapper
+   gets .ab-details-locked from renderDetailsToggle() when disabled. */
+.ab-details-toggle-wrap.ab-details-locked {
+  opacity: 0.45;
+}
+.ab-details-toggle-wrap.ab-details-locked,
+.ab-details-toggle-wrap.ab-details-locked .toggle-switch,
+.ab-details-toggle-wrap.ab-details-locked .toggle-slider,
+.ab-details-toggle-wrap.ab-details-locked input,
+.ab-details-toggle-wrap.ab-details-locked #ab-details-label {
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   PROGRESS PANEL
+============================================================================= */
+
+#ab-progress-panel {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ab-progress-current {
+  font-size: 0.8rem;
+  font-family: monospace;
+  opacity: 0.85;
+  word-break: break-all;
+  margin: 0;
+}
+
+/* "View Skipped Files" sits between the current-file line above and the
+   Backup Progress bar below, left-aligned, only appears when there were
+   skips (the button itself is hidden via inline style until then). It's
+   only ever shown post-completion, when the current-file line above is
+   always blank but still reserves its min-height (so live runs don't jump)
+:   the negative margin pulls the button up into that reserved blank space
+   instead of stacking a second gap on top of it. */
+.ab-skipped-files-btn {
+  align-self: flex-start;
+  white-space: nowrap;
+  margin-top: -8px;
+}
+
+/* Progress bar, base track/fill (.progress-bar-track/-fill) promoted to
+   shell.css; only Auto-Backup-specific modifiers stay here. */
+
+/* Indeterminate state, shown during the preflight "Calculating…" phase,
+   before the plan (and therefore a meaningful percentage) exists. A short
+   segment sweeps the track, Windows-style. */
+@keyframes ab-bar-sweep {
+  0%   { margin-left: -30%; }
+  100% { margin-left: 100%; }
+}
+
+.progress-bar-fill.ab-bar-indeterminate {
+  width: 30% !important;
+  animation: ab-bar-sweep 1.2s linear infinite;
+}
+
+/* Per-file bar uses a subtler accent so it reads as secondary */
+.ab-file-bar-fill {
+  background: var(--color-accent-entries);
+  opacity: 0.6;
+  transition: width 0.2s ease;
+}
+
+/* Label row above each bar: left label + right value */
+.ab-bar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ab-bar-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.ab-bar-label {
+  font-size: 0.62rem;
+  opacity: 0.45;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ab-bar-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-accent-entries);
+}
+
+/* Stats row */
+.ab-progress-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.ab-stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ab-stat-label {
+  font-size: 0.62rem;
+  opacity: 0.45;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ab-stat-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-accent-entries);
+}
+
+/* Log file reference row, sits below the stats grid */
+.ab-log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ab-log-value {
+  font-size: 0.72rem;
+  font-family: monospace;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =============================================================================
+   PROGRESS PANEL: always-visible state
+============================================================================= */
+
+.ab-progress-idle {
+  font-size: 0.8rem;
+  opacity: 0.4;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.ab-clear-btn {
+  font-size: 0.72rem;
+  padding: 2px 10px !important;
+}
+
+.ab-clear-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   PRESETS MODAL
+============================================================================= */
+
+.ab-presets-modal {
+  width: min(800px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ab-presets-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  padding: 0;
+  min-height: 0;
+}
+
+/* Sidebar, preset list */
+.ab-presets-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.ab-presets-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+}
+
+.ab-preset-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--hover-transition), color var(--hover-transition);
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.ab-preset-item:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.ab-preset-item.active {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-btn);
+}
+
+.ab-presets-list-empty {
+  font-size: 0.75rem;
+  opacity: 0.4;
+  font-style: italic;
+  padding: 8px 10px;
+}
+
+.ab-preset-new-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px;
+}
+
+.ab-preset-new-btn {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 0.78rem;
+  padding: 5px 10px;
+}
+
+/* Editor pane */
+.ab-presets-editor {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ab-presets-placeholder {
+  font-size: 0.8rem;
+  opacity: 0.4;
+  font-style: italic;
+  margin: auto;
+  text-align: center;
+}
+
+.ab-presets-form {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ab-presets-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ab-presets-field-label {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ab-presets-name-input {
+  font-size: 0.9rem;
+  padding: 5px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.ab-presets-name-input.input-error {
+  border-color: var(--color-danger);
+}
+
+/* Two-column layout inside editor */
+.ab-presets-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* see .ab-config-grid */
+  gap: 12px;
+}
+
+.ab-presets-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ab-presets-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ab-presets-col-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+
+.ab-presets-add-row {
+  display: flex;
+  gap: 4px;
+}
+
+.ab-presets-add-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  padding: 4px 6px;
+  margin: 0;
+}
+
+.ab-presets-add-row button {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+}
+
+.ab-presets-path-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 150px;
+  overflow-y: auto;
+  min-height: 32px;
+}
+
+.ab-preset-path-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+.ab-preset-path-label {
+  flex: 1;
+  min-width: 0; /* see .ab-list-path */
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: normal;
+  opacity: 0.85;
+}
+
+.ab-preset-path-remove {
+  width: 18px !important;
+  height: 18px !important;
+  padding: 2px !important;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ab-preset-path-remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+.ab-presets-path-empty {
+  font-size: 0.73rem;
+  opacity: 0.35;
+  font-style: italic;
+  padding: 4px 6px;
+}
+
+/* Bottom actions row */
+.ab-presets-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+  margin-top: 4px;
+}
+
+/* =============================================================================
+   LOCKDOWN STATE  (during backup)
+============================================================================= */
+
+/* Disables all buttons inside a list while backup is running */
+.ab-list-locked button {
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+/* Suppress the pointer/text cursor on path labels while list is locked
+   so the double-click-to-edit affordance is visually hidden */
+.ab-list-locked .ab-list-path {
+  cursor: default;
+  user-select: none;
+}
+
+/* Style the input-row Add / Browse buttons as locked when disabled,
+   matching the opacity treatment of per-row buttons under ab-list-locked */
+.ab-input-row button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   CURRENT FILE LINE  (below the folder label in progress panel)
+============================================================================= */
+
+.ab-progress-current-file {
+  font-size: 0.72rem;
+  font-family: monospace;
+  opacity: 0.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+  min-height: 1em; /* hold space even when empty so the layout doesn't jump */
+}
+
+/* =============================================================================
+   FACE SWITCHER: disclaimer ⇄ tool cross-fade
+   Mirrors the Budget main ⇄ Annual Stats pattern (budget.css): only one face
+   is ever in normal flow, JS fades the outgoing face out, swaps display at
+   the midpoint, then fades the incoming face in.
+============================================================================= */
+
+/* Transparent wrapper, faces behave as direct children of the tool view */
+.ab-flip-card {
+  display: contents;
+}
+
+.ab-face-tool,
+.ab-face-disclaimer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Disclaimer face hidden by default; entry logic flips display as needed */
+.ab-face-disclaimer {
+  display: none;
+}
+
+@keyframes ab-face-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes ab-face-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.ab-face-hiding {
+  animation: ab-face-out 0.4s ease both;
+  pointer-events: none;
+}
+
+.ab-face-showing {
+  animation: ab-face-in 0.4s ease both;
+}
+
+/* =============================================================================
+   DISCLAIMER FACE: first-entry warning panel
+============================================================================= */
+
+.ab-disclaimer-panel {
+  display: flex;
+  justify-content: center;
+}
+
+.ab-disclaimer-inner {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 4px;
+}
+
+.ab-disclaimer-title {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent-totals);
+}
+
+.ab-disclaimer-inner p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  opacity: 0.85;
+}
+
+/* Checkbox row, sits above the action buttons, aligned with Continue (right) */
+.ab-disclaimer-skip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  font-size: 0.78rem;
+  opacity: 0.7;
+  cursor: pointer;
+  user-select: none;
+  margin-top: 4px;
+}
+
+.ab-disclaimer-skip input {
+  margin: 0;
+}
+
+.ab-disclaimer-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ab-disclaimer-actions button {
+  font-size: 0.85rem;
+  padding: 6px 18px;
+}
+
+/* =============================================================================
+   RUN CONFIRMATION MODAL
+============================================================================= */
+
+.ab-run-confirm-modal {
+  width: min(480px, 92vw);
+}
+
+.ab-run-confirm-modal .exit-modal-actions {
+  flex-wrap: wrap;
+}
+
+/* =============================================================================
+   CONFIRM MODAL: free-space warnings
+   -----------------------------------------------------------------------------
+   Non-blocking cautions, not errors: "size to copy" counts the full size of
+   every changed file, not the smaller number of bytes an overwrite actually
+   adds, so a destination showing here might still have enough room.
+============================================================================= */
+
+.ab-confirm-space-warning {
+  font-size: 0.8rem;
+  background: var(--color-hover);
+  border: 1px solid var(--color-danger, #c0392b);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+/* =============================================================================
+   SKIPPED FILES MODAL
+============================================================================= */
+
+.ab-skipped-files-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.75;
+  margin: 4px 0 8px;
+}
+
+.ab-skipped-files-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ab-skipped-file-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.72rem;
+}
+
+.ab-skipped-file-row:last-child {
+  border-bottom: none;
+}
+
+/* Truncation notice appended when the run had more skips than the backend
+   retains. Single child in a 3-column grid row, so it has to span all of
+   them or it would be squeezed into the first column's width. */
+.ab-skipped-file-more {
+  display: block;
+  font-style: italic;
+  opacity: 0.75;
+  white-space: normal;
+}
+
+.ab-skipped-file-source,
+.ab-skipped-file-dest {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ab-skipped-file-arrow {
+  opacity: 0.4;
+  flex-shrink: 0;
+}
