@@ -4528,7 +4528,7 @@ function applyPreset(
   viewStartInput.value = range.start;
   viewEndInput.value = range.end;
 
-  document.querySelectorAll("#utility-tool-time-tracker .preset-btn").forEach((btn) => {
+  document.querySelectorAll("#tracking-tool-time-tracker .preset-btn").forEach((btn) => {
     btn.classList.toggle("active", (btn as HTMLElement).dataset.preset === preset);
   });
 
@@ -4545,9 +4545,9 @@ function syncActivePreset(): void {
     const range = getPresetRange(preset);
     return range.start === viewStart && range.end === viewEnd;
   });
-  document.querySelectorAll("#utility-tool-time-tracker .preset-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll("#tracking-tool-time-tracker .preset-btn").forEach((b) => b.classList.remove("active"));
   if (matched) {
-    document.querySelectorAll("#utility-tool-time-tracker .preset-btn").forEach((btn) => {
+    document.querySelectorAll("#tracking-tool-time-tracker .preset-btn").forEach((btn) => {
       if ((btn as HTMLElement).dataset.preset === matched) btn.classList.add("active");
     });
   }
@@ -4866,7 +4866,7 @@ export function initTimeTracker(): void {
      EVENT LISTENERS: CONTROLS PANEL
   -------------------------------------------------------------------------- */
 
-  document.querySelectorAll("#utility-tool-time-tracker .preset-btn").forEach((btn) => {
+  document.querySelectorAll("#tracking-tool-time-tracker .preset-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       doApplyPreset((btn as HTMLElement).dataset.preset!);
     });

@@ -181,10 +181,10 @@ body.solid-modals .modal {
 
 /* ── Budget Tracker ── */
 
-#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(224, 85, 26, 0.12) 0%, #341c11 100%); }
-#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(122, 154, 61, 0.09) 0%, #341c11 100%); }
-#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(194, 42, 30, 0.11) 0%, #341c11 100%); }
-#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(255, 122, 46, 0.1) 0%, #341c11 100%); }
+#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(224, 85, 26, 0.12) 0%, #341c11 100%); }
+#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(122, 154, 61, 0.09) 0%, #341c11 100%); }
+#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(194, 42, 30, 0.11) 0%, #341c11 100%); }
+#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(255, 122, 46, 0.1) 0%, #341c11 100%); }
 
 .budget-annual-stats-title-panel {
   border-left: 4px solid #e8631f;

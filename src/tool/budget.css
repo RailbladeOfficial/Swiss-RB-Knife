@@ -1167,13 +1167,13 @@ span.entry-col-category:not(.entry-field) {
    BUDGET AUTH GATE
    -----------------------------------------------------------------------------
    Just another internal view of the Budget tool, a flex sibling of
-   #budgetToolContent inside #finance-tool-budget. It lives and dies entirely
+   #budgetToolContent inside #tracking-tool-budget. It lives and dies entirely
    with the tool's own visibility, exactly like every other tool-internal
    panel (Setup, bill editor, etc). No positioning tricks, no coupling to
-   shell.ts: when shell.ts shows/hides #finance-tool-budget, this comes along
+   shell.ts: when shell.ts shows/hides #tracking-tool-budget, this comes along
    for free as a normal child element.
 
-   #finance-tool-budget is display:flex; flex-direction:column (set inline by
+   #tracking-tool-budget is display:flex; flex-direction:column (set inline by
    shell.ts). This gate takes flex:1 to fill all available space within the
    tool view and centers its own content within that space.
 

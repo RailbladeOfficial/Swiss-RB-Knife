@@ -1264,11 +1264,11 @@ function applyGsHistoryEntry(entry: GsHistoryEntry): void {
 
 /** Whether the tool is actually rendered right now, checking this element's
  *  own style.display isn't enough, since leaving the tool for another one
- *  hides it by removing the .active class from its ancestor #section-games
+ *  hides it by removing the .active class from its ancestor #section-tracking
  *  (a CSS-level hide), not by touching this element's inline style at all.
  *  offsetParent is null for anything hidden by itself OR by an ancestor. */
 function gsToolIsVisible(): boolean {
-  const view = document.getElementById("games-tool-game-stats");
+  const view = document.getElementById("tracking-tool-game-stats");
   return !!view && view.offsetParent !== null;
 }
 

@@ -728,7 +728,7 @@
 /* =============================================================================
    SETTINGS: TIME TRACKER SPECIFIC
    (The collapsible .subsettings primitive used here lives in shell.css, since
-   it's shared with the General Settings modal and the Budget setup modals.
+   it's shared with the App Settings modal and the Budget setup modals.
    The Period Length dropdown likewise wears shell.css's .settings-select, the
    shared compact settings-row select, rather than the byte-identical private
    copy of it that used to sit here.)

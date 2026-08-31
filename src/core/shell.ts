@@ -148,7 +148,8 @@ import {
   openSidebarEditModal,
   setPinned,
 } from "./sidebar-edit";
-import { attachMenu, type MenuItem } from "../menu/menu";
+import { attachMenu, openMenu, type MenuItem } from "../menu/menu";
+import { openEditMenu, setEditMenuNotify } from "../menu/edit-menu";
 // Re-exported so tool files keep importing it from "./shell", their existing
 // convention, rather than reaching into a shell-internal module.
 export { isToolVisible };
@@ -197,10 +198,40 @@ type NavEntry = {
  *  uses for _activeViewKey, so pin-state lookups can compare directly. */
 type ToolMeta = {
   key: string;
-  section: string;
+  /** The tool's category. Called `section` throughout because that is what
+   *  the DOM calls it: it names the tool's `#section-<id>` container, its
+   *  `#<id>-tool-<tool>` view, and its data-section attribute. A tool has one
+   *  grouping, not two. */
+  section: ToolCategoryId;
   tool: string;
   label: string;
 };
+
+/** The categories, in the order their headings appear. Kept small on purpose:
+ *  a category earns its place by what it turns away, not by how full it is,
+ *  and a bucket that accepts anything (the old "utility") is how the last set
+ *  of categories stopped meaning anything.
+ *
+ *  Renaming an id here is not a rename. It is the tool key ("<id>/<tool>"),
+ *  the section container's id, every tool view id inside it, the per-tool
+ *  theme selectors in public/themes/, and two persisted files. Re-assigning a
+ *  tool from one existing category to another is cheap; adding or renaming a
+ *  category is not. See RENAMED_TOOL_KEYS below for what that costs. */
+export type ToolCategoryId = "productivity" | "tracking" | "calculators" | "files";
+
+/* Array order IS heading order, on the sidebar, on the Home dashboard and in
+   the Edit Home/Sidebar modal's drag list. Nothing else reads it, so this is
+   the one place to reorder them. */
+export const TOOL_CATEGORIES: { id: ToolCategoryId; label: string }[] = [
+  // Records you add to over time and look back at.
+  { id: "tracking", label: "Tracking" },
+  // Things that have not happened yet.
+  { id: "productivity", label: "Productivity" },
+  // Takes files off disk, hands files back.
+  { id: "files", label: "File Tools" },
+  // One-off answers. Nothing is kept.
+  { id: "calculators", label: "Calculators" },
+];
 
 /** One row of the persisted sidebar order/pin state (settings.sidebarItems).
  *  Array order IS the display order for pinned items; unpinned items are
@@ -382,17 +413,17 @@ export function currentSoundPackId(id: string): string {
    add a tool here (matching its data-section/data-tool attributes in
    index.html) and it's automatically pinnable/reorderable/hideable. */
 export const ALL_TOOLS: ToolMeta[] = [
-  { key: "finance/budget", section: "finance", tool: "budget", label: "Budget Tracker" },
-  { key: "utility/time-tracker", section: "utility", tool: "time-tracker", label: "Time Tracker" },
-  { key: "utility/kanban", section: "utility", tool: "kanban", label: "Kanban" },
+  { key: "tracking/budget", section: "tracking", tool: "budget", label: "Budget Tracker" },
+  { key: "tracking/time-tracker", section: "tracking", tool: "time-tracker", label: "Time Tracker" },
+  { key: "productivity/kanban", section: "productivity", tool: "kanban", label: "Kanban" },
   { key: "files/auto-backup", section: "files", tool: "auto-backup", label: "Auto-Backup" },
-  { key: "utility/countdown", section: "utility", tool: "countdown", label: "Countdown Timer" },
-  { key: "games/game-stats", section: "games", tool: "game-stats", label: "Game Stats" },
-  { key: "media/image-ccr", section: "media", tool: "image-ccr", label: "Image CCR" },
-  { key: "utility/days-between", section: "utility", tool: "days-between", label: "Days Between Dates" },
-  { key: "utility/tts-repeater", section: "utility", tool: "tts-repeater", label: "TTS Repeater" },
+  { key: "productivity/countdown", section: "productivity", tool: "countdown", label: "Countdown Timer" },
+  { key: "tracking/game-stats", section: "tracking", tool: "game-stats", label: "Game Stats" },
+  { key: "files/image-ccr", section: "files", tool: "image-ccr", label: "Image CCR" },
+  { key: "calculators/days-between", section: "calculators", tool: "days-between", label: "Days Between Dates" },
+  { key: "productivity/tts-repeater", section: "productivity", tool: "tts-repeater", label: "TTS Repeater" },
   { key: "files/dummy-file-generator", section: "files", tool: "dummy-file-generator", label: "Dummy File Generator" },
-  { key: "utility/rng", section: "utility", tool: "rng", label: "RNGesus" },
+  { key: "calculators/rng", section: "calculators", tool: "rng", label: "RNGesus" },
 ];
 
 /** How the sidebar is ordered. "classic" is ALL_TOOLS' own order above;
@@ -496,7 +527,7 @@ const FONT_SCALE_MAX = 10;
  *
  *  Worth being strict about: --font-scale feeds `font-size: calc(20px +
  *  var(--font-scale) * 1px)` on :root in shell.css, so a value of 500 renders
- *  the entire app at a ~520px root font. At that size the General Settings
+ *  the entire app at a ~520px root font. At that size the App Settings
  *  modal cannot be read, which means the control that would undo it is no
  *  longer usable and the only fix is hand-editing settings.json. NaN passes a
  *  bare `typeof === "number"` check, so it is excluded explicitly. */
@@ -805,13 +836,13 @@ function switchSection(sectionKey: string, toolKey?: string): void {
   // (400 ms), so an edit made just before navigating away would otherwise
   // still be sitting in the queue when the tool re-locks or the state resets.
   const nextViewKey = `${sectionKey}/${toolKey ?? ""}`;
-  if (_activeViewKey === "finance/budget" && nextViewKey !== "finance/budget") {
+  if (_activeViewKey === "tracking/budget" && nextViewKey !== "tracking/budget") {
     onBudgetToolExit();
   }
   // Kanban for the same reason, plus one of its own: its session password is
   // given up here when the tool lock is on, and any queued edit has to be
   // written while that password is still held.
-  if (_activeViewKey === "utility/kanban" && nextViewKey !== "utility/kanban") {
+  if (_activeViewKey === "productivity/kanban" && nextViewKey !== "productivity/kanban") {
     void onKanbanToolExit();
   }
   // Bank the outgoing view's scroll position. Guarded on the key actually
@@ -861,14 +892,14 @@ export function activateSection(sectionKey: string): void {
   // saveShellState() wrote the bad key straight back to disk, so the empty
   // view survived every restart. Home instead.
   //
-  // This is NOT about the category sections. Those are only shelved from the
-  // nav UI, not removed: section-utility/files/media/music/finance/games all
-  // still exist in index.html, so activateSection("utility") resolves normally
-  // today and will keep doing so when categories come back. Nor is it about
-  // "lastCategory", which has its own branch in loadShellState() and resolves
-  // through state.lastCategory. What reaches this guard is a key with no
-  // section at all: a hand-edited settings file, or a stale shell-state naming
-  // a section that no longer exists.
+  // This is NOT about the category sections. Each category still has its own
+  // #section-<id> container holding that category's tool views, so
+  // activateSection("productivity") resolves normally today and will keep
+  // doing so if landing pages come back. Nor is it about "lastCategory",
+  // which has its own branch in loadShellState() and resolves through
+  // state.lastCategory. What reaches this guard is a key with no section at
+  // all: a hand-edited settings file, or a shell-state naming a section that
+  // no longer exists AND that currentSectionId() has no rename for.
   if (!sectionEl && sectionKey !== "home") {
     console.warn(`[nav] no section "${sectionKey}", falling back to home`);
     activateSection("home");
@@ -894,8 +925,8 @@ export function activateSection(sectionKey: string): void {
 function activateToolFromClick(section: string, tool: string): void {
   scrollToTopOnNextView();
   activateTool(section, tool);
-  if (section === "games" && tool === "game-stats") onGameStatsIconClicked();
-  if (section === "utility" && tool === "kanban") onKanbanIconClicked();
+  if (section === "tracking" && tool === "game-stats") onGameStatsIconClicked();
+  if (section === "productivity" && tool === "kanban") onKanbanIconClicked();
 }
 
 /** activateSection() for explicit user clicks only (sidebar icon with no tool,
@@ -1003,10 +1034,10 @@ function activateTool(section: string, tool: string): void {
 
   // Notify tools that need to gate entry (e.g. Budget encryption auth,
   // Auto-Backup's first-entry disclaimer)
-  if (section === "finance" && tool === "budget") onBudgetToolEntry();
-  if (section === "games" && tool === "game-stats") onGameStatsToolEntry();
+  if (section === "tracking" && tool === "budget") onBudgetToolEntry();
+  if (section === "tracking" && tool === "game-stats") onGameStatsToolEntry();
   if (section === "files" && tool === "auto-backup") onAutoBackupToolEntry();
-  if (section === "utility" && tool === "kanban") onKanbanToolEntry();
+  if (section === "productivity" && tool === "kanban") onKanbanToolEntry();
 
   saveShellState(section, tool);
   pushNavHistory(section, tool);
@@ -1296,32 +1327,43 @@ async function loadShellState(): Promise<void> {
 
     // Seed in-memory tracking from persisted state so saveShellState
     // never needs to read back from disk to preserve these fields.
+    // The three section fields are mapped through the rename table for the
+    // same reason settings' keys are: shell-state.json outlives a
+    // re-categorisation, and an un-mapped section names a #section-<id> that
+    // no longer exists, so the app opens to a blank main pane.
     _lastTool = state.lastTool ?? null;
-    _lastToolSection = state.lastToolSection ?? null;
-    _lastCategory = state.lastCategory ?? null;
+    _lastToolSection =
+      (state.lastToolSection && state.lastTool
+        ? currentSectionForTool(state.lastToolSection, state.lastTool)
+        : currentSectionId(state.lastToolSection)) ?? null;
+    _lastCategory = currentSectionId(state.lastCategory) ?? null;
+    const activeSectionId =
+      (state.activeSection && state.activeTool
+        ? currentSectionForTool(state.activeSection, state.activeTool)
+        : currentSectionId(state.activeSection)) ?? null;
 
     const target = settings.startupTarget ?? "lastView";
 
     if (target === "lastView") {
       // Restore exactly where the user left off, tool, landing, or home
-      if (state.activeTool && state.activeSection) {
-        activateToolIfPinned(state.activeSection, state.activeTool);
-      } else if (state.activeSection) {
-        activateSection(state.activeSection);
+      if (state.activeTool && activeSectionId) {
+        activateToolIfPinned(activeSectionId, state.activeTool);
+      } else if (activeSectionId) {
+        activateSection(activeSectionId);
       } else {
         activateSection("home");
       }
     } else if (target === "lastTool") {
       // Restore the last tool opened, regardless of where the user closed from
-      if (state.lastTool && state.lastToolSection) {
-        activateToolIfPinned(state.lastToolSection, state.lastTool);
+      if (state.lastTool && _lastToolSection) {
+        activateToolIfPinned(_lastToolSection, state.lastTool);
       } else {
         activateSection("home");
       }
     } else if (target === "lastCategory") {
       // Restore the last real category visited, never Home
-      if (state.lastCategory) {
-        activateSection(state.lastCategory);
+      if (_lastCategory) {
+        activateSection(_lastCategory);
       } else {
         activateSection("home");
       }
@@ -1329,11 +1371,11 @@ async function loadShellState(): Promise<void> {
       activateSection("home");
     } else if (target.includes(":")) {
       // Specific tool, format is "section:tool-id"
-      const [section, tool] = target.split(":");
+      const [section, tool] = currentStartupTarget(target).split(":");
       activateToolIfPinned(section, tool);
     } else {
-      // Specific category, value matches a section key (e.g. "utility", "music")
-      activateSection(target);
+      // Specific category, value matches a section key (e.g. "productivity")
+      activateSection(currentSectionId(target) ?? target);
     }
   } catch {
     activateSection("home");
@@ -1474,30 +1516,52 @@ window.addEventListener(
   { capture: true },
 );
 
-// Suppress the webview's own right-click menu. Its entries (Back, Reload,
-// Save as, Inspect, View source) are all browser concepts that mean nothing
-// in a desktop app, and several of them can visibly break it.
-//
-// EXCEPT inside text fields. There the webview menu is Cut / Copy / Paste /
-// Undo / Select All, which is real editing function with no app-drawn
-// replacement yet, so it stays until there is one. Anywhere else the gesture
-// is free for the app to claim.
-//
-// Deliberately a BUBBLING listener with preventDefault() only, no
-// stopPropagation. Right-click is meant to become an app gesture, so an
-// element that wants its own menu adds a "contextmenu" listener of its own:
-// that one runs first on the way up, and this only cancels the webview's
-// default afterwards. Capturing here, or stopping propagation, would make
-// those per-element menus unreachable.
+// The text-field menu reports a refused clipboard read as a toast. Handed
+// over rather than imported, so edit-menu.ts stays free of the shell.
+setEditMenuNotify(flash);
+
+/* -----------------------------------------------------------------------------
+   THE LAST RIGHT-CLICK HANDLER
+   ---------------------------------------------------------------------------
+   The webview's own right-click menu (Back, Reload, Save as, Inspect, View
+   source) is all browser concepts that mean nothing in a desktop app, and
+   several of them can visibly break it, so it never appears. This handler is
+   what replaces it.
+
+   Deliberately a BUBBLING listener on window, which makes it the LAST thing
+   the event reaches. Any element that wants its own menu adds a contextmenu
+   listener of its own (see attachMenu in menu.ts); that one runs first on the
+   way up and stops the event, so this never sees the clicks it claimed. What
+   is left here is exactly "a right-click nothing else wanted": the page
+   background, a panel, the gap between controls.
+
+   Two menus come out of that:
+
+     a text field   Cut / Copy / Paste / Select All / Undo / Redo, drawn by
+                    the app. See edit-menu.ts. This used to be the one place
+                    the webview's menu was left alone, because those commands
+                    were worth more than a blank gesture; now there is an app
+                    menu that does the same six things.
+     anywhere else  the background menu: the open tool's own header buttons,
+                    then Settings / About / Immersive / Exit. See
+                    backgroundMenu() below.
+----------------------------------------------------------------------------- */
 window.addEventListener("contextmenu", (e: MouseEvent) => {
-  if (isTextEntry(e.target)) return;
   e.preventDefault();
+
+  if (isTextEntry(e.target)) {
+    openEditMenu(e.target as HTMLElement, e.clientX, e.clientY);
+    return;
+  }
+
+  if (!backgroundMenuAvailable()) return;
+  openMenu({ x: e.clientX, y: e.clientY }, backgroundMenu());
 });
 
-/** True for the elements whose native right-click menu is worth keeping: a
- *  text-editable input, a textarea, or a contenteditable region. A
- *  non-text input (checkbox, range, color, file) has nothing useful on that
- *  menu, so it is treated like the rest of the page. */
+/** True for the elements that get the text-editing menu: a text-editable
+ *  input, a textarea, or a contenteditable region. A non-text input
+ *  (checkbox, range, color, file) has nothing to cut or paste, so it is
+ *  treated like the rest of the page. */
 function isTextEntry(target: EventTarget | null): boolean {
   if (target instanceof HTMLTextAreaElement) return true;
   if (target instanceof HTMLElement && target.isContentEditable) return true;
@@ -1535,8 +1599,11 @@ function isTextEntry(target: EventTarget | null): boolean {
    would open the app with no visible way out of it, so every session starts
    windowed and F11 is the only way in.
 
-   No hover-to-reveal strip yet. Staging is what stands in for it: stage 1
-   keeps the header controls rather than making you go looking for them.
+   No hover-to-reveal strip. Two things stand in for one: staging, so stage 1
+   still keeps every header control, and the background menu (see THE
+   BACKGROUND MENU below), which puts those controls plus Settings, About and
+   Exit on a right-click anywhere on empty space. That menu is also a second
+   way out of stage 2, alongside F11.
 ============================================================================= */
 
 /** 0 windowed · 1 fullscreen, no shell chrome · 2 also no tool header. */
@@ -1566,7 +1633,7 @@ async function setImmersiveStage(stage: ImmersiveStage): Promise<void> {
   }
 }
 
-/* The General Settings > Display "View Mode (F11)" segmented control. It is a
+/* The App Settings > Display "View Mode (F11)" segmented control. It is a
    second face on the same state, not a second setting: pressing F11 moves the
    buttons, and pressing a button is the same call F11 makes. Which is why
    setImmersiveStage() repaints them rather than the click handler doing it. */
@@ -1589,6 +1656,13 @@ export function isImmersive(): boolean {
   return immersiveStage > 0;
 }
 
+/** Moves to the next view mode, wrapping Standard → Spacious → Bare →
+ *  Standard. What F11 does, and what the Toggle View row on the background
+ *  menu does, because they are the same control with two faces. */
+function cycleViewMode(): void {
+  void setImmersiveStage(((immersiveStage + 1) % 3) as ImmersiveStage);
+}
+
 // Capturing, like the F7 handler above, so this beats any default handling of
 // F11 in the webview and the app is the only thing deciding what the key does.
 window.addEventListener(
@@ -1597,28 +1671,145 @@ window.addEventListener(
     if (e.key !== "F11") return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    const next = ((immersiveStage + 1) % 3) as ImmersiveStage;
-    void setImmersiveStage(next);
+    cycleViewMode();
   },
   { capture: true },
 );
 
-// The title bar's menu. A Standard-mode shortcut to two things that otherwise
-// live only in the sidebar, and nothing more than that: the first immersive
-// stage hides the title bar along with the sidebar, so this menu is not a way
-// back from either stage. F11 is the only way back, which is what the (i) on
-// the View Mode setting exists to say.
-attachMenu(document.getElementById("titleBar")!, () => [
-  { label: "Settings…", onClick: () => settingsModal.open() },
-  { label: "About…", onClick: () => document.getElementById("aboutBtn")!.click() },
-  {
-    label:
-      immersiveStage === 0
-        ? "Immersive Mode (F11)"
-        : "Exit Immersive Mode (F11)",
-    onClick: () => void setImmersiveStage(immersiveStage === 0 ? 1 : 0),
-  },
-]);
+/* =============================================================================
+   THE BACKGROUND MENU
+   -----------------------------------------------------------------------------
+   Right-click on anything that has no menu of its own (the page background,
+   a panel, the sidebar below the last icon, the title bar) and this is what
+   opens.
+
+   It exists because of immersive mode. F11 stage 1 takes away the title bar
+   and the sidebar, stage 2 takes away the tool's header bar as well, and up to
+   now that meant App Settings, About, Exit, Back-to-Home and every tool's own
+   header buttons went with them. The gesture that gets them back has to be one
+   that works on empty space, because empty space is all stage 2 leaves.
+
+   Two groups, ruled apart:
+
+     the open tool's header buttons  read off the header bar itself, so a tool
+                                     that gains a button gains a menu row with
+                                     no code here to change. Nothing on Home,
+                                     which has no header buttons.
+     the app-wide rows               About, App Settings, Toggle View, Exit.
+                                     Shared with the title bar's menu so the
+                                     two can never disagree.
+
+   NOT shown while a modal or the lock screen is up. A modal is a destination
+   with its own way out; opening App Settings behind one, or offering Exit from
+   the lock screen, is not something the gesture should be able to do.
+============================================================================= */
+
+/** The view and header bar of the tool currently open, or null on Home.
+ *
+ *  Found through body[data-active-tool], which switchSection() maintains, and
+ *  not by looking for a visible header: at immersive stage 2 the header is
+ *  display:none, which is precisely when this menu matters most. */
+function activeToolHeader(): { view: HTMLElement; header: HTMLElement } | null {
+  const key = document.body.dataset.activeTool;
+  if (!key) return null;
+  const [section, tool] = key.split("/");
+  const view = document.getElementById(`${section}-tool-${tool}`);
+  const header = view?.querySelector<HTMLElement>(".tool-view-header");
+  return view && header ? { view, header } : null;
+}
+
+/** Whether `btn` would be on screen if the header bar were.
+ *
+ *  offsetParent would be the usual test and is no use here: the whole header
+ *  is display:none at immersive stage 2, which would report every button in
+ *  it as hidden. So the chain from the button up to the tool view is walked
+ *  by hand, skipping the header itself and nothing else. Skipping only the
+ *  header is what keeps the two real cases apart:
+ *
+ *    a button hidden inside a shown header   Kanban's Board Setup, which only
+ *                                            appears once a board is open.
+ *                                            Correctly left off the menu.
+ *    a hidden header inside a shown view     Budget behind its password gate,
+ *                                            where the whole tool including
+ *                                            its header is switched off.
+ *                                            Also correctly left off. */
+function isShownInHeader(btn: HTMLElement, header: HTMLElement, view: HTMLElement): boolean {
+  const stop = view.parentElement;
+  for (let node: HTMLElement | null = btn; node && node !== stop; node = node.parentElement) {
+    if (node === header) continue;
+    if (node.hidden) return false;
+    if (getComputedStyle(node).display === "none") return false;
+  }
+  return true;
+}
+
+/** A header button's menu label: its own text, or, for the icon-only Back
+ *  button, the tooltip that is the only words it has. */
+function headerButtonLabel(btn: HTMLButtonElement): string {
+  const text = (btn.textContent ?? "").replace(/\s+/g, " ").trim();
+  if (text !== "") return text;
+  return (btn.getAttribute("aria-label") ?? btn.title).trim();
+}
+
+/** Every button on the open tool's header bar, as menu rows that click it.
+ *
+ *  Read off the DOM rather than declared per tool. A tool's header is already
+ *  the single statement of what that tool offers at the top level; a second
+ *  list here would be a second thing to keep in step, and the one that gets
+ *  forgotten. Sub-nav tabs are included and the current one is greyed out,
+ *  the same way the sidebar Sort submenu greys out the mode already in use. */
+function toolHeaderItems(): MenuItem[] {
+  const active = activeToolHeader();
+  if (!active) return [];
+  const { view, header } = active;
+
+  const items: MenuItem[] = [];
+  header.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
+    if (btn.disabled || !isShownInHeader(btn, header, view)) return;
+    const label = headerButtonLabel(btn);
+    if (label === "") return;
+    items.push({
+      label,
+      disabled: btn.classList.contains("active"),
+      onClick: () => btn.click(),
+    });
+  });
+  return items;
+}
+
+/** The rows that mean the same thing everywhere in the app.
+ *
+ *  Toggle View is the same cycle F11 runs, all three modes rather than a
+ *  two-way switch, so the menu can reach Bare and can walk back out of it the
+ *  same way the key does. */
+function appMenuItems(): MenuItem[] {
+  return [
+    { label: "About…", onClick: () => document.getElementById("aboutBtn")!.click() },
+    { label: "App Settings…", onClick: () => settingsModal.open() },
+    { label: "Toggle View (F11)", onClick: cycleViewMode },
+    { label: "Exit Swiss RB Knife…", danger: true, onClick: () => openExitModal() },
+  ];
+}
+
+/** Whether a right-click on empty space should produce a menu at all. */
+function backgroundMenuAvailable(): boolean {
+  if (lockScreen.style.display === "flex") return false;
+  if (document.body.classList.contains("modal-open")) return false;
+  return true;
+}
+
+/** The whole background menu: the open tool's header buttons, then the
+ *  app-wide rows. The separator between them is dropped by menu.ts when the
+ *  first group is empty, which is every right-click on Home. */
+function backgroundMenu(): MenuItem[] {
+  return [...toolHeaderItems(), { separator: true }, ...appMenuItems()];
+}
+
+// The title bar gets the app-wide rows on their own. It is only ever visible
+// at stage 0, where the tool's header bar is visible too and one right-click
+// away, so repeating its buttons up here would be a longer menu saying the
+// same thing.
+attachMenu(document.getElementById("titleBar")!, appMenuItems);
 
 /* =============================================================================
    SETTINGS: LOAD / SAVE / APPLY
@@ -1707,6 +1898,77 @@ export async function saveSettings(): Promise<void> {
  *  from the loaded array (e.g. a tool added since this was saved) as pinned
  *  at the end, so a fresh install and an upgrade both always cover every
  *  known tool exactly once. */
+/* Tools whose category (and therefore whose key) has changed, old key ->
+   current key. Same permanence and the same bar as RENAMED_SOUND_PACKS and
+   THEME_ID_MIGRATIONS: an entry earns its place the day a key that shipped
+   changes, and is then never removed, because dropping it strands anyone
+   whose settings still name it, whether from an older build, a restored
+   backup, or a hand-edited file.
+
+   Without these, re-categorising is silently destructive rather than merely
+   inconvenient: normalizeSidebarItems() drops any key not in ALL_TOOLS, so an
+   un-migrated tool loses its place in the order, its pin state and its usage
+   counts, and re-appears unpinned at the end of the list as though it were
+   brand new.
+
+   2026-08-30 (v0.6.1): the five old sections (finance, utility, files, games,
+   media, of which "utility" held six of eleven tools) were replaced by the
+   four categories in TOOL_CATEGORIES. Only auto-backup and
+   dummy-file-generator kept their key. */
+export const RENAMED_TOOL_KEYS: Record<string, string> = {
+  "finance/budget": "tracking/budget",
+  "utility/time-tracker": "tracking/time-tracker",
+  "utility/kanban": "productivity/kanban",
+  "utility/countdown": "productivity/countdown",
+  "games/game-stats": "tracking/game-stats",
+  "media/image-ccr": "files/image-ccr",
+  "utility/days-between": "calculators/days-between",
+  "utility/tts-repeater": "productivity/tts-repeater",
+  "utility/rng": "calculators/rng",
+};
+
+/** Maps a possibly-stale tool key to the current one. Keys that were never
+ *  renamed pass straight through, still to be validated by the caller. */
+export function currentToolKey(key: string): string {
+  return RENAMED_TOOL_KEYS[key] ?? key;
+}
+
+/** The section a stored "<section>/<tool>" pair resolves to now.
+ *
+ *  Always prefer this over currentSectionId() when a tool is in hand. A pair
+ *  is exact; a bare section cannot be, because "utility" split three ways. */
+function currentSectionForTool(section: string, tool: string): string {
+  return currentToolKey(`${section}/${tool}`).split("/")[0];
+}
+
+/** Maps a possibly-stale SECTION id to the current one, for the persisted
+ *  fields that name a section with no tool beside it.
+ *
+ *  Only old sections whose every tool landed in the SAME new one are mapped.
+ *  "utility" is deliberately absent: its six tools went to three different
+ *  categories, so any answer here would be a guess, and a guess sends the app
+ *  to a category the user was not in. Left unmapped, it falls through
+ *  activateSection()'s existing "no such section" guard to Home, which is
+ *  wrong in a way the user can see and correct rather than wrong in a way
+ *  that looks deliberate. */
+export function currentSectionId<T extends string | null | undefined>(id: T): T | string {
+  if (!id) return id;
+  const targets = new Set(
+    Object.entries(RENAMED_TOOL_KEYS)
+      .filter(([from]) => from.split("/")[0] === id)
+      .map(([, to]) => to.split("/")[0]),
+  );
+  return targets.size === 1 ? [...targets][0] : id;
+}
+
+/** The same map in the "section:tool" form the On Startup select uses, so
+ *  a stored startup target survives a re-categorisation too. Derived rather
+ *  than written out twice, which is what keeps the two from drifting. */
+function currentStartupTarget(target: string): string {
+  if (!target.includes(":")) return target;
+  return currentToolKey(target.replace(":", "/")).replace("/", ":");
+}
+
 function normalizeSidebarItems(raw: unknown): SidebarItemState[] {
   const candidates: SidebarItemState[] = Array.isArray(raw)
     ? raw.filter(
@@ -1714,9 +1976,13 @@ function normalizeSidebarItems(raw: unknown): SidebarItemState[] {
           it !== null &&
           typeof it === "object" &&
           typeof (it as SidebarItemState).key === "string" &&
-          typeof (it as SidebarItemState).pinned === "boolean" &&
-          ALL_TOOLS.some((t) => t.key === (it as SidebarItemState).key),
+          typeof (it as SidebarItemState).pinned === "boolean",
       )
+        // Renames are applied BEFORE the "is this a tool we know about" test
+        // below, or a re-categorised tool fails it and is dropped along with
+        // everything the user had set on it.
+        .map((it) => ({ ...it, key: currentToolKey(it.key) }))
+        .filter((it) => ALL_TOOLS.some((t) => t.key === it.key))
     : [];
 
   const deduped: SidebarItemState[] = [];
@@ -1755,10 +2021,14 @@ async function loadSettings(): Promise<void> {
         typeof merged.solidModals === "boolean"
           ? merged.solidModals
           : DEFAULT_SETTINGS.solidModals,
+      // Mapped through the rename table first, so a startup target naming a
+      // tool's old category still resolves. Without that it fails the
+      // isKnownStartupTarget check and silently reverts to Last View, which
+      // reads as the setting having been forgotten.
       startupTarget:
         typeof merged.startupTarget === "string" &&
-        isKnownStartupTarget(merged.startupTarget)
-          ? merged.startupTarget
+        isKnownStartupTarget(currentStartupTarget(merged.startupTarget))
+          ? currentStartupTarget(merged.startupTarget)
           : DEFAULT_SETTINGS.startupTarget,
       // Renames are mapped here so the corrected id is what gets persisted on
       // the next save. It runs on every stored theme id, not just this one, or
@@ -1925,6 +2195,10 @@ async function loadSettings(): Promise<void> {
       sidebarSort: SIDEBAR_SORT_MODES.includes(merged.sidebarSort as SidebarSortMode)
         ? (merged.sidebarSort as SidebarSortMode)
         : DEFAULT_SETTINGS.sidebarSort,
+      toolCategories:
+        typeof merged.toolCategories === "boolean"
+          ? merged.toolCategories
+          : DEFAULT_SETTINGS.toolCategories,
     });
   } catch {
     setSettings({ ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() });
@@ -1946,12 +2220,14 @@ async function loadSettings(): Promise<void> {
    SETTINGS MODAL
 ============================================================================= */
 
-type SettingsTab = "display" | "audio" | "preferences";
+export type SettingsTab = "display" | "audio" | "preferences";
 
-/* Declaration order is tab order: Display is what a fresh open lands on. The
-   Customize buttons (Sidebar / Theme / Notification Sound) and the App Lock and
-   new-version flows all leave and come back, so they close with
-   { handoff: true } to keep the tab they left from. */
+/* Declaration order is tab order: Display is what a fresh open lands on.
+
+   Everything that leaves Settings and comes back (the Customize buttons for
+   Sidebar / Theme / the three sound cues, the App Lock flows, the new-version
+   flow) closes with { handoff: true } on the way out and returns through
+   openSettingsOnTab() below, naming the tab it belongs to. */
 const settingsTabs = new ModalTabs<SettingsTab>({
   scope: "#settingsModal",
   key: "settingsTab",
@@ -1966,6 +2242,30 @@ export const settingsModal = new Modal(settingsBackdrop, {
   tabs: settingsTabs,
   onOpen: () => applySettings(),
 });
+
+/** Opens App Settings, optionally on a named tab.
+ *
+ *  The one way back into Settings from a panel that left it. Every such panel
+ *  sits behind a button on exactly one tab, and that tab is the honest answer
+ *  to "where was I?", whether or not the person was ever actually there: reach
+ *  Customize Home/Sidebar from a right-click on a Home card and the back arrow
+ *  still has to land on Preferences, because that is the only place the
+ *  Customize button lives.
+ *
+ *  Naming the tab rather than letting the modal restore its own is also what
+ *  makes a first-ever open land correctly. A modal that has never been opened
+ *  has no tab in use to restore, so it would fall back to the first one.
+ *
+ *  Same shape as openSetupModalOnTab() in budget.ts, openTTSetupOnTab() in
+ *  time-tracker.ts, openGsSetupOnTab() in game-stats.ts and openSetupOnTab()
+ *  in kanban.ts. Settings was the last tabbed modal in the app not doing this.
+ *
+ *  Called with no tab (the sidebar's Settings entry, the title bar and
+ *  background menus) it is an ordinary open: a fresh one lands on Display. */
+export function openSettingsOnTab(tab?: SettingsTab): void {
+  if (tab) settingsTabs.select(tab);
+  settingsModal.open();
+}
 
 settingsBtn.addEventListener("click", () => settingsModal.open());
 settingsClose.addEventListener("click", () => settingsModal.close());
@@ -2231,7 +2531,7 @@ function toggleThemePickerInfoTooltip(btn: HTMLButtonElement, text: string): voi
 }
 
 // Both classes, one bubble. .settings-info-btn is the same control in a
-// General Settings row; it needs the identical click-to-toggle behaviour and
+// App Settings row; it needs the identical click-to-toggle behaviour and
 // there is no reason for a second copy of it.
 document
   .querySelectorAll<HTMLButtonElement>(
@@ -2426,7 +2726,7 @@ export function maybeShowBudgetReminder(): Promise<void> {
 
 budgetReminderGoBtn.addEventListener("click", () => {
   budgetReminderModal.close();
-  activateToolFromClick("finance", "budget");
+  activateToolFromClick("tracking", "budget");
 });
 
 budgetReminderReviewedBtn.addEventListener("click", () => {

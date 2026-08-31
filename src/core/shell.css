@@ -273,6 +273,83 @@ body.immersive-headers .section-header {
   opacity: 1;
 }
 
+/* =============================================================================
+   SIDEBAR CATEGORY HEADINGS  (Tool Categories: Enabled)
+   -----------------------------------------------------------------------------
+   Built by sidebar-edit.ts, never present while the setting is off.
+
+   The collapsed rail is 52px, which is not enough for a word, so the heading
+   carries a hairline rule as well as its label and the two cross-fade with
+   the sidebar's own width transition: a separator collapsed, a label
+   expanded. The alternative (hiding the heading outright when collapsed)
+   makes the list jump by the heading's height every time the sidebar opens.
+============================================================================= */
+.nav-group-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* Collapsed, this is a hairline with nothing to read, so it only needs
+     enough room to separate. It grows to fit the label when the sidebar
+     opens, on the sidebar's own timing so the two move as one gesture. The
+     sidebar opens on a click rather than on hover, so this is a deliberate
+     motion, not something that happens under a passing cursor. */
+  height: 12px;
+  margin-top: 0;
+  transition:
+    height var(--sidebar-transition),
+    margin-top var(--sidebar-transition);
+  padding: 0 17px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-btn);
+  white-space: nowrap;
+  overflow: hidden;
+  /* Not a destination. Never take a click, a hover or a text selection. */
+  pointer-events: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+#sidebar.expanded .nav-group-label {
+  height: 26px;
+  margin-top: 6px;
+}
+
+/* The first heading sits directly under Home, which already has its own
+   padding above it, so it takes less of a gap than the ones between groups.
+   Only needed expanded: collapsed, no heading has a margin at all. Marked in
+   JS, see applySidebarOrder(). */
+#sidebar.expanded .nav-group-label.is-first {
+  margin-top: 2px;
+}
+
+.nav-group-rule {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 50%;
+  height: 1px;
+  background: var(--color-border);
+  transition: opacity var(--sidebar-transition);
+}
+
+#sidebar.expanded .nav-group-rule {
+  opacity: 0;
+}
+
+.nav-group-text {
+  opacity: 0;
+  transition: opacity var(--sidebar-transition);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#sidebar.expanded .nav-group-text {
+  opacity: 1;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -484,7 +561,7 @@ body.immersive-headers .section-header {
    are where a theme puts its gradients, glows, bevels and rails.
 
    Every theme styles these four selectors directly, and Budget additionally
-   refines them under #finance-tool-budget. The names come from the Time
+   refines them under #tracking-tool-budget. The names come from the Time
    Tracker they started in (type here / control the view / read a total / read
    a list); past that they are just four slots, and a tool with four panels
    should walk them in DOM order rather than agonise over the labels.
@@ -722,7 +799,7 @@ button:hover {
   flex-direction: column;
 }
 
-/* Time Tracker Settings modal. Same sizing/scroll as the General Settings modal */
+/* Time Tracker Settings modal. Same sizing/scroll as the App Settings modal */
 #ttSettingsModal {
   max-height: 85vh;
   display: flex;
@@ -802,7 +879,7 @@ button:hover {
 
 /* Collapsible sub-block that expands/collapses beneath a settings row (its
    max-height is toggled from JS). Shared app-wide, not tool-specific: the
-   General Settings modal (App Lock / Random / Custom-theme sub-options), the
+   App Settings modal (App Lock / Random / Custom-theme sub-options), the
    Time Tracker settings (pay-period options), and the Budget setup modals
    (expectation / threshold fields) all use it. Lives here next to the other
    settings-structure primitives rather than in any one tool's stylesheet.
@@ -1459,50 +1536,23 @@ input[type="checkbox"]:not(.toggle-switch input):checked::before {
 
 /* Bottom-left footer row, separate from the header's back arrow so the two
    don't compete for the same corner. Reset itself uses the default <button>
-   look (no extra class), same as General Settings' own Reset button. */
-/* Wider than the default modal so the five sort buttons sit on one line with
-   room to breathe rather than being crushed or wrapped. */
+   look (no extra class), same as App Settings' own Reset button. */
+/* Wider than the default modal so a tool's name, its drag handle and its
+   visibility toggle sit on one comfortable line at any font scale. */
 .sidebar-edit-modal {
   width: min(660px, 94vw);
 }
 
-.sidebar-edit-footer {
+/* Sort + Tool Categories. Both describe the list under them, so they sit
+   above it, separated by a rule rather than by whitespace alone: without one
+   the Sort row reads as another item in the list it is meant to govern. */
+.sidebar-edit-controls {
   display: flex;
-  justify-content: flex-start;
-  gap: 6px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
-}
-
-/* Equal shares of the row, so the set always fits and stays balanced whatever
-   the longest label is. nowrap keeps "Most Recent" on one line. */
-.sidebar-sort-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 7px 6px;
-  font-size: 0.75rem;
-  white-space: nowrap;
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  transition:
-    background var(--hover-transition),
-    color var(--hover-transition),
-    border-color var(--hover-transition);
-}
-
-.sidebar-sort-btn:hover {
-  background: var(--color-hover);
-  color: var(--color-text);
-}
-
-/* No button is marked while the order is a custom, hand-dragged one, none of
-   them describes it. */
-.sidebar-sort-btn.active {
-  background: var(--color-btn);
-  color: var(--color-btn-text);
-  border-color: var(--color-btn);
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .sidebar-edit-hint {
@@ -1510,6 +1560,38 @@ input[type="checkbox"]:not(.toggle-switch input):checked::before {
   opacity: 0.65;
   text-align: left;
   margin: 0 0 10px;
+}
+
+/* Subheading in the shown list while Tool Categories is on. Same look as the
+   headings it mirrors on the sidebar and Home, so the modal reads as the list
+   it edits rather than as a separate arrangement of it.
+
+   It is also the whole explanation of why a row will not drag past it: the
+   boundary is visible, so the drag simply refusing to cross reads as the rule
+   it is. That is what replaced a paragraph saying so. */
+.sidebar-edit-group-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-btn);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* The list's own 4px gap already sits above the first subheading. */
+.sidebar-edit-group-label:first-child {
+  margin-top: 0;
+}
+
+.sidebar-edit-group-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
 }
 
 .sidebar-edit-list {
@@ -2011,7 +2093,7 @@ input[type="checkbox"]:not(.toggle-switch input):checked::before {
 }
 
 /* .settings-info-btn is the same size delta on the same shared look, for the
-   (i) buttons that sit in a General Settings row. Listed together rather than
+   (i) buttons that sit in a App Settings row. Listed together rather than
    duplicated because there is genuinely nothing different about them. */
 .theme-picker-info-btn,
 .settings-info-btn {

@@ -25,6 +25,14 @@ function allTools() {
   )].map((m) => ({ key: m[1], section: m[2], tool: m[3], label: m[4] }));
 }
 
+/** The category ids the headings are built from, in heading order. */
+function toolCategories() {
+  const block = slice("src/core/shell.ts", "const TOOL_CATEGORIES", "];");
+  return [...block.matchAll(/id: "([a-z-]+)", label: "([^"]+)"/g)].map((m) => ({
+    id: m[1], label: m[2],
+  }));
+}
+
 test("the tool list is not empty (guards every tool check below)", () => {
   // Without this, a parsing change would make the checks below pass by
   // checking nothing at all.
@@ -53,6 +61,60 @@ test("every tool has BOTH a sidebar entry and a dashboard card", () => {
   assert.deepEqual(missing, [], "these tools cannot be opened the usual way");
 });
 
+test("every tool lives in a category that has a heading", () => {
+  // A tool's category IS its section. The headings are built by walking
+  // TOOL_CATEGORIES and filtering the tool list into each one, so a tool whose
+  // section is not in that list matches no group: it does not merely lose its
+  // heading, it vanishes from the sidebar and from Home, and only while Tool
+  // Categories is on, which is exactly the kind of thing nobody notices for a
+  // month.
+  const known = new Set(toolCategories().map((c) => c.id));
+  assert.ok(known.size >= 2, `expected the category list, parsed ${known.size}`);
+
+  const stranded = allTools()
+    .filter((t) => !known.has(t.section))
+    .map((t) => `${t.label} (${t.section})`);
+  assert.deepEqual(stranded, [], "these tools would disappear when categories are on");
+});
+
+test("every category heading has at least one tool under it", () => {
+  // The reverse: a category nothing is assigned to is a heading that can never
+  // appear, so it is dead weight in the list rather than a bug on screen. Worth
+  // failing on anyway, because it is usually a half-finished rename.
+  const tools = allTools();
+  const empty = toolCategories()
+    .filter((c) => !tools.some((t) => t.section === c.id))
+    .map((c) => c.id);
+  assert.deepEqual(empty, [], "these categories have no tools");
+});
+
+test("a tool's key always matches the section and tool it is built from", () => {
+  // key, section and tool are written out separately in ALL_TOOLS, and every
+  // lookup in the app assumes "<section>/<tool>". A key that disagrees with its
+  // own pair silently breaks pin state and usage counts for that one tool.
+  const wrong = allTools()
+    .filter((t) => t.key !== `${t.section}/${t.tool}`)
+    .map((t) => `${t.key} != ${t.section}/${t.tool}`);
+  assert.deepEqual(wrong, [], "these keys disagree with their own section/tool");
+});
+
+test("every renamed tool key points at a tool that still exists", () => {
+  // RENAMED_TOOL_KEYS is what stops a re-categorisation from quietly wiping a
+  // tool's place in the sidebar order, its pin state and its usage counts. An
+  // entry whose target is not a real key does nothing at all, and does nothing
+  // silently: the stale key is dropped exactly as if there were no map.
+  const block = slice("src/core/shell.ts", "RENAMED_TOOL_KEYS: Record<string, string>", "};");
+  const pairs = [...block.matchAll(/"([^"]+)": "([^"]+)"/g)].map((m) => [m[1], m[2]]);
+  assert.ok(pairs.length > 0, "parsed no rename entries");
+
+  const known = new Set(allTools().map((t) => t.key));
+  const broken = pairs.filter(([, to]) => !known.has(to)).map(([from, to]) => `${from} -> ${to}`);
+  assert.deepEqual(broken, [], "these renames point at keys no tool has");
+
+  const notStale = pairs.filter(([from]) => known.has(from)).map(([from]) => from);
+  assert.deepEqual(notStale, [], "these old keys are still live tool keys, so the rename is wrong");
+});
+
 test("every tool lives in a section that exists", () => {
   const sections = new Set(
     [...read("index.html").matchAll(/id="section-([a-z-]+)"/g)].map((m) => m[1]),
@@ -63,6 +125,37 @@ test("every tool lives in a section that exists", () => {
     [],
     "these tools are filed under a section that does not exist in the page",
   );
+});
+
+test("every tool's view sits inside its own category's section", () => {
+  // activateTool() hides "#section-<section> .tool-view" and then shows
+  // "#<section>-tool-<tool>". A view whose id says one category while it
+  // physically sits in another opens to a blank pane: the show finds it, the
+  // hide that runs on the NEXT navigation never does, so it is also left
+  // stacked under whatever opens after it. Re-categorising a tool means
+  // physically moving its view, and this is the only thing that says so.
+  const html = read("index.html");
+  const bounds = [...html.matchAll(
+    /<section id="section-([a-z-]+)" class="content-section[^>]*>/g,
+  )].map((m) => ({ id: m[1], start: m.index }));
+  bounds.forEach((b, i) => {
+    b.end = i + 1 < bounds.length ? bounds[i + 1].start : html.length;
+  });
+  assert.ok(bounds.length > 1, "parsed no section containers");
+
+  const misplaced = [];
+  for (const t of allTools()) {
+    const at = html.indexOf(`id="${t.section}-tool-${t.tool}"`);
+    if (at === -1) {
+      misplaced.push(`${t.label}: no view #${t.section}-tool-${t.tool}`);
+      continue;
+    }
+    const holder = bounds.find((b) => at > b.start && at < b.end);
+    if (holder?.id !== t.section) {
+      misplaced.push(`${t.label}: view sits in section-${holder?.id ?? "none"}, not section-${t.section}`);
+    }
+  }
+  assert.deepEqual(misplaced, [], "these tool views are in the wrong section container");
 });
 
 test("every tool has its own code and styling files", () => {

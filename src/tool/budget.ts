@@ -1175,7 +1175,7 @@ let appSettings: BudgetAppSettings = {
 
 async function loadAppSettings(): Promise<void> {
   try {
-    // americanDates is SHELL-owned (General Settings' Date Format), read it
+    // americanDates is SHELL-owned (App Settings' Date Format), read it
     // from the shared settings.json; everything else Budget owns lives in
     // Budget's own settings file.
     const sharedRaw = await invoke<string>("load_settings");
@@ -1474,7 +1474,7 @@ function refreshBudgetDueUI(): void {
   const status = getDueBudgetReminder();
   const due = status !== null;
 
-  setToolAttention("finance", "budget", due);
+  setToolAttention("tracking", "budget", due);
 
   // The Mark Reviewed button lives inside this wrapper, so it appears and
   // disappears with the notice without needing its own toggle.
@@ -6724,7 +6724,7 @@ export async function initBudget(): Promise<void> {
     // ran too early and saw encryptionEnabled === false, so it no-opped and
     // the gate never appeared. Detect that race here: if the Budget tool
     // view is currently the visible one, treat this as tool entry now.
-    const budgetView = document.getElementById("finance-tool-budget");
+    const budgetView = document.getElementById("tracking-tool-budget");
     const isBudgetCurrentlyActive =
       budgetView !== null && budgetView.style.display !== "none";
 
@@ -6771,7 +6771,7 @@ async function _continueInit(): Promise<void> {
     snapBtnEl = document.getElementById("budgetSnapBtn") as HTMLButtonElement;
     viewModeBtns = Array.from(
       document.querySelectorAll<HTMLButtonElement>(
-        "#finance-tool-budget .budget-view-mode-btn",
+        "#tracking-tool-budget .budget-view-mode-btn",
       ),
     );
     budgetStartupModeSelect = document.getElementById(
@@ -7356,9 +7356,9 @@ async function _continueInit(): Promise<void> {
    BUDGET AUTH GATE
    -----------------------------------------------------------------------------
    A view within the Budget tool itself, a sibling of #budgetToolContent
-   inside #finance-tool-budget, exactly like any other internal tool panel.
+   inside #tracking-tool-budget, exactly like any other internal tool panel.
    It lives and dies with the tool's own visibility: shell.ts shows/hides
-   #finance-tool-budget exactly as it always has, and the gate (or the tool
+   #tracking-tool-budget exactly as it always has, and the gate (or the tool
    content) is shown/hidden within that based on auth state. No positioning
    tricks, no observers, no shell.ts coupling beyond the existing
    onBudgetToolEntry() call already wired into activateTool().
@@ -7406,7 +7406,7 @@ function _bindAuthGate(): void {
   });
 
   homeBtn.addEventListener("click", () => {
-    // Clicking the Home nav item hides #finance-tool-budget, which takes
+    // Clicking the Home nav item hides #tracking-tool-budget, which takes
     // this gate down with it automatically. No manual hide needed.
     const homeNavItem = document.querySelector<HTMLElement>(".nav-item[data-section='home']");
     homeNavItem?.click();

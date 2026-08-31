@@ -46,6 +46,7 @@ import {
   saveSettings,
   settings,
   settingsModal,
+  openSettingsOnTab,
   themeSelect,
 } from "../core/shell";
 
@@ -776,7 +777,7 @@ export const themePickerTabs = new ModalTabs<ThemePickerTab>({
   onActivate: (tab) => renderThemePickerTab(tab),
 });
 
-// Replaces (rather than stacks on) the General Settings modal, same pattern
+// Replaces (rather than stacks on) the App Settings modal, same pattern
 // as the Edit Sidebar modal above. Exported: theme-editor.ts's Create/Edit
 // Custom Theme flow returns here (not to Settings) when done, since it's now
 // only ever reached from this modal.
@@ -800,9 +801,10 @@ themeEditBtn.addEventListener("click", () => {
   themePickerModal.open();
 });
 
+// Choose Theme is reached from Settings > Display.
 themePickerBack.addEventListener("click", () => {
   themePickerModal.close();
-  settingsModal.open();
+  openSettingsOnTab("display");
 });
 
 themePickerClose.addEventListener("click", () => themePickerModal.close());

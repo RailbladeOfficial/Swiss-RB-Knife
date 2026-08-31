@@ -330,7 +330,7 @@ function defaultPresets(): CountdownPreset[] {
   ];
 }
 
-const TIME_TRACKER_KEY = "utility/time-tracker";
+const TIME_TRACKER_KEY = "tracking/time-tracker";
 
 /* =============================================================================
    STATE
@@ -793,7 +793,7 @@ function formatDuration(ms: number): string {
  *  than the OS locale (toLocaleTimeString would ignore the setting entirely),
  *  and renders it the same way Time Tracker does, so the same moment reads
  *  identically in both tools. Read live from the shell's settings, so a change
- *  in General Settings lands on the next repaint. */
+ *  in App Settings lands on the next repaint. */
 function formatWallClock(ts: number): string {
   const d = new Date(ts);
   const rest = `${pad(d.getMinutes())}:${pad(d.getSeconds())}`;

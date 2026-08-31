@@ -23,7 +23,7 @@ The source code for Swiss RB Knife was developed with the assistance of **Anthro
 
 ## Sound Effects
 
-This application uses various curated Sound Packs (selectable in the General Settings modal) to customize notifications. It also plays individual cues for button presses and modal opens, and the Countdown Timer has its own alarm sounds. All of these contain content from third parties - their attribution can be found below.
+This application uses various curated Sound Packs (selectable in the App Settings modal) to customize notifications. It also plays individual cues for button presses and modal opens, and the Countdown Timer has its own alarm sounds. All of these contain content from third parties - their attribution can be found below.
 
 ---
 
@@ -221,7 +221,7 @@ This application uses various curated Sound Packs (selectable in the General Set
 
 ### Button Sounds
 
-Individual cues played on a button press, chosen in the General Settings modal. Off by default.
+Individual cues played on a button press, chosen in the App Settings modal. Off by default.
 
 **Blip**  
 **Author:** suntemple  
@@ -282,7 +282,7 @@ Individual cues played on a button press, chosen in the General Settings modal. 
 
 ### Modal Sounds
 
-Individual cues played when a modal opens, chosen in the General Settings modal. Off by default.
+Individual cues played when a modal opens, chosen in the App Settings modal. Off by default.
 
 **Bloop**  
 **Author:** [The Hamster Alliance](https://www.hamsteralliance.com/) ([YouTube](https://www.youtube.com/hamsteralliance))  

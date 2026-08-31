@@ -297,10 +297,10 @@ body:not(.solid-modals) .modal {
 /* ── Budget Tracker ── */
 
 /* Panel backgrounds, panel tone with very subtle accent tints */
-#finance-tool-budget .panel-accent-input  { background: #f4f7fc; box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6; }
-#finance-tool-budget .panel-accent-view   { background: #f4f7fc; box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669; }
-#finance-tool-budget .panel-accent-totals { background: #f4f7fc; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706; }
-#finance-tool-budget .panel-accent-entries{ background: #f4f7fc; box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08),  inset 3px 0 0 #dc2626; }
+#tracking-tool-budget .panel-accent-input  { background: #f4f7fc; box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6; }
+#tracking-tool-budget .panel-accent-view   { background: #f4f7fc; box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669; }
+#tracking-tool-budget .panel-accent-totals { background: #f4f7fc; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706; }
+#tracking-tool-budget .panel-accent-entries{ background: #f4f7fc; box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08),  inset 3px 0 0 #dc2626; }
 
 /* Annual Stats title panel */
 .budget-annual-stats-title-panel { border-left: 4px solid #3b82f6; background: #f4f7fc; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }

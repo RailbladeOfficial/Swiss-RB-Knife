@@ -53,6 +53,7 @@ import {
   saveSettings,
   settings,
   settingsModal,
+  openSettingsOnTab,
 } from "../core/shell";
 
 /* Element refs used only by this feature, moved here with it. */
@@ -288,9 +289,10 @@ soundPackEditBtn.addEventListener("click", () => {
   soundPackPickerModal.open();
 });
 
+// All three sound pickers are reached from Settings > Audio.
 soundPackPickerBack.addEventListener("click", () => {
   soundPackPickerModal.close();
-  settingsModal.open();
+  openSettingsOnTab("audio");
 });
 
 soundPackPickerClose.addEventListener("click", () => soundPackPickerModal.close());
@@ -417,7 +419,7 @@ function createCuePicker(opts: CuePickerOptions): { refreshBadge: () => void } {
 
   backBtn.addEventListener("click", () => {
     modal.close();
-    settingsModal.open();
+    openSettingsOnTab("audio");
   });
 
   closeBtn.addEventListener("click", () => modal.close());

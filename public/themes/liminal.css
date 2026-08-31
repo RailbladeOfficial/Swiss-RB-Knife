@@ -956,19 +956,19 @@ textarea:focus {
    BUDGET TRACKER
 ============================================================================= */
 
-#finance-tool-budget .panel-accent-input {
+#tracking-tool-budget .panel-accent-input {
   background: linear-gradient(140deg, rgba(111, 216, 212, 0.1) 0%, #362631 60%);
   box-shadow: 0 0 20px rgba(111, 216, 212, 0.1);
 }
-#finance-tool-budget .panel-accent-view {
+#tracking-tool-budget .panel-accent-view {
   background: linear-gradient(140deg, rgba(229, 174, 196, 0.1) 0%, #362631 60%);
   box-shadow: 0 0 20px rgba(229, 174, 196, 0.1);
 }
-#finance-tool-budget .panel-accent-totals {
+#tracking-tool-budget .panel-accent-totals {
   background: linear-gradient(140deg, rgba(243, 211, 138, 0.09) 0%, #362631 60%);
   box-shadow: 0 0 20px rgba(243, 211, 138, 0.09);
 }
-#finance-tool-budget .panel-accent-entries {
+#tracking-tool-budget .panel-accent-entries {
   background: linear-gradient(140deg, rgba(183, 156, 240, 0.1) 0%, #362631 60%);
   box-shadow: 0 0 20px rgba(183, 156, 240, 0.1);
 }

@@ -365,10 +365,10 @@ input { background: rgba(255, 255, 255, 0.8); border-color: #ccaaff; }
 
 /* ── Budget Tracker ── */
 
-#finance-tool-budget .panel-accent-input  { background: #fff0ee; box-shadow: 0 1px 4px rgba(255, 34, 0, 0.08), inset 3px 0 0 #ff2200; }
-#finance-tool-budget .panel-accent-view   { background: #f0fff0; box-shadow: 0 1px 4px rgba(0, 187, 0, 0.08), inset 3px 0 0 #00bb00; }
-#finance-tool-budget .panel-accent-totals { background: #fffbee; box-shadow: 0 1px 4px rgba(221, 204, 0, 0.08), inset 3px 0 0 #ddcc00; }
-#finance-tool-budget .panel-accent-entries{ background: #f5eeff; box-shadow: 0 1px 4px rgba(102, 0, 204, 0.08), inset 3px 0 0 #6600cc; }
+#tracking-tool-budget .panel-accent-input  { background: #fff0ee; box-shadow: 0 1px 4px rgba(255, 34, 0, 0.08), inset 3px 0 0 #ff2200; }
+#tracking-tool-budget .panel-accent-view   { background: #f0fff0; box-shadow: 0 1px 4px rgba(0, 187, 0, 0.08), inset 3px 0 0 #00bb00; }
+#tracking-tool-budget .panel-accent-totals { background: #fffbee; box-shadow: 0 1px 4px rgba(221, 204, 0, 0.08), inset 3px 0 0 #ddcc00; }
+#tracking-tool-budget .panel-accent-entries{ background: #f5eeff; box-shadow: 0 1px 4px rgba(102, 0, 204, 0.08), inset 3px 0 0 #6600cc; }
 
 .budget-annual-stats-title-panel {
   border-left: 4px solid #6600cc;

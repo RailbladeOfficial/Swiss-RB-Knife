@@ -44,12 +44,12 @@
    The gallery then takes its own scroll, since #mainContent no longer has one.
 ========================================================================== */
 
-body[data-active-tool="utility/kanban"] #mainContent {
+body[data-active-tool="productivity/kanban"] #mainContent {
   overflow: hidden;
 }
 
-body[data-active-tool="utility/kanban"] #section-utility,
-body[data-active-tool="utility/kanban"] #utility-tool-kanban {
+body[data-active-tool="productivity/kanban"] #section-productivity,
+body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   flex: 1;
   /* Without this a flex child refuses to shrink below its content, which is
      exactly the overflow this whole block exists to prevent. */

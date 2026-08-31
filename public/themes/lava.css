@@ -425,10 +425,10 @@ input:focus {
 
 /* Color only, never the `background` shorthand: these are .panel elements and
    the shorthand would wipe the blob layers back off them. */
-#finance-tool-budget .panel-accent-input   { background-color: #2a0a0b; }
-#finance-tool-budget .panel-accent-view    { background-color: #2a1206; }
-#finance-tool-budget .panel-accent-totals  { background-color: #26071a; }
-#finance-tool-budget .panel-accent-entries { background-color: #2a0710; }
+#tracking-tool-budget .panel-accent-input   { background-color: #2a0a0b; }
+#tracking-tool-budget .panel-accent-view    { background-color: #2a1206; }
+#tracking-tool-budget .panel-accent-totals  { background-color: #26071a; }
+#tracking-tool-budget .panel-accent-entries { background-color: #2a0710; }
 
 .budget-annual-stats-title-panel {
   border-left: 4px solid #ff5a1f;

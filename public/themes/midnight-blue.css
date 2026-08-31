@@ -207,10 +207,10 @@ body:not(.solid-modals) .modal {
 /* ── Budget Tracker ── */
 
 /* Panel background tints, gradient from an accent wash into the panel color */
-#finance-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-btn) 8%, transparent) 0%, var(--color-panel) 100%); }
-#finance-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 7%, transparent) 0%, var(--color-panel) 100%); }
-#finance-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 7%, transparent) 0%, var(--color-panel) 100%); }
-#finance-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-entries) 6%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-btn) 8%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 7%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 7%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-entries) 6%, transparent) 0%, var(--color-panel) 100%); }
 
 /* Annual Stats title panel, accent left border */
 .budget-annual-stats-title-panel { border-left: 4px solid var(--color-btn); }

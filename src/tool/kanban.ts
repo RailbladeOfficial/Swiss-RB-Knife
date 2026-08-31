@@ -1839,11 +1839,11 @@ function applyKbHistoryEntry(entry: KbHistoryEntry): void {
 
 /** Whether the tool is actually rendered right now. Checking this element's
  *  own style.display is not enough: leaving for another tool hides it by
- *  dropping the .active class from its ancestor #section-utility, which never
+ *  dropping the .active class from its ancestor #section-productivity, which never
  *  touches this element's inline style. offsetParent is null for anything
  *  hidden by itself OR by an ancestor. */
 function kbToolIsVisible(): boolean {
-  const view = document.getElementById("utility-tool-kanban");
+  const view = document.getElementById("productivity-tool-kanban");
   return !!view && view.offsetParent !== null;
 }
 
@@ -1915,7 +1915,7 @@ function refreshOverdueAttention(): void {
     ? cards.filter((c) => isOverdue(c, todayStr)).length
     : 0;
 
-  setToolAttention("utility", "kanban", overdue > 0);
+  setToolAttention("productivity", "kanban", overdue > 0);
 
   if (overdue > 0) {
     headerNoticeWrap.style.display = "";
@@ -4968,7 +4968,7 @@ const BOARD_OVERRIDE_ROWS: OverrideRow[] = [
   {
     key: "showDue",
     label: "Due Date",
-    info: "The due date block on a card and the due chip on the card face. Separate from stage dates: a due date is a target rather than a record of something that happened. Off also means this board's cards never count as overdue.",
+    info: "The due date block and the due chip on the card face. Separate from stage dates. Off also means this board's cards never count as overdue.",
   },
   {
     key: "confirmDelete",
@@ -7042,7 +7042,7 @@ async function encryptBoard(board: Board): Promise<void> {
       title: hasPassword ? "Encrypt This Board" : "Set the Kanban Password",
       message: hasPassword
         ? "Enter the Kanban password. Every encrypted board on this install uses the same one."
-        : "This password encrypts the boards you choose. There is no way to recover it and no way to read an encrypted board without it, so put it somewhere safe before you continue.",
+        : "This password encrypts the boards you choose. It cannot be recovered, and no encrypted board can be read without it. Put it somewhere safe.",
       confirm: !hasPassword,
       okLabel: "Encrypt",
       reopen: () => openBoardSetup(board, "board"),

@@ -8,6 +8,7 @@
      .menu               the container
      .menu-item          one row
      .menu-item-danger   a destructive row
+     .menu-sep           a ruled gap between two groups of rows
 
    Colors come from the active theme's --color-* variables, so a menu picks up
    a theme change with no per-theme rule. No theme currently overrides
@@ -78,4 +79,14 @@
   padding-bottom: 6px;
   border-bottom: 1px solid var(--color-border);
   border-radius: 6px 6px 0 0;
+}
+
+/* The line between two groups of rows (the open tool's own header actions and
+   the app-wide ones, in the background menu). Margins rather than padding so
+   the gap belongs to the rule and the rows either side keep their own hit
+   areas right up to it. */
+.menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--color-border);
 }

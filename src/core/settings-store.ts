@@ -1,5 +1,5 @@
 /* =============================================================================
-   SETTINGS STORE: the shape of General Settings, its defaults, and the live copy
+   SETTINGS STORE: the shape of App Settings, its defaults, and the live copy
    -----------------------------------------------------------------------------
    Split out of shell.ts so the modules that only need to READ a setting no
    longer have to import shell to get one.
@@ -155,6 +155,15 @@ export type ShellSettings = {
    *  keep all their own data/settings untouched. */
   sidebarItems: SidebarItemState[];
   sidebarSort: SidebarSortMode;
+  /** Whether the sidebar and Home dashboard are broken up by category
+   *  heading. Off by default: the flat list is what the app has shipped
+   *  with, and headings only start paying for themselves once the tool
+   *  count outgrows a single glance.
+   *
+   *  This is display-only. It never touches sidebarItems, so a tool's key,
+   *  order and pin state survive switching it on and back off, and a tool's
+   *  category can be re-assigned in ALL_TOOLS without a settings migration. */
+  toolCategories: boolean;
 };
 
 export const DEFAULT_SETTINGS: ShellSettings = {
@@ -197,6 +206,7 @@ export const DEFAULT_SETTINGS: ShellSettings = {
   // get reset to defaults (see the comment on that function for why).
   sidebarItems: [],
   sidebarSort: "classic",
+  toolCategories: false,
 };
 
 /** The live settings object. Exported as a `let` so importers see reassignments

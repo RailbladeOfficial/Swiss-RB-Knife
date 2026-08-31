@@ -794,7 +794,7 @@ test("no placeholder names this app or a version of it", () => {
   // A placeholder that says "Swiss RB Knife v0.7" reads as a real entry someone
   // left behind, and is wrong for every board that is not about this app.
   const html = read("index.html");
-  const start = html.indexOf('id="utility-tool-kanban"');
+  const start = html.indexOf('id="productivity-tool-kanban"');
   const kanban = html.slice(start);
   const bad = [];
   for (const m of kanban.matchAll(/placeholder="([^"]*)"/g)) {

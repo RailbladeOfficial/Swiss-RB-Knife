@@ -172,6 +172,45 @@
   gap: 12px;
 }
 
+/* =============================================================================
+   HOME CATEGORY HEADINGS  (Tool Categories: Enabled)
+   -----------------------------------------------------------------------------
+   Built by sidebar-edit.ts alongside the sidebar's, never present while the
+   setting is off. Spans every column so the cards under it start on a fresh
+   row instead of sharing one with the heading.
+============================================================================= */
+.tool-card-group-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  user-select: none;
+}
+
+/* The grid's own 12px gap already sits above the first heading. Marked in
+   JS, see applySidebarOrder(). */
+.tool-card-group-head.is-first {
+  margin-top: 0;
+}
+
+.tool-card-group-text {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-btn);
+  white-space: nowrap;
+}
+
+/* Carries the eye across the row so a short heading over a wide grid still
+   reads as a divider rather than as a stray label. */
+.tool-card-group-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
 .tool-card {
   background: var(--color-panel);
   border: 1px solid var(--color-border);

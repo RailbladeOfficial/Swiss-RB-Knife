@@ -37,22 +37,31 @@
    -----------------------------------------------------------------------------
    WIRING A RIGHT-CLICK MENU
 
-   shell.ts already cancels the webview's own menu everywhere except text
-   fields, and does it on the bubbling phase, so an element's own handler runs
-   first and this is all a caller needs:
+   shell.ts cancels the webview's own menu everywhere, and does it on the
+   bubbling phase at window level, so an element's own handler runs first and
+   this is all a caller needs:
 
      el.addEventListener("contextmenu", (e) => {
        e.preventDefault();
        openMenu({ x: e.clientX, y: e.clientY }, [ ...items ]);
      });
 
+   That window-level handler is also the fallback: a right-click no element
+   claimed opens the app's background menu (Settings / About / Immersive /
+   Exit, plus the open tool's own header buttons), and a right-click in a text
+   field opens the editing menu in edit-menu.ts. So "no menu here" now means
+   "the app-wide menu", never "the webview's menu".
+
    Styling lives in menu.css, linked from index.html.
 ============================================================================= */
 
-/** One row of a menu. */
+/** One row of a menu.
+ *
+ *  A row is either a command (a `label`, plus an `onClick` or a `submenu`) or
+ *  a `separator`, never both. */
 export interface MenuItem {
-  /** The row's text. Plain text, never markup. */
-  label: string;
+  /** The row's text. Plain text, never markup. Ignored on a separator. */
+  label?: string;
   /** Runs after the menu has closed, so the action can open a modal of its
    *  own without the menu still sitting over it. Ignored when `submenu` is
    *  set: that row's job is to open the submenu. */
@@ -65,6 +74,12 @@ export interface MenuItem {
    *  row that is sometimes available: a menu whose length changes is harder
    *  to build muscle memory for than one with a greyed-out entry. */
   disabled?: boolean;
+  /** A ruled gap instead of a row. For menus assembled from two sources that
+   *  mean different things: the open tool's own header actions above, the
+   *  app-wide ones below. Leading, trailing and doubled separators are
+   *  dropped when the level is rendered, so a caller can splice one in
+   *  between two lists without first checking either is non-empty. */
+  separator?: boolean;
 }
 
 /* -----------------------------------------------------------------------------
@@ -94,6 +109,23 @@ const EDGE_GAP = 8;
 /** The gap between an element anchor and the menu hanging off it. */
 const ANCHOR_GAP = 4;
 
+/** Drops separators that would rule off nothing: one at either end of a
+ *  level, and any run of them collapsed to a single line. Lets a caller build
+ *  a menu by concatenation without having to know which of its parts came
+ *  back empty. */
+function tidySeparators(level: MenuItem[]): MenuItem[] {
+  const out: MenuItem[] = [];
+  for (const item of level) {
+    if (!item.separator) {
+      out.push(item);
+      continue;
+    }
+    if (out.length > 0 && !out[out.length - 1].separator) out.push(item);
+  }
+  while (out.length > 0 && out[out.length - 1].separator) out.pop();
+  return out;
+}
+
 let openMenuEl: HTMLElement | null = null;
 
 /** Aborting this tears down every dismissal listener the open menu
@@ -119,7 +151,9 @@ export function isMenuOpen(): boolean {
 /** Opens a menu at `anchor`. Replaces any menu already open. */
 export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
   closeMenu();
-  if (items.length === 0) return;
+  // Separators alone are not a menu: a caller that assembled every group out
+  // of nothing would otherwise get an empty panel with a rule in it.
+  if (items.every((item) => item.separator === true)) return;
 
   const menu = document.createElement("div");
   menu.className = "menu";
@@ -147,7 +181,18 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
       menu.appendChild(backBtn);
     }
 
-    for (const item of level) {
+    for (const item of tidySeparators(level)) {
+      if (item.separator) {
+        const rule = document.createElement("div");
+        rule.className = "menu-sep";
+        // Presentational: a screen reader reading the rows in order already
+        // hears where one group ends, and "separator" announced aloud is not
+        // information a listener can act on.
+        rule.setAttribute("aria-hidden", "true");
+        menu.appendChild(rule);
+        continue;
+      }
+
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "menu-item";
@@ -160,7 +205,7 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
         // The chevron is a separate element rather than part of the label so
         // it can be pushed to the right edge whatever the label's length.
         const text = document.createElement("span");
-        text.textContent = item.label;
+        text.textContent = item.label ?? "";
         const chevron = document.createElement("span");
         chevron.className = "menu-item-chevron";
         chevron.textContent = "›";
@@ -173,7 +218,7 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
           positionMenu(menu, anchor);
         });
       } else {
-        btn.textContent = item.label;
+        btn.textContent = item.label ?? "";
         btn.addEventListener("click", () => {
           closeMenu();
           item.onClick?.();
@@ -185,6 +230,15 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
   };
 
   renderLevel(items, null);
+
+  // A menu never takes focus. Pressing a <button> focuses it, which blurs
+  // whatever had focus before, and the text-field menu (edit-menu.ts) acts on
+  // the field's live selection: losing it between the right-click and the
+  // click on Copy would leave nothing to copy. Cancelling mousedown is the
+  // one thing that suppresses the focus shift while still letting the click
+  // through. Nothing in the app drives a menu by keyboard, so there is
+  // nothing here that wanted the focus.
+  menu.addEventListener("mousedown", (e) => e.preventDefault());
 
   // Appended before positioning: the placement math needs the menu's real
   // measured size, which does not exist until it is in the document.
@@ -227,9 +281,9 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
    cancel the default and open at the cursor; the difference is only whether
    the rows are hung on one element or on many.
 
-   Returning null (or an empty list) from the builder means "no menu here",
-   and the event is left alone so the webview's own menu still appears. That
-   is the right behaviour for a text field inside a row.
+   Returning null (or an empty list) from the builder means "nothing specific
+   to offer here", and the event is left to carry on up to shell.ts, which
+   answers it with the app-wide background menu.
 ============================================================================= */
 
 /** Right-click on `target` opens a menu at the cursor.
@@ -242,8 +296,8 @@ export function attachMenu(
   build: MenuItem[] | ((e: MouseEvent) => MenuItem[] | null),
 ): void {
   target.addEventListener("contextmenu", (e) => {
-    // A text field inside the target keeps its own Cut/Copy/Paste; see the
-    // contextmenu handler in shell.ts, which makes the same exemption.
+    // A text field inside the target keeps Cut/Copy/Paste; the event is left
+    // to reach shell.ts, which opens the editing menu for it.
     if (isTextEntry(e.target)) return;
     const items = typeof build === "function" ? build(e) : build;
     if (!items || items.length === 0) return;
@@ -279,11 +333,12 @@ export function attachMenuDelegated(
   });
 }
 
-/** Mirrors shell.ts's isTextEntry(): the elements whose native right-click
- *  menu (Cut / Copy / Paste / Select All) is worth more than an app menu.
- *  Duplicated rather than imported because menu.ts imports nothing, which is
- *  what keeps it safe to pull into any module without risking a load-order
- *  loop. It is six lines and the rule has not changed since inputs existed. */
+/** Mirrors shell.ts's isTextEntry(): the elements that get the text-editing
+ *  menu (Cut / Copy / Paste / Select All / Undo / Redo) instead of whatever
+ *  the surrounding row would have offered. Duplicated rather than imported
+ *  because menu.ts imports nothing, which is what keeps it safe to pull into
+ *  any module without risking a load-order loop. It is six lines and the rule
+ *  has not changed since inputs existed. */
 function isTextEntry(target: EventTarget | null): boolean {
   if (target instanceof HTMLTextAreaElement) return true;
   if (target instanceof HTMLElement && target.isContentEditable) return true;

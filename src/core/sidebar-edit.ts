@@ -21,6 +21,7 @@ import { Modal } from "../modal/modal";
 import {
   ALL_TOOLS,
   SIDEBAR_SORT_MODES,
+  TOOL_CATEGORIES,
   type SidebarItemState,
   type SidebarSortMode,
   _activeViewKey,
@@ -30,6 +31,7 @@ import {
   saveSettings,
   settings,
   settingsModal,
+  openSettingsOnTab,
   startupSelect,
 } from "./shell";
 
@@ -42,6 +44,11 @@ const sidebarEditShownList = document.getElementById("sidebarEditShownList")!;
 const sidebarEditHiddenList = document.getElementById("sidebarEditHiddenList")!;
 const sidebarEditHiddenSection = document.getElementById("sidebarEditHiddenSection")!;
 const sidebarHiddenBadge = document.getElementById("sidebarHiddenBadge")!;
+const sidebarSortSelect = document.getElementById("sidebarSortSelect") as HTMLSelectElement;
+const toolCategoriesToggle = document.getElementById(
+  "toolCategoriesToggle",
+) as HTMLInputElement;
+const toolCategoriesLabel = document.getElementById("toolCategoriesLabel")!;
 const navListEl = document.getElementById("navList")!;
 const toolCardGrid = document.querySelector<HTMLElement>(".tool-card-grid");
 
@@ -94,7 +101,7 @@ function refreshStartupSelectOptions(): void {
   startupSelect.value = settings.startupTarget;
 }
 
-/** Updates the "Home/Sidebar:" row's status badge in General Settings, hidden
+/** Updates the "Home/Sidebar:" row's status badge in App Settings, hidden
  *  entirely when nothing is hidden, "N tools hidden" otherwise. Mirrors Time
  *  Tracker's CSV import status badge pattern. */
 function refreshSidebarHiddenBadge(): void {
@@ -110,41 +117,121 @@ function refreshSidebarHiddenBadge(): void {
   sidebarHiddenBadge.style.display = "";
 }
 
+/* Category headings are built here rather than living in index.html, because
+   which ones exist depends on what is currently shown: a category whose every
+   tool has been hidden must not leave a heading behind with nothing under it.
+   Both are torn down and rebuilt on every pass, which is what keeps them
+   correct after a hide, a re-show, a re-sort or the toggle itself. */
+const NAV_GROUP_CLASS = "nav-group-label";
+const CARD_GROUP_CLASS = "tool-card-group-head";
+
+function clearCategoryHeadings(): void {
+  navListEl.querySelectorAll(`.${NAV_GROUP_CLASS}`).forEach((el) => el.remove());
+  toolCardGrid?.querySelectorAll(`.${CARD_GROUP_CLASS}`).forEach((el) => el.remove());
+}
+
+/** Sidebar heading. Carries a rule as well as its text because the collapsed
+ *  52px rail has no room for a word: the two cross-fade, so the heading reads
+ *  as a hairline separator collapsed and as a label expanded. */
+function buildNavGroupHeading(label: string): HTMLElement {
+  const li = document.createElement("li");
+  li.className = NAV_GROUP_CLASS;
+  li.setAttribute("aria-hidden", "true");
+  const rule = document.createElement("span");
+  rule.className = "nav-group-rule";
+  const text = document.createElement("span");
+  text.className = "nav-group-text";
+  text.textContent = label;
+  li.append(rule, text);
+  return li;
+}
+
+/** Home dashboard heading. Spans the full width of the card grid so the cards
+ *  under it start on a fresh row. */
+function buildCardGroupHeading(label: string): HTMLElement {
+  const head = document.createElement("div");
+  head.className = CARD_GROUP_CLASS;
+  const text = document.createElement("span");
+  text.className = "tool-card-group-text";
+  text.textContent = label;
+  const rule = document.createElement("span");
+  rule.className = "tool-card-group-rule";
+  head.append(text, rule);
+  return head;
+}
+
 /** Reorders and shows/hides the sidebar nav-items and Home dashboard
  *  tool-cards to match settings.sidebarItems, then re-syncs the On Startup
  *  select and the Settings-row status badge. Call after ANY change to
  *  settings.sidebarItems (drag, show/hide toggle, reset, or a fresh
  *  settings load). */
 export function applySidebarOrder(): void {
-  // Sorting happens here rather than only at the moment a sort button is
-  // clicked, so the usage-driven modes stay live: opening a tool re-ranks the
+  // Sorting happens here rather than only at the moment a sort mode is
+  // picked, so the usage-driven modes stay live: opening a tool re-ranks the
   // sidebar on the spot instead of at next launch.
   applySidebarSortMode();
 
   const shownKeys = settings.sidebarItems.filter((it) => it.pinned).map((it) => it.key);
   const shownSet = new Set(shownKeys);
 
+  clearCategoryHeadings();
+
+  /* Categories partition the order, they do not replace it. Whatever
+     settings.sidebarItems already says (a sort mode, or a hand-dragged
+     order) still decides the order within each heading, so switching the
+     toggle on and back off returns the exact list you had.
+
+     A tool's category IS its section: a key is "<category>/<tool>", so this
+     reads the one grouping the tool has rather than a second one kept
+     alongside it. */
+  const groups = settings.toolCategories
+    ? TOOL_CATEGORIES.map((cat) => ({
+        label: cat.label,
+        keys: shownKeys.filter(
+          (key) => ALL_TOOLS.find((t) => t.key === key)?.section === cat.id,
+        ),
+      })).filter((group) => group.keys.length > 0)
+    : [{ label: null as string | null, keys: shownKeys }];
+
   // Move shown items into order (appendChild on an already-attached node
   // relocates it, repeated in desired order, this leaves everything in that
   // order without disturbing the fixed, non-reorderable nav-items around it:
   // the sidebar-toggle control and Home always stay first).
-  shownKeys.forEach((key) => {
-    const meta = ALL_TOOLS.find((t) => t.key === key);
-    if (!meta) return;
-    const li = document.querySelector<HTMLElement>(
-      `.nav-item[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
-    );
-    if (li) {
-      li.style.display = "";
-      navListEl.appendChild(li);
+  groups.forEach((group, index) => {
+    if (group.label !== null) {
+      // "First" is marked here rather than with a :first-child rule, which
+      // could not do the job on either surface: the sidebar's first list item
+      // is always the collapse toggle, and a hidden Home card is left where it
+      // sits (display:none) rather than relocated, so it can sit ahead of the
+      // heading in the DOM without being on screen.
+      const first = index === 0;
+      const navHead = buildNavGroupHeading(group.label);
+      const cardHead = buildCardGroupHeading(group.label);
+      if (first) {
+        navHead.classList.add("is-first");
+        cardHead.classList.add("is-first");
+      }
+      navListEl.appendChild(navHead);
+      toolCardGrid?.appendChild(cardHead);
     }
-    const card = toolCardGrid?.querySelector<HTMLElement>(
-      `.tool-card[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
-    );
-    if (card) {
-      card.style.display = "";
-      toolCardGrid!.appendChild(card);
-    }
+    group.keys.forEach((key) => {
+      const meta = ALL_TOOLS.find((t) => t.key === key);
+      if (!meta) return;
+      const li = document.querySelector<HTMLElement>(
+        `.nav-item[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
+      );
+      if (li) {
+        li.style.display = "";
+        navListEl.appendChild(li);
+      }
+      const card = toolCardGrid?.querySelector<HTMLElement>(
+        `.tool-card[data-section="${meta.section}"][data-tool="${meta.tool}"]`,
+      );
+      if (card) {
+        card.style.display = "";
+        toolCardGrid!.appendChild(card);
+      }
+    });
   });
 
   ALL_TOOLS.forEach((meta) => {
@@ -231,6 +318,12 @@ function attachSidebarDragHandlers(row: HTMLElement, key: string): void {
   row.addEventListener("dragover", (e) => {
     e.preventDefault();
     if (!sidebarDragKey || sidebarDragKey === key) return;
+    // With categories on the list is partitioned, and a tool's category is
+    // not something a drag gets to change: that is decided in ALL_TOOLS. So a
+    // drag that has wandered over another category's rows simply does not
+    // insert, which leaves the dragged row where it was and makes the
+    // boundary felt rather than announced.
+    if (settings.toolCategories && categoryOf(sidebarDragKey) !== categoryOf(key)) return;
     const draggedEl = sidebarEditShownList.querySelector<HTMLElement>(
       `[data-key="${CSS.escape(sidebarDragKey)}"]`,
     );
@@ -246,11 +339,29 @@ function attachSidebarDragHandlers(row: HTMLElement, key: string): void {
 }
 
 /** Reads the shown list's current DOM order (post-drag) and writes it back
- *  into settings.sidebarItems, leaving the hidden group's order untouched. */
+ *  into settings.sidebarItems, leaving the hidden group's order untouched.
+ *
+ *  With categories on the DOM order is grouped, so the flat order this stores
+ *  comes out grouped too. That is the right answer rather than a side effect:
+ *  it is the arrangement the user just made, and it is what they would see
+ *  again if they switched categories off. Subheadings carry no data-key, so
+ *  they are skipped here rather than needing to be filtered out. */
 function commitShownOrderFromDom(): void {
   const orderedKeys = Array.from(
     sidebarEditShownList.querySelectorAll<HTMLElement>("[data-key]"),
   ).map((el) => el.dataset.key!);
+
+  // A drag that moved nothing must not be treated as a hand-placed order.
+  // Two ways to get here having changed nothing: picking a row up and
+  // dropping it back where it was, and a drag the category guard refused. In
+  // both cases writing through would switch the Sort select to Custom, which
+  // reads as the app having quietly discarded the sort mode you chose.
+  const currentKeys = settings.sidebarItems.filter((it) => it.pinned).map((it) => it.key);
+  if (orderedKeys.length === currentKeys.length &&
+      orderedKeys.every((key, i) => key === currentKeys[i])) {
+    return;
+  }
+
   const hiddenItems = settings.sidebarItems.filter((it) => !it.pinned);
   settings.sidebarItems = [
     ...orderedKeys.map((key) => settings.sidebarItems.find((it) => it.key === key)!),
@@ -262,15 +373,17 @@ function commitShownOrderFromDom(): void {
   settings.sidebarSort = "custom";
   applySidebarOrder();
   saveSettings();
-  refreshSidebarSortButtons();
+  refreshSidebarEditControls();
 }
 
-/** Marks whichever sort button matches the active mode. Nothing is marked
- *  under "custom", a dragged order isn't any of them. */
-function refreshSidebarSortButtons(): void {
-  document.querySelectorAll<HTMLButtonElement>(".sidebar-sort-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.sort === settings.sidebarSort);
-  });
+/** Points the Sort select and the Tool Categories toggle at the live state,
+ *  and shows the categories-are-on note. "Custom" is a real option on the
+ *  select (disabled, so it can be shown but never picked): after a drag the
+ *  select still has to be able to say what order you are in. */
+function refreshSidebarEditControls(): void {
+  sidebarSortSelect.value = settings.sidebarSort;
+  toolCategoriesToggle.checked = settings.toolCategories;
+  toolCategoriesLabel.textContent = settings.toolCategories ? "Enabled" : "Disabled";
 }
 
 function buildSidebarEditRow(item: SidebarItemState, draggable: boolean): HTMLElement {
@@ -318,6 +431,27 @@ function buildSidebarEditRow(item: SidebarItemState, draggable: boolean): HTMLEl
   return row;
 }
 
+/** A tool's category, which is its section. Undefined for a key no tool
+ *  claims, which the drag guard treats as its own group rather than as a
+ *  match for anything. */
+function categoryOf(key: string): string | undefined {
+  return ALL_TOOLS.find((t) => t.key === key)?.section;
+}
+
+/** Subheading in the shown list, marking where one category's tools end and
+ *  the next begins. Not a drop target: it carries no data-key and no drag
+ *  handlers, so nothing can be dropped onto it. */
+function buildSidebarEditGroupLabel(label: string): HTMLElement {
+  const head = document.createElement("div");
+  head.className = "sidebar-edit-group-label";
+  const text = document.createElement("span");
+  text.textContent = label;
+  const rule = document.createElement("span");
+  rule.className = "sidebar-edit-group-rule";
+  head.append(text, rule);
+  return head;
+}
+
 function renderSidebarEditModal(): void {
   sidebarEditShownList.innerHTML = "";
   sidebarEditHiddenList.innerHTML = "";
@@ -325,20 +459,35 @@ function renderSidebarEditModal(): void {
   const shown = settings.sidebarItems.filter((it) => it.pinned);
   const hidden = settings.sidebarItems.filter((it) => !it.pinned);
 
-  shown.forEach((it) => sidebarEditShownList.appendChild(buildSidebarEditRow(it, true)));
+  if (settings.toolCategories) {
+    // Same partition the sidebar and Home get, so what you drag is what you
+    // see. A category every one of whose tools is hidden gets no subheading,
+    // for the same reason it gets no heading on the sidebar.
+    TOOL_CATEGORIES.forEach((cat) => {
+      const rows = shown.filter((it) => categoryOf(it.key) === cat.id);
+      if (rows.length === 0) return;
+      sidebarEditShownList.appendChild(buildSidebarEditGroupLabel(cat.label));
+      rows.forEach((it) => sidebarEditShownList.appendChild(buildSidebarEditRow(it, true)));
+    });
+  } else {
+    shown.forEach((it) => sidebarEditShownList.appendChild(buildSidebarEditRow(it, true)));
+  }
+
+  // The hidden group is never subdivided: hidden tools have no order that is
+  // shown or editable, so a heading there would group nothing.
   hidden.forEach((it) => sidebarEditHiddenList.appendChild(buildSidebarEditRow(it, false)));
 
   sidebarEditHiddenSection.style.display = hidden.length > 0 ? "" : "none";
 }
 
-// Replaces (rather than stacks on) the General Settings modal. Same pattern
+// Replaces (rather than stacks on) the App Settings modal. Same pattern
 // Time Tracker's Setup → Add/Edit Activity / CSV Import modals use: opening
 // closes the parent first, and a back-arrow (not the X) is what reopens it.
 const sidebarEditModal = new Modal(sidebarEditBackdrop, {
   closeOnEsc: true,
   onOpen: () => {
     renderSidebarEditModal();
-    refreshSidebarSortButtons();
+    refreshSidebarEditControls();
   },
 });
 
@@ -347,9 +496,12 @@ sidebarEditBtn.addEventListener("click", () => {
   sidebarEditModal.open();
 });
 
+// The Customize button that leads here lives on Settings > Preferences, so
+// that is where the back arrow returns to, however this modal was reached: the
+// Settings button, or a right-click on a Home card or sidebar entry.
 sidebarEditBack.addEventListener("click", () => {
   sidebarEditModal.close();
-  settingsModal.open();
+  openSettingsOnTab("preferences");
 });
 
 sidebarEditClose.addEventListener("click", () => sidebarEditModal.close());
@@ -382,17 +534,35 @@ const SIDEBAR_SORT_LABELS: Record<string, string> = {
   used: "Sorted by most used",
 };
 
-document.querySelectorAll<HTMLButtonElement>(".sidebar-sort-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const mode = btn.dataset.sort as SidebarSortMode;
-    if (!SIDEBAR_SORT_MODES.includes(mode)) return;
-    settings.sidebarSort = mode;
-    applySidebarOrder();
-    saveSettings();
-    renderSidebarEditModal();
-    refreshSidebarSortButtons();
-    flash(SIDEBAR_SORT_LABELS[mode] ?? "Sidebar sorted", "success");
-  });
+sidebarSortSelect.addEventListener("change", () => {
+  const mode = sidebarSortSelect.value as SidebarSortMode;
+  // "custom" is only ever arrived at by dragging. The option is disabled, so
+  // this is a belt-and-braces guard rather than a reachable path; either way
+  // the select is put back to whatever the real mode is.
+  if (mode === "custom" || !SIDEBAR_SORT_MODES.includes(mode)) {
+    refreshSidebarEditControls();
+    return;
+  }
+  applySidebarSort(mode);
+});
+
+/* Tool Categories. Display-only: it groups the sidebar and Home under
+   headings and changes nothing about order, pins or a tool's own data, so
+   switching it off gives back exactly the flat list you had. */
+toolCategoriesToggle.addEventListener("change", () => {
+  settings.toolCategories = toolCategoriesToggle.checked;
+  applySidebarOrder();
+  saveSettings();
+  // The modal is open and its list is the thing this setting changes, so it
+  // has to be rebuilt here. Without this the subheadings only appear on the
+  // next thing that happens to re-render (a sort, a hide, reopening), which
+  // reads as the toggle not having worked.
+  renderSidebarEditModal();
+  refreshSidebarEditControls();
+  flash(
+    settings.toolCategories ? "Tool categories on" : "Tool categories off",
+    "success",
+  );
 });
 
 /* =============================================================================
@@ -412,15 +582,15 @@ export function openSidebarEditModal(): void {
   sidebarEditModal.open();
 }
 
-/** Applies a sort mode, exactly as clicking that button in the modal would.
- *  Same re-render, same persistence, same confirmation toast. */
+/** Applies a sort mode, exactly as picking it in the modal would. Same
+ *  re-render, same persistence, same confirmation toast. */
 export function applySidebarSort(mode: SidebarSortMode): void {
   if (!SIDEBAR_SORT_MODES.includes(mode)) return;
   settings.sidebarSort = mode;
   applySidebarOrder();
   saveSettings();
   renderSidebarEditModal();
-  refreshSidebarSortButtons();
+  refreshSidebarEditControls();
   flash(SIDEBAR_SORT_LABELS[mode] ?? "Sidebar sorted", "success");
 }
 

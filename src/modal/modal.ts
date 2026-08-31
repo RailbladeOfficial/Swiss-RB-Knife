@@ -9,7 +9,7 @@
      • a single shared open-stack so Escape closes only the TOP-most modal
      • z-index stacking by depth (so a modal opened over another sits above it)
      • header-region drag (grab the top chrome strip to move its modal) + reset-on-close
-     • automatic scroll reset of the inner .modal-body on open and after close
+     • scroll position: reset on a fresh open, restored on a return (see below)
      • tab strips, via ModalTabs (see below) passed as the `tabs` option
 
    Content and per-modal wiring stay in the owning file (shell.ts / a tool .ts);
@@ -20,6 +20,30 @@
 
    A single global open-hook (setGlobalModalOpenHook) runs before every open so
    theme-level concerns (e.g. regenerative random palette) stay out of here.
+
+   -----------------------------------------------------------------------------
+   SCROLL POSITION
+
+   One rule, and it is the same rule the tab strip follows: a modal you LEFT
+   comes back exactly as you left it, and a modal you OPEN starts at the top.
+
+     open it fresh            top of the body, every time.
+     step aside for a child   position banked, and put back when the child's
+                              back arrow returns you.
+     close it for real        banked position dropped, so the next open is a
+                              fresh one.
+     child dismissed with X   nothing returns, so the bank is collected when
+                              the stack empties; see heldScrollPositions.
+
+   This is not a tabbed-modal feature. Every modal in the app scrolls its
+   .modal-body (see the max-height on .modal in modal.css), so every modal that
+   hands off to a child needs it: a long Kanban card, a board's archive, a
+   preset list. Tabbed modals scroll in two places, the body and the pane
+   inside it, and both are banked.
+
+   Restoring happens one frame after open(), deliberately after onOpen(), so a
+   modal that rebuilds its list on the way in cannot render over the position
+   and drop it back to the top.
 ============================================================================= */
 
 export interface ModalOptions {
@@ -68,14 +92,23 @@ export interface ModalOptions {
    Which tab you land on:
      • Opening the modal fresh starts on the FIRST tab in `panes` (or whatever
        `defaultTab` returns, for a modal with a smarter idea of "first").
-     • Leaving for a child modal and coming back keeps the tab you were on.
-   Both fall out of one rule, that a real close forgets the current tab, while
-   the two ways a modal steps aside for a child do not: `replaceModal` (which
-   never fires the parent's close path) and close({ handoff: true }).
+     • Coming back from a child modal lands on whatever tab that child NAMED,
+       because it calls select() on the way back.
+
+   Every close forgets the current tab, handoff or not. This modal has no
+   memory of where you were and needs none: a back arrow that only knew which
+   modal to return to could not answer "which tab" when you arrived from a
+   right-click shortcut and had never been in the parent at all, so every back
+   arrow in the app states its destination outright. openSettingsOnTab() in
+   shell.ts is the shape; budget, time-tracker, game-stats and kanban each have
+   their own.
 
    Pane scroll position is reset on close too, but applied lazily: scrollTop on
    a display:none element is a no-op, so each pane is flagged here and reset at
-   the moment it is next made visible.
+   the moment it is next made visible. Restoring a pane on the way BACK is
+   Modal's job rather than this one's (see SCROLL POSITION above), because the
+   body outside the panes has to be restored with it and only Modal can see
+   both.
 ----------------------------------------------------------------------------- */
 
 /** The slice of ModalTabs that Modal itself drives. Kept generic-free so a
@@ -197,6 +230,28 @@ export class ModalTabs<T extends string> implements ModalTabsController {
 ----------------------------------------------------------------------------- */
 
 const openStack: Modal[] = [];
+
+/* Modals that stepped aside for a child and are holding a scroll position,
+   still waiting to find out whether anyone actually hands back.
+
+   The promise a handoff makes is only kept if the child is left by its BACK
+   arrow. Dismiss the child with its X (or Esc, or the backdrop) and nothing
+   ever returns, so the held position would sit there and be handed to the
+   next fresh open, which is meant to start at the top.
+
+   So it is collected the moment the modal stack empties, which is exactly the
+   point at which no handoff can still be in flight. Reopening a modal takes
+   it back out of this set, because that open IS the return the position was
+   being held for.
+
+   This set used to hold deferred TAB resets as well, back when a back arrow
+   only knew which modal to return to and left the tab to the parent's memory.
+   Every back arrow in the app now names the tab it returns to (openSettingsOnTab
+   in shell.ts, openSetupModalOnTab in budget.ts, and their equivalents in
+   time-tracker, game-stats and kanban), so there is no tab left to carry and
+   the reset below is unconditional. */
+const heldScrollPositions = new Set<Modal>();
+
 let listenersBound = false;
 let globalOpenHook: (() => void) | null = null;
 
@@ -352,6 +407,11 @@ export class Modal {
   private opts: ModalOptions;
   readonly escEnabled: boolean;
 
+  /** Where this modal was scrolled to when it stepped aside for a child, or
+   *  null when the next open is a fresh one and belongs at the top. See
+   *  SCROLL POSITION above. */
+  private savedScroll: Map<HTMLElement, number> | null = null;
+
   constructor(backdrop: HTMLElement, opts: ModalOptions = {}) {
     this.backdrop = backdrop;
     this.panel = backdrop.querySelector<HTMLElement>(".modal");
@@ -377,9 +437,42 @@ export class Modal {
     return openStack.includes(this);
   }
 
+  /** Everything inside this modal that scrolls on its own: the body, plus any
+   *  tab panes, which have an overflow of their own nested inside it. */
+  private scrollRegions(): HTMLElement[] {
+    return Array.from(
+      this.backdrop.querySelectorAll<HTMLElement>(".modal-body, .modal-tab-pane"),
+    );
+  }
+
+  /** Banks where every region is scrolled to. Run on the way out to a child. */
+  private saveScroll(): void {
+    this.savedScroll = new Map();
+    for (const el of this.scrollRegions()) this.savedScroll.set(el, el.scrollTop);
+  }
+
+  /** Puts every region back where it was, or at the top if nothing was banked.
+   *
+   *  A pane that is hidden right now cannot be scrolled (scrollTop on a
+   *  display:none element is a no-op), which is fine: the pane that was
+   *  showing when the modal stepped aside is the pane showing when it comes
+   *  back, because the tab comes back with it. */
+  private restoreScroll(): void {
+    for (const el of this.scrollRegions()) el.scrollTop = this.savedScroll?.get(el) ?? 0;
+  }
+
+  /** Drops the banked position, so the next open starts at the top. */
+  private forgetScroll(): void {
+    this.savedScroll = null;
+  }
+
   open(): void {
     if (this.isOpen) return;
     globalOpenHook?.();
+
+    // This open IS the return any held position was being held for, so it is
+    // no longer owed a collection.
+    heldScrollPositions.delete(this);
 
     // Replace-mode: immediately hide the parent modal without firing its
     // onClosed hook. The overlay stays active. No flicker between modals.
@@ -387,6 +480,11 @@ export class Modal {
       const parent = this.opts.replaceModal;
       const pi = openStack.indexOf(parent);
       if (pi !== -1) openStack.splice(pi, 1);
+      // Replace-mode is a handoff by another name: it hides the parent
+      // without firing its close path, so the parent's scroll position is
+      // held the same way.
+      parent.saveScroll();
+      heldScrollPositions.add(parent);
       parent.backdrop.classList.remove("open");
       parent.backdrop.style.display = "none";
       parent.backdrop.style.zIndex = "";
@@ -404,8 +502,10 @@ export class Modal {
     // Double RAF: first lets the browser commit display:flex so the panel
     // starts at opacity:0/scale:0.85; second triggers the transition.
     requestAnimationFrame(() => {
-      const body = this.backdrop.querySelector<HTMLElement>(".modal-body");
-      if (body) body.scrollTop = 0;
+      // After onOpen below, deliberately: a modal that rebuilds its list on
+      // open would otherwise render over the restored position and drop it
+      // back to the top.
+      this.restoreScroll();
       requestAnimationFrame(() => {
         this.backdrop.classList.add("open");
       });
@@ -420,11 +520,20 @@ export class Modal {
   /**
    * Closes the modal.
    *
-   * `handoff: true` means "another modal is taking over and will hand control
-   * back here" (the Settings → Choose Theme → back flow, and friends). It skips
-   * the tab reset so returning lands on the tab you left from, exactly as
-   * `replaceModal` does for modals wired that way. Use it whenever a close is
-   * immediately followed by opening a child modal with a back arrow.
+   * `handoff: true` means "another modal is taking over and may hand control
+   * back here" (the App Settings → Choose Theme → back flow, and friends). It
+   * HOLDS this modal's scroll position so the return lands where you left,
+   * exactly as `replaceModal` does for modals wired that way. Use it whenever
+   * a close is immediately followed by opening a child modal with a back
+   * arrow.
+   *
+   * Held rather than kept outright, because the child does not have to hand
+   * back: dismissing it with its X leaves nobody to return, and the next open
+   * is then a fresh one that belongs at the top. See heldScrollPositions for
+   * where that is collected.
+   *
+   * It does NOT affect the tab. A tabbed modal forgets its tab on every close,
+   * and every back arrow names the tab it returns to.
    */
   close(opts: { handoff?: boolean } = {}): void {
     if (!this.isOpen) return;
@@ -436,14 +545,37 @@ export class Modal {
     // Deactivate the shared overlay when the last modal closes
     syncOverlay();
 
-    if (!opts.handoff) this.opts.tabs?.reset();
+    // Unconditional: a return names the tab it wants, so there has never been
+    // anything here worth carrying across a handoff. See heldScrollPositions.
+    this.opts.tabs?.reset();
+
+    if (opts.handoff) {
+      // Held, not dropped. If nothing hands back, this is collected when the
+      // stack empties.
+      this.saveScroll();
+      heldScrollPositions.add(this);
+    } else {
+      this.forgetScroll();
+    }
 
     window.setTimeout(() => {
+      // Nothing is open any more, so no handoff can still be in flight and
+      // every held position was for a return that never came. Checked here
+      // rather than at the top of close() because a handoff opens its child in
+      // the same synchronous block, leaving the stack momentarily empty
+      // mid-handoff.
+      if (openStack.length === 0 && heldScrollPositions.size > 0) {
+        for (const modal of heldScrollPositions) modal.forgetScroll();
+        heldScrollPositions.clear();
+      }
+
       if (this.isOpen) return;
       this.backdrop.style.display = "none";
       this.backdrop.style.zIndex = "";
-      const body = this.backdrop.querySelector<HTMLElement>(".modal-body");
-      if (body) body.scrollTop = 0;
+      // Only meaningful after a real close, where forgetScroll() has already
+      // run and this puts the hidden panel back at the top to match. After a
+      // handoff the position is banked, and open() restores it over this.
+      this.restoreScroll();
       resetPanelPosition(this.panel);
       this.opts.onClosed?.();
     }, MODAL_FADE_MS);

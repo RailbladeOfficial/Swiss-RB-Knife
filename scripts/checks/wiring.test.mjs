@@ -191,3 +191,163 @@ test("every tabbed pop-up points its tabs at panels that exist", () => {
   }
   assert.deepEqual(problems, []);
 });
+
+/* -----------------------------------------------------------------------------
+   BACK ARROWS INTO GENERAL SETTINGS
+
+   A back arrow means "put me back where I came from". Every panel that has one
+   sits behind a button on exactly ONE tab of App Settings, so that tab is
+   the answer, and the panel is the one that has to say it: leaving it to the
+   Settings modal to remember only works if the person was in Settings in the
+   first place, and right-click shortcuts (Customize Home/Sidebar off a Home
+   card) reach these panels without ever going through it. Settings then has
+   nothing to remember and opens on its first tab, which is the wrong one for
+   four of the five.
+
+   The two checks below are the drift guard. The first says every return names
+   a tab; the second says the tab it names is the one the button is actually
+   sitting in, read out of index.html, so moving a Customize button to another
+   tab fails here rather than quietly stranding its back arrow.
+----------------------------------------------------------------------------- */
+
+/** Which App Settings tab pane an element sits inside, by position in the
+ *  page. Panes are declared in tab order, so the last one that starts before
+ *  the element is the one containing it. */
+function settingsPaneOf(elementId) {
+  const html = read("index.html");
+  const start = html.indexOf('id="settingsBackdrop"');
+  const end = html.indexOf(
+    'class="modal-backdrop"',
+    html.indexOf('id="settingsTabPreferences"'),
+  );
+  const region = html.slice(start, end);
+  const at = region.indexOf(`id="${elementId}"`);
+  if (at === -1) return null;
+
+  let tab = null;
+  for (const [name, id] of [
+    ["display", "settingsTabDisplay"],
+    ["audio", "settingsTabAudio"],
+    ["preferences", "settingsTabPreferences"],
+  ]) {
+    const paneAt = region.indexOf(`id="${id}"`);
+    if (paneAt !== -1 && paneAt < at) tab = name;
+  }
+  return tab;
+}
+
+/* Each panel that leaves App Settings and comes back, paired with the
+   control inside Settings that leads to it. The tab is deliberately NOT
+   written here: it is read off the page, so this table cannot drift out of
+   agreement with the markup. */
+const SETTINGS_RETURNS = [
+  { button: "sidebarEditBtn", file: "src/core/sidebar-edit.ts", what: "Edit Home/Sidebar" },
+  { button: "themeEditBtn", file: "src/theme/theme-picker.ts", what: "Choose Theme" },
+  { button: "soundPackEditBtn", file: "src/sound/sound.ts", what: "the sound pickers" },
+  { button: "lockChangeBtn", file: "src/core/lockscreen.ts", what: "App Lock" },
+  { button: "newVersionToggle", file: "src/core/docs.ts", what: "version notifications" },
+];
+
+test("every way back into App Settings names the tab it returns to", () => {
+  // shell.ts is exempt: it owns the modal, and its two bare opens are the
+  // front doors (the sidebar entry, the title bar / background menus), which
+  // are meant to land on a fresh first tab.
+  const offenders = [];
+  for (const file of filesUnder("src", ".ts")) {
+    if (file === "src/core/shell.ts") continue;
+    if (read(file).includes("settingsModal.open()")) offenders.push(file);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "these return to App Settings without saying which tab, so a first-ever open lands on Display",
+  );
+});
+
+test("a back arrow into App Settings lands on the tab its button lives on", () => {
+  for (const { button, file, what } of SETTINGS_RETURNS) {
+    const tab = settingsPaneOf(button);
+    assert.ok(tab, `#${button} is no longer inside a App Settings tab pane`);
+    assert.ok(
+      read(file).includes(`openSettingsOnTab("${tab}")`),
+      `${what} is reached from the ${tab} tab (#${button}), but ${file} does not return there`,
+    );
+  }
+});
+
+test("a pop-up you come back to is still scrolled where you left it", () => {
+  // Leaving a pop-up for a child and returning by the back arrow used to drop
+  // you at the top: open() zeroed .modal-body on EVERY open, handoff or not.
+  // Only tab panes were spared, and only because ModalTabs deferred their
+  // reset, so the behavior existed on the four tabbed setup panels and
+  // nowhere else. Every modal in the app scrolls its body, so a long Kanban
+  // card, a board archive or a preset list lost your place.
+  //
+  // The rule now: a modal you LEFT comes back as you left it, a modal you
+  // OPEN starts at the top. Same rule, and the same deferral, as the tab.
+  const modal = read("src/modal/modal.ts");
+
+  assert.doesNotMatch(
+    modal,
+    /if \(body\) body\.scrollTop = 0;/,
+    "open() must restore the banked position, not zero the body unconditionally",
+  );
+  assert.match(
+    modal,
+    /scrollRegions\(\)[\s\S]{0,200}\.modal-body, \.modal-tab-pane/,
+    "the body AND the tab panes both scroll, so both have to be banked",
+  );
+  assert.match(
+    modal,
+    /if \(opts\.handoff\) \{[\s\S]{0,300}this\.saveScroll\(\)/,
+    "stepping aside for a child must bank the scroll position",
+  );
+  assert.match(
+    modal,
+    /\} else \{[\s\S]{0,120}this\.forgetScroll\(\)/,
+    "a real close must drop the banked position, or the next fresh open is not fresh",
+  );
+  assert.match(
+    modal,
+    /heldScrollPositions\)[\s\S]{0,120}forgetScroll\(\)/,
+    "a bank nothing came back for must be collected when the stack empties",
+  );
+  assert.match(
+    modal,
+    /requestAnimationFrame\(\(\) => \{[\s\S]{0,300}this\.restoreScroll\(\)/,
+    "the position must be restored a frame after open, so onOpen cannot render over it",
+  );
+});
+
+test("a pop-up forgets its tab on every close, handoff or not", () => {
+  // This used to be the opposite. A handoff DEFERRED the tab reset so that
+  // returning landed on the tab you left from, and the deferral existed
+  // because a back arrow only knew which modal to return to, never which tab.
+  //
+  // That could never answer the case it most needed to: arrive at a child
+  // panel from a right-click shortcut, having never been in the parent, and
+  // there is no tab to remember. So every back arrow in the app names its
+  // destination outright instead, and the memory it replaced is gone.
+  //
+  // What is left has to STAY unconditional. A tab held across a handoff would
+  // silently outrank the tab a back arrow asked for, and only on the routes
+  // where the person had been in the parent first, which is the hardest kind
+  // of inconsistency to spot.
+  const modal = read("src/modal/modal.ts");
+
+  assert.doesNotMatch(
+    modal,
+    /deferredTabResets/,
+    "the deferred tab reset is gone; nothing should be reintroducing it",
+  );
+  assert.match(
+    modal,
+    /tabs\?\.reset\(\);[\s\S]{0,60}if \(opts\.handoff\)/,
+    "the tab reset must run before the handoff branch, so a handoff cannot skip it",
+  );
+  assert.equal(
+    (modal.match(/tabs\?\.reset\(\)/g) ?? []).length,
+    1,
+    "there should be exactly one place a modal forgets its tab",
+  );
+});

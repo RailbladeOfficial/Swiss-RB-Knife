@@ -14,7 +14,14 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { Modal } from "../modal/modal";
-import { settings, flash, quitApp, saveSettings, settingsModal } from "./shell";
+import {
+  settings,
+  flash,
+  quitApp,
+  saveSettings,
+  settingsModal,
+  openSettingsOnTab,
+} from "./shell";
 
 /* ── Element refs ────────────────────────────────────────────────────────── */
 
@@ -271,13 +278,13 @@ appLockToggle.addEventListener("change", async () => {
     const saved = await openSetLockModal("enable");
     if (!saved) {
       // User cancelled, leave lock off
-      settingsModal.open();
+      openSettingsOnTab("preferences");
       return;
     }
     settings.appLock = true;
     await saveSettings();
     applyLockSettings();
-    settingsModal.open();
+    openSettingsOnTab("preferences");
     flash("App lock enabled", "success");
   } else {
     // Turning OFF
@@ -293,10 +300,11 @@ appLockToggle.addEventListener("change", async () => {
   }
 });
 
+// App Lock and its two buttons live on Settings > Preferences.
 lockChangeBtn.addEventListener("click", async () => {
   settingsModal.close({ handoff: true });
   await openSetLockModal("change");
-  settingsModal.open();
+  openSettingsOnTab("preferences");
 });
 
 lockRemoveBtn.addEventListener("click", async () => {

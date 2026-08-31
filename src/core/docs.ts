@@ -26,6 +26,7 @@ import {
   escapeHtml,
   saveSettings,
   settingsModal,
+  openSettingsOnTab,
   quitApp,
   maybeShowBackupReminder,
   maybeShowBudgetReminder,
@@ -167,7 +168,7 @@ document.getElementById("contributingLink")!.addEventListener("click", (e) => {
        per settings.updateNotifyAggressive. See announceUpdate() below.
 
    (The Settings toggle that enables all of this, and the Gentle/Aggressive
-   mode switch, are wired in the General Settings section.)
+   mode switch, are wired in the App Settings section.)
 ============================================================================= */
 
 const updateNotice = document.getElementById("updateNotice")!;
@@ -406,7 +407,7 @@ ignoreVersionConfirm.addEventListener("click", async () => {
 });
 
 /* -----------------------------------------------------------------------------
-   New Version Notification toggle (General Settings) + enable-confirm modal.
+   New Version Notification toggle (App Settings) + enable-confirm modal.
    Off by default. Turning it ON is gated by a confirm modal explaining the one
    network request; the toggle only commits if the user proceeds (same
    revert-on-cancel shape as the App Lock toggle). Enabling also runs a check
@@ -488,13 +489,14 @@ newVersionToggle.addEventListener("change", async () => {
     settingsModal.close({ handoff: true });
     const proceed = await openUpdateEnableModal();
     if (!proceed) {
-      settingsModal.open(); // left off
+      openSettingsOnTab("preferences"); // left off
       return;
     }
     settings.autoCheckUpdates = true;
     await saveSettings();
     applyUpdateSettings();
-    settingsModal.open();
+    // Version notifications live on Settings > Preferences.
+    openSettingsOnTab("preferences");
     flash("Version notifications enabled", "success");
     // Run a check now so a pending update shows without a restart. Its
     // announcement is forced Gentle regardless of mode, see announceUpdate()
