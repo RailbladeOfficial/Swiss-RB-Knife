@@ -1033,8 +1033,7 @@ test("retired attachments are pruned with the buckets that could want them", () 
     "nothing ever drops a retired attachment, so the store grows without limit",
   );
   assert.ok(
-    body.indexOf("remove_dir_all(backups_root.join(old_name))") <
-      body.indexOf("prune_kanban_attachment_store("),
+    body.indexOf("prune_buckets(") < body.indexOf("prune_kanban_attachment_store("),
     "the store is pruned before the buckets are, so it measures against the wrong oldest bucket",
   );
   /* And only against KANBAN's buckets. Snapshots are per tool, so the oldest
@@ -1053,9 +1052,24 @@ test("retired attachments are pruned with the buckets that could want them", () 
     "the store is looked for relative to the wrong folder",
   );
 
-  // And the cutoff is the OLDEST SURVIVING bucket, taken after the drop.
-  assert.match(body, /existing_buckets\.drain\(/, "the pruned buckets are still counted as surviving");
+  /* And the cutoff is the OLDEST SURVIVING bucket. The list comes back FROM
+     the pruner rather than being read separately, so a bucket that has just
+     been dropped cannot still be in it. */
+  assert.match(
+    body,
+    /let existing_buckets = prune_buckets\(/,
+    "the bucket list is not the one the pruner left behind",
+  );
   assert.match(body, /existing_buckets\.first\(\)/, "the cutoff is not the oldest surviving bucket");
+
+  // And the pruner itself deletes before it reports what survived.
+  const pruneAt = lib.indexOf("pub(crate) fn prune_buckets(");
+  assert.notEqual(pruneAt, -1, "prune_buckets is missing");
+  const prune = lib.slice(pruneAt, lib.indexOf("\n}\n", pruneAt));
+  assert.ok(
+    prune.indexOf("remove_dir_all") < prune.indexOf("existing.drain("),
+    "prune_buckets reports buckets it is about to delete as surviving",
+  );
 });
 
 test("the attachment size limit is the same number on both sides", () => {

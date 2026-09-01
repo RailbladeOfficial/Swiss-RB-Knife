@@ -252,6 +252,9 @@ interface GsSnapshot {
   games: GameRow[];
   profiles: ProfileRow[];
   tables: TableRow[];
+  /** Whether the old game-stats.json has already been taken in. Recorded in the
+   *  database, so an emptied tool is not mistaken for one that never migrated. */
+  jsonMigrated: boolean;
 }
 
 /** The id a round is stored under. Not a field on RoundEntry: rounds are only
@@ -369,19 +372,22 @@ async function loadSettingsFile(): Promise<void> {
 
 /**
  * Reads everything from the database, carrying over the old JSON file the first
- * time. The migration only runs into an empty table and never deletes
+ * time. The migration runs at most once per database and never deletes
  * game-stats.json; see the header of game_stats_db.rs.
+ *
+ * Keyed on the database saying it has not migrated yet, NOT on there being no
+ * games. Those are different facts: a tool someone has just emptied has no
+ * games either, and reading the old file back in at that point put the deleted
+ * history straight back.
  */
 async function loadFromDisk(): Promise<void> {
   try {
     let snapshot = await invoke<GsSnapshot>("gs_load");
 
-    if (snapshot.games.length === 0) {
+    if (!snapshot.jsonMigrated) {
       const moved = await migrateGamesFromJson();
-      if (moved > 0) {
-        snapshot = await invoke<GsSnapshot>("gs_load");
-        flash(`Moved ${moved} games into the new storage.`, "success", 9000);
-      }
+      snapshot = await invoke<GsSnapshot>("gs_load");
+      if (moved > 0) flash(`Moved ${moved} games into the new storage.`, "success", 9000);
     }
     await loadSettingsFile();
 
@@ -410,31 +416,33 @@ async function loadFromDisk(): Promise<void> {
   backfillTables();
 }
 
-/** Reads the old game-stats.json and hands it to the database, once. */
+/** Reads the old game-stats.json and hands it to the database, once ever. */
 async function migrateGamesFromJson(): Promise<number> {
-  let parsed: Partial<GameStatsData>;
+  let parsed: Partial<GameStatsData> = {};
   try {
     const raw = await invoke<string>("load_tool_file", { toolId: "game-stats", kind: "data" });
-    parsed = JSON.parse(raw) as Partial<GameStatsData>;
+    parsed = (JSON.parse(raw) as Partial<GameStatsData>) ?? {};
   } catch {
-    return 0;
+    // No readable file is a fresh install. The command is still called, because
+    // calling it is what records that there is nothing left to read.
+    parsed = {};
   }
-  if (!parsed || !Array.isArray(parsed.games) || parsed.games.length === 0) return 0;
 
-  const carried = parsed.games
+  const carried = (Array.isArray(parsed.games) ? parsed.games : [])
     .filter((g): g is GameInstance => !!g && typeof g === "object" && typeof g.id === "string")
     .map(gameToRow);
-  if (carried.length === 0) return 0;
 
   const moved = await invoke<number>("gs_migrate_from_json", {
     games: carried,
     profiles: Array.isArray(parsed.profiles) ? parsed.profiles : [],
     tables: Array.isArray(parsed.tables) ? parsed.tables : [],
   });
-  // The preferences that were in the same file move with it, and only when the
-  // games actually moved, so a second launch does not overwrite a changed
-  // switch with the one the old file still remembers.
-  if (moved > 0 && parsed.settings) {
+  /* The preferences in that same file move with it, tied to the file being read
+     for the first time rather than to games having moved. A history of no games
+     and a switch someone had set is still a switch someone had set, and the old
+     rule dropped it. This runs at most once, so it cannot overwrite a later
+     change with what the old file still remembers. */
+  if (parsed.settings && Object.keys(parsed.settings).length > 0) {
     const merged = { ...DEFAULT_SETTINGS, ...parsed.settings };
     await invoke("save_tool_file", {
       toolId: "game-stats",

@@ -152,6 +152,13 @@ export async function renderDbBackups(opts: DbBackupListOptions): Promise<void> 
           await invoke("restore_db_backup", { toolId: opts.toolId, name: item.name });
           await opts.onRestored();
           await renderDbBackups(opts);
+        } catch (err) {
+          // Said out loud rather than swallowed. A restore that fails silently
+          // leaves the button looking pressed and the data looking restored.
+          const failed = document.createElement("p");
+          failed.className = "placeholder-text";
+          failed.textContent = `Couldn't restore that snapshot: ${String(err)}`;
+          host.appendChild(failed);
         } finally {
           restore.disabled = false;
         }

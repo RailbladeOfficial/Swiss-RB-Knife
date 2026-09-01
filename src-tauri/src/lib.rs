@@ -526,13 +526,40 @@ const BACKUP_MIN_INTERVAL_SECS: i64 = 3600;
 /// How many historical buckets to retain per tool before pruning the oldest.
 /// Thirty hours OF THAT TOOL'S OWN EDITS, which for a tool you open monthly is
 /// months of history. See the FILE PATHS header.
-const BACKUP_KEEP_COUNT: usize = 30;
+pub(crate) const BACKUP_KEEP_COUNT: usize = 30;
 
 /// Folder-name format for backup snapshots: sorts correctly as plain strings
 /// (matches chronological order) and is readable in a file browser without
 /// translating a Unix timestamp. Always UTC, a snapshot taken at 2pm local
 /// won't necessarily show "14" here unless you're on UTC.
-const BACKUP_FOLDER_FORMAT: &str = "%Y-%m-%d_%H-%M-%S";
+pub(crate) const BACKUP_FOLDER_FORMAT: &str = "%Y-%m-%d_%H-%M-%S";
+
+/// Deletes all but the newest `keep` buckets in one tool's backups folder and
+/// returns what survived, oldest first.
+///
+/// Shared rather than written once per snapshot writer. The JSON snapshots and
+/// the database snapshot capture different things in different ways, but "how
+/// much history does a tool keep" is one answer, and a second copy of this is
+/// how the database folder ended up growing without a cap.
+pub(crate) fn prune_buckets(backups_root: &std::path::Path, keep: usize) -> Vec<String> {
+    let mut existing: Vec<String> = fs::read_dir(backups_root)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .filter(|name| valid_bucket_name(name))
+        .collect();
+    existing.sort(); // the format sorts correctly as plain strings
+    if existing.len() > keep {
+        let cut = existing.len() - keep;
+        for old_name in &existing[..cut] {
+            let _ = fs::remove_dir_all(backups_root.join(old_name));
+        }
+        existing.drain(..cut);
+    }
+    existing
+}
 
 /// Writes `write_bytes` to `write_filename` atomically, but first captures
 /// the CURRENT on-disk contents of every file in `group_filenames` together
@@ -618,20 +645,7 @@ fn snapshot_group(app: &tauri::AppHandle, tool_dir: &str, group_paths: &[PathBuf
     // Prune to the newest BACKUP_KEEP_COUNT buckets OF THIS TOOL. Cheap enough
     // (a directory listing of ~30 entries) to just do on every write rather
     // than tracking whether this call started a new bucket.
-    let mut existing_buckets: Vec<String> = fs::read_dir(&backups_root)
-        .into_iter()
-        .flatten()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_dir())
-        .map(|e| e.file_name().to_string_lossy().to_string())
-        .collect();
-    existing_buckets.sort(); // format sorts correctly as plain strings
-    if existing_buckets.len() > BACKUP_KEEP_COUNT {
-        for old_name in &existing_buckets[..existing_buckets.len() - BACKUP_KEEP_COUNT] {
-            let _ = fs::remove_dir_all(backups_root.join(old_name));
-        }
-        existing_buckets.drain(..existing_buckets.len() - BACKUP_KEEP_COUNT);
-    }
+    let existing_buckets = prune_buckets(&backups_root, BACKUP_KEEP_COUNT);
 
     /* Kanban's attachments are not copied into buckets, because thirty hourly
        copies of a video is gigabytes of a file that never changes. They are
@@ -835,11 +849,6 @@ struct ToolFile {
 const TT_GROUP: &[&str] =
     &["time-tracker/time-tracker.json", "time-tracker/time-tracker-settings.json"];
 
-/// Game Stats keeps profiles, games and settings in one file, so its group is
-/// itself. Listed explicitly rather than left empty, because empty means "do
-/// not snapshot" and that is a different statement.
-const GS_GROUP: &[&str] = &["game-stats/game-stats.json"];
-
 const NO_SNAPSHOT: &[&str] = &[];
 
 fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
@@ -858,10 +867,16 @@ fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
         ("countdown", "data") => {
             ("countdown/countdown.json", r#"{"session":null,"log":[]}"#, NO_SNAPSHOT)
         }
+        /* READ ONLY IN PRACTICE. game-stats.json is the pre-database history,
+           and the only thing that still opens it is the one-time migration.
+           Not snapshotted, because nothing writes it: leaving it in a group
+           listed a shelf of .bak files from before the move that no screen
+           shows and no restore should put back. The live history is the
+           database, and its snapshots are in db.rs. */
         ("game-stats", "data") => (
             "game-stats/game-stats.json",
             r#"{"profiles":[],"games":[],"settings":{}}"#,
-            GS_GROUP,
+            NO_SNAPSHOT,
         ),
         ("game-stats", "settings") => ("game-stats/game-stats-settings.json", "{}", NO_SNAPSHOT),
         ("game-stats", "draft") => ("game-stats/game-stats-draft.json", "null", NO_SNAPSHOT),

@@ -1,11 +1,10 @@
 /* =============================================================================
-   DB: the shared SQLite connection, schema versioning and snapshotting
+   DB: the SQLite connection, schema versioning and snapshotting
    -----------------------------------------------------------------------------
-   One database file, `tools.db`, in the same data directory as everything else.
-   One file rather than one per tool because a database is not a JSON blob: the
-   reason the JSON files were split per board was that a save rewrote whichever
-   file it touched, and that reason is gone. One file means one connection, one
-   transaction boundary, and one thing to back up.
+   One database file, `game-stats/game-stats.db`, in the Game Stats folder with
+   the rest of that tool. It is named for its tool because Game Stats is what it
+   holds; see DB_FILE. One file means one connection, one transaction boundary,
+   and one thing to back up.
 
    WHAT LIVES HERE, AND WHY IT IS ONLY GAME STATS.
 
@@ -58,7 +57,7 @@ pub const DB_FILE: &str = "game-stats/game-stats.db";
 
 /// Bumped when the schema changes. `migrate` walks from whatever the file says
 /// to this, one step at a time, so a version can never be skipped.
-const SCHEMA_VERSION: i32 = 4;
+pub const SCHEMA_VERSION: i32 = 5;
 
 /// The one connection, opened on first use and held for the life of the app.
 ///
@@ -166,6 +165,24 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     // fills in whatever an older one is missing, without touching what it has.
     conn.execute_batch(SCHEMA)?;
 
+    /* v5 adds gs_meta, which is where "has game-stats.json already been taken
+       in" is now recorded. It runs after SCHEMA because it writes to a table
+       SCHEMA has just created.
+
+       A database that already holds games was migrated before this flag
+       existed, so the flag is set for it here. Without that, emptying the tool
+       would put the old file's games back the next time it loaded, which is the
+       bug this table exists to stop. */
+    if current < 5 {
+        let games: i64 = conn.query_row("SELECT count(*) FROM gs_game", [], |r| r.get(0))?;
+        if games > 0 {
+            conn.execute(
+                "INSERT OR REPLACE INTO gs_meta (key, value) VALUES ('json_migrated', '1')",
+                [],
+            )?;
+        }
+    }
+
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())
 }
@@ -175,6 +192,18 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
 ----------------------------------------------------------------------------- */
 
 const SCHEMA: &str = r#"
+-- One row per remembered fact about the store itself, not about any game.
+-- Currently one: whether game-stats.json has already been taken in.
+--
+-- It exists because "have I migrated" used to be answered by asking whether
+-- gs_game was empty, and an empty table is not the same statement: deleting
+-- every game, or importing an export that holds none, made the old file look
+-- like something still waiting to be read.
+CREATE TABLE IF NOT EXISTS gs_meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS gs_profile (
   id     TEXT PRIMARY KEY,
   name   TEXT NOT NULL DEFAULT '',
@@ -295,8 +324,9 @@ fn tables_for(tool_id: &str) -> Result<&'static [&'static str], String> {
 }
 
 fn backups_root(app: &AppHandle) -> Option<std::path::PathBuf> {
-    // game-stats/backups. The database is Game Stats' alone, so its history
-    // is kept and pruned with the rest of that tool's.
+    // game-stats/backups, the same folder that tool's JSON snapshots use, so
+    // one tool has one history in one place. Pruned to the same bucket count,
+    // by snapshot_if_due, through the same helper lib.rs uses.
     Some(crate::backups_root(app, crate::tool_dir_of(DB_FILE)))
 }
 
@@ -308,7 +338,7 @@ fn current_bucket() -> String {
     let secs = (Utc::now().timestamp() / 3600) * 3600;
     Utc.timestamp_opt(secs, 0)
         .single()
-        .map(|dt| dt.format("%Y-%m-%d_%H-%M-%S").to_string())
+        .map(|dt| dt.format(crate::BACKUP_FOLDER_FORMAT).to_string())
         .unwrap_or_else(|| "0000-00-00_00-00-00".to_string())
 }
 
@@ -338,6 +368,10 @@ pub fn snapshot_if_due(app: &AppHandle) {
     // was riding along with; the alternative is an app that stops accepting
     // edits because its backup folder is read-only.
     let _ = snapshot_to(app, &dest);
+    /* Capped at the same bucket count as every other tool, and for a stronger
+       reason: a bucket here holds a whole copy of the database, so an uncapped
+       folder grows by the entire dataset for every hour the tool is used. */
+    crate::prune_buckets(&root, crate::BACKUP_KEEP_COUNT);
 }
 
 #[derive(serde::Serialize)]
@@ -378,12 +412,30 @@ pub fn list_db_backups(app: AppHandle) -> Result<Vec<DbBackup>, String> {
     Ok(out)
 }
 
+/// The column names of one table, in declaration order, from either the live
+/// database or an attached snapshot.
+///
+/// An empty list means the table is not in that schema at all, which for a
+/// snapshot taken before the table existed is a fact rather than a fault.
+fn columns_of(conn: &Connection, schema: &str, table: &str) -> rusqlite::Result<Vec<String>> {
+    let mut stmt = conn.prepare(&format!("PRAGMA {schema}.table_info({table})"))?;
+    let names = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    names.collect()
+}
+
 /// Puts one tool's records back from a snapshot, and touches no other tool.
 ///
 /// The snapshot is ATTACHED rather than copied over the live file. Copying
 /// would mean closing the connection, replacing the file and reopening, and
 /// would restore every tool at once; attaching lets this replace three tables
 /// and leave the rest of the database alone.
+///
+/// COLUMNS ARE NAMED, NOT COUNTED. This used to be `INSERT INTO main.t SELECT *
+/// FROM snap.t`, which pairs columns by position: a snapshot taken before a
+/// column was added either fails outright or, if the counts happen to match,
+/// files each value under the wrong heading. Copying the columns the two
+/// schemas share means an older snapshot restores what it holds and anything
+/// added since takes its default.
 ///
 /// A snapshot is taken first, so restoring the wrong one is undone by restoring
 /// the newest, exactly as it was with the JSON files.
@@ -399,30 +451,65 @@ pub fn restore_db_backup(app: AppHandle, tool_id: String, name: String) -> Resul
         return Err("That snapshot does not hold a database.".to_string());
     }
 
+    /* A snapshot from a NEWER schema is refused rather than half-understood.
+       Older is fine and is what the column matching below is for; newer means
+       the file knows something this build does not, and the honest answer is to
+       say so instead of copying across the columns that happen to line up. */
+    let snap_version: i32 = Connection::open_with_flags(
+        &src,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .and_then(|c| c.pragma_query_value(None, "user_version", |r| r.get(0)))
+    .map_err(|e| format!("Could not read that snapshot: {e}"))?;
+    if snap_version > SCHEMA_VERSION {
+        return Err("That snapshot was taken by a newer version of the app.".to_string());
+    }
+
     // The state being replaced, captured before it is replaced.
     snapshot_if_due(&app);
 
+    /* The inner Result is the one this can REFUSE with, in a sentence worth
+       showing. The outer one is whatever SQLite had to say. Returning the
+       refusal as a value rather than as an error leaves the transaction
+       uncommitted, which rolls it back, and keeps the wording ours. */
     with_db(&app, |conn| {
         conn.execute("ATTACH DATABASE ?1 AS snap", [src.to_string_lossy().to_string()])?;
-        let result = (|| -> rusqlite::Result<()> {
+        let result = (|| -> rusqlite::Result<Result<(), String>> {
             let tx = conn.unchecked_transaction()?;
             // Emptied in reverse, so a child table goes before its parent.
             for table in tables.iter().rev() {
                 tx.execute(&format!("DELETE FROM main.{table}"), [])?;
             }
             for table in tables.iter() {
+                let snap_cols = columns_of(&tx, "snap", table)?;
+                // Not in the snapshot at all: that table held nothing when this
+                // was taken, and nothing is what it has just been left with.
+                if snap_cols.is_empty() {
+                    continue;
+                }
+                let shared: Vec<String> = columns_of(&tx, "main", table)?
+                    .into_iter()
+                    .filter(|c| snap_cols.contains(c))
+                    .collect();
+                if shared.is_empty() {
+                    return Ok(Err(format!(
+                        "That snapshot's '{table}' shares no column with this version's,                          so there is no safe way to put it back."
+                    )));
+                }
+                let cols = shared.join(", ");
                 tx.execute(
-                    &format!("INSERT INTO main.{table} SELECT * FROM snap.{table}"),
+                    &format!("INSERT INTO main.{table} ({cols}) SELECT {cols} FROM snap.{table}"),
                     [],
                 )?;
             }
-            tx.commit()
+            tx.commit()?;
+            Ok(Ok(()))
         })();
         // Detached whether or not the copy worked, or the next restore in this
         // session finds the name already taken.
         let _ = conn.execute("DETACH DATABASE snap", []);
         result
-    })
+    })?
 }
 
 /* -----------------------------------------------------------------------------

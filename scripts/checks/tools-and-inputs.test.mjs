@@ -431,11 +431,14 @@ test("every tool that keeps records you would miss also snapshots them", () => {
   );
 });
 
-test("a migration only ever runs into an empty table", () => {
-  // Game Stats has shipped, so game-stats.json holds real history. The move
-  // happens once. Running it twice must not double anything,
-  // and the check for that is the table's own contents rather than a flag in a
-  // settings file that could disagree with reality.
+test("a migration runs once and records that it did", () => {
+  /* Game Stats has shipped, so game-stats.json holds real history. The move
+     happens ONCE, and "once" has to be a thing the database REMEMBERS.
+
+     It used to be inferred from gs_game being empty, and that is a different
+     statement: someone who deletes every game, or imports an export holding
+     none, leaves the tables empty on purpose. The old rule read the file back
+     in at that point and put the deleted history straight back. */
   for (const [file, fn, table] of [
     ["src-tauri/src/tools/game_stats_db.rs", "gs_migrate_from_json", "gs_game"],
   ]) {
@@ -443,21 +446,43 @@ test("a migration only ever runs into an empty table", () => {
     const at = text.indexOf(`pub fn ${fn}(`);
     assert.notEqual(at, -1, `${fn} is missing`);
     const body = text.slice(at, text.indexOf("\n}\n", at));
+    assert.match(
+      body,
+      /if json_migrated\(conn\)\? \{\s*return Ok\(0\);/,
+      `${fn} decides whether it has already run without asking what was recorded`,
+    );
+    // Rows already there mean it ran before this flag existed, which is still
+    // "already run" and still has to be written down.
     assert.ok(
       body.includes(`SELECT count(*) FROM ${table}`),
-      `${fn} does not check whether the table is already populated`,
+      `${fn} does not notice a database that migrated before the flag existed`,
     );
-    assert.match(body, /if existing > 0 \{\s*return Ok\(0\);/, `${fn} would run a second time`);
+    assert.match(
+      body,
+      /mark_json_migrated\(/,
+      `${fn} never records that it ran, so it would run again`,
+    );
     // The old file is read and left alone. It is the fallback if this ever goes
     // wrong, and it costs a few kilobytes to keep.
     assert.ok(!/remove_file/.test(body), `${fn} deletes the file it migrated from`);
   }
 
-  // The front end only offers the migration when there is nothing there yet.
+  /* Every path that deliberately sets what this tool holds records the same
+     thing, or an import of an empty export lets the old file back in. */
+  const dbSrc = read("src-tauri/src/tools/game_stats_db.rs");
+  const replaceAt = dbSrc.indexOf("pub fn gs_replace_all(");
+  assert.notEqual(replaceAt, -1, "gs_replace_all is missing");
+  assert.match(
+    dbSrc.slice(replaceAt, dbSrc.indexOf("\n}\n", replaceAt)),
+    /mark_json_migrated\(/,
+    "importing or restoring an empty history would let the old JSON file back in",
+  );
+
+  // And the front end asks the recorded answer, not the row count.
   assert.match(
     read("src/tool/game-stats.ts"),
-    /length === 0[\s\S]{0,120}migrateGamesFromJson\(/,
-    "Game Stats would migrate over records that are already there",
+    /!snapshot\.jsonMigrated[\s\S]{0,120}migrateGamesFromJson\(/,
+    "Game Stats decides whether to migrate from how many games it can see",
   );
 });
 
@@ -621,7 +646,10 @@ test("a snapshot group never spans two tools", () => {
       /const\s+([A-Z_0-9]+_GROUP):\s*\[&str;\s*\d+\]\s*=\s*\[([^\]]*)\]/g,
     )].map((m) => [m[1], m[2]]),
   ];
-  assert.ok(groups.length >= 3, `parsed ${groups.length} snapshot groups, expected at least 3`);
+  // A floor rather than an exact count: the point is that the regexes above
+  // actually parsed something, so an edit that renames the constants fails here
+  // instead of passing on an empty list.
+  assert.ok(groups.length >= 2, `parsed ${groups.length} snapshot groups, expected at least 2`);
 
   const mixed = [];
   for (const [name, body] of groups) {
@@ -672,6 +700,27 @@ test("every tool's snapshots are pruned against its own history", () => {
       read(file),
       new RegExp(`crate::backups_root\\(app, crate::tool_dir_of\\(${expected}\\)\\)`),
       `${file} does not derive its snapshot folder from its own data path`,
+    );
+  }
+
+  /* AND EVERY WRITER OF A BUCKET PRUNES ONE. Naming a per-tool folder is only
+     half of it: a writer that never drops an old bucket grows that folder
+     forever. The database snapshot did exactly that, and it is the one whose
+     buckets are whole copies of the dataset, so it was the most expensive
+     folder in the app to leave uncapped.
+
+     Both go through the same helper, so retention is one answer rather than
+     one per writer. */
+  assert.match(
+    lib,
+    /pub\(crate\) fn prune_buckets\(/,
+    "there is no shared pruner, so each writer decides its own retention",
+  );
+  for (const file of ["src-tauri/src/lib.rs", "src-tauri/src/db.rs"]) {
+    assert.match(
+      read(file),
+      /prune_buckets\([^)]*BACKUP_KEEP_COUNT\)/,
+      `${file} writes snapshot buckets it never prunes`,
     );
   }
 });

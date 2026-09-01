@@ -21,7 +21,11 @@
    said by the rows themselves.
 
    MIGRATION. This tool has shipped, so game-stats.json holds real history. It
-   moves once, only into empty tables, and the file is READ and never deleted.
+   moves once, the file is READ and never deleted, and the fact that it has been
+   taken in is RECORDED in gs_meta rather than inferred from the tables being
+   empty. Inferring it meant the old file came back every time the tool was
+   legitimately emptied: delete every game, or import an export holding none,
+   and the next load read the file again and called it a migration.
 ============================================================================= */
 
 use rusqlite::{params, Connection};
@@ -81,6 +85,27 @@ pub struct GameStatsSnapshot {
     pub games: Vec<GameRow>,
     pub profiles: Vec<ProfileRow>,
     pub tables: Vec<TableRow>,
+    /// Whether game-stats.json has already been taken in. Sent with the data so
+    /// the front end can stop reading a file it has already consumed, rather
+    /// than re-reading it on every load that finds no games.
+    pub json_migrated: bool,
+}
+
+/// Whether the old JSON file has already been read into these tables.
+fn json_migrated(conn: &Connection) -> rusqlite::Result<bool> {
+    let value: Option<String> = conn
+        .query_row("SELECT value FROM gs_meta WHERE key = 'json_migrated'", [], |r| r.get(0))
+        .ok();
+    Ok(value.as_deref() == Some("1"))
+}
+
+/// Records that the old JSON file has been dealt with, once and for good.
+fn mark_json_migrated(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO gs_meta (key, value) VALUES ('json_migrated', '1')",
+        [],
+    )?;
+    Ok(())
 }
 
 /* -----------------------------------------------------------------------------
@@ -192,7 +217,7 @@ pub fn gs_load(app: AppHandle) -> Result<GameStatsSnapshot, String> {
             }
         }
 
-        Ok(GameStatsSnapshot { games, profiles, tables })
+        Ok(GameStatsSnapshot { games, profiles, tables, json_migrated: json_migrated(conn)? })
     })
 }
 
@@ -286,7 +311,11 @@ pub fn gs_save(
     profiles: Option<Vec<ProfileRow>>,
     tables: Option<Vec<TableRow>>,
 ) -> Result<(), String> {
-    if games.is_empty() && deleted.is_empty() && profiles.is_none() {
+    /* The guard has to match what the body will actually write, or a call can
+       take a snapshot and commit nothing. write_lists needs BOTH lists, so a
+       call carrying only one of them has no work in it either. */
+    let has_lists = profiles.is_some() && tables.is_some();
+    if games.is_empty() && deleted.is_empty() && !has_lists {
         return Ok(());
     }
     snapshot_if_due(&app);
@@ -328,16 +357,25 @@ pub fn gs_replace_all(
             write_game(&tx, game)?;
         }
         write_lists(&tx, &profiles, &tables)?;
+        /* An import or a restore is a deliberate statement about what this tool
+           holds, including when it holds nothing. Recording it as migrated
+           stops the old JSON file being read back in over the top of it. */
+        mark_json_migrated(&tx)?;
         tx.commit()?;
         Ok(())
     })
 }
 
-/// Moves game-stats.json into the tables, once.
+/// Moves game-stats.json into the tables, once and once only.
 ///
-/// Only into an EMPTY table, so running twice cannot double anything, and "is
-/// it empty" is a question the database answers for itself rather than one a
-/// flag in a settings file has to remember. The JSON file is left where it is.
+/// ONCE IS RECORDED, NOT INFERRED. The old test was "are the tables empty",
+/// which is not the same question: a person who deletes every game, or imports
+/// an export that holds none, leaves them empty on purpose, and the next load
+/// read the file back in and told them it had moved their games. The answer now
+/// lives in gs_meta and is written whatever the outcome, so this runs at most
+/// once per database no matter what the tables hold afterwards.
+///
+/// The JSON file is still left exactly where it is, unread from here on.
 #[tauri::command]
 pub fn gs_migrate_from_json(
     app: AppHandle,
@@ -345,12 +383,15 @@ pub fn gs_migrate_from_json(
     profiles: Vec<ProfileRow>,
     tables: Vec<TableRow>,
 ) -> Result<u32, String> {
-    if games.is_empty() {
-        return Ok(0);
-    }
     with_db(&app, |conn| {
+        if json_migrated(conn)? {
+            return Ok(0);
+        }
+        // Rows already here mean this database has been used since the move, so
+        // the file is history. Recorded as done and not read again.
         let existing: i64 = conn.query_row("SELECT count(*) FROM gs_game", [], |r| r.get(0))?;
-        if existing > 0 {
+        if existing > 0 || games.is_empty() {
+            mark_json_migrated(conn)?;
             return Ok(0);
         }
         let tx = conn.unchecked_transaction()?;
@@ -358,6 +399,7 @@ pub fn gs_migrate_from_json(
             write_game(&tx, game)?;
         }
         write_lists(&tx, &profiles, &tables)?;
+        mark_json_migrated(&tx)?;
         tx.commit()?;
         Ok(games.len() as u32)
     })
