@@ -528,3 +528,106 @@ test("moving an old data folder into the new shape cannot destroy anything", () 
     "the layout migration does not run at startup",
   );
 });
+
+test("nothing the app writes lands loose in the data root", () => {
+  /* THE GENERAL GUARD, not a list of the files that happen to exist today.
+
+     Every path the app writes inside its own data folder goes through
+     get_data_path, and the folder it lands in is decided by the string handed
+     to it. A string with no slash lands at the top and quietly undoes the whole
+     layout, and nothing else in the app would notice: the write succeeds, the
+     read succeeds, and the file is simply in the wrong place.
+
+     So this reads every argument get_data_path is ever given, follows the named
+     constants to their definitions, and requires a folder in all of them. */
+  const files = filesUnder("src-tauri/src", ".rs");
+  assert.ok(files.length >= 8, `only found ${files.length} Rust files`);
+
+  const source = files.map((f) => read(f)).join("\n");
+
+  // Every constant in the backend, so a name passed to get_data_path can be
+  // followed to the string it stands for.
+  const consts = new Map(
+    [...source.matchAll(/const\s+([A-Z_0-9]+):\s*&(?:'static\s+)?str\s*=\s*"([^"]*)"/g)]
+      .map((m) => [m[1], m[2]]),
+  );
+
+  // Constants holding a LIST of paths: the snapshot groups.
+  const groups = new Map(
+    [...source.matchAll(/const\s+([A-Z_0-9]+):\s*(?:\[&(?:'static )?str;\s*\d+\]|&\[&str\])\s*=\s*&?\[([^\]]*)\]/g)]
+      .map((m) => [m[1], [...m[2].matchAll(/"([^"]+)"/g)].map((s) => s[1])]),
+  );
+
+  const offenders = [];
+  const seen = [];
+
+  const judge = (value, where) => {
+    seen.push(value);
+    // A path inside the data folder has to name the folder it lives in. The
+    // only thing allowed at the top is a folder, and nothing writes one
+    // directly: get_data_path creates it from the path it was handed.
+    if (!value.includes("/")) offenders.push(`${where}: "${value}"`);
+  };
+
+  for (const file of files) {
+    const text = read(file);
+    for (const m of text.matchAll(/get_data_path\(\s*&?[a-z_]+,\s*(&?)([A-Za-z_0-9"][^,)]*)\)/g)) {
+      const arg = m[2].trim();
+      if (arg.startsWith('"')) {
+        judge(arg.slice(1, -1), file);
+      } else if (consts.has(arg)) {
+        judge(consts.get(arg), `${file} (${arg})`);
+      }
+      // Anything else is a value built at runtime (a board path, a tool-file
+      // entry). Those are covered by the two checks below.
+    }
+  }
+
+  // The snapshot groups, which name files directly rather than through
+  // get_data_path at the call site.
+  for (const [name, values] of groups) {
+    if (!/GROUP$|RELOCATIONS/.test(name)) continue;
+    for (const v of values) judge(v, name);
+  }
+
+  assert.ok(seen.length >= 15, `only resolved ${seen.length} data paths; did the parse break?`);
+  assert.deepEqual(offenders, [], "these would be written loose in the data root");
+
+  // Two things build a path at runtime. Both have to produce a folder.
+  const kb = read("src-tauri/src/tools/kanban.rs");
+  assert.match(
+    kb.slice(kb.indexOf("fn board_path(")),
+    /format!\("\{BOARD_DIR\}\/\{\}"/,
+    "a board file would not land in the boards folder",
+  );
+});
+
+test("no two tools can claim the same snapshot file", () => {
+  /* A snapshot bucket is ONE FLAT FOLDER shared by every tool, and a captured
+     file is stored in it under its basename. Two tools whose paths differ only
+     by their folder would write the same .bak and silently overwrite each
+     other's history. The tool prefixes on the filenames are what prevent that,
+     which is the whole reason they were kept when the folders arrived. */
+  const lib = read("src-tauri/src/lib.rs");
+  const table = lib.slice(lib.indexOf("fn tool_file("), lib.indexOf("Ok(ToolFile {"));
+
+  const paths = [
+    ...[...table.matchAll(/"([a-z0-9./-]+\.json)"/g)].map((m) => m[1]),
+    ...[...read("src-tauri/src/tools/budget.rs").matchAll(/"(budget\/[a-z0-9.-]+)"/g)].map(
+      (m) => m[1],
+    ),
+    read("src-tauri/src/db.rs").match(/DB_FILE: &str = "([^"]+)"/)[1],
+    read("src-tauri/src/tools/kanban.rs").match(/INDEX_FILE: &str = "([^"]+)"/)[1],
+  ];
+
+  const byBase = new Map();
+  for (const p of paths) {
+    const base = p.split("/").pop();
+    if (!byBase.has(base)) byBase.set(base, new Set());
+    byBase.get(base).add(p);
+  }
+  const clashes = [...byBase]
+    .filter(([, owners]) => owners.size > 1)
+    .map(([base, owners]) => `${base} <- ${[...owners].join(", ")}`);
+  assert.deepEqual(clashes, [], "these would overwrite each other in a snapshot bucket");
+});
