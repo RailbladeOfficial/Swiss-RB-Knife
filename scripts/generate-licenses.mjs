@@ -83,7 +83,7 @@ function spdxUrl(license) {
 |
 | Package names, versions, licenses, and repository URLs come from
 | third-party tooling (license-checker / cargo-license) and reflect whatever
-| a dependency put in its own metadata — i.e. untrusted input. The generated
+| a dependency put in its own metadata, i.e. untrusted input. The generated
 | THIRD_PARTY_LICENSES.md is displayed in-app by a markdown renderer that
 | intentionally passes raw HTML through (for the README), so an unescaped '<'
 | in a dependency's name would otherwise become a live tag in that view.
@@ -234,7 +234,7 @@ ${rows}
    MAIN
 ============================================================================= */
 
-console.log("\n🔍 Swiss RB Knife — License Generator");
+console.log("\n🔍 Swiss RB Knife License Generator");
 console.log("======================================");
 
 const npmPackages = getNpmPackages();

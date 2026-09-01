@@ -244,7 +244,7 @@
    is six times the size of a nav row, though, so a full inversion to the button
    colors would shout. This lights the border, fades a soft ring in around it,
    and dims the card 10%. The dim is what makes it read at a glance; the ring
-   is what makes it read as "flagged" rather than "greyed out".
+   is what makes it read as "flagged" rather than "grayed out".
 
    filter: brightness() rather than a background swap, so :hover still visibly
    answers on a pulsing card. The hover background change happens underneath
@@ -275,7 +275,7 @@
 
 /* Respect reduced-motion: no pulsing, but hold the lit state so the signal
    isn't lost entirely for those users. The dim is dropped here, a card that's
-   permanently darker than its neighbours reads as disabled rather than
+   permanently darker than its neighbors reads as disabled rather than
    flagged, and it's the throb that made it mean "look at me". */
 @media (prefers-reduced-motion: reduce) {
   .tool-card.attention-pulse {
@@ -329,7 +329,7 @@
   border-bottom: 1px solid var(--color-border);
   border-radius: 8px 8px 0 0;
   flex-shrink: 0;
-  /* Positioning context for .tool-header-notice-wrap, centred across the full
+  /* Positioning context for .tool-header-notice-wrap, centered across the full
      bar independent of the left-aligned title. Same arrangement .section-header
      uses for the Home dashboard's #homeUpdateNotice. */
   position: relative;
@@ -436,16 +436,16 @@
 
 /* Attention line in a tool view header. The tool-level counterpart to
    .home-update-notice on the Home dashboard, and deliberately identical to it:
-   absolutely centred across the full bar, same size, weight and --color-btn
+   absolutely centered across the full bar, same size, weight and --color-btn
    coloring, so "something wants your attention" reads the same wherever it
    appears. Used by Auto-Backup's backup-due notice and Budget's update-due
    notice.
 
-   Taken out of flow so the centring is on the BAR, not on the space left over
+   Taken out of flow so the centering is on the BAR, not on the space left over
    beside the title, and so it can't shove the header's action buttons around.
-   The wrapper exists (rather than centring .tool-header-notice directly) so a
+   The wrapper exists (rather than centering .tool-header-notice directly) so a
    notice with an action button attached, like Budget's Mark Reviewed, travels
-   with its text as one centred unit. */
+   with its text as one centered unit. */
 .tool-header-notice-wrap {
   position: absolute;
   left: 50%;
@@ -510,7 +510,7 @@
 }
 
 /* Home top-bar "Update Available - vX.Y.Z" line. Home section only (the element
-   lives solely in #section-home's header). Absolutely centred across the full
+   lives solely in #section-home's header). Absolutely centered across the full
    bar, colored with --color-btn to match the About-icon pulse flash. Shown /
    hidden by refreshUpdateUI() alongside the pulse and the About-modal notice. */
 .home-update-notice {

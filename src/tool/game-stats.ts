@@ -189,7 +189,7 @@ function makeId(): string {
    PERSISTENCE
 ============================================================================= */
 
-/** What was last successfully written, as id -> serialised game. The diff
+/** What was last successfully written, as id -> serialized game. The diff
  *  against this is what makes a save write the games that changed rather than
  *  all of them; see core/row-diff.ts for why it compares rather than being
  *  told. */
@@ -666,10 +666,7 @@ async function refreshGsBackups(): Promise<void> {
     host: document.getElementById("gsBackupList")!,
     summary: document.getElementById("gsBackupSummary"),
     label: "Profiles, games and tables",
-    note:
-      "One copy an hour, taken at the first change of that hour. The other tools " +
-      "capture on every save; Game Stats keeps its records in a database, where " +
-      "copying the whole database on every save would cost more than it protects.",
+    note: "One copy an hour, taken at the first change of that hour.",
     onRestored: async () => {
       // Everything came from the database, so everything is re-read from it.
       await loadFromDisk();
@@ -1890,7 +1887,7 @@ function refreshPlayerPickerState(): void {
   // "+ Add Player" stays enabled at the cap on purpose, addPlayerPickerRow()
   // flashes why, which is more useful than a silently dead button. Clear is
   // different: at the default two empty seats it would do literally nothing,
-  // so it greys out instead of pretending to act.
+  // so it grays out instead of pretending to act.
   const clearBtn = document.getElementById("gsClearPlayersBtn") as HTMLButtonElement | null;
   if (clearBtn) clearBtn.disabled = !isPlayerPickerDirty();
   refreshPlayerCountHint();
@@ -3092,7 +3089,7 @@ function setHistoricalCount(text: string): void {
   if (el) el.textContent = text;
 }
 
-/** A labelled run of games from one table. Filtering by player can pull in
+/** A labeled run of games from one table. Filtering by player can pull in
  *  several tables at once, and since each numbers its games independently,
  *  one flat list would silently interleave two unrelated "Game 40"s and bury
  *  a short table's games below a long one's. Sections keep each table's run
@@ -4848,7 +4845,7 @@ function refreshGsNameDependentUI(): void {
 
   // The Setup modal re-renders these on open anyway, so this is belt-and-
   // braces for an edit made while it's already showing, and the Tables list
-  // needs it regardless, since its rows are labelled from player names.
+  // needs it regardless, since its rows are labeled from player names.
   renderProfilesList();
   renderTablesList();
 

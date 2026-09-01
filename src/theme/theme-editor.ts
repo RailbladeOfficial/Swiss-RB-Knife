@@ -382,7 +382,7 @@ function readCurrentVars(): Record<string, string> {
   const vars: Record<string, string> = {};
   for (const v of RANDOM_VARS) {
     const raw = style.getPropertyValue(v).trim();
-    // Normalise to 6-digit hex so color inputs can consume it
+    // Normalize to 6-digit hex so color inputs can consume it
     vars[v] = cssColorToHex(raw) ?? "#000000";
   }
   return vars;
@@ -803,11 +803,11 @@ document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
   });
 
   // Hex input: only update the swatch + preview when the value is a valid full
-  // hex. Never write back to hexInput here, let blur handle normalisation.
+  // hex. Never write back to hexInput here, let blur handle normalization.
   hexInput.addEventListener("input", () => {
     const raw = hexInput.value.trim();
-    const normalised = raw.startsWith("#") ? raw : "#" + raw;
-    const hex = cssColorToHex(normalised);
+    const normalized = raw.startsWith("#") ? raw : "#" + raw;
+    const hex = cssColorToHex(normalized);
     if (hex) {
       swatch.value = hex;
       _teWorkingVars[varName] = hex;
@@ -815,7 +815,7 @@ document.querySelectorAll<HTMLElement>(".te-row[data-var]").forEach((row) => {
     }
   });
 
-  // On blur, normalise the display to whatever the swatch currently holds.
+  // On blur, normalize the display to whatever the swatch currently holds.
   hexInput.addEventListener("blur", () => {
     hexInput.value = swatch.value.toUpperCase();
   });
@@ -878,7 +878,7 @@ teWireToggle(teButtonGlowToggle, teButtonGlowControls, () => {
 /** Wires a color picker + hex input pair in the Advanced tab.
  *  Swatch changes update the hex input and trigger preview;
  *  hex input changes update the swatch and trigger preview;
- *  blur normalises the hex display. */
+ *  blur normalizes the hex display. */
 function teWireGlowColor(
   swatch: HTMLInputElement,
   hexInput: HTMLInputElement,
@@ -889,8 +889,8 @@ function teWireGlowColor(
   });
   hexInput.addEventListener("input", () => {
     const raw = hexInput.value.trim();
-    const normalised = raw.startsWith("#") ? raw : "#" + raw;
-    const hex = cssColorToHex(normalised);
+    const normalized = raw.startsWith("#") ? raw : "#" + raw;
+    const hex = cssColorToHex(normalized);
     if (hex) {
       swatch.value = hex;
       teSyncAdvAndPreview();

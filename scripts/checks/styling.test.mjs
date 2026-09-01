@@ -4,7 +4,7 @@
    CSS fails silently. A rule whose selector matches nothing, or whose value
    names a variable nothing defines, produces no error anywhere: the element
    just renders with whatever it had before. That is exactly how the Game Stats
-   panel stripes stayed grey through several releases while the correct color
+   panel stripes stayed gray through several releases while the correct color
    sat in the file.
 
    These check that the hooks styling reaches for actually exist.

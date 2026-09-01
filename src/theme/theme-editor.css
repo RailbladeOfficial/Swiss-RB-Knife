@@ -77,7 +77,7 @@
    own two tabs. Only the tab PANE keeps a local rule: unlike the Setup modal
    panes (which scroll themselves via max-height + overflow-y), this pane needs
    flex:1/min-height:0 so its .te-groups child does the scrolling instead, a
-   real behavioural difference, not duplication. */
+   real behavioral difference, not duplication. */
 
 /* Tab pane. Each tab's scrollable content area */
 .te-tab-pane {

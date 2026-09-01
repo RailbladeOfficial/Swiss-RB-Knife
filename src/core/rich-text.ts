@@ -90,7 +90,7 @@ const INLINE = new RegExp(
 );
 
 /** Renders one line's inline formatting. `raw` is the untouched source line;
- *  everything that is not a recognised construct is escaped on the way out.
+ *  everything that is not a recognized construct is escaped on the way out.
  *
  *  Every match is collected BEFORE any of them is handled, because handling one
  *  recurses back into this function (bold text can contain a link, a link's
@@ -295,7 +295,7 @@ export function renderRichText(source: string): string {
     }
     closeQuote();
 
-    /* List items. A task marker is recognised inside a bullet and drawn as a
+    /* List items. A task marker is recognized inside a bullet and drawn as a
        read-only box: these are a way of writing a checklist in prose, and the
        card's own Subtasks block is the one that is actually tickable. */
     const bullet = line.match(/^\s*[-*+]\s+(.*)$/);

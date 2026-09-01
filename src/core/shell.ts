@@ -27,7 +27,7 @@
 
    Per-tool logic lives in src/tool/<tool>.ts and is initialized via init*()
    calls at the bottom of init(). The Modal primitive (modal.ts) owns all shared
-   chrome behaviour (Escape, drag, open-stack, scroll reset).
+   chrome behavior (Escape, drag, open-stack, scroll reset).
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -793,7 +793,7 @@ export let _activeViewKey = "";
    down Budget and then opening Time Tracker leaves you halfway down Time
    Tracker, because scrollTop never moved.
 
-   Two different behaviours are wanted, and the difference is intent rather
+   Two different behaviors are wanted, and the difference is intent rather
    than destination:
      - Going somewhere NEW (sidebar icon, Home card, tool card) should start at
        the top, the way opening a page does.
@@ -976,7 +976,7 @@ sidebarToggleEl.addEventListener("click", () => {
 // SIDEBAR_SORT_MENU comes from sidebar-edit.ts, which is a circular-import
 // partner of this file, so the startup-order check in
 // scripts/checks/module-init.test.mjs has to be able to see that the read
-// happens on click and not at load. It recognises a function declaration as
+// happens on click and not at load. It recognizes a function declaration as
 // deferred; an `() => [ … ]` with no braces it cannot tell apart from a value
 // being built on the spot, and it errs toward flagging.
 attachMenu(sidebarToggleEl, sidebarListMenu);
@@ -988,7 +988,7 @@ function sidebarListMenu(): MenuItem[] {
   ];
 }
 
-/** The sort modes as menu rows, with the active one greyed out. Shared by the
+/** The sort modes as menu rows, with the active one grayed out. Shared by the
  *  collapse control's menu and every tool entry's Sort submenu. */
 function sidebarSortItems(): MenuItem[] {
   return SIDEBAR_SORT_MENU.map((s) => ({
@@ -1127,7 +1127,7 @@ function toolEntryMenu(section: string, tool: string): MenuItem[] {
     {
       label: "Hide from Home & Sidebar",
       // Hiding the tool you are currently in sends you back to Home; that is
-      // setPinned's own behaviour, not something this menu adds.
+      // setPinned's own behavior, not something this menu adds.
       onClick: () => setPinned(key, false),
     },
     { label: "Customize Home/Sidebar…", onClick: openSidebarEditModal },
@@ -1220,7 +1220,7 @@ function activateToolIfPinned(section: string, tool: string): void {
    contract, so the queue doesn't have to care which mode each nudge is in.
 
    One duration for all three rather than each keeping its own: they're read one
-   after another now, so a nudge that lingered twice as long as its neighbour
+   after another now, so a nudge that lingered twice as long as its neighbor
    would just be an unexplained pause in the sequence.
 ============================================================================= */
 
@@ -1761,8 +1761,8 @@ function headerButtonLabel(btn: HTMLButtonElement): string {
  *  Read off the DOM rather than declared per tool. A tool's header is already
  *  the single statement of what that tool offers at the top level; a second
  *  list here would be a second thing to keep in step, and the one that gets
- *  forgotten. Sub-nav tabs are included and the current one is greyed out,
- *  the same way the sidebar Sort submenu greys out the mode already in use. */
+ *  forgotten. Sub-nav tabs are included and the current one is grayed out,
+ *  the same way the sidebar Sort submenu grays out the mode already in use. */
 function toolHeaderItems(): MenuItem[] {
   const active = activeToolHeader();
   if (!active) return [];
@@ -1844,7 +1844,7 @@ export function applySettings(): void {
   themeSelect.value = settings.theme;
   refreshThemeCurrentBadge();
 
-  // The Random tab's settings panel (visibility + enabled/greyed state) is
+  // The Random tab's settings panel (visibility + enabled/grayed state) is
   // managed by renderThemePickerTab() as that tab is shown, not here, just
   // keep the control values themselves in sync so they're correct whenever
   // that panel is shown/enabled.
@@ -2616,7 +2616,7 @@ function toggleThemePickerInfoTooltip(btn: HTMLButtonElement, text: string): voi
 }
 
 // Both classes, one bubble. .settings-info-btn is the same control in a
-// App Settings row; it needs the identical click-to-toggle behaviour and
+// App Settings row; it needs the identical click-to-toggle behavior and
 // there is no reason for a second copy of it.
 document
   .querySelectorAll<HTMLButtonElement>(
@@ -2677,7 +2677,7 @@ const BUTTON_CUE_INCLUDE = [
   // Real checkboxes only, the same set shell.css restyles as circles. The
   // inputs inside a .toggle-switch are 0x0 and invisible (the .toggle-slider
   // beside them is what you actually press), so they are not a "checkbox"
-  // click in any sense a user would recognise.
+  // click in any sense a user would recognize.
   //
   // Clicking a <label> that wraps a checkbox forwards a second, synthetic
   // click to the input itself. The label matches nothing here, so the cue
@@ -3158,7 +3158,7 @@ async function restoreWindowSize(): Promise<void> {
 }
 
 /* =============================================================================
-   INITIALISATION
+   INITIALIZATION
 ============================================================================= */
 
 /** Rewrites settings.theme to the default when it names something that can't be

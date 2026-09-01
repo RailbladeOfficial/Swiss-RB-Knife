@@ -35,7 +35,7 @@ test("every element the app looks up by name exists in the page", () => {
   assert.ok(referenced.size > 500, `expected many lookups, found ${referenced.size}`);
 
   // Elements the app creates itself at runtime are legitimately absent from the
-  // page. They are recognised by the code assigning the id rather than only
+  // page. They are recognized by the code assigning the id rather than only
   // reading it.
   const source = filesUnder("src", ".ts").map(read).join("\n");
   const createdAtRuntime = new Set(
@@ -163,7 +163,7 @@ test("the Game Stats draft is actually saved, restored and cleared", () => {
 
 test("every pop-up panel is built correctly", () => {
   // Each pop-up is a dimmed backdrop wrapping a panel. If the panel is missing,
-  // the modal still opens but several of its behaviours silently do nothing,
+  // the modal still opens but several of its behaviors silently do nothing,
   // because the code that positions and sizes it has nothing to hold.
   const html = read("index.html");
   const backdrops = [...html.matchAll(/<div\s+id="([^"]+)"[^>]*class="[^"]*modal-backdrop[^"]*"[^>]*>/g)];

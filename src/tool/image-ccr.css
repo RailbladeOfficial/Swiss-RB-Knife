@@ -778,7 +778,7 @@
 ============================================================================= */
 
 /* Folder stats grid */
-/* Outer row: count pill on left, 2×2 dims grid on right, vertically centred */
+/* Outer row: count pill on left, 2×2 dims grid on right, vertically centered */
 .resize-stats-row {
   display: flex;
   align-items: center;
@@ -983,9 +983,9 @@
 }
 
 /* =============================================================================
-   GATED PANELS  (shown but greyed-out until their prerequisite is met)
+   GATED PANELS  (shown but grayed-out until their prerequisite is met)
    -----------------------------------------------------------------------------
-   Replaces the old "display:none until ready" behaviour: the option panels stay
+   Replaces the old "display:none until ready" behavior: the option panels stay
    visible so the whole workflow is discoverable, but their body is dimmed and
    non-interactive, with a lock hint in the header naming what's still needed.
 ============================================================================= */
@@ -1010,7 +1010,7 @@
   content: "🔒 ";
 }
 
-/* Grey only the body. The header (title + lock hint + any info button) stays
+/* Gray only the body. The header (title + lock hint + any info button) stays
    legible and, where relevant, still clickable. */
 .panel.is-disabled .tool-panel-body {
   opacity: 0.4;
@@ -1039,7 +1039,7 @@
   flex-shrink: 0;
 }
 
-/* When transparent is active, grey the swatch + hex (but not the checkbox) */
+/* When transparent is active, gray the swatch + hex (but not the checkbox) */
 .color-input-row.is-transparent .color-swatch,
 .color-input-row.is-transparent .color-hex {
   opacity: 0.35;
@@ -1061,7 +1061,7 @@
 }
 
 /* =============================================================================
-   RESIZE: source scan progress (spinner + bar while a source is analysed)
+   RESIZE: source scan progress (spinner + bar while a source is analyzed)
 ============================================================================= */
 
 .resize-scan-progress {

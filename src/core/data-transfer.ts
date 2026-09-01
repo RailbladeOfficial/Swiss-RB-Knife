@@ -29,7 +29,7 @@
    else's file, so they need column matching, a preview and a per-row error
    list: Game Stats' importer alone is six screens' worth of controls. Folding
    them into a dropdown would either lose that or make this a button that opens
-   them anyway. So it is a button that opens them, honestly labelled.
+   them anyway. So it is a button that opens them, honestly labeled.
 
    ADDING A TOOL is one entry in TRANSFERABLE. Nothing else here knows the
    difference between one tool and another.
@@ -64,7 +64,7 @@ export interface Transferable {
 
 const TRANSFERABLE: Transferable[] = [];
 
-/** Tools register themselves as they initialise, so this module does not have
+/** Tools register themselves as they initialize, so this module does not have
  *  to import every tool and put itself in the middle of the load order. */
 export function registerTransferable(entry: Transferable): void {
   const at = TRANSFERABLE.findIndex((t) => t.id === entry.id);

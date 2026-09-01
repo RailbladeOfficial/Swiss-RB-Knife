@@ -263,7 +263,7 @@
 }
 
 /* Whole-panel dimming while a run is in progress. Replaces the original's
-   per-input inline backgroundColor, which hard-coded a grey that only looked
+   per-input inline backgroundColor, which hard-coded a gray that only looked
    right on a light page. This leaves color to the theme and just signals
    "locked". :disabled already handles the individual controls' own styling. */
 .tts-running .tts-locked-panel {
@@ -340,7 +340,7 @@
   width: 100%;
   font-weight: 700;
   line-height: 1.2;
-  /* Honours the newlines the user typed in the message box, a "we'll be
+  /* Honors the newlines the user typed in the message box, a "we'll be
      back" card is usually more than one line. */
   white-space: pre-wrap;
   overflow-wrap: break-word;

@@ -223,7 +223,7 @@ test("the import loops this project has are the ones we know about", () => {
   // Every tool is in a loop with shell, and always has been: shell imports the
   // tool's init function, the tool imports shell's shared helpers back. They
   // only started showing up here once parseImports learned to resolve a
-  // specifier against the importing file's folder — before that a tool's
+  // specifier against the importing file's folder. Before that a tool's
   // "../core/shell" resolved to a module id nothing else used, so the edge
   // silently went nowhere and the loop never formed in the graph.
   assert.deepEqual(

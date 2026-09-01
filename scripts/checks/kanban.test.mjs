@@ -234,7 +234,7 @@ test("card order is committed on dragend, not on drop", () => {
   );
 });
 
-test("the tool refuses to be entered before it has initialised", () => {
+test("the tool refuses to be entered before it has initialized", () => {
   // Not defensiveness for its own sake. shell.ts calls loadShellState() at the
   // TOP of its init and every init*() at the bottom, so an install whose saved
   // startup target is this tool navigates into it, and fires its entry hook,
@@ -242,15 +242,15 @@ test("the tool refuses to be entered before it has initialised", () => {
   // touch pre-assigned refs, so without this the app crashes on launch and the
   // only way out is hand-editing the settings file.
   const src = ts();
-  assert.match(src, /let initialised = false;/, "there is no initialised flag");
-  assert.match(src, /\n  initialised = true;/, "the flag is never set");
+  assert.match(src, /let initialized = false;/, "there is no initialized flag");
+  assert.match(src, /\n  initialized = true;/, "the flag is never set");
 
   for (const hook of ["onKanbanToolEntry", "onKanbanIconClicked", "onKanbanToolExit"]) {
     const at = src.search(new RegExp(String.raw`export (?:async )?function ${hook}\(`));
     assert.notEqual(at, -1, `${hook} does not exist`);
     const body = src.slice(at, src.indexOf("\n}", at));
     assert.ok(
-      /if \(!initialised\) return;/.test(body),
+      /if \(!initialized\) return;/.test(body),
       `${hook} runs before init has, which is a crash on launch`,
     );
   }
@@ -958,7 +958,7 @@ test("two saves can never be in flight at once", () => {
   // copy of an encrypted board's cards in the data folder for good, with the
   // whole app reporting that board as encrypted.
   const src = ts();
-  assert.match(src, /let saveChain: Promise<void>/, "saves are not serialised");
+  assert.match(src, /let saveChain: Promise<void>/, "saves are not serialized");
 
   const at = src.indexOf("function saveNow(");
   const body = src.slice(at, src.indexOf("\n}", at));

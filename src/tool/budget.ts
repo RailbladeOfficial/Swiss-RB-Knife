@@ -1435,7 +1435,7 @@ function markBudgetUpdated(): void {
    has asked for yet.
 
    Only the header button is guarded. The Aggressive reminder modal's "Nothing
-   to add, mark it reviewed" is already a deliberate pick from three labelled
+   to add, mark it reviewed" is already a deliberate pick from three labeled
    options, and stacking a second modal on top of a choice the user just read
    and made would be noise, not safety. The header button is a single click
    with no surrounding context, which is the case worth catching. */
@@ -6155,7 +6155,7 @@ const SIMPLE_ADD_LABEL: Record<SimpleListKind, string> = {
  * Adds a new active entry, or reactivates an existing one (active or retired)
  * with a case-insensitive matching name. Used by the Setup modal's "Add"
  * buttons, an explicit add action, so reactivating a matching retired item
- * makes more sense here than the silent-duplicate behaviour of findOrCreateX
+ * makes more sense here than the silent-duplicate behavior of findOrCreateX
  * (which only matches active items, for in-form quick-add).
  */
 function addOrReactivateSimple(kind: SimpleListKind, name: string): void {

@@ -770,7 +770,7 @@ test("splitting the old shared backups folder cannot lose a snapshot", () => {
   assert.ok(!/remove_file|remove_dir_all/.test(fn), "the split deletes rather than moves");
 
   /* A .bak nothing claims is LEFT WHERE IT IS, and the folders are removed with
-     remove_dir, which only succeeds when empty. So an unrecognised file keeps
+     remove_dir, which only succeeds when empty. So an unrecognized file keeps
      both itself and the folder holding it. */
   assert.match(fn, /None => continue/, "an unclaimed snapshot would not be left alone");
   assert.ok(
@@ -779,7 +779,7 @@ test("splitting the old shared backups folder cannot lose a snapshot", () => {
   );
 
   // The database was captured under the name it had when it held three tools.
-  assert.match(fn, /"tools\.db\.bak"/, "an old database snapshot would not be recognised");
+  assert.match(fn, /"tools\.db\.bak"/, "an old database snapshot would not be recognized");
   assert.match(fn, /"game-stats\.db\.bak"/, "an old database snapshot keeps a misleading name");
 
   // Every tool that snapshots has to be claimable, or its history is stranded.

@@ -13,7 +13,7 @@
         applySolidColor() in kanban.ts: --kb-ink-soft and --kb-ink-faint. Those
         are washes of the ink that function already chose for contrast, so the
         secondary text on a solid card is a fade of the SAME ink rather than
-        the theme's muted grey, which would be invisible on half the palette.
+        the theme's muted gray, which would be invisible on half the palette.
 
      2. The board background sits in its own layer (#kbBoardBg) UNDER the board
         chrome rather than as a background on it, because it carries a blur
@@ -172,7 +172,7 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 }
 
 /* A tile is mostly its background: the whole point of setting one is that you
-   recognise the board before you have read anything. The text block sits over
+   recognize the board before you have read anything. The text block sits over
    it in its own scrim so it stays readable on any image. */
 .kb-board-tile {
   position: relative;
@@ -263,7 +263,7 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 }
 
 /* One bar per column, height proportional to that column's share of the
-   board's fullest column. A board's SHAPE is recognisable this way in a
+   board's fullest column. A board's SHAPE is recognizable this way in a
    glance; a total is not. */
 .kb-board-tile-bars {
   display: flex;
@@ -359,7 +359,7 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* With an image behind it, the chrome needs its own ground or the bar's text
    sits directly on a photo. color-mix keeps it the theme's own panel color
-   rather than a grey, so every theme still recognisably owns the board. */
+   rather than a gray, so every theme still recognizably owns the board. */
 .kb-has-bg .kb-board-bar,
 .kb-has-bg .kb-filter-bar {
   /* Declared twice on purpose: an engine that cannot parse color-mix drops that

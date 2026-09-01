@@ -1,7 +1,7 @@
 /* =============================================================================
    MENU: shared primitive
    -----------------------------------------------------------------------------
-   The app's small floating command list: a column of labelled buttons that
+   The app's small floating command list: a column of labeled buttons that
    opens next to something, runs one action, and dismisses itself. Kanban's
    board and card three-dot menus are the first users; right-click menus are
    the reason it lives here rather than in kanban.ts.
@@ -70,9 +70,9 @@ export interface MenuItem {
   submenu?: MenuItem[];
   /** Renders in the danger color. For destructive rows (Delete, Remove). */
   danger?: boolean;
-  /** Greys the row out and makes it unclickable. Prefer this over omitting a
+  /** Grays the row out and makes it unclickable. Prefer this over omitting a
    *  row that is sometimes available: a menu whose length changes is harder
-   *  to build muscle memory for than one with a greyed-out entry. */
+   *  to build muscle memory for than one with a grayed-out entry. */
   disabled?: boolean;
   /** A ruled gap instead of a row. For menus assembled from two sources that
    *  mean different things: the open tool's own header actions above, the
@@ -89,7 +89,7 @@ export interface MenuItem {
    "‹ Back" row at the top, rather than opening a panel off the side.
 
    That is a deliberate choice, not a shortcut. A side flyout needs hover
-   intent (so crossing a neighbouring row on the diagonal does not swap the
+   intent (so crossing a neighboring row on the diagonal does not swap the
    panel out from under the cursor), its own edge-flipping when it would open
    off-screen, and a dismissal model where the parent stays open while the
    child has the pointer. Drill-down needs none of that: there is still

@@ -106,8 +106,9 @@ const INDEX_FILE: &str = "kanban/kanban-index.json";
 const BOARD_DIR: &str = "kanban/kanban-boards";
 
 /// A board file keeps its "kanban-board-" prefix inside that folder, and that
-/// is not redundant: a snapshot bucket is one flat folder shared with every
-/// other tool, and a captured file is stored there under its basename.
+/// is not redundant: a snapshot bucket is one flat folder, so a captured board
+/// and the captured index sit side by side under their basenames alone, with
+/// nothing but the name to tell them apart.
 fn board_file_name(id: &str) -> String {
     format!("kanban-board-{id}.json")
 }
@@ -197,10 +198,12 @@ pub fn delete_kanban_board(app: AppHandle, board_id: String) -> Result<(), Strin
 /* =============================================================================
    SNAPSHOTS
    -----------------------------------------------------------------------------
-   One bucket per hour, in the shared backups folder, holding a .bak per file
-   that was about to be overwritten. Every write inside an hour refreshes that
-   hour's bucket, so a bucket holds the LAST state before the gap rather than
-   the first. Thirty buckets are kept; see backed_up_write_group in lib.rs.
+   One bucket per hour, in kanban/backups, holding a .bak per file that was
+   about to be overwritten. Every write inside an hour refreshes that hour's
+   bucket, so a bucket holds the LAST state before the gap rather than the
+   first. Thirty buckets of KANBAN'S OWN writes are kept, so an afternoon spent
+   in another tool cannot evict a month of boards; see backed_up_write_group
+   and prune_buckets in lib.rs.
 ============================================================================= */
 
 #[derive(Serialize)]
@@ -247,8 +250,8 @@ fn classify_backup_file(name: &str) -> Option<Option<String>> {
         return valid_board_id(id).then(|| Some(id.to_string()));
     }
     /* The index. Compared against the BASENAME, not against INDEX_FILE: that is
-       a path inside the data folder now, and a snapshot bucket is one flat
-       folder that stores a captured file under its filename alone.
+       a path inside the data folder now, and a bucket stores a captured file
+       under its filename alone.
 
        The settings file is deliberately not offered: restoring preferences is
        not a recovery, and rewinding them would be a surprise nobody asked for
@@ -264,9 +267,12 @@ fn describe_bucket(dir: &Path) -> Vec<KanbanBackupFile> {
         .filter_map(|e| e.ok())
         .filter_map(|e| {
             let name = e.file_name().to_string_lossy().to_string();
-            // The backups folder is shared with every other tool that
-            // snapshots, so this is the filter that keeps Budget's files out of
-            // the Kanban's restore list.
+            /* Kanban owns this folder, so nothing else writes into it, but the
+               filter still earns its place: it is what decides which of Kanban's
+               OWN captured files are restorable, and it deliberately leaves the
+               settings file out. Buckets from before snapshots were split per
+               tool were sorted into these folders by name, so a stray file is
+               possible; one that is not recognized is left alone. */
             let board_id = classify_backup_file(&name)?;
             let bytes = e.metadata().ok()?.len();
             Some(KanbanBackupFile { file: name, bytes, board_id })
@@ -332,11 +338,6 @@ pub fn read_kanban_backup(app: AppHandle, name: String, file: String) -> Result<
     let path = root.join(&name).join(&file);
     fs::read_to_string(&path).map_err(|e| format!("Could not read that snapshot: {e}"))
 }
-
-
-
-
-
 
 
 /* =============================================================================
@@ -720,7 +721,7 @@ pub fn import_kanban_attachment(
 /// written to a temporary first.
 ///
 /// Base64 rather than a raw byte array over IPC because the byte array form
-/// serialises as JSON numbers, which is roughly seven bytes on the wire per
+/// serializes as JSON numbers, which is roughly seven bytes on the wire per
 /// byte of image. A pasted screenshot is small enough that base64's extra third
 /// is the cheaper of the two.
 #[tauri::command]
@@ -957,7 +958,11 @@ pub fn sweep_kanban_attachments(
    nothing. Only a delete does any work, and it is a rename rather than a copy.
    One copy of the bytes exists at any moment, either live or retired.
 
-       kanban-attachment-store/<boardId>/<attachmentId>[.enc]
+       kanban-attachment-store/<boardId>/<attachmentId>[.<ext>]
+
+   The name is whatever the file was called live, so a retired file goes back
+   under the name the card is pointing at. Anything retired before attachments
+   kept their extension is there under the bare id, and still revives.
 
    WHEN A RETIRED FILE IS FINALLY GONE. A file retired at time T can only be
    wanted by a snapshot taken BEFORE T, because every snapshot after T was taken
@@ -1138,8 +1143,6 @@ mod tests {
     use super::*;
 
 
-
-
     #[test]
     fn a_board_id_is_a_name_and_never_a_path() {
         assert!(valid_board_id("0f8fad5b-d9cb-469f-a165-70867728950e"));
@@ -1161,8 +1164,6 @@ mod tests {
             assert!(!valid_board_id(bad), "should have rejected {bad:?}");
         }
     }
-
-
 
 
     #[test]

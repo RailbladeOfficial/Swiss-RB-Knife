@@ -61,8 +61,9 @@ mod tools;
 /// - **Dev builds** (`debug_assertions` on): `../data/` relative to the Cargo
 ///   workspace root, so the files sit next to `src-tauri/` and are easy to
 ///   inspect during development.
-/// - **Release builds**: the OS app-data directory via Tauri's `app_data_dir()`
-///   (`%APPDATA%\Swiss RB Knife\` on Windows).
+/// - **Release builds**: the OS app-data directory via Tauri's `app_data_dir()`,
+///   which is named for the bundle identifier, so `%APPDATA%\swiss-rb-knife\`
+///   on Windows rather than the product name.
 #[allow(unused_variables)]
 pub(crate) fn data_root(app: &tauri::AppHandle) -> PathBuf {
     #[cfg(debug_assertions)]
@@ -185,7 +186,7 @@ fn relocate(root: &std::path::Path, from: &str, to: &str) {
 }
 
 /// Which tool folder a captured file belongs to, from the name it was captured
-/// under. None for anything the app does not recognise.
+/// under. None for anything the app does not recognize.
 fn owner_of_backup(bak_name: &str) -> Option<&'static str> {
     let stem = bak_name.strip_suffix(".bak")?;
     // Longest prefix first, so "game-stats-settings" is not read as a tool
@@ -213,7 +214,7 @@ fn owner_of_backup(bak_name: &str) -> Option<&'static str> {
 ///
 /// Buckets keep their names, so a snapshot taken before this still lines up
 /// with the ones taken after. A bucket left empty because nothing in it was
-/// recognised stays; an emptied one is removed, and remove_dir only succeeds
+/// recognized stays; an emptied one is removed, and remove_dir only succeeds
 /// on a folder that is already empty, which is the safety here.
 fn split_shared_backups(root: &std::path::Path) {
     let shared = root.join("backups");
@@ -767,7 +768,7 @@ fn import_tool_json(app: tauri::AppHandle) -> Result<Option<String>, String> {
    WINDOW SIZE COMMANDS  (shell-level)
 ============================================================================= */
 
-/// Persists the serialised window size JSON to disk.
+/// Persists the serialized window size JSON to disk.
 /// Called by shell.ts on every window resize (debounced 300 ms).
 #[tauri::command]
 fn save_window_size(app: tauri::AppHandle, data: String) -> Result<(), String> {
@@ -801,19 +802,12 @@ fn load_window_size(app: tauri::AppHandle) -> Result<String, String> {
 /// Merges a JSON patch into settings.json: only the TOP-LEVEL keys present in
 /// the patch are written; every other key on disk is preserved untouched.
 ///
-/// NOTE ON THE CURRENT OWNERSHIP MODEL: since tool settings moved into their
-/// own per-tool files (see the section below), the shell is the only writer
-/// of settings.json left. Time Tracker and Budget still READ it, both for the
-/// shell-owned display prefs they have to honour and to pick up legacy keys
-/// of theirs still sitting there from before the split, but neither writes to
-/// it any more. So the multi-writer hazard this command was built for no
-/// longer exists in practice.
-///
-/// It stays the write path regardless, for two reasons: a patch that touches
-/// only the shell's own keys cannot corrupt those legacy tool keys that are
-/// still being read (a whole-file write would drop them), and the guarantee
-/// stops being something that has to be re-argued the next time anything
-/// needs to write here.
+/// The shell is the only writer left: tool settings moved into per-tool files,
+/// and Time Tracker and Budget now only READ this one, for shell-owned display
+/// preferences and for legacy keys of theirs still sitting here from before the
+/// split. It stays a merge anyway, because a whole-file write would drop those
+/// legacy keys, and because the guarantee then does not have to be re-argued
+/// the next time something needs to write here.
 ///
 /// The read-merge-write runs under a process-wide mutex, closing the
 /// interleaving window where two near-simultaneous saves could each read the
@@ -964,9 +958,10 @@ fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
 
 /// The filename part of a tool-file path.
 ///
-/// A snapshot bucket is ONE FLAT FOLDER shared by every tool, so a captured
-/// file is stored under its basename. Every lookup of a .bak has to agree with
-/// that, which is why this exists rather than each caller slicing the string.
+/// A snapshot bucket is one FLAT folder: a tool's files are captured into it
+/// under their basenames, whatever sub-folder they live in. Every lookup of a
+/// .bak has to agree with that, which is why this exists rather than each
+/// caller slicing the string.
 pub(crate) fn file_basename(relative: &str) -> &str {
     relative.rsplit('/').next().unwrap_or(relative)
 }
@@ -1125,8 +1120,8 @@ pub(crate) fn valid_bucket_name(name: &str) -> bool {
    CUSTOM THEMES COMMANDS  (shell-level)
 ============================================================================= */
 
-/// Persists the serialised custom themes JSON to disk.
-/// The payload is an array of CustomTheme objects serialised by shell.ts.
+/// Persists the serialized custom themes JSON to disk.
+/// The payload is an array of CustomTheme objects serialized by shell.ts.
 #[tauri::command]
 fn save_custom_themes(app: tauri::AppHandle, data: String) -> Result<(), String> {
     atomic_write(&get_data_path(&app, "app/custom-themes.json"), data.as_bytes())
@@ -1147,7 +1142,7 @@ fn load_custom_themes(app: tauri::AppHandle) -> Result<String, String> {
    SHELL STATE COMMANDS  (shell-level)
 ============================================================================= */
 
-/// Persists the serialised shell state JSON to disk (active section/tool).
+/// Persists the serialized shell state JSON to disk (active section/tool).
 /// Called by shell.ts on every navigation action.
 #[tauri::command]
 fn save_shell_state(app: tauri::AppHandle, data: String) -> Result<(), String> {
@@ -1285,7 +1280,7 @@ fn clear_lock_hash(app: tauri::AppHandle) -> Result<(), String> {
    Rust, so the locked-down CSP (connect-src 'self' ipc:) still holds. Runs only
    when the user has opted in (the frontend gates the call on a setting), and it
    fails soft: any network or parse error comes back as Err and the frontend
-   stays silent, preserving the offline-by-default behaviour.
+   stays silent, preserving the offline-by-default behavior.
 ============================================================================= */
 
 /// Repo slug ("owner/name") the update check queries. This single constant is
@@ -1471,12 +1466,12 @@ pub fn run() {
             // Countdown
             tools::countdown::countdown_start_ticker,
             tools::countdown::countdown_stop_ticker,
-            // RNGesus (random number generator)
-            // Kanban Boards
+            // Game Stats records (the database)
             tools::game_stats_db::gs_load,
             tools::game_stats_db::gs_save,
             tools::game_stats_db::gs_replace_all,
             tools::game_stats_db::gs_migrate_from_json,
+            // Kanban Boards
             tools::kanban::save_kanban_index,
             tools::kanban::load_kanban_index,
             tools::kanban::save_kanban_board,

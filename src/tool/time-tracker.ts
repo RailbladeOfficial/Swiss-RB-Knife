@@ -784,7 +784,7 @@ function parseEntries(raw: string): Entry[] {
           endDate = date;
         }
       }
-      // Legacy values may be "HH:MM" with no seconds; both normalise the same.
+      // Legacy values may be "HH:MM" with no seconds; both normalize the same.
       const startSecs = parseTime(start);
       if (startSecs !== null) start = secondsToTimeString(startSecs);
       const endSecs = parseTime(end);
@@ -4075,7 +4075,7 @@ function getBreakInModal(): Modal {
       const host = breakInHost;
       if (!host) return;
       // A new row starts where the previous one ended, which is almost always
-      // the right neighbourhood and is never invalid on its own. A previous row
+      // the right neighborhood and is never invalid on its own. A previous row
       // that isn't finished yet has no end to follow, so fall back to the
       // host's start.
       const prev = breakInDrafts[breakInDrafts.length - 1];

@@ -77,7 +77,7 @@ export function isKnownBuiltinTheme(id: string): boolean {
 }
 
 /** Turns whatever is stored in settings into an id that is guaranteed to name a
- *  real file: renames are mapped, and anything still unrecognised falls back to
+ *  real file: renames are mapped, and anything still unrecognized falls back to
  *  the default theme.
  *
  *  The validation half is not paranoia, it is the only thing that works. A
@@ -298,7 +298,7 @@ export function setSeasonalCanvasElevated(elevated: boolean): void {
 
 /** Whether the ACTIVE theme puts a glow on its header titles. False when the
  *  probe is missing, which reads as "nothing to switch off" rather than
- *  throwing at a caller that only wanted to grey out a toggle. */
+ *  throwing at a caller that only wanted to gray out a toggle. */
 export function themeHasTitleGlow(): boolean {
   const probe = document.getElementById("theme-glow-probe");
   if (!probe) return false;
@@ -450,7 +450,7 @@ const SWIRL_HALO_RADIUS = 110; // px) soft glow pool, sized around the cursor wh
 const SWIRL_ACTIVITY_DECAY = 0.93;
 // Anchors the halo/particle origin a little off the literal cursor
 // coordinate, always opposite whichever direction the cursor last moved,
-// so the glow trails behind the cursor no matter which way it's travelling
+// so the glow trails behind the cursor no matter which way it's traveling
 // instead of sitting fixed to one side (which reads wrong once the cursor
 // heads toward that side).
 const SWIRL_ORIGIN_OFFSET = 30; // px
@@ -749,7 +749,7 @@ function startChristmasSnow(): void {
     if (current < SNOW_PILE_MAX_HEIGHT) {
       snowPile[col] = Math.min(SNOW_PILE_MAX_HEIGHT, current + amount);
     }
-    // Spread a little into the immediate neighbours so the bank reads as a
+    // Spread a little into the immediate neighbors so the bank reads as a
     // drift rather than a bar chart.
     for (const neighbor of [col - 1, col + 1]) {
       if (neighbor < 0 || neighbor >= snowPile.length) continue;
@@ -1289,7 +1289,7 @@ function buildSwirlDotPattern(ctx: CanvasRenderingContext2D): CanvasPattern | nu
  *  ambient pattern so it reads as extra-bright grid dots, not a free
  *  floating blob. Both layers are anchored SWIRL_ORIGIN_OFFSET px off the
  *  cursor, but not toward a fixed corner. The anchor always sits opposite
- *  whichever direction the cursor last travelled (dirX/dirY below), so the
+ *  whichever direction the cursor last traveled (dirX/dirY below), so the
  *  glow trails behind the cursor no matter which way it's moving instead of
  *  reading as "ahead" of it once the cursor heads toward a fixed offset. */
 function startHaloSwirl(): void {

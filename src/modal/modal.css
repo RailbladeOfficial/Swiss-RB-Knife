@@ -1,7 +1,7 @@
 /* =============================================================================
    MODALS: SHARED CHROME
    -----------------------------------------------------------------------------
-   The structural skeleton + behaviour styling common to every modal in the app.
+   The structural skeleton + behavior styling common to every modal in the app.
    Driven by modal.ts. Content-specific modal styling (settings rows, changelog,
    licensing tabs, tool pickers, etc.) stays in shell.css / the owning tool CSS.
 
@@ -191,7 +191,7 @@ body:not(.solid-modals) .modal {
   color: var(--color-text);
 }
 
-/* Confirm/cancel modals (exit, delete), centred body + spread actions row */
+/* Confirm/cancel modals (exit, delete), centered body + spread actions row */
 .exit-modal-body {
   align-items: center;
   text-align: center;

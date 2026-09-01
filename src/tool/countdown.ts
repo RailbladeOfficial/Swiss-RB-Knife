@@ -274,7 +274,7 @@ const CLOCK_FONTS: ClockFontDef[] = [
 ];
 
 /** The stack for a font id, falling back to the default face for an id that
- *  isn't in the catalogue (an older data file, a hand-edited one). */
+ *  isn't in the catalog (an older data file, a hand-edited one). */
 function clockFontStack(id: string): string {
   return (CLOCK_FONTS.find((f) => f.id === id) ?? CLOCK_FONTS[0]).stack;
 }
@@ -705,7 +705,7 @@ function bareUnitWord(): string {
 }
 
 /** Keeps the two places that explain the bare-number rule in step with the
- *  setting, a hint that contradicts the behaviour is worse than no hint. */
+ *  setting, a hint that contradicts the behavior is worse than no hint. */
 function refreshBareUnitHints(): void {
   const presetHint = document.getElementById("cd-preset-hint");
   if (presetHint) {
@@ -1154,7 +1154,7 @@ function layoutRing(fig: ProgressFigure): void {
    against that same function, so the outline you see and the fill inside it
    can't drift apart. Everything below is in the SVG's own 40x80 viewBox. */
 
-const HG_CX = 20; // centre line
+const HG_CX = 20; // center line
 const HG_RIM_HALF_W = 14; // half-width where a bulb meets its cap
 const HG_BULB_H = 31; // neck-to-rim height of one bulb
 const HG_TOP_NECK_Y = 38;
@@ -1838,7 +1838,7 @@ function renderDisplay(): void {
   displayControls.style.display = controls ? "" : "none";
   if (controls) {
     // The same three lines render() gives the panel's pair, deliberately: two
-    // buttons labelled Pause and Stop that disagree about what they will do
+    // buttons labeled Pause and Stop that disagree about what they will do
     // would be worse than no buttons at all.
     displayPauseBtn.textContent = session!.pausedAt !== null ? "Resume" : "Pause";
     displayPauseBtn.disabled = remaining <= 0 && session!.pausedAt === null;
@@ -2042,7 +2042,7 @@ function applySettingsToForm(): void {
  *  Display View section shows conditionally. */
 function syncSetupUI(): void {
   const trackerAvailable = isToolVisible(TIME_TRACKER_KEY);
-  // Greyed out rather than hidden: the setting still exists and comes back on
+  // Grayed out rather than hidden: the setting still exists and comes back on
   // its own the moment the Time Tracker is unhidden, so saying why beats
   // making the row vanish.
   showTrackerToggle.disabled = !trackerAvailable;
@@ -2054,7 +2054,7 @@ function syncSetupUI(): void {
   displayEffectsRow.style.display = display.look === "custom" ? "none" : "";
 
   // Both effect toggles depend on the ACTIVE theme actually having the thing
-  // they switch. Rather than greying them out (which reads as "broken") they
+  // they switch. Rather than graying them out (which reads as "broken") they
   // stay usable and the note says why nothing will change. Re-checked on every
   // themechange, so Cycle mode keeps these honest.
   glowNote.textContent = themeHasTitleGlow() ? "" : "This theme has no glow.";

@@ -27,7 +27,7 @@
    Random or Custom theme too, so someone who never touches Cycle can still
    have Christmas paint itself on Christmas. The two settings keep their
    cycle* names only because renaming persisted keys would need a migration
-   for no behavioural gain.
+   for no behavioral gain.
 
    Split out the same way random-theme.ts is split out of shell.ts: this file
    is one more node in the existing theme-core.ts <-> theme-editor.ts <->

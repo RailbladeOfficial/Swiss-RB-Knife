@@ -124,7 +124,7 @@ export interface SoundOptionGroup {
 /** Everything a tool can offer as an alert cue, grouped by where it comes
  *  from so a dropdown can render optgroups rather than one flat run of a
  *  hundred entries. Empty groups are omitted: a cue folder with nothing in it
- *  should not leave a labelled but empty heading in the list.
+ *  should not leave a labeled but empty heading in the list.
  *
  *  Timer Sounds come first, being purpose-built alarms. The group after them
  *  tracks whatever the app's sound pack is set to, rather than pinning a
@@ -457,7 +457,7 @@ interface VolumeControlOptions {
 }
 
 /** How the current value reads on screen. Three cases, because the two ends of
- *  the range aren't levels: the bottom notch is silence and the centre is the
+ *  the range aren't levels: the bottom notch is silence and the center is the
  *  app's original loudness. */
 function cueVolumeLabel(db: number): string {
   if (db <= CUE_VOLUME_MUTED_DB) return "Muted";

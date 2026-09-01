@@ -42,7 +42,7 @@
        available_parallelism(), minus one core left free for the OS/UI, and
        capped at 8, so a 16-core desktop actually uses its hardware, while a
        2-core laptop falls back to a single worker (i.e. today's sequential
-       behaviour) instead of contending with itself.
+       behavior) instead of contending with itself.
 ============================================================================= */
 
 use image::{DynamicImage, GenericImageView, ImageFormat};
@@ -206,7 +206,7 @@ pub async fn get_image_info(app: AppHandle, path: String) -> Result<ImageInfo, S
 ///
 /// Transparency only survives in a format that has an alpha channel: saving an
 /// RGBA image as JPG drops the alpha and the transparent regions flatten to
-/// black. The frontend warns about that; here we just honour whatever fill the
+/// black. The frontend warns about that; here we just honor whatever fill the
 /// caller asked for.
 fn parse_hex_color(hex: &str) -> [u8; 4] {
     let trimmed = hex.trim();
@@ -258,7 +258,7 @@ const MAX_DECODE_ALLOC: u64 = 1_536 * 1024 * 1024;
 /// with_guessed_format() here would quietly widen what the resize and compress
 /// tools accept, and would disagree with image_dimensions() (which is
 /// extension-based too) that the combine planner relies on. Limits are the
-/// only behaviour this wrapper changes.
+/// only behavior this wrapper changes.
 fn open_image_limited(path: &(impl AsRef<Path> + ?Sized)) -> Result<DynamicImage, String> {
     let p = path.as_ref();
     let mut reader = image::ImageReader::open(p)
@@ -371,7 +371,7 @@ fn plan_combine(
 /// is just a colored margin.
 ///
 /// Images are NOT rotated to match orientation; mismatched sizes are padded
-/// with canvas_rgba so they align correctly (centred on the cross-axis).
+/// with canvas_rgba so they align correctly (centered on the cross-axis).
 fn composite_streaming(
     plan: &CombinePlan,
     direction: &str,
@@ -1047,7 +1047,7 @@ fn resize_images_thread(
     // and cap the upper bound. Each in-flight worker holds a full decoded
     // bitmap in memory, so unlimited parallelism on a many-core box just trades
     // CPU headroom for a RAM/disk-I/O bottleneck instead. A 1-2 core machine
-    // falls back to a single worker, i.e. today's sequential behaviour.
+    // falls back to a single worker, i.e. today's sequential behavior.
     let worker_count = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
@@ -1239,7 +1239,7 @@ fn resize_images_thread(
    TESTS: combine geometry
    -----------------------------------------------------------------------------
    Covers the streaming compositor's layout maths: canvas sizing, cross-axis
-   centring of mismatched sources, gap placement, direction reversal, and
+   centering of mismatched sources, gap placement, direction reversal, and
    border insetting. These are the parts that were previously implicit in
    "decode everything, then measure it" and are now computed up front from
    headers, so they are worth pinning down.
@@ -1332,7 +1332,7 @@ mod tests {
     }
 
     #[test]
-    fn stacks_vertically_centring_narrower_sources_and_honouring_the_gap() {
+    fn stacks_vertically_centering_narrower_sources_and_honoring_the_gap() {
         let d = scratch("vertical");
         let a = solid(&d, "a.png", 10, 20, RED);
         let b = solid(&d, "b.png", 30, 5, BLUE);
@@ -1343,14 +1343,14 @@ mod tests {
         let out = composite_streaming(&plan, "below", 4, WHITE, 0, BLACK).unwrap();
         assert_eq!(out.dimensions(), (30, 29));
 
-        assert_eq!(px(&out, 10, 0), RED, "first image starts at centred x offset");
+        assert_eq!(px(&out, 10, 0), RED, "first image starts at centered x offset");
         assert_eq!(px(&out, 0, 0), WHITE, "cross-axis padding uses the canvas color");
         assert_eq!(px(&out, 0, 21), WHITE, "gap band uses the canvas color");
         assert_eq!(px(&out, 0, 24), BLUE, "second image starts after the gap");
     }
 
     #[test]
-    fn stacks_horizontally_centring_shorter_sources() {
+    fn stacks_horizontally_centering_shorter_sources() {
         let d = scratch("horizontal");
         let a = solid(&d, "a.png", 10, 20, RED);
         let b = solid(&d, "b.png", 6, 10, BLUE);
@@ -1361,8 +1361,8 @@ mod tests {
         let out = composite_streaming(&plan, "right", 2, WHITE, 0, BLACK).unwrap();
         assert_eq!(px(&out, 0, 0), RED);
         assert_eq!(px(&out, 10, 0), WHITE, "gap band");
-        assert_eq!(px(&out, 12, 5), BLUE, "second image centred vertically: (20-10)/2 = 5");
-        assert_eq!(px(&out, 12, 4), WHITE, "just above the centred second image");
+        assert_eq!(px(&out, 12, 5), BLUE, "second image centered vertically: (20-10)/2 = 5");
+        assert_eq!(px(&out, 12, 4), WHITE, "just above the centered second image");
     }
 
     #[test]
@@ -1407,7 +1407,7 @@ mod tests {
 
         assert_eq!(px(&out, 0, 0), BLACK, "border");
         assert_eq!(px(&out, 2, 2), WHITE, "padding beside the narrow first image");
-        assert_eq!(px(&out, 5, 2), RED, "narrow image centred: 2 + (10-4)/2 = 5");
+        assert_eq!(px(&out, 5, 2), RED, "narrow image centered: 2 + (10-4)/2 = 5");
         assert_eq!(px(&out, 2, 8), BLUE, "full-width second image fills to the border");
     }
 

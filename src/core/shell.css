@@ -149,8 +149,8 @@ body {
    Hands the window to the active tool in two steps, driven by
    setImmersiveStage() in shell.ts:
 
-     .immersive           stage 1 AND 2 — fullscreen, no title bar, no sidebar
-     .immersive-headers   stage 2 only  — also drops the tool header bar
+     .immersive           stage 1 AND 2: fullscreen, no title bar, no sidebar
+     .immersive-headers   stage 2 only: also drops the tool header bar
 
    The split is the whole point of staging. Stage 1 buys the screen space but
    keeps every control the tool has, because the header bar is where Back,
@@ -162,7 +162,7 @@ body {
    offsets itself by --titlebar-height and #sidebar already takes its width
    from a variable, so zeroing both is enough to make the content area fill
    the window. Same reason the one calc() that reads --titlebar-height
-   (budget.css's centred empty state) needs no rule of its own: the variables
+   (budget.css's centered empty state) needs no rule of its own: the variables
    are redefined on body, so every descendant re-resolves against zero.
 
    --sidebar-transition is preserved, so the sidebar slides out and back
@@ -504,7 +504,7 @@ body.immersive-headers .section-header {
   border-bottom: 1px solid var(--color-border);
   border-radius: 8px 8px 0 0;
   flex-shrink: 0;
-  /* Positioning context for the Home-only #homeUpdateNotice, centred across
+  /* Positioning context for the Home-only #homeUpdateNotice, centered across
      the full bar independent of the left-aligned title. */
   position: relative;
   /* Cross-fades the palette on a theme change rather than cutting to it, see
@@ -864,7 +864,7 @@ button:hover {
    It lived in budget.css until the Kanban needed it too, which made the hidden
    dependency visible: a rule shared by several tools but owned by one of them
    works only because index.html happens to load that tool's stylesheet first,
-   and it would break the day that tool was reorganised. Same reason
+   and it would break the day that tool was reorganized. Same reason
    .settings-row, .settings-label-col and .subsettings all live here. */
 .settings-action-btn {
   font-size: 0.78rem;
@@ -954,7 +954,7 @@ button:hover {
    CHECKBOX  (the real ones, drawn as a themed circle)
    -----------------------------------------------------------------------------
    The native control ignores nearly every color a theme sets, so on a dark
-   palette it stayed a bright grey-and-blue Windows box. appearance:none hands
+   palette it stayed a bright gray-and-blue Windows box. appearance:none hands
    the whole thing over to us: a circle that borrows --color-btn when checked,
    like every other affirmative control in the app.
 

@@ -21,7 +21,7 @@ dist-ssr
 # /data (above) already covers the dev data directory where these normally
 # live. These extra patterns catch a sensitive file even if a stray copy ever
 # ended up somewhere else in the tree (e.g. dragged to the repo root to inspect
-# it). The .enc envelopes and the lock hash are the crown jewels — losing those
+# it). The .enc envelopes and the lock hash are the crown jewels; losing those
 # to a public commit is the one outcome worth being paranoid about.
 *.enc
 lock.json
@@ -44,7 +44,7 @@ robocopy_log_*.txt
 files-generated-*/
 resized-*/
 
-# Build-generated copies in public/ (created by copy-public-docs.mjs —
+# Build-generated copies in public/ (created by copy-public-docs.mjs:
 # the originals at the repo root are the tracked source of truth)
 public/README.md
 public/LICENSE
@@ -59,7 +59,7 @@ public/screenshots/
 # Sound attribution notes. The credit lines from each sound's source, kept
 # next to the audio while a pack is being put together and consolidated by
 # hand into ATTRIBUTION.md, which is the tracked source of truth. Untracked
-# because they are working notes, not a deliverable; the licences they record
+# because they are working notes, not a deliverable; the licenses they record
 # live in ATTRIBUTION.md, and scripts/checks/settings.test.mjs fails if a
 # shipped sound has no entry there.
 attr/

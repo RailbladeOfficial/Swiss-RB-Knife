@@ -13,7 +13,7 @@
    publishes on the document root from the user's pick (see applyClockFont and
    CLOCK_FONTS). The fallback baked into each var() is the default face, so the
    page is correct before any script runs and stays correct if the tool never
-   initialises. Two of the four readers (the Display View overlay, the Setup
+   initializes. Two of the four readers (the Display View overlay, the Setup
    preview) live outside the tool view entirely, which is why this is a root
    variable rather than something set on .cd-body.
 
@@ -55,7 +55,7 @@
   padding: 22px 12px 18px;
 }
 
-/* Clock plus the hourglass figure beside it, centred as a pair. */
+/* Clock plus the hourglass figure beside it, centered as a pair. */
 .cd-clock-row {
   display: flex;
   align-items: center;
@@ -434,7 +434,7 @@
 
 /* ── Size slider with raw entry ────────────────────────────────────────────
    Double-clicking the read-out swaps it for a number box (bindSliderEntry).
-   Same component the TTS Repeater's Setup uses, same behaviour.
+   Same component the TTS Repeater's Setup uses, same behavior.
 ========================================================================== */
 
 .cd-slider-grid {
@@ -606,7 +606,7 @@
 
 /* The clock and the hourglass beside it.
 
-   inline-flex, which is doing two jobs at once. Flex centres the glass against
+   inline-flex, which is doing two jobs at once. Flex centers the glass against
    the digits exactly, whatever their relative heights. Inline-level means the
    row is placed by the stack's text-align, which is where the Alignment
    setting lives, so there is no second alignment property to keep in step with
@@ -790,7 +790,7 @@
 
 .cd-display-ctl-btn:hover:not(:disabled) {
   opacity: 1;
-  /* Neutral grey rather than currentColor: mixed at this alpha it lifts a
+  /* Neutral gray rather than currentColor: mixed at this alpha it lifts a
      light button on a dark card and darkens a dark one on a light card, where
      currentColor would wash the label out in the first case. */
   background: rgba(127, 127, 127, 0.2);

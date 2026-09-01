@@ -11,7 +11,7 @@
    shell.ts, _tePrevTheme in theme-editor.ts), so when they lived in
    theme-core.ts, theme-editor's body evaluated ~1000 lines before theme-core
    declared them and init died with "Cannot access 'DEFAULT_THEME_ID' before
-   initialization" — a blank window, and nothing tsc can catch, since the types
+   initialization", a blank window, and nothing tsc can catch, since the types
    are all perfectly valid.
 
    A module with no imports has no such hazard: it is fully evaluated before any

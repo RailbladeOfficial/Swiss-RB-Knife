@@ -448,7 +448,7 @@ export function refreshCycleDayNightNote(): void {
     : `${side} all day, showing ${label}.`;
 }
 
-/** The note's clock. Honours the app's own Time Format setting rather than the
+/** The note's clock. Honors the app's own Time Format setting rather than the
  *  OS locale, same idiom as the title-bar clock, so the switch time is written
  *  the way the rest of the app writes times. */
 function formatClock(at: Date): string {

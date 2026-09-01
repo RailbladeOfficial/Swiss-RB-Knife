@@ -120,7 +120,7 @@ test("the sound manifest is in step with the three cue folders", () => {
     assert.deepEqual(
       listed,
       onDisk,
-      `${constName} disagrees with public/sounds/${folder}/ — re-run scripts/generate-sound-manifest.mjs`,
+      `${constName} disagrees with public/sounds/${folder}/, re-run scripts/generate-sound-manifest.mjs`,
     );
   }
   assert.ok(text.includes("SoundEffect"), "the manifest is not the file this check expects");
@@ -252,7 +252,7 @@ test("the Countdown alarm's Test button does not also fire the button cue", () =
 
 test("every sound the app ships is credited in ATTRIBUTION.md", () => {
   // Not housekeeping: several of these are CC BY, where crediting the author
-  // is a condition of the licence, not a courtesy. Adding a pack or dropping a
+  // is a condition of the license, not a courtesy. Adding a pack or dropping a
   // cue file into a folder is a two-second job that silently creates a
   // licensing gap, and nothing else in the build would notice.
   //

@@ -1033,7 +1033,7 @@ export function parseGameSheet(sheetName: string, rows: string[][]): SheetParseR
 
     const roundIndex = roundIndexFromLabel(label);
     if (roundIndex == null) {
-      errors.push(where(`row ${r + 1} has an unrecognised round label ("${label}").`));
+      errors.push(where(`row ${r + 1} has an unrecognized round label ("${label}").`));
       continue;
     }
     if (seenRoundIndexes.has(roundIndex)) {
@@ -1083,7 +1083,7 @@ export function parseGameSheet(sheetName: string, rows: string[][]): SheetParseR
   }
 
   // Overtime is one continuous timeline appended to round 13, so a gap in it
-  // (a "16 (3OT)" with no "15") means rounds were deleted or mislabelled.
+  // (a "16 (3OT)" with no "15") means rounds were deleted or mislabeled.
   [...seenRoundIndexes]
     .filter((i) => i > LAST_FIXED_ROUND)
     .sort((a, b) => a - b)

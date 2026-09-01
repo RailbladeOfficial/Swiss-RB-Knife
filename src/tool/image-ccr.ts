@@ -140,7 +140,7 @@ function setLoading(btn: HTMLButtonElement, loading: boolean) {
 }
 
 /**
- * Toggles a gated panel between active and a greyed-out "locked" state. The
+ * Toggles a gated panel between active and a grayed-out "locked" state. The
  * panel stays visible (so the user can see the step exists) but its body is
  * dimmed and non-interactive until its prerequisite is met. `hint`, when
  * provided, shows the requirement text while disabled and hides when enabled.
@@ -160,7 +160,7 @@ function setPanelEnabled(
 
 /**
  * Wires a "Transparent" checkbox to a color control. When checked, the swatch
- * and hex label grey out and the callback fires with `true`; the caller then
+ * and hex label gray out and the callback fires with `true`; the caller then
  * sends the "transparent" sentinel to Rust instead of a hex value. Unchecking
  * restores the previously chosen color.
  */
@@ -546,7 +546,7 @@ export async function initImageCCR(): Promise<void> {
   });
 
   // ── Initial gated-panel states ──
-  // Each tool's option panels stay visible but greyed until their prerequisite
+  // Each tool's option panels stay visible but grayed until their prerequisite
   // (enough files / a scanned source) is met, so the whole workflow is always
   // discoverable rather than appearing out of nowhere.
   setPanelEnabled(
@@ -863,7 +863,7 @@ export async function initImageCCR(): Promise<void> {
   }
 
   // Enable/disable the whole "2 · Options" panel based on whether a scan has
-  // produced any images. Panel stays visible-but-greyed until then.
+  // produced any images. Panel stays visible-but-grayed until then.
   function gateResizeOptions(enabled: boolean, hintText?: string) {
     setPanelEnabled(
       document.getElementById("resize-options-section")!,

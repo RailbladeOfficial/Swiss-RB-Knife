@@ -11,7 +11,7 @@ Licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE
 
 ## Original Author
 
-**Railblade** — Creator, designer, tester, and project maintainer
+**Railblade**: creator, designer, tester, and project maintainer
 
 ---
 

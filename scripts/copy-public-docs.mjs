@@ -71,7 +71,7 @@ async function copyFiles() {
 
     try {
       // Remove any existing copy first so the result is an exact mirror of
-      // the source. Without this, fs.cp MERGES into an existing folder —
+      // the source. Without this, fs.cp MERGES into an existing folder:
       // screenshots deleted or renamed at the root would live on as ghosts
       // in public/ (and end up bundled into the build) forever.
       await fs.rm(destinationPath, { recursive: true, force: true });

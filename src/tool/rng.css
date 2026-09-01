@@ -176,7 +176,7 @@
   min-width: 0;
 }
 
-/* Says which of the two history modes is live, in words. A switch labelled
+/* Says which of the two history modes is live, in words. A switch labeled
    only "Keep history" leaves the OTHER position unexplained. */
 .rng-toggle-note {
   font-size: 0.7rem;
@@ -298,7 +298,7 @@
 }
 
 /* ── Rows view ─────────────────────────────────────────────────────────────
-   A scrolling list: id on the left, the number in the centre, remove on the
+   A scrolling list: id on the left, the number in the center, remove on the
    right. Capped in height rather than left to grow, so the Generate button
    beside it never scrolls off, but capped generously: this is the view you use
    when you are working through a run of numbers, and the more of them that fit
@@ -315,11 +315,11 @@
   overflow-y: auto;
 }
 
-/* Grid, not flex, and that is what centres the number.
+/* Grid, not flex, and that is what centers the number.
    `1fr auto 1fr` sizes the middle column to the number and splits everything
    left over EQUALLY between the two outer columns, so the value sits on the
-   row's true centre line however long the id beside it or the button opposite
-   it happen to be. Flex would centre it only when those two matched. */
+   row's true center line however long the id beside it or the button opposite
+   it happen to be. Flex would center it only when those two matched. */
 .rng-row {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

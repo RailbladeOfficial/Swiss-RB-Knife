@@ -348,7 +348,7 @@
   animation: budget-face-in 0.4s ease both;
 }
 
-/* Greyed-out view mode buttons in Annual Stats mode */
+/* Grayed-out view mode buttons in Annual Stats mode */
 .budget-view-mode-btn.budget-view-mode-btn-disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -860,11 +860,11 @@ span.entry-col-category:not(.entry-field) {
    own rule (time-tracker.css) sets align-self: flex-start for its flex rows.
    That bleeds into this grid and pins Notes to the top, so when the Expense
    Source wraps to a second line, Notes sits high while Category and Amount
-   centre via the row's align-items: center.
+   center via the row's align-items: center.
    Scoped to #budgetEntries rather than added to the unscoped rule above: both
    files' rules are plain .entry-col-notes at equal specificity and budget.css
    is the later one in the bundle, so an unscoped align-self here would win
-   everywhere and flip the Time Tracker's own notes to centred too. The id
+   everywhere and flip the Time Tracker's own notes to centered too. The id
    keeps the correction on this ledger only, matching how #budgetEntries
    .entry-row above already scopes this grid.
    (The Time Tracker rule also supplies this column's italic and its " ("
@@ -1045,7 +1045,7 @@ span.entry-col-category:not(.entry-field) {
   /* Explicit, for the same reason .setup-item-name (shell.css) carries it:
      .modal-body sets text-align: center and, being later in the bundle, beats
      .setup-body's text-align: left, so anything in a setup modal that should
-     read left-aligned has to say so itself. Without this, bill names centre
+     read left-aligned has to say so itself. Without this, bill names center
      while the Income/Category/Expense-Source tabs (which use .setup-item-name)
      stay left, and the tabs look inconsistent with each other. */
   text-align: left;
@@ -1419,7 +1419,7 @@ span.entry-col-category:not(.entry-field) {
 }
 
 /* Deliberately no pointer-events: none here (unlike the Time Tracker's bar):
-   Merge greys out for a reason the user can't see from the row, and the title
+   Merge grays out for a reason the user can't see from the row, and the title
    that explains it only surfaces if the button still takes hover. */
 .budget-selection-btn:disabled {
   opacity: 0.35;

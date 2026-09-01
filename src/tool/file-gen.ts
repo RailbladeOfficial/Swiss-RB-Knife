@@ -109,7 +109,7 @@ let extModal: Modal;
    VALIDATION
 ============================================================================= */
 
-function normaliseExtension(raw: string): string {
+function normalizeExtension(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   return trimmed.startsWith(".") ? trimmed.toLowerCase() : `.${trimmed.toLowerCase()}`;
@@ -136,7 +136,7 @@ function validateCount(raw: string): string | null {
 function openExtModal(targetInput: HTMLInputElement): void {
   activeExtInput = targetInput;
   // Highlight the pill matching the current value
-  const current = normaliseExtension(targetInput.value);
+  const current = normalizeExtension(targetInput.value);
   document.querySelectorAll<HTMLElement>("#dfg-ext-modal .dfg-ext-pill").forEach((p) => {
     p.classList.toggle("active", p.dataset.ext === current);
   });
@@ -257,7 +257,7 @@ function renderBatchList(): void {
     prefixEl.addEventListener("change", () => { batchEntries[idx].prefix    = prefixEl.value; });
     suffixEl.addEventListener("change", () => { batchEntries[idx].suffix    = suffixEl.value; });
     extEl.addEventListener("change", () => {
-      batchEntries[idx].extension = normaliseExtension(extEl.value);
+      batchEntries[idx].extension = normalizeExtension(extEl.value);
       extEl.value = batchEntries[idx].extension;
     });
 
@@ -364,7 +364,7 @@ async function handleGenerate(): Promise<void> {
     const suffixEl = card.querySelector<HTMLInputElement>(".dfg-batch-suffix");
     if (countEl)  batchEntries[idx].count     = parseInt(countEl.value, 10) || 0;
     if (prefixEl) batchEntries[idx].prefix    = prefixEl.value;
-    if (extEl)    batchEntries[idx].extension = normaliseExtension(extEl.value);
+    if (extEl)    batchEntries[idx].extension = normalizeExtension(extEl.value);
     if (suffixEl) batchEntries[idx].suffix    = suffixEl.value;
   });
 

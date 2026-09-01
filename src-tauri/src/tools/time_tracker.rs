@@ -48,7 +48,7 @@ const MAX_IMPORT_CSV_BYTES: u64 = 50 * 1024 * 1024;
 /// in the other tools.
 ///
 /// The SIZE is checked, though, because reading is only the first of several
-/// copies: the whole file lands in this String, gets serialised into the IPC
+/// copies: the whole file lands in this String, gets serialized into the IPC
 /// response as JSON (escaped, so potentially larger again), and is then parsed
 /// into a JS string on the other side. An accidental pick of a huge file would
 /// multiply its size several times over before anything could reject it, and

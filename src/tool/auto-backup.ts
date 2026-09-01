@@ -374,11 +374,11 @@ let clearBtn: HTMLButtonElement;
 let clearSourceBtn: HTMLButtonElement;
 let clearDestBtn: HTMLButtonElement;
 let presetsBtn: HTMLButtonElement;
-let presetsModal: Modal; // initialised in initPresetsModal once the DOM element exists
+let presetsModal: Modal; // initialized in initPresetsModal once the DOM element exists
 
 /* Setup modal */
 let setupBtn: HTMLButtonElement;
-let setupModal: Modal; // initialised in initSetupModal once the DOM element exists
+let setupModal: Modal; // initialized in initSetupModal once the DOM element exists
 let setupWarningToggle: HTMLInputElement;
 let setupWarningLabel: HTMLElement;
 let setupReminderToggle: HTMLInputElement;
@@ -401,20 +401,20 @@ let disclaimerSkipCheck: HTMLInputElement;
 let headerNav: HTMLElement;
 
 /* Run-confirmation modal */
-let runConfirmModal: Modal; // initialised in initRunConfirmModal
+let runConfirmModal: Modal; // initialized in initRunConfirmModal
 let confirmFilesEl: HTMLElement;
 let confirmSizeEl: HTMLElement;
 let confirmDrivesEl: HTMLElement;
 let confirmSpaceWarningsEl: HTMLElement;
 
 /* Skipped-files modal */
-let skippedFilesModal: Modal; // initialised in initSkippedFilesModal
+let skippedFilesModal: Modal; // initialized in initSkippedFilesModal
 let skippedFilesBtn: HTMLButtonElement;
 let skippedFilesCountEl: HTMLElement;
 let skippedFilesListEl: HTMLElement;
 
 /** Set once initAutoBackup completes. Entry-hook calls that arrive before
- *  then (the startup-restore path navigates before tools initialise) are
+ *  then (the startup-restore path navigates before tools initialize) are
  *  deferred, init applies the disclaimer state itself when it finishes. */
 let _abInitialized = false;
 
@@ -1755,7 +1755,7 @@ async function attachBackupListeners(): Promise<void> {
       // estimates track this machine's reality instead of a manual guess.
       // Guards: only successful runs, only when enough data moved for the
       // measurement to mean something (small deltas are all noise), and only
-      // when the EMA actually initialised. 70/30 blending means one outlier
+      // when the EMA actually initialized. 70/30 blending means one outlier
       // run (thermal throttling, antivirus scan day) can't wreck the value,
       // and a manual override simply becomes the new 70% base. Clamped to the
       // input's own 1–10,000 MB/s range.

@@ -2,7 +2,7 @@
    MODAL: shared primitive
    -----------------------------------------------------------------------------
    Wraps a `.modal-backdrop` element (which contains a single `.modal` panel) and
-   owns every behaviour common to all modals in the app:
+   owns every behavior common to all modals in the app:
 
      • open / close lifecycle (display + .open class + transition-end teardown)
      • body.modal-open toggling
@@ -13,7 +13,7 @@
      • tab strips, via ModalTabs (see below) passed as the `tabs` option
 
    Content and per-modal wiring stay in the owning file (shell.ts / a tool .ts);
-   this primitive only handles the chrome and behaviour. Per-modal hooks:
+   this primitive only handles the chrome and behavior. Per-modal hooks:
      onOpen(): runs after the modal is displayed (load content…)
      onClosed(): runs after the close transition finishes & display:none is set
                   (collapse resets, extra scroll resets, etc.)
@@ -345,7 +345,7 @@ function bindGlobalListeners(): void {
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
 
-    // Switch from the centring transform to fixed positioning for the drag.
+    // Switch from the centering transform to fixed positioning for the drag.
     modal.style.position = "fixed";
     modal.style.margin = "0";
     modal.style.left = `${rect.left}px`;
@@ -387,7 +387,7 @@ function bindGlobalListeners(): void {
   });
 }
 
-/** Clears any inline drag positioning so the modal re-opens centred. */
+/** Clears any inline drag positioning so the modal re-opens centered. */
 function resetPanelPosition(modal: HTMLElement | null): void {
   if (!modal) return;
   modal.style.position = "";
@@ -488,7 +488,7 @@ export class Modal {
       parent.backdrop.classList.remove("open");
       parent.backdrop.style.display = "none";
       parent.backdrop.style.zIndex = "";
-      // Reset panel position so it re-opens centred if returned to
+      // Reset panel position so it re-opens centered if returned to
       resetPanelPosition(parent.panel);
     }
 

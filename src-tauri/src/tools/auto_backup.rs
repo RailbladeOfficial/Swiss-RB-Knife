@@ -573,13 +573,13 @@ pub async fn get_free_space(path: String) -> Result<u64, String> {
 }
 
 fn get_free_space_blocking(path: String) -> Result<u64, String> {
-    // Normalise slashes and grab the first character as the drive letter.
+    // Normalize slashes and grab the first character as the drive letter.
     // Works for "D:/Backup", "D:\Backup", "D:Backup", etc.
-    let normalised = path.replace('\\', "/");
-    if normalised.starts_with("//") {
+    let normalized = path.replace('\\', "/");
+    if normalized.starts_with("//") {
         return Err("Free-space check isn't supported for network (UNC) paths.".to_string());
     }
-    let drive_char = normalised
+    let drive_char = normalized
         .chars()
         .next()
         .ok_or_else(|| "Empty path".to_string())?
@@ -727,7 +727,7 @@ const LOG_WRITER_CAPACITY: usize = 64 * 1024;
 struct FolderLog {
     /// None if the log file couldn't be opened. Logging is best-effort and
     /// must never fail a backup, so every write is silently dropped in that
-    /// case, exactly the behaviour of the `let _ = ...` writes it replaces.
+    /// case, exactly the behavior of the `let _ = ...` writes it replaces.
     writer: Option<std::io::BufWriter<fs::File>>,
     tail: std::collections::VecDeque<String>,
 }

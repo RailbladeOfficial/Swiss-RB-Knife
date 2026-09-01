@@ -10,7 +10,7 @@
    8th, and the same date twice is 0. That is the "how long until / how long
    since" reading, and it's the number the tool leads with. The other reading (
    counting both endpoints, so Aug 1–8 is 8 "days involved", which is what you
-   want for booking a hotel or billing a stay) is shown as a clearly labelled
+   want for booking a hotel or billing a stay) is shown as a clearly labeled
    secondary figure rather than left for the user to guess at.
 
    All arithmetic is done on plain YYYY-MM-DD strings parsed to UTC midnight.

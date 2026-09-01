@@ -989,7 +989,7 @@ function syncSetupUI(): void {
   displayEffectsRow.style.display = display.look === "custom" ? "none" : "";
 
   // Both toggles depend on the ACTIVE theme actually having the thing they
-  // switch. Rather than greying them out (which reads as "broken") they stay
+  // switch. Rather than graying them out (which reads as "broken") they stay
   // usable and the note says why nothing will change. Re-checked on every
   // themechange, so Cycle mode keeps these honest.
   glowNote.textContent = themeHasTitleGlow() ? "" : "This theme has no glow.";

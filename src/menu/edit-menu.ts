@@ -75,7 +75,7 @@ function isInputLike(el: EventTarget | null): el is InputLike {
    Everything below is written to survive an <input type="number">, which is a
    text entry by every measure a user cares about but THROWS on selectionStart
    and setSelectionRange rather than returning null. So each read is guarded,
-   and "cannot tell" is treated as "assume there is a selection": a greyed-out
+   and "cannot tell" is treated as "assume there is a selection": a grayed-out
    Copy on a field that does have text selected is a worse wrong answer than a
    live Copy that turns out to have nothing to do.
 ----------------------------------------------------------------------------- */
@@ -101,7 +101,7 @@ function readSelectedText(el: HTMLElement): string | null {
   return window.getSelection()?.toString() ?? "";
 }
 
-/** Whether the field holds anything at all, for greying out Select All. */
+/** Whether the field holds anything at all, for graying out Select All. */
 function hasContent(el: HTMLElement): boolean {
   return isInputLike(el) ? el.value.length > 0 : (el.textContent ?? "").length > 0;
 }
@@ -241,7 +241,7 @@ export function openEditMenu(el: HTMLElement, x: number, y: number): void {
       },
     },
     { separator: true },
-    // Never greyed out: the webview keeps the undo history privately and
+    // Never grayed out: the webview keeps the undo history privately and
     // offers no way to ask whether it holds anything, so the honest choice is
     // a live row that sometimes does nothing rather than a guess at whether
     // there is something to undo.

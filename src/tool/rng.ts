@@ -255,7 +255,7 @@ export function randomUnit(): number {
  *  Fractional draws are continuous over [min, max] and then rounded to the
  *  requested places, so the two ends are half as likely as an interior value
  *  by exactly the amount rounding says they should be. That is the honest
- *  behaviour: the alternative, drawing integers over a scaled range, quietly
+ *  behavior: the alternative, drawing integers over a scaled range, quietly
  *  changes what "between 1 and 2 to two places" means.
  *
  *  Exported with its arguments rather than reading module state so the rules
@@ -518,7 +518,7 @@ function renderGrid(): void {
 }
 
 /** One scrolling row per number: its id on the left, the number itself in the
- *  centre, and its remove button on the right.
+ *  center, and its remove button on the right.
  *
  *  The number is what the eye is here for, so it takes the middle and every
  *  other row puts it in the same place. The identifying furniture is gathered

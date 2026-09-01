@@ -167,8 +167,8 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
 };
 
 /** Green through red, skipping "none", which is the absence of a priority and
- *  so has no color: a card with no priority set must not be painted grey as if
- *  grey were a priority. */
+ *  so has no color: a card with no priority set must not be painted gray as if
+ *  gray were a priority. */
 /** Blue, then green through red. Blue rather than a paler green for Trivial
  *  because it sits OUTSIDE the urgency ramp: "worth doing, not worth ranking"
  *  is a different statement from "low urgency", and a colder hue says that
@@ -262,7 +262,7 @@ export interface CardComment {
 }
 
 /** The four shapes an attachment is drawn in, decided by its extension.
- *  Anything unrecognised is a "file", which is a row you can open rather than
+ *  Anything unrecognized is a "file", which is a row you can open rather than
  *  an error: the app not knowing how to preview a .docx is no reason to refuse
  *  to hold one. */
 export type AttachmentKind = "image" | "video" | "audio" | "file";
@@ -561,7 +561,7 @@ const SAVE_DEBOUNCE_MS = 400;
  *  5,000 rather than the original 2,000, on measurement rather than nerve. A
  *  5,000-card board of detailed cards (a paragraph of description, tags, five
  *  subtasks, a couple of comments each) is 8.4 MB of JSON and takes 24 ms to
- *  serialise, which is well inside the 400 ms save debounce. Even 10,000 is
+ *  serialize, which is well inside the 400 ms save debounce. Even 10,000 is
  *  survivable at 37 ms. The data side is simply not what gives out first.
  *
  *  What gives out first is the DOM, and that is why there is still a number
@@ -695,7 +695,7 @@ const deletedBoards = new Set<string>();
  * assigned. Without this guard that is a crash on launch, and the only way to
  * get out of it is to edit the settings file by hand.
  */
-let initialised = false;
+let initialized = false;
 
 /** Which board the board view is showing, or null on the gallery. */
 let currentBoardId: string | null = null;
@@ -858,7 +858,7 @@ export function readableTextOn(background: string): string {
     : LIGHT_INK;
 }
 
-/** The ink to actually paint, honouring a card's choice.
+/** The ink to actually paint, honoring a card's choice.
  *
  *  "auto" measures and picks the readable one, which is the right default and
  *  what everything did before this was a choice. Forcing light or dark is for
@@ -1069,7 +1069,7 @@ function buildContents(board: Board): BoardContents {
  */
 /** The save currently running, or a settled promise when nothing is.
  *
- *  Saves are SERIALISED through this rather than being allowed to overlap, and
+ *  Saves are SERIALIZED through this rather than being allowed to overlap, and
  *  that is a correctness requirement rather than tidiness. flushSave() is used
  *  as a barrier by a snapshot restore, which replaces the state wholesale.
  *
@@ -1164,7 +1164,7 @@ async function flushSave(): Promise<void> {
 }
 
 /* -----------------------------------------------------------------------------
-   NORMALISATION
+   NORMALIZATION
    Everything below coerces one record from disk into a complete, in-range
    object, or returns null to drop it. A record that cannot be repaired into
    something the renderer can draw is worse than a missing one: it takes the
@@ -1195,7 +1195,7 @@ export function normalizeSectionOrder(raw: unknown): CardSection[] {
      Appending was the obvious thing and it was wrong: an order saved before Due
      Date existed would get Due Date after Stage Dates, which is not where the
      default puts it and not what anyone asked for. Inserting it relative to the
-     neighbours it already knows about respects both the arrangement the user
+     neighbors it already knows about respects both the arrangement the user
      made and the intent of the new section's default position. */
   for (const [index, section] of CARD_SECTIONS.entries()) {
     if (seen.has(section)) continue;
@@ -1740,7 +1740,7 @@ export function cardColorMode(card: Card, board: Board | null): CardColorMode {
  *
  *  Returning null rather than a fallback color is deliberate for the derived
  *  modes: a card colored "by priority" with no priority set, or "by tag" with
- *  no colored tag, has nothing to say, and a grey card would be saying
+ *  no colored tag, has nothing to say, and a gray card would be saying
  *  something. It just looks like every other uncolored card until it has a
  *  reason not to. */
 export function resolveCardColor(card: Card, board: Board | null): string | null {
@@ -2165,7 +2165,7 @@ function buildBoardTile(board: Board): HTMLElement {
   }
 
   // The mini column bars are the tile's real content: a board's shape (a lot
-  // in Backlog, nothing in Testing) is recognisable at a glance in a way a
+  // in Backlog, nothing in Testing) is recognizable at a glance in a way a
   // total never is.
   const bars = document.createElement("span");
   bars.className = "kb-board-tile-bars";
@@ -2785,7 +2785,7 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
  *  modal. That one acts on a card you already have open, so it can close the
  *  modal afterwards and has no need to offer "Open". This one is the reverse:
  *  it is the shortcut past opening the card at all, which is why priority,
- *  column and board — the three fields most often changed on their own — are
+ *  column and board, the three fields most often changed on their own, are
  *  here as submenus but are plain form controls in the modal. */
 function boardCardMenu(card: Card): MenuItem[] {
   const board = getBoard(card.boardId);
@@ -3680,7 +3680,7 @@ function getCardModal(): Modal {
 
 /** Deletes a card, asking first unless this board says not to. The single
  *  delete path, shared by the card menu and by the bin on the card face, so the
- *  confirmation preference cannot end up honoured in one place and not the
+ *  confirmation preference cannot end up honored in one place and not the
  *  other. */
 function requestDeleteCard(card: Card, opts: { reopen?: () => void } = {}): void {
   const remove = (): void => {
@@ -4436,7 +4436,7 @@ async function pickAttachments(boardId: string, have: number): Promise<Attachmen
 /**
  * Stores an image that arrived on the clipboard.
  *
- * The bytes go over as base64 rather than as a byte array: an array serialises
+ * The bytes go over as base64 rather than as a byte array: an array serializes
  * as JSON numbers, which is several bytes on the wire per byte of image, and a
  * screenshot is small enough that base64's 33% is the cheaper of the two.
  */
@@ -7895,7 +7895,7 @@ interface KanbanBackupInfo {
 
 /** What one captured file is, in words. The board name is looked up rather than
  *  stored in the snapshot, so a board renamed since is described by the name it
- *  has now, which is the one you will recognise. */
+ *  has now, which is the one you will recognize. */
 function describeBackupFile(entry: KanbanBackupFileInfo): string {
   if (!entry.boardId) return "Board list and tags";
   const board = getBoard(entry.boardId);
@@ -8239,7 +8239,7 @@ registerTransferable({
     if (!payload || !Array.isArray(payload.boards) || !Array.isArray(payload.cards)) {
       throw new Error("that file does not hold a board list");
     }
-    // Normalised on the way in, exactly as a load is. A hand-edited export is
+    // Normalized on the way in, exactly as a load is. A hand-edited export is
     // outside input like any other, and this is the one path where it reaches
     // the app.
     const nextBoards = payload.boards
@@ -8379,7 +8379,7 @@ export function initKanban(): void {
 
   // Last, and before the load: everything above has to be in place before any
   // shell hook is allowed to run, and loadAll() calls back into rendering.
-  initialised = true;
+  initialized = true;
   void loadAll();
 }
 
@@ -8389,10 +8389,10 @@ export function initKanban(): void {
  *  The re-render also picks up a date rollover: a card that was "due tomorrow"
  *  when you left is overdue when you come back the next morning. */
 export function onKanbanToolEntry(): void {
-  // See `initialised`: the shell can route into this tool before init() has
+  // See `initialized`: the shell can route into this tool before init() has
   // reached it. loadAll() renders once it finishes, so there is nothing lost
   // by doing nothing here.
-  if (!initialised) return;
+  if (!initialized) return;
   clearFilters();
   renderAll();
 }
@@ -8401,7 +8401,7 @@ export function onKanbanToolEntry(): void {
  *  still sitting in the save debounce, so an edit made in the last half-second
  *  before leaving is not waiting on the next visit. */
 export async function onKanbanToolExit(): Promise<void> {
-  if (!initialised) return;
+  if (!initialized) return;
   // Leaving the tool ends any comment that was only half written. Its files
   // were already imported, so this is also the last chance to unlink them
   // before nothing points at them any more.
@@ -8415,6 +8415,6 @@ export async function onKanbanToolExit(): Promise<void> {
  *  jump is recorded: mouse-back then returns to the board it interrupted
  *  rather than orphaning it. */
 export function onKanbanIconClicked(): void {
-  if (!initialised) return;
+  if (!initialized) return;
   showKbView("boards");
 }

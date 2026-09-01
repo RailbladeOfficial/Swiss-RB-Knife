@@ -101,11 +101,11 @@ test("the first paint uses the default theme (a wrong href here means a blank fi
   assert.ok(exists(`public/themes/${def}.css`), `default theme ${def}.css is missing`);
 });
 
-test("the colored stripe on a tool panel is not silently overwritten with grey", () => {
+test("the colored stripe on a tool panel is not silently overwritten with gray", () => {
   // Budget, Time Tracker and Auto-Backup mark their panels with a colored
   // left border. Nine themes declared that border and THEN declared a plain
   // `border-color` after it, and because border-color is a shorthand covering
-  // all four sides, it repainted the stripe grey. The color was in the file,
+  // all four sides, it repainted the stripe gray. The color was in the file,
   // correct, and never once reached the screen.
   //
   // In CSS the later declaration wins, so border-color has to come FIRST.
@@ -121,7 +121,7 @@ test("the colored stripe on a tool panel is not silently overwritten with grey",
       }
     }
   }
-  assert.deepEqual(problems, [], "these panel stripes render grey instead of their color");
+  assert.deepEqual(problems, [], "these panel stripes render gray instead of their color");
 });
 
 test("the Special tab stays alphabetical", () => {

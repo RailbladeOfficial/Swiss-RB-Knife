@@ -16,7 +16,7 @@
    -----------------------------------------------------------------------------
    The callout that slots in under the version line in the About modal, plus its
    "Ignore this Version" button. Toggled via inline display by refreshUpdateUI().
-   Sits inside .modal-body, so it inherits the centred text + link color there.
+   Sits inside .modal-body, so it inherits the centered text + link color there.
 ============================================================================= */
 
 .update-notice {
@@ -260,7 +260,7 @@
    content, which otherwise starts flush against it.
    Scoped to this modal on purpose: .changelog-body is shared by seven modals
    (Changelog, Readme, Security, Contributing, the license gate, the full
-   licence text, and this one) and this is the only one with a tab strip above
+   license text, and this one) and this is the only one with a tab strip above
    it, so putting the space on the shared class would indent six modals that
    have nothing to be separated from.
    margin rather than padding because #licensingBody is the scroll region:

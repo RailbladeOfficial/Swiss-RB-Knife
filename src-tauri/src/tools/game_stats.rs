@@ -48,7 +48,7 @@ const MAX_IMPORT_WORKBOOK_BYTES: u64 = 64 * 1024 * 1024;
    The ZIP and sheet-XML handling all lives in the frontend (game-stats-xlsx.ts),
    where the WebView already provides DecompressionStream for the inflate.
 
-   Bytes cross the IPC boundary base64-encoded. Tauri serialises a Vec<u8> as a
+   Bytes cross the IPC boundary base64-encoded. Tauri serializes a Vec<u8> as a
    JSON array of decimal numbers, which costs roughly 4 bytes of transport per
    byte of payload; base64 costs 1.33 and is a plain string on both sides.
 ============================================================================= */

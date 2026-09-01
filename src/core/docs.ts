@@ -370,7 +370,7 @@ updateNotifyLaterBtn.addEventListener("click", () => updateNotifyModal.close());
    licensing…): About closes, this opens; back-arrow and Cancel return to About;
    the X closes out entirely. Only the Confirm button actually writes the
    ignored version, matching the "ignore is committed on the confirm modal,
-   not the About button" behaviour we settled on.
+   not the About button" behavior we settled on.
 ----------------------------------------------------------------------------- */
 
 const ignoreVersionModal = new Modal(ignoreVersionBackdrop);
@@ -796,7 +796,7 @@ document.getElementById("readmeBody")!.addEventListener("click", (e) => {
   // in a packaged build the page origin is Tauri's internal asset protocol,
   // which the OS's default browser can't load. So in-app we intercept the
   // click before that default navigation fires and show it in our own
-  // lightbox instead. Same behaviour in dev and prod, and the markdown
+  // lightbox instead. Same behavior in dev and prod, and the markdown
   // source is untouched so GitHub is unaffected.
   //
   // Match against the wrapping <a> too, not just the <img> itself: the
@@ -976,7 +976,7 @@ async function loadReadme(): Promise<void> {
    Plain single-document modals: fetch the markdown once, render it, and let
    internal doc links route onward. They're independent Modal instances rather
    than extra tabs on the Licensing modal because neither is a licensing
-   document, and an independent modal can grow its own behaviour later without
+   document, and an independent modal can grow its own behavior later without
    adding cases to a shared one.
 
    Both files are copied into public/ by copy-public-docs.mjs, same as
@@ -1385,7 +1385,7 @@ function renderMarkdown(md: string): string {
     // Start of a raw HTML block. README.md is a trusted local file we
     // already innerHTML the rest of, so passthrough here isn't a new
     // trust boundary. Markdown syntax is NOT processed inside these blocks
-    // (matches standard Markdown behaviour), use HTML tags throughout.
+    // (matches standard Markdown behavior), use HTML tags throughout.
     const htmlOpenMatch = line.match(/^<([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>/);
     if (htmlOpenMatch) {
       const tag = htmlOpenMatch[1].toLowerCase();

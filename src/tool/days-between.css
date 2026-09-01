@@ -12,7 +12,7 @@
 
 /* ── Date pickers ──────────────────────────────────────────────────────────── */
 
-/* Centred rather than bottom-aligned: each date column is now label + input +
+/* Centered rather than bottom-aligned: each date column is now label + input +
    its own nudge row, and the swap button belongs between the two columns
    rather than pinned to either edge of them. */
 .dbd-dates-row {

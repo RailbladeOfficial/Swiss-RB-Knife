@@ -659,7 +659,7 @@
               <span class="tool-header-notice">Not Updated In <span id="budgetDueDays">—</span> Days</span>
               <!-- The only way to clear this reminder short of entering data,
                    see markBudgetReviewed(). Inside the wrapper so it stays with
-                   the text as one centred unit. -->
+                   the text as one centered unit. -->
               <button id="budgetDueClearBtn" class="tool-header-notice-btn"
                 title="Clear this reminder without entering anything, for when you've looked and there's nothing to add">Mark
                 Reviewed</button>
@@ -1846,7 +1846,7 @@
             </button>
             <span class="tool-view-title">Auto-Backup</span>
             <!-- Backup-due line. The tool-header counterpart to the Home
-                 header's "Update Available" notice, centred across the bar the
+                 header's "Update Available" notice, centered across the bar the
                  same way. Shown/hidden by refreshBackupDueUI() alongside the
                  sidebar pulse. -->
             <div id="ab-due-notice" class="tool-header-notice-wrap" style="display: none;">
@@ -2405,7 +2405,7 @@
                 </div>
                 <p class="option-hint">Pick a whole folder, or select one or more individual images.</p>
 
-                <!-- Scan progress, shown while the source is being analysed -->
+                <!-- Scan progress, shown while the source is being analyzed -->
                 <div id="resize-scan-progress" class="resize-scan-progress" style="display:none">
                   <span class="scan-spinner"></span>
                   <div class="progress-bar-track">
@@ -3331,7 +3331,7 @@
         <div id="themePickerGrid" class="theme-picker-grid"></div>
 
         <!-- Random tab: the tile on the left, its settings to the right.
-             The settings panel is always visible here, greyed out and
+             The settings panel is always visible here, grayed out and
              inert (see .theme-picker-random-settings.inactive) until Random
              is actually the active theme, not just being previewed. -->
         <div id="themePickerRandomPane" class="theme-picker-random-pane" style="display:none;">
@@ -4411,9 +4411,9 @@
         </div>
 
         <!-- DATA
-             Snapshots, the same hourly capture Budget and Kanban have had.
-             Every save records the file it is about to overwrite, so an entry
-             deleted by mistake is recoverable rather than gone. -->
+             Every save records the file it is about to overwrite, into one
+             bucket per hour, so an entry deleted by mistake is recoverable
+             rather than gone. -->
         <div id="ttTabData" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
 
@@ -4611,7 +4611,7 @@
       <div class="modal-body setup-body">
 
         <!-- Two tabs rather than two halves of one scroll: the timer's
-             behaviour and how it looks on someone else's screen are set at
+             behavior and how it looks on someone else's screen are set at
              different times and have nothing to say to each other. Each pane
              ends with its own Reset for the same reason. -->
         <div class="modal-tabs">
@@ -4706,7 +4706,7 @@
 
         <div class="cd-setup-actions">
           <button id="cd-setup-reset" class="modal-cancel-btn"
-            title="Restore the default timer behaviour. Leaves Display View alone.">Reset Timer Settings</button>
+            title="Restore the default timer behavior. Leaves Display View alone.">Reset Timer Settings</button>
         </div>
 
         </div><!-- /cdTabTimer -->
@@ -7288,9 +7288,9 @@
         </div>
 
         <!-- DATA
-             Snapshots, the same hourly capture Budget and Kanban have had.
-             Every save records the file it is about to overwrite, so a game
-             deleted by mistake is recoverable rather than gone. -->
+             One copy of the database per hour, taken at the first change of
+             that hour, so a game deleted by mistake is recoverable rather than
+             gone. -->
         <div id="gsTabData" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
 
@@ -7298,7 +7298,7 @@
               <div class="settings-label-col">
                 <span class="kb-label-with-info">Snapshots
                   <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="A copy is taken once an hour, at the first change of that hour, because these records live in a database rather than a file. Restoring is itself captured, so an unwanted restore is undone by restoring the newest entry. Preferences are a separate file and are not rewound by a restore.">&#8505;</button>
+                    data-tooltip="A copy is taken once an hour, at the first change of that hour. Restoring is itself captured, so an unwanted restore is undone by restoring the newest entry. Preferences are a separate file and are not rewound by a restore.">&#8505;</button>
                 </span>
                 <span id="gsBackupSummary" class="settings-status-badge"></span>
               </div>
