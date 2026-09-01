@@ -1,0 +1,414 @@
+/* =============================================================================
+   RICH TEXT
+   -----------------------------------------------------------------------------
+   Styling for the output of renderRichText() (src/core/rich-text.ts), plus the
+   formatting toolbar that writes it and the attachment tiles that sit under it.
+
+   Kept apart from docs.css on purpose. That file styles the app's own shipped
+   documents, which are pages: full-width headings, generous rhythm, images
+   sized to a reading column. This styles a paragraph of somebody's notes inside
+   a modal that also has to hold six other blocks, so everything here is tuned
+   down: headings are barely larger than the body, the vertical rhythm is tight,
+   and nothing is allowed to set its own width.
+
+   Every rule is scoped under .rt-body or .rt-* so a rendered block cannot
+   affect the modal around it.
+============================================================================= */
+
+.rt-body {
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.5;
+  /* A pasted URL or a wide code line must not stretch the modal. */
+  overflow-wrap: anywhere;
+}
+
+.rt-body > *:first-child {
+  margin-top: 0;
+}
+
+.rt-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.rt-p {
+  margin: 0 0 8px;
+}
+
+.rt-h1,
+.rt-h2,
+.rt-h3 {
+  margin: 14px 0 6px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.rt-h1 {
+  font-size: 15px;
+}
+
+.rt-h2 {
+  font-size: 14px;
+}
+
+.rt-h3 {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.rt-list {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.rt-list li {
+  margin: 2px 0;
+}
+
+/* Task lines carry their own box, so they lose the list marker. */
+.rt-task {
+  list-style: none;
+  margin-left: -20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.rt-task-box {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 12px;
+  text-align: center;
+  color: var(--color-success);
+}
+
+.rt-task-done > span:last-child {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.rt-quote {
+  margin: 0 0 8px;
+  padding: 2px 0 2px 10px;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.rt-quote .rt-p:last-child {
+  margin-bottom: 0;
+}
+
+.rt-hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.rt-code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
+.rt-pre {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.rt-pre code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  white-space: pre;
+}
+
+.rt-link {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.rt-link:hover {
+  filter: brightness(1.2);
+}
+
+/* Tables scroll inside their own wrapper rather than widening the modal. */
+.rt-table-wrap {
+  margin: 0 0 8px;
+  overflow-x: auto;
+}
+
+.rt-table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.rt-table th,
+.rt-table td {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.rt-table th {
+  background: var(--color-input-bg);
+  font-weight: 600;
+}
+
+/* -----------------------------------------------------------------------------
+   THE EDITOR
+   -----------------------------------------------------------------------------
+   One field, two faces: a textarea you type in and a rendered preview you read.
+   Only one is in the DOM flow at a time (the other is display:none), because
+   both being present would make the section jump height as you switch.
+----------------------------------------------------------------------------- */
+
+.rt-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* The toolbar buttons carry their own `display`, which outranks the browser's
+   default rule for [hidden]. Without this, hiding the format buttons in preview
+   mode would set the attribute and change nothing on screen. */
+.rt-editor [hidden] {
+  display: none !important;
+}
+
+.rt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+
+.rt-tool-btn {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-input-bg);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--hover-transition);
+}
+
+.rt-tool-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.rt-tool-bold {
+  font-weight: 800;
+}
+
+.rt-tool-italic {
+  font-style: italic;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.rt-tool-strike {
+  text-decoration: line-through;
+}
+
+.rt-tool-code {
+  font-family: Consolas, "Courier New", monospace;
+}
+
+/* Pushes the view switch to the far end of the strip. */
+.rt-toolbar-gap {
+  flex: 1 1 auto;
+}
+
+.rt-view-btn {
+  padding: 0 9px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--hover-transition);
+}
+
+.rt-view-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.rt-view-btn.rt-view-active {
+  background: var(--color-btn);
+  border-color: var(--color-btn);
+  color: var(--color-btn-text);
+}
+
+/* The rendered face. Clickable, because the fastest route from reading a note
+   to fixing it is clicking the word that is wrong. */
+.rt-preview {
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-input-bg);
+  cursor: text;
+}
+
+.rt-preview:hover {
+  border-color: var(--color-accent-input);
+}
+
+.rt-preview-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* -----------------------------------------------------------------------------
+   ATTACHMENTS
+   -----------------------------------------------------------------------------
+   Three shapes, decided by what the file is rather than by a setting: a picture
+   is shown, a video or a sound is played, and everything else is a row you can
+   click to open in whatever program owns it.
+----------------------------------------------------------------------------- */
+
+.rt-attach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rt-attach-list:empty {
+  display: none;
+}
+
+.rt-attach {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-input-bg);
+  overflow: hidden;
+}
+
+/* A file row: icon, name, size, and the actions on the right. */
+.rt-attach-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+}
+
+.rt-attach-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+}
+
+.rt-attach-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.rt-attach-name:hover {
+  filter: brightness(1.2);
+}
+
+.rt-attach-size {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rt-attach-missing .rt-attach-name {
+  color: var(--color-danger);
+  text-decoration: line-through;
+  cursor: default;
+}
+
+.rt-attach-media {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  background: #000;
+}
+
+.rt-attach-img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  background: var(--color-bg);
+  cursor: zoom-in;
+}
+
+.rt-attach-audio {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+}
+
+/* The caption strip under a picture or a video: what it is called, how big it
+   is, and how to get rid of it. */
+.rt-attach-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.rt-attach-remove {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--hover-transition);
+}
+
+.rt-attach-remove:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}

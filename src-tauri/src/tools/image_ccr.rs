@@ -1236,6 +1236,65 @@ mod tests {
     }
 
     #[test]
+    fn every_accepted_format_actually_round_trips() {
+        // The `image` crate is built with default-features off and an explicit
+        // format list (see Cargo.toml), so a format this app ACCEPTS but did not
+        // ask the crate for would compile perfectly and then fail at the moment
+        // a user picks a file. ImageFormat's variants exist whatever features
+        // are on; only the codec behind them is gated, so nothing about that
+        // mistake is visible until runtime.
+        //
+        // This decodes what the resize path is allowed to be handed. Encoding is
+        // exercised where the app actually encodes: PNG and JPEG on the resize
+        // path, plus GIF and WebP on the compress path, which keeps the source
+        // file's extension.
+        let dir = scratch("formats");
+        let img = image::RgbaImage::from_pixel(4, 4, image::Rgba(RED));
+
+        // Probed as a DynamicImage, which is what every save site in this file
+        // actually holds. DynamicImage::save_with_format converts to a color
+        // type the target encoder supports; a bare ImageBuffer does not, which
+        // is why this must not be simplified to img.save_with_format().
+        let dynimg = DynamicImage::ImageRgba8(img.clone());
+        for (ext, fmt) in [
+            ("png", ImageFormat::Png),
+            ("jpg", ImageFormat::Jpeg),
+            ("gif", ImageFormat::Gif),
+            ("bmp", ImageFormat::Bmp),
+            ("tiff", ImageFormat::Tiff),
+            ("webp", ImageFormat::WebP),
+        ] {
+            let p = dir.join(format!("probe.{ext}"));
+            dynimg
+                .save_with_format(&p, fmt)
+                .unwrap_or_else(|e| panic!("cannot ENCODE {ext}: {e}. Is its feature on in Cargo.toml?"));
+
+            let back = open_image_limited(&p)
+                .unwrap_or_else(|e| panic!("cannot DECODE {ext}: {e}. Is its feature on in Cargo.toml?"));
+            assert_eq!(back.width(), 4, "{ext} decoded to the wrong size");
+            assert_eq!(back.height(), 4, "{ext} decoded to the wrong size");
+        }
+
+        // ".tif" is the other spelling the resize path accepts, and it has to
+        // resolve to the same decoder as ".tiff".
+        let tif = dir.join("probe.tif");
+        dynimg.save_with_format(&tif, ImageFormat::Tiff).unwrap();
+        assert!(open_image_limited(&tif).is_ok(), "the .tif spelling does not decode");
+
+        // Every extension the resize path admits is covered above. If that list
+        // grows, this fails until the new one is added here AND to Cargo.toml.
+        let covered = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif"];
+        assert_eq!(
+            RESIZE_SUPPORTED_EXTS.len(),
+            covered.len(),
+            "the resize path accepts a format this test does not probe",
+        );
+        for ext in RESIZE_SUPPORTED_EXTS {
+            assert!(covered.contains(&ext), "{ext} is accepted but never probed here");
+        }
+    }
+
+    #[test]
     fn stacks_vertically_centring_narrower_sources_and_honouring_the_gap() {
         let d = scratch("vertical");
         let a = solid(&d, "a.png", 10, 20, RED);

@@ -18,6 +18,10 @@
 ============================================================================= */
 
 import { settings } from "../core/settings-store";
+// From the leaf, not from shell: theme-core is deliberately outside shell's
+// import graph, and reaching into it here is what put the app in a load-order
+// loop once already.
+import { devWarn } from "../core/dev-log";
 import {
   PERSISTENT_RANDOM_KEY,
   applyPalette,
@@ -88,7 +92,7 @@ export function isKnownBuiltinTheme(id: string): boolean {
 export function resolveThemeId(themeId: string): string {
   const migrated = migrateThemeId(themeId);
   if (isKnownBuiltinTheme(migrated)) return migrated;
-  console.warn(
+  devWarn(
     `[theme] unknown theme id ${JSON.stringify(themeId)}, falling back to ${JSON.stringify(DEFAULT_THEME_ID)}`,
   );
   return DEFAULT_THEME_ID;

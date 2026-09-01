@@ -38,7 +38,6 @@
      countdown_start_ticker, countdown_stop_ticker
 ============================================================================= */
 
-use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -49,24 +48,7 @@ use tauri::{AppHandle, Emitter};
    DATA COMMANDS
 ============================================================================= */
 
-/// Writes the given JSON string to countdown.json in the data directory.
-#[tauri::command]
-pub fn save_countdown_data(app: AppHandle, data: String) -> Result<(), String> {
-    crate::atomic_write(
-        &crate::get_data_path(&app, "countdown.json"),
-        data.as_bytes(),
-    )
-}
 
-/// Reads and returns the contents of countdown.json.
-/// Returns an empty root object if the file does not exist.
-#[tauri::command]
-pub fn load_countdown_data(app: AppHandle) -> Result<String, String> {
-    match fs::read_to_string(crate::get_data_path(&app, "countdown.json")) {
-        Ok(content) => Ok(content),
-        Err(_) => Ok(r#"{"session":null,"log":[]}"#.to_string()),
-    }
-}
 
 /* =============================================================================
    DISPLAY TICKER

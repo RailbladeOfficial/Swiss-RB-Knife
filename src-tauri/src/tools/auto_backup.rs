@@ -485,35 +485,9 @@ fn validate_backup_paths(sources: &[String], destinations: &[String]) -> Result<
    PERSISTENCE COMMANDS
 ============================================================================= */
 
-/// Persists the backup config (sources, destinations, copy speed) to disk.
-#[tauri::command]
-pub fn save_backup_config(app: AppHandle, data: String) -> Result<(), String> {
-    crate::atomic_write(&crate::get_data_path(&app, "auto-backup.json"), data.as_bytes())
-}
 
-/// Loads the backup config from disk. Returns sensible defaults if not found.
-#[tauri::command]
-pub fn load_backup_config(app: AppHandle) -> Result<String, String> {
-    match fs::read_to_string(crate::get_data_path(&app, "auto-backup.json")) {
-        Ok(content) => Ok(content),
-        Err(_) => Ok(r#"{"sources":[],"destinations":[],"copySpeed":31457280}"#.to_string()),
-    }
-}
 
-/// Persists the presets list to disk.
-#[tauri::command]
-pub fn save_backup_presets(app: AppHandle, data: String) -> Result<(), String> {
-    crate::atomic_write(&crate::get_data_path(&app, "auto-backup-presets.json"), data.as_bytes())
-}
 
-/// Loads the presets list from disk. Returns an empty array if not found.
-#[tauri::command]
-pub fn load_backup_presets(app: AppHandle) -> Result<String, String> {
-    match fs::read_to_string(crate::get_data_path(&app, "auto-backup-presets.json")) {
-        Ok(content) => Ok(content),
-        Err(_) => Ok("[]".to_string()),
-    }
-}
 
 /* =============================================================================
    FOLDER STATS COMMAND  (files + dirs + bytes)

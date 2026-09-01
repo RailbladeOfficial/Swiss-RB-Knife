@@ -99,13 +99,21 @@ function modulesInCycles(graph) {
  *
  *  Deliberately keeps `if (...) { }` and `for (...) { }` blocks, which DO run at
  *  load, by only stripping a block that directly follows `=>` or a `function`
- *  parameter list. */
+ *  parameter list.
+ *
+ *  The \b word boundaries around `function` are load-bearing twice over. They
+ *  stop the pattern matching inside an identifier, and they are also the part
+ *  that was silently missing: two literal backspace characters sat here for a
+ *  while instead, which no editor renders, so the alternative could never match
+ *  and every `function foo() { ... }` body was being scanned as though it ran at
+ *  load. The check still passed, because it was only ever going to report
+ *  MORE than it should. */
 function stripFunctionBodies(text) {
   let out = "";
   let i = 0;
   while (i < text.length) {
     const rest = text.slice(i);
-    const m = /^(=>\s*|function[^(){}]*\([^()]*\)\s*)\{/.exec(rest);
+    const m = /^(=>\s*|\bfunction\b[^(){}]*\([^()]*\)\s*)\{/.exec(rest);
     if (!m) {
       out += text[i];
       i++;

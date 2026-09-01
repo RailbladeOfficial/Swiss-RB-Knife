@@ -35,7 +35,6 @@
      tts_repeater_start_timer, tts_repeater_stop_timer
 ============================================================================= */
 
-use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -46,24 +45,7 @@ use tauri::{AppHandle, Emitter};
    DATA COMMANDS
 ============================================================================= */
 
-/// Writes the given JSON string to tts-repeater.json in the data directory.
-#[tauri::command]
-pub fn save_tts_repeater_data(app: AppHandle, data: String) -> Result<(), String> {
-    crate::atomic_write(
-        &crate::get_data_path(&app, "tts-repeater.json"),
-        data.as_bytes(),
-    )
-}
 
-/// Reads and returns the contents of tts-repeater.json.
-/// Returns an empty root object if the file does not exist.
-#[tauri::command]
-pub fn load_tts_repeater_data(app: AppHandle) -> Result<String, String> {
-    match fs::read_to_string(crate::get_data_path(&app, "tts-repeater.json")) {
-        Ok(content) => Ok(content),
-        Err(_) => Ok(r#"{"settings":null,"presets":[],"display":null}"#.to_string()),
-    }
-}
 
 /* =============================================================================
    REPEAT TIMER

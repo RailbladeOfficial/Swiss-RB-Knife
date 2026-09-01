@@ -31,6 +31,8 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
+import { devError, devWarn, isDev } from "./dev-log";
+import { initDataTransfer, refreshDataTab } from "./data-transfer";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { Modal, ModalTabs, setGlobalModalOpenHook } from "../modal/modal";
@@ -769,18 +771,13 @@ export function escapeHtml(value: unknown): string {
    relying on the `vite/client` ambient types being in scope.
 ============================================================================= */
 
-const __DEV__: boolean =
-  (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
-
-/** console.error, but silent in production builds. */
-export function devError(...args: unknown[]): void {
-  if (__DEV__) console.error(...args);
-}
-
-/** console.warn, but silent in production builds. */
-export function devWarn(...args: unknown[]): void {
-  if (__DEV__) console.warn(...args);
-}
+/* Both now live in core/dev-log.ts, which imports nothing, and are re-exported
+   here so the several dozen files already importing them from shell keep
+   working. The move was not tidying: theme-core.ts does not import shell, could
+   not reach these, and had quietly grown a bare console.warn that logged in
+   production while every sibling call was correctly silent. */
+export { devError, devWarn } from "./dev-log";
+const __DEV__ = isDev;
 
 /* =============================================================================
    SIDEBAR NAVIGATION
@@ -831,6 +828,14 @@ function applyViewScroll(): void {
  *  This lets two sidebar items point at the same section (e.g. Auto-Backup and Dummy
  *  File Generator both live in "files") and still highlight independently.
  *  Also triggers a palette regeneration when the theme is set to Regenerative Random. */
+/** Navigates to a tool from outside the shell. The Data tab in App Settings
+ *  uses this: a tool's own import screens belong to that tool, so a link to one
+ *  has to put you in front of it rather than open a modal over whatever you
+ *  happened to be looking at. */
+export function navigateToTool(sectionKey: string, toolKey: string): void {
+  switchSection(sectionKey, toolKey);
+}
+
 function switchSection(sectionKey: string, toolKey?: string): void {
   // Fire tool-exit hooks BEFORE the view changes. Budget debounces its saves
   // (400 ms), so an edit made just before navigating away would otherwise
@@ -901,7 +906,7 @@ export function activateSection(sectionKey: string): void {
   // all: a hand-edited settings file, or a shell-state naming a section that
   // no longer exists AND that currentSectionId() has no rename for.
   if (!sectionEl && sectionKey !== "home") {
-    console.warn(`[nav] no section "${sectionKey}", falling back to home`);
+    devWarn(`[nav] no section "${sectionKey}", falling back to home`);
     activateSection("home");
     return;
   }
@@ -2220,7 +2225,7 @@ async function loadSettings(): Promise<void> {
    SETTINGS MODAL
 ============================================================================= */
 
-export type SettingsTab = "display" | "audio" | "preferences";
+export type SettingsTab = "display" | "audio" | "preferences" | "data";
 
 /* Declaration order is tab order: Display is what a fresh open lands on.
 
@@ -2235,8 +2240,88 @@ const settingsTabs = new ModalTabs<SettingsTab>({
     display: "settingsTabDisplay",
     audio: "settingsTabAudio",
     preferences: "settingsTabPreferences",
+    data: "settingsTabData",
+  },
+  onActivate: (tab) => {
+    // The tool list and its counts change as tools are used, so they are read
+    // when the tab is looked at rather than once at startup.
+    if (tab === "data") refreshDataTab();
   },
 });
+
+/* The Data tab's two shell services, handed over rather than imported: shell
+   imports data-transfer, and importing back would put the two in a load-order
+   loop of exactly the kind module-init.test.mjs exists to catch. */
+initDataTransfer({
+  flash: (msg, kind, ms) => flash(msg, kind ?? "success", ms),
+  confirm: (opts, run) => appConfirm({ ...opts, reopen: () => openSettingsOnTab("data") }, run),
+});
+
+/* =============================================================================
+   APP CONFIRM
+   -----------------------------------------------------------------------------
+   The shell's own "are you sure", for actions that belong to the app rather
+   than to one tool. Same rule every confirm in this app follows: it REPLACES
+   what it was launched from rather than stacking on it, and the caller says how
+   to get back, because only the caller knows.
+============================================================================= */
+
+let _appConfirmModal: Modal | null = null;
+let appConfirmAction: (() => void) | null = null;
+let appConfirmReturn: (() => void) | null = null;
+
+function getAppConfirmModal(): Modal {
+  if (_appConfirmModal) return _appConfirmModal;
+  _appConfirmModal = new Modal(document.getElementById("appConfirmBackdrop")!, {
+    closeOnEsc: true,
+    onClosed: () => {
+      // Still set means this was dismissed by something other than the buttons
+      // below (Escape, most likely). That is a dismissal and owes the same
+      // journey back.
+      const back = appConfirmReturn;
+      appConfirmAction = null;
+      appConfirmReturn = null;
+      back?.();
+    },
+  });
+
+  const dismiss = (): void => {
+    const back = appConfirmReturn;
+    appConfirmAction = null;
+    appConfirmReturn = null;
+    _appConfirmModal!.close({ handoff: true });
+    back?.();
+  };
+  document.getElementById("appConfirmCancelBtn")!.addEventListener("click", dismiss);
+  document.getElementById("appConfirmOkBtn")!.addEventListener("click", () => {
+    // Captured before the close, because onClosed clears both.
+    const action = appConfirmAction;
+    appConfirmAction = null;
+    appConfirmReturn = null;
+    _appConfirmModal!.close({ handoff: true });
+    action?.();
+  });
+  return _appConfirmModal;
+}
+
+/** Asks, over the top of nothing. `reopen` runs on dismissal AND after the
+ *  action, because unlike a delete these actions leave you somewhere you were
+ *  looking at. */
+export function appConfirm(
+  opts: { title: string; message: string; confirmLabel: string; reopen?: () => void },
+  onConfirm: () => void,
+): void {
+  // Handoff, so the parent keeps its tab and its scroll position.
+  if (settingsModal.isOpen) settingsModal.close({ handoff: true });
+
+  const modal = getAppConfirmModal();
+  document.getElementById("appConfirmTitle")!.textContent = opts.title;
+  document.getElementById("appConfirmMessage")!.textContent = opts.message;
+  document.getElementById("appConfirmOkBtn")!.textContent = opts.confirmLabel;
+  appConfirmAction = onConfirm;
+  appConfirmReturn = opts.reopen ?? null;
+  modal.open();
+}
 
 export const settingsModal = new Modal(settingsBackdrop, {
   tabs: settingsTabs,
@@ -3095,7 +3180,7 @@ async function restoreWindowSize(): Promise<void> {
 async function healStoredThemeId(): Promise<void> {
   const stored = settings.theme;
   if (THEME_SENTINELS.includes(stored) || isKnownBuiltinTheme(stored)) return;
-  console.warn(
+  devWarn(
     `[theme] stored theme ${JSON.stringify(stored)} does not exist, resetting to ${JSON.stringify(DEFAULT_THEME_ID)}`,
   );
   settings.theme = DEFAULT_THEME_ID;

@@ -1110,6 +1110,13 @@ const imageLightboxModal = new Modal(imageLightboxBackdrop, {
   // call) in one place, rather than clearing it per-button.
   onClosed: () => {
     lightboxSourceImg = null;
+    // The picture goes with the panel. A closed modal is only display:none, so
+    // an <img> left holding a source keeps that image DECODED for as long as
+    // the app runs: a full-size screenshot is a few megabytes of bitmap, and
+    // opening several over a session keeps every one of them. Clearing the
+    // attribute is what lets the decoder hand the memory back at the moment the
+    // user is done looking, rather than never.
+    imageLightboxImg.removeAttribute("src");
   },
 });
 
