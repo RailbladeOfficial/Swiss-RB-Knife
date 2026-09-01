@@ -46,8 +46,8 @@ test("every tool has BOTH a sidebar entry and a dashboard card", () => {
   // caught that; each way in is now verified in its own right.
   //
   // The third way in, .dashboard-tool-btn, is deliberately not required: only
-  // five of the nine tools have one, so it is a partial feature rather than
-  // part of the contract.
+  // Kanban has one, so it is a partial feature rather than part of the
+  // contract.
   const html = read("index.html");
   const missing = [];
   for (const t of allTools()) {
@@ -259,4 +259,204 @@ test("every dropdown that ships with choices is one the app knows about", () => 
     if (!source.includes(`"${id}"`)) ignored.push(id);
   }
   assert.deepEqual(ignored, [], "these dropdowns have choices but nothing reads them");
+});
+
+/* -----------------------------------------------------------------------------
+   HOUSE STANDARDS
+   -----------------------------------------------------------------------------
+   Jobs every tool has to do the SAME way. Each of these started as two tools
+   quietly doing it differently, which is invisible until the day the difference
+   is the bug.
+----------------------------------------------------------------------------- */
+
+test("nothing logs to the console except through the dev-only helpers", () => {
+  // devError and devWarn compile out of a production build; a bare console call
+  // does not, and ships diagnostics to end users beside sibling calls that are
+  // correctly silent. theme-core.ts had three of these, because the helpers
+  // used to live in shell.ts and theme-core deliberately does not import shell.
+  /** Blanks out every `if (__DEV__) { ... }` block, keeping the file's length
+   *  and line breaks so reported line numbers stay true. A whole block behind
+   *  the dev flag is already compiled out, however much is inside it. */
+  const stripDevBlocks = (text) => {
+    let out = text;
+    for (;;) {
+      const at = out.search(/if \(__DEV__\) \{/);
+      if (at === -1) return out;
+      let depth = 0;
+      let i = out.indexOf("{", at);
+      const start = i;
+      for (; i < out.length; i++) {
+        if (out[i] === "{") depth++;
+        else if (out[i] === "}" && --depth === 0) break;
+      }
+      const body = out.slice(start, i + 1);
+      out = out.slice(0, start) + body.replace(/[^\n]/g, " ") + out.slice(i + 1);
+    }
+  };
+
+  const offenders = [];
+  for (const file of filesUnder("src", ".ts")) {
+    // The helpers themselves, obviously.
+    if (file.endsWith("core/dev-log.ts")) continue;
+    const text = stripDevBlocks(read(file));
+    for (const m of text.matchAll(/(?<![\w.])console\.(log|warn|error|info|debug)\s*\(/g)) {
+      const line = text.slice(0, m.index).split("\n").length;
+      offenders.push(`${file}:${line} console.${m[1]}`);
+    }
+  }
+  assert.deepEqual(offenders, [], "these log straight to the console in production builds");
+});
+
+test("there is one base64 codec, not one per tool", () => {
+  // Game Stats moves a spreadsheet across the IPC boundary and Kanban moves a
+  // pasted image. Both need base64, and for a while both had their own copy of
+  // it: the same algorithm twice, two error messages, and two places for a bug
+  // to be fixed in one of.
+  const copies = [];
+  for (const file of filesUnder("src-tauri/src", ".rs")) {
+    const text = read(file);
+    for (const m of text.matchAll(/^(?:pub\(crate\) )?fn base64_(?:en|de)code\b/gm)) {
+      const line = text.slice(0, m.index).split("\n").length;
+      copies.push(`${file}:${line}`);
+    }
+  }
+  assert.deepEqual(
+    copies.filter((c) => !c.startsWith("src-tauri/src/lib.rs")),
+    [],
+    "these files carry their own base64 instead of using the shared one in lib.rs",
+  );
+});
+
+test("every tool that keeps user data writes it without leaving a half-file", () => {
+  // atomic_write and backed_up_write_group both write through a temp file and
+  // rename. A bare fs::write to a data-directory path does not, and an install
+  // that force-terminates the app mid-write (which is how Windows upgrades one)
+  // leaves a truncated file where the data was.
+  const offenders = [];
+  for (const file of filesUnder("src-tauri/src", ".rs")) {
+    const text = read(file);
+    for (const m of text.matchAll(/fs::write\(&?(\w+)/g)) {
+      const target = m[1];
+      // Temporaries, staging files and export destinations are not the app's
+      // own data files; each is named for what it is.
+      if (/^(temp|tmp|out|dest|path|file_path|src|sealed|sealed2|p)$/.test(target)) continue;
+      // The snapshot copy itself. A torn .bak costs one bucket and is not a
+      // torn data file, which is the thing the atomic helper exists to stop;
+      // routing it through that helper would also mean snapshotting a snapshot.
+      if (target === "snapshot_dir") continue;
+      const line = text.slice(0, m.index).split("\n").length;
+      offenders.push(`${file}:${line} fs::write(${target})`);
+    }
+  }
+  assert.deepEqual(offenders, [], "these write a data file without the atomic helper");
+});
+
+test("a tool's own files go through the shared store, not a pair of its own", () => {
+  // Nine tools had each grown an identical save/load pair: atomic_write in,
+  // read_to_string with a hardcoded empty shape out, differing only in a
+  // filename. Nine places to remember when the write path changes.
+  //
+  // Budget's data and Kanban's index and board files are deliberately NOT here:
+  // they snapshot what they overwrite and can be encrypted, which is a
+  // different job rather than the same job written out again.
+  const lib = read("src-tauri/src/lib.rs");
+  assert.match(lib, /fn tool_file\(tool_id: &str, kind: &str\)/, "there is no shared tool-file store");
+
+  const allowed = new Set([
+    "save_kanban_index", "load_kanban_index",
+    "save_kanban_board", "load_kanban_board",
+    "save_budget_data", "load_budget_data",
+    "save_budget_entities", "load_budget_entities",
+  ]);
+  const strays = [];
+  for (const file of filesUnder("src-tauri/src/tools", ".rs")) {
+    const text = read(file);
+    for (const m of text.matchAll(/#\[tauri::command\][\s\S]{0,160}?fn\s+((?:save|load)_[a-z0-9_]+)/g)) {
+      const name = m[1];
+      if (allowed.has(name)) continue;
+      // A command that just wraps atomic_write on a fixed filename is the
+      // shape that belongs in the table.
+      const body = text.slice(m.index, text.indexOf("\n}", m.index));
+      if (/atomic_write\(&crate::get_data_path\(&app, "[a-z-]+\.json"\)/.test(body)) {
+        strays.push(`${file}: ${name}`);
+      }
+    }
+  }
+  assert.deepEqual(strays, [], "these write a fixed data file instead of using the shared store");
+});
+
+test("every tool that keeps records you would miss also snapshots them", () => {
+  // Budget and Kanban captured every write since they shipped; Time Tracker and
+  // Game Stats did not, so an entry or a game deleted by mistake was gone.
+  //
+  // The tools whose records are in the database are captured a different way,
+  // and deliberately: copying the whole database on every save would reinstate
+  // exactly the amplification the move removed, so it happens once per hour
+  // instead. Every write path has to trigger that check.
+  const rs = read("src-tauri/src/db.rs");
+  assert.match(rs, /pub fn snapshot_if_due/, "the database is never snapshotted");
+  assert.match(
+    rs,
+    /VACUUM INTO/,
+    "the snapshot copies the file, which can catch a database mid-transaction",
+  );
+
+  for (const [file, fns] of [
+    ["src-tauri/src/tools/game_stats_db.rs", ["gs_save", "gs_replace_all"]],
+  ]) {
+    const text = read(file);
+    for (const fn of fns) {
+      const at = text.indexOf(`pub fn ${fn}(`);
+      assert.notEqual(at, -1, `${fn} is missing`);
+      const body = text.slice(at, text.indexOf("\n}\n", at));
+      assert.match(body, /snapshot_if_due\(&app\)/, `${fn} writes without capturing what it replaces`);
+    }
+  }
+
+  // And the tools on JSON files snapshot through the file helper, which
+  // captures on EVERY write rather than once an hour.
+  for (const file of ["src-tauri/src/tools/budget.rs", "src-tauri/src/tools/kanban.rs"]) {
+    assert.match(
+      read(file),
+      /backed_up_write_group/,
+      `${file} writes without capturing what it replaces`,
+    );
+  }
+  // Time Tracker's entries go through lib.rs's shared store, which snapshots
+  // any file whose tool_file entry names a group.
+  assert.match(
+    read("src-tauri/src/lib.rs"),
+    /\("time-tracker", "data"\) => \("time-tracker\.json", "\[\]", TT_GROUP\)/,
+    "Time Tracker's entries are not in a snapshot group",
+  );
+});
+
+test("a migration only ever runs into an empty table", () => {
+  // Game Stats has shipped, so game-stats.json holds real history. The move
+  // happens once. Running it twice must not double anything,
+  // and the check for that is the table's own contents rather than a flag in a
+  // settings file that could disagree with reality.
+  for (const [file, fn, table] of [
+    ["src-tauri/src/tools/game_stats_db.rs", "gs_migrate_from_json", "gs_game"],
+  ]) {
+    const text = read(file);
+    const at = text.indexOf(`pub fn ${fn}(`);
+    assert.notEqual(at, -1, `${fn} is missing`);
+    const body = text.slice(at, text.indexOf("\n}\n", at));
+    assert.ok(
+      body.includes(`SELECT count(*) FROM ${table}`),
+      `${fn} does not check whether the table is already populated`,
+    );
+    assert.match(body, /if existing > 0 \{\s*return Ok\(0\);/, `${fn} would run a second time`);
+    // The old file is read and left alone. It is the fallback if this ever goes
+    // wrong, and it costs a few kilobytes to keep.
+    assert.ok(!/remove_file/.test(body), `${fn} deletes the file it migrated from`);
+  }
+
+  // The front end only offers the migration when there is nothing there yet.
+  assert.match(
+    read("src/tool/game-stats.ts"),
+    /length === 0[\s\S]{0,120}migrateGamesFromJson\(/,
+    "Game Stats would migrate over records that are already there",
+  );
 });

@@ -1,9 +1,9 @@
 /* =============================================================================
    TIME TRACKER
    -----------------------------------------------------------------------------
-   Frontend logic for the Time Tracker tool. Entries are persisted to disk via
-   Rust commands; this file owns all UI state, event wiring, rendering, and the
-   delete-confirm modal.
+   Frontend logic for the Time Tracker tool. Entries live in one JSON file,
+   time-tracker.json, read and written whole; this file owns all UI state, event
+   wiring, rendering, and the delete-confirm modal.
 
    Architecture notes:
      • Module-level state (entries, settings, viewStart/viewEnd) is closed over
@@ -17,15 +17,18 @@
        form survives accidental closes.
 
    Rust commands used:
-     save_data, load_data, save_draft, load_draft, export_csv, import_csv,
-     save_tool_settings, load_tool_settings, load_settings (legacy-key migration)
+     save_tool_file, load_tool_file (entries, preferences and the draft),
+     list_tool_backups, read_tool_backup, export_csv, import_csv,
+     load_settings (the app-level preferences this tool formats against)
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { flash, devError, shortPath } from "../core/shell";
+import { flash, devError, shortPath, navigateToTool } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
+import { renderToolBackups, readToolBackup } from "../core/tool-backups";
+import { registerTransferable } from "../core/data-transfer";
 
 /* =============================================================================
    TYPES
@@ -595,8 +598,7 @@ function saveSettings(): void {
       pausedTasks: settings.pausedTasks,
     };
     try {
-      await invoke("save_tool_settings", {
-        toolId: "time-tracker",
+      await invoke("save_tool_file", { toolId: "time-tracker", kind: "settings",
         data: JSON.stringify(own),
       });
     } catch (e) {
@@ -621,7 +623,7 @@ async function loadSettings(): Promise<void> {
     // exist yet (first run after the split), the legacy values merged above
     // stand, and get persisted to the new home so the migration happens
     // exactly once.
-    const ownRaw = await invoke<string>("load_tool_settings", { toolId: "time-tracker" });
+    const ownRaw = await invoke<string>("load_tool_file", { toolId: "time-tracker", kind: "settings" });
     const own = JSON.parse(ownRaw || "{}");
     const hasOwnFile =
       own && typeof own === "object" &&
@@ -682,67 +684,128 @@ function isValidProject(p: unknown): p is Project {
 
 /* =============================================================================
    PERSISTENCE: ENTRIES
+   -----------------------------------------------------------------------------
+   One file, time-tracker.json, holding the whole list.
+
+   It was briefly a database table, and that has been undone deliberately. A
+   ledger of a few thousand short records that is always read whole and always
+   written whole gains nothing from SQL, and moving it there cost the two things
+   that actually matter here: the file can be opened and repaired by hand when
+   something goes wrong, and every single save captures the state it is about to
+   replace. See backed_up_write_group in lib.rs for that second one.
 ============================================================================= */
 
+/** Everything an entry holds, in a fixed order, so the file reads the same way
+ *  every time and a diff of two exports is a diff of what changed. */
+function entryToRow(e: Entry): Entry {
+  return {
+    date: e.date,
+    start: e.start,
+    endDate: e.endDate,
+    end: e.end,
+    activity: e.activity,
+    project: e.project,
+    notes: e.notes,
+  };
+}
+
 async function saveToDisk(): Promise<void> {
-  await invoke("save_data", { data: JSON.stringify(entries) });
+  try {
+    await invoke("save_tool_file", {
+      toolId: "time-tracker",
+      kind: "data",
+      data: JSON.stringify(entries.map(entryToRow)),
+    });
+  } catch (err) {
+    devError("Save failed:", err);
+    flash(`Couldn't save your entries: ${String(err)}`, "error", 9000);
+  }
 }
 
 async function loadFromDisk(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_data");
-    const parsed = JSON.parse(raw || "[]");
-    if (!Array.isArray(parsed)) {
-      entries = [];
-      return;
-    }
-    // Validate each entry, drop any records with missing or wrong-typed required
-    // fields so downstream render/sort logic never hits unexpected values.
-    entries = parsed
-      .filter((e): e is Entry & { endDate?: unknown } =>
-        e !== null &&
-        typeof e === "object" &&
-        typeof e.date     === "string" && e.date.length > 0 &&
-        typeof e.start    === "string" &&
-        typeof e.end      === "string" &&
-        typeof e.activity === "string"
-      )
-      // notes is a later addition, older saved entries won't have it, so
-      // default to "" rather than dropping them.
-      // endDate is a later addition too. Pre-migration entries encoded an
-      // overnight span by inflating `end` past 24:00 (e.g. "26:00" for
-      // 2am next day), split that back into a real time-of-day plus a
-      // rolled-forward endDate so old data reads correctly under the new
-      // explicit-date model.
-      // start/end are reformatted through parseTime+secondsToTimeString
-      // either way, since both migration paths above may carry legacy
-      // "HH:MM" (no seconds) values that need a ":00" appended to match
-      // the current HH:MM:SS storage format.
-      .map((e) => {
-        const notes = typeof e.notes === "string" ? e.notes : "";
-        // project is a later addition, older saved entries won't have it.
-        const project = typeof e.project === "string" ? e.project : "";
-        if (typeof e.endDate === "string" && e.endDate) {
-          return {
-            ...e,
-            notes,
-            project,
-            endDate: e.endDate,
-            start: secondsToTimeString(parseTime(e.start)),
-            end: secondsToTimeString(parseTime(e.end)),
-          } as Entry;
-        }
-        const endSecs = parseTime(e.end);
-        const daysForward = Math.floor(endSecs / 86400);
-        const endDate = daysForward > 0 ? addDaysToDate(e.date, daysForward) : e.date;
-        const end = secondsToTimeString(endSecs - daysForward * 86400);
-        const start = secondsToTimeString(parseTime(e.start));
-        return { ...e, notes, project, endDate, start, end } as Entry;
-      });
+    const raw = await invoke<string>("load_tool_file", { toolId: "time-tracker", kind: "data" });
+    entries = parseEntries(raw);
   } catch (err) {
     devError("Load failed:", err);
+    flash(`Couldn't load your entries: ${String(err)}`, "error", 9000);
     entries = [];
   }
+}
+
+/**
+ * Turns the stored array into entries, repairing what older versions left.
+ *
+ * These entries have been on disk since before some of their fields existed:
+ * `notes`, `project` and `endDate` were all added after the fact, and an
+ * overnight shift used to be stored by inflating the end time past midnight
+ * ("26:00" meaning 2am the next day). Every one of those repairs has to stay
+ * here, because a file written in 2025 is still a file this has to open.
+ *
+ * A record that is not an entry at all is dropped rather than fixed. One
+ * malformed line must not take the whole ledger down with it.
+ */
+function parseEntries(raw: string): Entry[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || "[]");
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .filter(
+      (e): e is Record<string, unknown> =>
+        e !== null &&
+        typeof e === "object" &&
+        typeof (e as Record<string, unknown>).date === "string" &&
+        typeof (e as Record<string, unknown>).start === "string" &&
+        typeof (e as Record<string, unknown>).end === "string" &&
+        typeof (e as Record<string, unknown>).activity === "string",
+    )
+    .map((e) => {
+      const notes = typeof e.notes === "string" ? e.notes : "";
+      const project = typeof e.project === "string" ? e.project : "";
+      const date = String(e.date);
+      let start = String(e.start);
+      let end = String(e.end);
+      let endDate = typeof e.endDate === "string" && e.endDate ? e.endDate : "";
+
+      if (!endDate) {
+        // The pre-endDate encoding: an end time past 24:00 meant the next day.
+        // Split it back into a real time plus a rolled-forward date.
+        const secs = parseTime(end);
+        if (secs !== null && secs >= 86400) {
+          const days = Math.floor(secs / 86400);
+          end = secondsToTimeString(secs % 86400);
+          endDate = addDaysToDate(date, days);
+        } else {
+          endDate = date;
+        }
+      }
+      // Legacy values may be "HH:MM" with no seconds; both normalise the same.
+      const startSecs = parseTime(start);
+      if (startSecs !== null) start = secondsToTimeString(startSecs);
+      const endSecs = parseTime(end);
+      if (endSecs !== null) end = secondsToTimeString(endSecs);
+
+      return { date, start, endDate, end, activity: String(e.activity), project, notes };
+    });
+}
+
+/** One record, checked before anything renders it. Used on the import path,
+ *  where the file came from outside the app and has not been through
+ *  parseEntries. */
+function isStoredEntry(e: unknown): e is Entry {
+  if (!e || typeof e !== "object") return false;
+  const r = e as Partial<Entry>;
+  return (
+    typeof r.date === "string" && r.date.length > 0 &&
+    typeof r.start === "string" &&
+    typeof r.end === "string" &&
+    typeof r.activity === "string"
+  );
 }
 
 /* =============================================================================
@@ -760,7 +823,7 @@ function saveDraft(
 ): void {
   if (draftSaveTimer) clearTimeout(draftSaveTimer);
   draftSaveTimer = window.setTimeout(async () => {
-    await invoke("save_draft", {
+    await invoke("save_tool_file", { toolId: "time-tracker", kind: "draft",
       data: JSON.stringify({
         selectedDate: datePicker.value,
         endDate: endDatePicker.value,
@@ -786,7 +849,7 @@ async function loadDraft(
   onLoad: () => void,
 ): Promise<void> {
   try {
-    const raw = await invoke<string>("load_draft");
+    const raw = await invoke<string>("load_tool_file", { toolId: "time-tracker", kind: "draft" });
     const draft = JSON.parse(raw);
     if (draft.selectedDate) datePicker.value = draft.selectedDate;
     if (draft.endDate)      endDatePicker.value = draft.endDate;
@@ -3075,7 +3138,7 @@ function renderProjectsList(): void {
    modals can reopen Setup on the Activities tab after their actions.
 ============================================================================= */
 
-type TTSetupTab = "projects" | "activities" | "preferences";
+type TTSetupTab = "projects" | "activities" | "preferences" | "data";
 let ttSetupModal: Modal | null = null;
 
 // Set by initTimeTracker so module-level code (activity rename/delete, which
@@ -3091,12 +3154,138 @@ const ttSetupTabs = new ModalTabs<TTSetupTab>({
     projects: "ttTabProjects",
     activities: "ttTabActivities",
     preferences: "ttTabPreferences",
+    data: "ttTabData",
+  },
+});
+
+/* -----------------------------------------------------------------------------
+   SNAPSHOTS
+   -----------------------------------------------------------------------------
+   Every save captures the file it is about to overwrite, the same hourly
+   capture Budget and Kanban have had since they shipped. This is the screen
+   that gets at it.
+
+   Entries and the activity/project vocabulary are captured TOGETHER (see
+   TT_GROUP in lib.rs), so an hour of entries can be restored beside the list of
+   activities as it stood at that hour. They are still restored one at a time,
+   because wanting last week's entries is not the same as wanting last week's
+   preferences back with them.
+----------------------------------------------------------------------------- */
+
+/** Wired once, on the first Setup open. */
+let ttBackupRefreshWired = false;
+
+function wireTTBackupRefresh(): void {
+  if (ttBackupRefreshWired) return;
+  ttBackupRefreshWired = true;
+  document
+    .getElementById("ttBackupRefreshBtn")!
+    .addEventListener("click", () => void refreshTTBackups());
+}
+
+async function refreshTTBackups(): Promise<void> {
+  wireTTBackupRefresh();
+  await renderToolBackups({
+    toolId: "time-tracker",
+    host: document.getElementById("ttBackupList")!,
+    summary: document.getElementById("ttBackupSummary"),
+    labels: { data: "Time entries", settings: "Activities and projects" },
+    onRestore: async (entry, snapshot) => {
+      const raw = await readToolBackup("time-tracker", snapshot.name, entry.kind);
+      // Written back through the ordinary save path, which captures what it is
+      // replacing on the way past. See the header of core/tool-backups.ts.
+      await invoke("save_tool_file", { toolId: "time-tracker", kind: entry.kind, data: raw });
+      if (entry.kind === "data") {
+        await loadFromDisk();
+      } else {
+        await loadSettings();
+        applyTTSettings();
+      }
+      renderCurrentView();
+      await refreshTTBackups();
+    },
+  });
+}
+
+
+/* -----------------------------------------------------------------------------
+   EXPORT AND IMPORT
+   -----------------------------------------------------------------------------
+   Registered with the Data tab in App Settings, which owns the buttons.
+
+   Entries AND the activity/project vocabulary go in one file, because an export
+   is meant to rebuild the tool: entries name their activity as free text, so a
+   set of entries without the list that autocompletes them is a tool that works
+   but has forgotten what you call things.
+----------------------------------------------------------------------------- */
+
+interface TimeTrackerExport {
+  entries: Entry[];
+  activities: Activity[];
+  projects: Project[];
+  settings: Partial<TTSettings>;
+}
+
+registerTransferable({
+  id: "time-tracker",
+  label: "Time Tracker",
+  summary: () => `${entries.length} entries · ${activities.length} activities`,
+  otherFormats: {
+    // Navigates to the tool first. Its Setup modal belongs to a screen, and
+    // opening it from App Settings would leave it floating over whatever tool
+    // happened to be showing.
+    label: "CSV import and export",
+    open: () => {
+      navigateToTool("tracking", "time-tracker");
+      openTTSetupOnTab("preferences");
+    },
+  },
+  gather: async () => ({
+    entries: entries.map(entryToRow),
+    activities,
+    projects,
+    settings: {
+      quickDelete: settings.quickDelete,
+      roundNowToMinute: settings.roundNowToMinute,
+      payPeriod: settings.payPeriod,
+      breakInUseMinutes: settings.breakInUseMinutes,
+    },
+  }),
+  apply: async (parsed) => {
+    const payload = parsed as Partial<TimeTrackerExport> | null;
+    if (!payload || !Array.isArray(payload.entries)) {
+      throw new Error("that file does not hold a list of entries");
+    }
+    // Checked on the way in, as a load is: a hand-edited export is outside
+    // input, and this is the one path where it reaches the app.
+    const rows = payload.entries.filter(isStoredEntry).map(entryToRow);
+    await invoke("save_tool_file", {
+      toolId: "time-tracker",
+      kind: "data",
+      data: JSON.stringify(rows),
+    });
+
+    if (Array.isArray(payload.activities)) activities = payload.activities.filter(isValidActivity);
+    if (Array.isArray(payload.projects)) projects = payload.projects.filter(isValidProject);
+    if (payload.settings && typeof payload.settings === "object") {
+      settings = { ...settings, ...payload.settings };
+    }
+    saveSettings();
+
+    // Re-read rather than trusting what was just sent: the round trip is the
+    // same one a launch makes.
+    await loadFromDisk();
+    renderCurrentView();
   },
 });
 
 function openTTSetupOnTab(tab?: TTSetupTab): void {
   if (tab) ttSetupTabs.select(tab);
   getTTSetupModal().open();
+  // Read on the way in rather than on tab switch: the list is a directory
+  // listing of about thirty entries, and doing it here means the Data tab is
+  // never the one that is still loading when you arrive at it.
+  void refreshTTBackups();
 }
 
 function getTTSetupModal(): Modal {
@@ -4158,7 +4347,7 @@ function fillMergeNotesSelect(ordered: Entry[]): void {
       const when = mergePointLabel(entryStartAbs(e), refDate);
       const snippet = e.notes.trim().replace(/\s+/g, " ");
       const short = snippet.length > 40 ? `${snippet.slice(0, 40)}…` : snippet;
-      add(`entry:${index}`, `Only ${when} ${e.activity} — "${short}"`);
+      add(`entry:${index}`, `Only ${when} ${e.activity} · "${short}"`);
     });
   }
 

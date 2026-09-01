@@ -129,8 +129,18 @@ test("the Game Stats draft is actually saved, restored and cleared", () => {
   // once already. Presence of the commands is not enough; all three moments
   // have to be wired or a draft either never appears or never goes away.
   const src = read("src/tool/game-stats.ts");
-  assert.match(src, /invoke\("save_game_stats_draft"/, "nothing saves the draft");
-  assert.match(src, /invoke<string>\("load_game_stats_draft"\)/, "nothing restores the draft");
+  // The draft goes through the shared tool-file store like every other tool's
+  // own file; what matters here is that both halves are still wired.
+  assert.match(
+    src,
+    /invoke\("save_tool_file", \{ toolId: "game-stats", kind: "draft"/,
+    "nothing saves the draft",
+  );
+  assert.match(
+    src,
+    /invoke<string>\("load_tool_file", \{ toolId: "game-stats", kind: "draft"/,
+    "nothing restores the draft",
+  );
   assert.match(src, /function clearGameStatsDraft/, "nothing clears the draft");
   // Cleared on both endings, or a saved/abandoned game returns next launch.
   for (const fn of ["saveNewGame", "cancelNewGame", "resetNewGameSetup"]) {

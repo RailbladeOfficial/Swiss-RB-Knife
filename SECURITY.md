@@ -23,10 +23,12 @@ Anything that lets someone read or destroy data they shouldn't, run code, gain p
 These are deliberate choices, explained in the README's **Security & Privacy** section, no need to report them:
 
 - Admin elevation is required (robocopy `/COPYALL` needs it).
-- Most data is plaintext JSON on purpose; only Budget Tracker offers encryption.
+- Most data is plaintext JSON on purpose; only Budget Tracker offers encryption (AES-256-GCM with an Argon2id-derived key). Game Stats keeps its records in a local SQLite file instead, which is also unencrypted.
+- Kanban is deliberately not encrypted. A board holds task titles and notes, not the kind of data that sits behind a bank login, and encrypting it would have meant holding a key in memory for the whole session to read attachments with.
 - App Lock is a UI gate, not encryption.
 - The asset-protocol scope is broad so Image CCR can display images from anywhere you pick.
-- Game Stats reads a workbook you pick from anywhere on disk, and writes its exports and blank templates to your Downloads folder (Time Tracker's CSV export does the same). Those are the only two places anything lands outside the app's own data folder.
+- Kanban attachments are files inside the app's own folder, named by an id rather than by anything you typed, so a card can't point at a file outside its own board.
+- Game Stats reads a workbook you pick from anywhere on disk, and writes its exports and blank templates to your Downloads folder. Time Tracker's CSV export and Kanban's JSON export do the same. Those exports, and the output folders you choose yourself in Image CCR, Auto-Backup and the Dummy File Generator, are the only places anything lands outside the app's own data folder.
 - Game Stats' `.xlsx` reader is hand-rolled (no library) and parses a file you chose. Deliberate, since the app ships no runtime JS dependencies and the needed slice of the format is tiny, but it *is* a parser being fed outside input, so bugs in it are fair game to report.
 - Budget Tracker's "re-auth on every entry" mode, and its re-locking when Windows locks, are session gates on top of the existing encryption. Not a second layer of crypto, and not a replacement for it.
 - To notice a Windows lock at all, the app subclasses its own window and registers for session notifications (`WM_WTSSESSION_CHANGE`). It watches for lock/unlock and passes every other message straight through; it reads nothing about the session.

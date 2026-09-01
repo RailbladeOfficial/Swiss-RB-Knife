@@ -27,6 +27,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
+import { registerTransferable } from "../core/data-transfer";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { flash, devError, devWarn, setToolAttention } from "../core/shell";
@@ -423,7 +424,7 @@ let _abInitialized = false;
 
 async function saveConfig(): Promise<void> {
   try {
-    await invoke("save_backup_config", { data: JSON.stringify(config) });
+    await invoke("save_tool_file", { toolId: "auto-backup", kind: "data", data: JSON.stringify(config) });
   } catch (e) {
     devError("Failed to save backup config:", e);
   }
@@ -443,7 +444,7 @@ async function saveConfig(): Promise<void> {
 
 async function loadConfig(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_backup_config");
+    const raw = await invoke<string>("load_tool_file", { toolId: "auto-backup", kind: "data" });
     const parsed = JSON.parse(raw);
     // Coerce each field to its expected type rather than trusting the stored shape.
     const sources = Array.isArray(parsed?.sources)
@@ -500,7 +501,7 @@ async function savePresets(): Promise<void> {
   }
   // Also persist via Rust for proper AppData storage (registered in lib.rs).
   try {
-    await invoke("save_backup_presets", { data: JSON.stringify(presets) });
+    await invoke("save_tool_file", { toolId: "auto-backup", kind: "presets", data: JSON.stringify(presets) });
   } catch (e) {
     devWarn("save_backup_presets invoke failed:", e);
   }
@@ -527,7 +528,7 @@ async function loadPresets(): Promise<void> {
 
   // Try Rust storage first (proper AppData location).
   try {
-    const raw = await invoke<string>("load_backup_presets");
+    const raw = await invoke<string>("load_tool_file", { toolId: "auto-backup", kind: "presets" });
     const loaded = sanitizePresets(JSON.parse(raw));
     // If Rust returned real data, sync it to localStorage as well.
     if (loaded.length > 0) {
@@ -2958,3 +2959,32 @@ export async function initAutoBackup(): Promise<void> {
   const view = document.getElementById("files-tool-auto-backup")!;
   if (view.style.display !== "none") applyDisclaimerEntryState();
 }
+
+/* -----------------------------------------------------------------------------
+   EXPORT AND IMPORT
+   -----------------------------------------------------------------------------
+   Registered with the Data tab in App Settings, which owns the buttons. This
+   tool's records are still a JSON file, so its export IS that file's contents
+   and its import writes them straight back.
+----------------------------------------------------------------------------- */
+
+registerTransferable({
+  id: "auto-backup",
+  label: "Auto-Backup",
+  gather: async () => JSON.parse(
+    await invoke<string>("load_tool_file", { toolId: "auto-backup", kind: "data" }),
+  ),
+  apply: async (parsed) => {
+    if (parsed === null || typeof parsed !== "object") {
+      throw new Error("that file does not hold this tool's data");
+    }
+    await invoke("save_tool_file", {
+      toolId: "auto-backup",
+      kind: "data",
+      data: JSON.stringify(parsed),
+    });
+    // Read back through the ordinary load, so every validator and default this
+    // tool applies on the way in is applied to an imported file too.
+    await loadConfig();
+  },
+});

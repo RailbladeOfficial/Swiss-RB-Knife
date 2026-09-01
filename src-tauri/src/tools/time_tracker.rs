@@ -24,40 +24,13 @@ use tauri::Manager;
    ENTRY DATA COMMANDS
 ============================================================================= */
 
-/// Writes the given JSON string to time-tracker.json in the data directory.
-#[tauri::command]
-pub fn save_data(app: tauri::AppHandle, data: String) -> Result<(), String> {
-    crate::atomic_write(&crate::get_data_path(&app, "time-tracker.json"), data.as_bytes())
-}
 
-/// Reads and returns the contents of time-tracker.json.
-/// Returns an empty JSON array string if the file does not exist.
-#[tauri::command]
-pub fn load_data(app: tauri::AppHandle) -> Result<String, String> {
-    match fs::read_to_string(crate::get_data_path(&app, "time-tracker.json")) {
-        Ok(content) => Ok(content),
-        Err(_) => Ok("[]".to_string()),
-    }
-}
 
 /* =============================================================================
    DRAFT COMMANDS
 ============================================================================= */
 
-/// Saves the current input field draft state to draft.json.
-#[tauri::command]
-pub fn save_draft(app: tauri::AppHandle, data: String) -> Result<(), String> {
-    crate::atomic_write(&crate::get_data_path(&app, "draft.json"), data.as_bytes())
-}
 
-/// Reads the saved draft state. Returns empty fields if file does not exist.
-#[tauri::command]
-pub fn load_draft(app: tauri::AppHandle) -> Result<String, String> {
-    match fs::read_to_string(crate::get_data_path(&app, "draft.json")) {
-        Ok(content) => Ok(content),
-        Err(_) => Ok(r#"{"activity":"","start":"","end":"","notes":""}"#.to_string()),
-    }
-}
 
 /* =============================================================================
    CSV IMPORT

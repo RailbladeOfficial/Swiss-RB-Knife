@@ -29,6 +29,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
+import { registerTransferable } from "../core/data-transfer";
 import { flash, escapeHtml } from "../core/shell";
 import { attachMenuDelegated } from "../menu/menu";
 
@@ -153,7 +154,7 @@ let rowsEl: HTMLElement;
 
 async function loadStore(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_rng_data");
+    const raw = await invoke<string>("load_tool_file", { toolId: "rng", kind: "data" });
     const parsed = JSON.parse(raw) as Partial<RngStore>;
     rngSettings = normalizeSettings(parsed.settings ?? {});
     // slice(-n) rather than slice(0, n): if a hand-edited file (or an older
@@ -182,7 +183,7 @@ async function saveStore(): Promise<void> {
   if (!storeLoaded) return;
   const store: RngStore = { settings: rngSettings, results };
   try {
-    await invoke("save_rng_data", { data: JSON.stringify(store) });
+    await invoke("save_tool_file", { toolId: "rng", kind: "data", data: JSON.stringify(store) });
   } catch (err) {
     flash(`Couldn't save RNGesus data: ${String(err)}`, "error");
   }
@@ -671,3 +672,32 @@ export function initRNG(): void {
   render();
   void loadStore();
 }
+
+/* -----------------------------------------------------------------------------
+   EXPORT AND IMPORT
+   -----------------------------------------------------------------------------
+   Registered with the Data tab in App Settings, which owns the buttons. This
+   tool's records are still a JSON file, so its export IS that file's contents
+   and its import writes them straight back.
+----------------------------------------------------------------------------- */
+
+registerTransferable({
+  id: "rng",
+  label: "RNGesus",
+  gather: async () => JSON.parse(
+    await invoke<string>("load_tool_file", { toolId: "rng", kind: "data" }),
+  ),
+  apply: async (parsed) => {
+    if (parsed === null || typeof parsed !== "object") {
+      throw new Error("that file does not hold this tool's data");
+    }
+    await invoke("save_tool_file", {
+      toolId: "rng",
+      kind: "data",
+      data: JSON.stringify(parsed),
+    });
+    // Read back through the ordinary load, so every validator and default this
+    // tool applies on the way in is applied to an imported file too.
+    await loadStore();
+  },
+});

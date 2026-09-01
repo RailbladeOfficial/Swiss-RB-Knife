@@ -26,6 +26,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
+import { registerTransferable } from "../core/data-transfer";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { flash, escapeHtml, setToolAttention } from "../core/shell";
@@ -1182,7 +1183,7 @@ async function loadAppSettings(): Promise<void> {
     const shared = JSON.parse(sharedRaw || "{}");
     appSettings.americanDates = !!shared.americanDates;
 
-    const ownRaw = await invoke<string>("load_tool_settings", { toolId: "budget" });
+    const ownRaw = await invoke<string>("load_tool_file", { toolId: "budget", kind: "settings" });
     const own = JSON.parse(ownRaw || "{}");
     const hasOwnFile =
       own && typeof own === "object" &&
@@ -1262,7 +1263,7 @@ async function saveAppSettings(): Promise<void> {
       lastUpdatedAt: appSettings.lastUpdatedAt,
       dataNewestAt: appSettings.dataNewestAt,
     };
-    await invoke("save_tool_settings", { toolId: "budget", data: JSON.stringify(own) });
+    await invoke("save_tool_file", { toolId: "budget", kind: "settings", data: JSON.stringify(own) });
   } catch {
     /* non-critical */
   }
@@ -4951,7 +4952,7 @@ function fillMergeNotesSelect(ordered: EntryItem[]): void {
       const short = snippet.length > 40 ? `${snippet.slice(0, 40)}…` : snippet;
       add(
         `entry:${index}`,
-        `Only ${formatDate(item.entry.date)} ${itemSourceLabel(item)} — "${short}"`,
+        `Only ${formatDate(item.entry.date)} ${itemSourceLabel(item)} · "${short}"`,
       );
     });
   }
@@ -7735,3 +7736,43 @@ function _applyEncryptionSettingsUI(): void {
   if (enableBtn) enableBtn.style.display = encryptionEnabled ? "none" : "";
   if (disableBtn) disableBtn.style.display = encryptionEnabled ? "" : "none";
 }
+
+/* -----------------------------------------------------------------------------
+   EXPORT AND IMPORT
+   -----------------------------------------------------------------------------
+   Registered with the Data tab in App Settings, which owns the buttons.
+
+   The export is PLAINTEXT, and that is worth being explicit about: this is the
+   one tool in the app that encrypts, and a file written out of it is an
+   ordinary readable JSON document wherever the user chose to put it. That is
+   the point of an export (it has to be readable to be a fallback) but it means
+   the file deserves the same care as a bank statement.
+
+   Import goes through the tool's ordinary save, so an encrypted install
+   re-encrypts on the way in and the imported data never lands in the clear.
+----------------------------------------------------------------------------- */
+
+registerTransferable({
+  id: "budget",
+  label: "Budget Tracker",
+  summary: () =>
+    `${data.recurringBills.length} bills · ${data.incomeSources.length} income sources`,
+  note:
+    "A Budget export is readable JSON wherever you save it, even when the tool " +
+    "itself is encrypted. Keep it somewhere you would keep a bank statement.",
+  gather: async () => data,
+  apply: async (parsed) => {
+    const payload = parsed as Partial<BudgetData> | null;
+    if (!payload || typeof payload !== "object" || !Array.isArray(payload.recurringBills)) {
+      throw new Error("that file does not hold budget data");
+    }
+    // Merged over an empty shape rather than assigned, so a file written by an
+    // older version that lacks a list gets an empty one instead of undefined.
+    data = { ...emptyData(), ...payload };
+    // Through the ordinary save, so an encrypted install re-encrypts on the way
+    // in and the imported data is never written to disk in the clear.
+    await saveToDisk();
+    await loadFromDisk();
+    renderAll();
+  },
+});

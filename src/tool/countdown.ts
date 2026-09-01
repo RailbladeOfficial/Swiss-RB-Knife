@@ -39,6 +39,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
+import { registerTransferable } from "../core/data-transfer";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import {
@@ -495,7 +496,7 @@ let presetsModal: Modal | null = null;
 
 async function loadStore(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_countdown_data");
+    const raw = await invoke<string>("load_tool_file", { toolId: "countdown", kind: "data" });
     const parsed = JSON.parse(raw) as Partial<CountdownStore>;
     log = Array.isArray(parsed.log) ? parsed.log.filter(isValidLogEntry) : [];
     session = isValidSession(parsed.session) ? parsed.session : null;
@@ -534,7 +535,7 @@ async function saveStore(): Promise<void> {
     session, log, settings: cdSettings, presets, lastDurationMs: pendingDurationMs, display,
   };
   try {
-    await invoke("save_countdown_data", { data: JSON.stringify(store) });
+    await invoke("save_tool_file", { toolId: "countdown", kind: "data", data: JSON.stringify(store) });
   } catch (err) {
     flash(`Couldn't save Countdown Timer data: ${String(err)}`, "error");
   }
@@ -1572,7 +1573,7 @@ function renderLog(): void {
       {
         label: "Copy Session Summary",
         onClick: () => {
-          const text = `${entry.memo || "(no memo)"} — ${meta.join(" · ")}`;
+          const text = `${entry.memo || "(no memo)"} · ${meta.join(" · ")}`;
           void navigator.clipboard
             .writeText(text)
             .then(() => flash("Session copied.", "success"))
@@ -2627,3 +2628,32 @@ export function initCountdown(): void {
   render();
   void loadStore();
 }
+
+/* -----------------------------------------------------------------------------
+   EXPORT AND IMPORT
+   -----------------------------------------------------------------------------
+   Registered with the Data tab in App Settings, which owns the buttons. This
+   tool's records are still a JSON file, so its export IS that file's contents
+   and its import writes them straight back.
+----------------------------------------------------------------------------- */
+
+registerTransferable({
+  id: "countdown",
+  label: "Countdown Timer",
+  gather: async () => JSON.parse(
+    await invoke<string>("load_tool_file", { toolId: "countdown", kind: "data" }),
+  ),
+  apply: async (parsed) => {
+    if (parsed === null || typeof parsed !== "object") {
+      throw new Error("that file does not hold this tool's data");
+    }
+    await invoke("save_tool_file", {
+      toolId: "countdown",
+      kind: "data",
+      data: JSON.stringify(parsed),
+    });
+    // Read back through the ordinary load, so every validator and default this
+    // tool applies on the way in is applied to an imported file too.
+    await loadStore();
+  },
+});

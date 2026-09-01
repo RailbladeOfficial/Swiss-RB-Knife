@@ -27,6 +27,7 @@ use argon2::{
     Argon2,
 };
 
+mod db;
 mod session_watch;
 mod tools;
 
@@ -157,6 +158,68 @@ pub(crate) fn sanitize_filename(filename: &str) -> Result<String, String> {
         return Err(format!("'{}' is a reserved Windows device name.", name));
     }
     Ok(name.to_string())
+}
+
+/* =============================================================================
+   BASE64
+   -----------------------------------------------------------------------------
+   Hand-rolled, for the same reason game_stats.rs's .xlsx reader is: the app
+   ships no runtime JS dependencies, and the needed slice of the format is forty
+   lines. It lives HERE rather than in a tool because two tools want it, Game
+   Stats to move a spreadsheet across the IPC boundary and Kanban to move a
+   pasted image, and two copies of a codec is one place for a bug to be fixed
+   and one place for it to survive.
+
+   Callers map the error to their own wording; the message here says only what
+   is true from inside the decoder.
+============================================================================= */
+
+const BASE64_ALPHABET: &[u8; 64] =
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+pub(crate) fn base64_encode(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
+        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        out.push(BASE64_ALPHABET[(triple >> 18) as usize & 63] as char);
+        out.push(BASE64_ALPHABET[(triple >> 12) as usize & 63] as char);
+        // The tail is padded rather than truncated so the output round-trips
+        // through any standards-compliant decoder, not just this one.
+        out.push(if chunk.len() > 1 { BASE64_ALPHABET[(triple >> 6) as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 2 { BASE64_ALPHABET[triple as usize & 63] as char } else { '=' });
+    }
+    out
+}
+
+pub(crate) fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
+    let mut out = Vec::with_capacity(text.len() / 4 * 3);
+    let mut acc: u32 = 0;
+    let mut bits: u32 = 0;
+    for ch in text.bytes() {
+        // Padding, and any whitespace a line-wrapped payload arrived with.
+        if matches!(ch, b'=' | b'\r' | b'\n' | b' ' | b'\t') {
+            continue;
+        }
+        let value = match ch {
+            b'A'..=b'Z' => ch - b'A',
+            b'a'..=b'z' => ch - b'a' + 26,
+            b'0'..=b'9' => ch - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return Err("Malformed base64 data.".to_string()),
+        } as u32;
+        acc = (acc << 6) | value;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+            acc &= (1 << bits) - 1;
+        }
+    }
+    Ok(out)
 }
 
 /* =============================================================================
@@ -323,7 +386,58 @@ fn snapshot_group(group_paths: &[PathBuf]) {
         for old_name in &existing_buckets[..existing_buckets.len() - BACKUP_KEEP_COUNT] {
             let _ = fs::remove_dir_all(backups_root.join(old_name));
         }
+        existing_buckets.drain(..existing_buckets.len() - BACKUP_KEEP_COUNT);
     }
+
+    /* Kanban's attachments are not copied into buckets, because thirty hourly
+       copies of a video is gigabytes of a file that never changes. They are
+       moved aside when deleted instead, and dropped once the oldest surviving
+       bucket is newer than the moment they left. This is the only place that
+       answer changes, so it is the only place worth asking it. */
+    if let Some(oldest) = existing_buckets.first() {
+        let cutoff = chrono::NaiveDateTime::parse_from_str(oldest, BACKUP_FOLDER_FORMAT)
+            .ok()
+            .map(|naive| naive.and_utc().timestamp().max(0) as u64)
+            .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs));
+        if let Some(cutoff) = cutoff {
+            crate::tools::kanban::prune_kanban_attachment_store_at(&backups_root, cutoff);
+        }
+    }
+}
+
+/* =============================================================================
+   EXPORT AND IMPORT
+   -----------------------------------------------------------------------------
+   Every tool's data, out to a JSON file the user names and back in from one.
+
+   FOR GAME STATS THIS REPLACES BEING ABLE TO OPEN THE FILE. Its records live
+   in the database, so there is no JSON to open in Notepad and repair by hand
+   the way there is for every other tool. An export therefore has to be able to
+   reconstruct it completely, and an import has to be able to put it back.
+
+   For the tools still on files, an export is a copy you can take somewhere
+   else, which a snapshot sitting beside the data is not.
+
+   These two commands are file I/O and nothing else. What an export CONTAINS and
+   what an import MEANS is each tool's own business, because only the tool knows
+   its own shape; the front end assembles one and applies the other.
+============================================================================= */
+
+/// Writes an export to a path the user chose, returning where it landed.
+#[tauri::command]
+fn export_tool_json(path: String, data: String) -> Result<String, String> {
+    // Through the atomic helper like every other write: an export interrupted
+    // half way must not leave a file that looks complete and is not.
+    let dest = PathBuf::from(&path);
+    atomic_write(&dest, data.as_bytes())?;
+    Ok(dest.to_string_lossy().to_string())
+}
+
+/// Reads a file the user picked. Returns its text; deciding what it means is
+/// the tool's job.
+#[tauri::command]
+fn import_tool_json(path: String) -> Result<String, String> {
+    fs::read_to_string(PathBuf::from(&path)).map_err(|e| format!("Could not read that file: {e}"))
 }
 
 /* =============================================================================
@@ -435,31 +549,244 @@ fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
 
 /// Maps a tool id to its settings filename. An allowlist rather than string
 /// interpolation, so the frontend can never address an arbitrary file.
-fn tool_settings_filename(tool_id: &str) -> Result<&'static str, String> {
-    match tool_id {
-        "time-tracker" => Ok("time-tracker-settings.json"),
-        "budget"       => Ok("budget-settings.json"),
-        _ => Err(format!("Unknown tool id '{}'", tool_id)),
+/// Every file a tool keeps to itself, by tool and by what the file holds, plus
+/// what an ABSENT one reads as.
+///
+/// One table, and one pair of commands behind it, rather than a bespoke
+/// save/load pair per tool. Nine tools had grown their own identical pair:
+/// atomic_write on the way in, read_to_string with a hardcoded empty shape on
+/// the way out, ~14 lines each, differing only in a filename. That is nine
+/// places to remember when the write path changes, and the app has already
+/// shipped a release where one tool's writes were not atomic because it was
+/// written before the helper existed.
+///
+/// Adding a tool is now a row here. Nothing else.
+///
+/// NOT everything lives here on purpose. Budget's data and Kanban's index and
+/// board files go through backed_up_write_group instead, because they snapshot
+/// what they overwrite, and Kanban's board files can be encrypted. Those are
+/// genuinely different jobs, not the same job written out again.
+/// One row of the table: what the file is called, what an absent one reads as,
+/// and which files are captured together when it is written.
+///
+/// An EMPTY group means this file is not snapshotted. That is the right answer
+/// for a draft (in-progress entry, replaced constantly, meaningless an hour
+/// later) and for preferences that are quick to set again. It is the wrong
+/// answer for anything you would be upset to lose, which is why the entries and
+/// the game history now carry one.
+struct ToolFile {
+    name: &'static str,
+    empty: &'static str,
+    /// Captured together, because they are only meaningful as a set. Listing a
+    /// file that does not exist is fine: snapshot_group skips it.
+    group: &'static [&'static str],
+}
+
+/// Time Tracker's entries and the activity/project vocabulary they name. An
+/// hour of entries restored beside the list of activities from that same hour
+/// is a coherent state; entries alone can point at activities that were since
+/// renamed away.
+const TT_GROUP: &[&str] = &["time-tracker.json", "time-tracker-settings.json"];
+
+/// Game Stats keeps profiles, games and settings in one file, so its group is
+/// itself. Listed explicitly rather than left empty, because empty means "do
+/// not snapshot" and that is a different statement.
+const GS_GROUP: &[&str] = &["game-stats.json"];
+
+const NO_SNAPSHOT: &[&str] = &[];
+
+fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
+    let (name, empty, group) = match (tool_id, kind) {
+        ("time-tracker", "settings") => ("time-tracker-settings.json", "{}", TT_GROUP),
+        ("time-tracker", "data") => ("time-tracker.json", "[]", TT_GROUP),
+        ("time-tracker", "draft") => (
+            "draft.json",
+            r#"{"activity":"","start":"","end":"","notes":""}"#,
+            NO_SNAPSHOT,
+        ),
+        ("budget", "settings") => ("budget-settings.json", "{}", NO_SNAPSHOT),
+        ("kanban", "settings") => ("kanban-settings.json", "{}", NO_SNAPSHOT),
+        ("countdown", "data") => ("countdown.json", r#"{"session":null,"log":[]}"#, NO_SNAPSHOT),
+        ("game-stats", "data") => (
+            "game-stats.json",
+            r#"{"profiles":[],"games":[],"settings":{}}"#,
+            GS_GROUP,
+        ),
+        ("game-stats", "settings") => ("game-stats-settings.json", "{}", NO_SNAPSHOT),
+        ("game-stats", "draft") => ("game-stats-draft.json", "null", NO_SNAPSHOT),
+        ("rng", "data") => ("rng.json", r#"{"settings":null,"results":[]}"#, NO_SNAPSHOT),
+        ("tts-repeater", "data") => (
+            "tts-repeater.json",
+            r#"{"settings":null,"presets":[],"display":null}"#,
+            NO_SNAPSHOT,
+        ),
+        ("auto-backup", "data") => (
+            "auto-backup.json",
+            r#"{"sources":[],"destinations":[],"copySpeed":31457280}"#,
+            NO_SNAPSHOT,
+        ),
+        ("auto-backup", "presets") => ("auto-backup-presets.json", "[]", NO_SNAPSHOT),
+        // An allowlist, not a filename built from the arguments. Both of these
+        // arrive from the front end and would otherwise be joined onto a path.
+        _ => return Err(format!("Unknown tool file '{tool_id}/{kind}'")),
+    };
+    Ok(ToolFile { name, empty, group })
+}
+
+/// Writes one of a tool's own files. Atomic, like every other write in the app.
+#[tauri::command]
+fn save_tool_file(
+    app: tauri::AppHandle,
+    tool_id: String,
+    kind: String,
+    data: String,
+) -> Result<(), String> {
+    let f = tool_file(&tool_id, &kind)?;
+    if f.group.is_empty() {
+        atomic_write(&get_data_path(&app, f.name), data.as_bytes())
+    } else {
+        // Captures what it is about to overwrite, same as Budget and Kanban.
+        backed_up_write_group(&app, f.group, f.name, data.as_bytes())
     }
 }
 
-/// Persists a tool's settings JSON to that tool's own settings file.
+/// Reads one of a tool's own files, or the empty shape that tool expects when
+/// there is no file yet. Callers merge that over their own defaults.
 #[tauri::command]
-fn save_tool_settings(app: tauri::AppHandle, tool_id: String, data: String) -> Result<(), String> {
-    let filename = tool_settings_filename(&tool_id)?;
-    atomic_write(&get_data_path(&app, filename), data.as_bytes())
-}
-
-/// Loads a tool's settings JSON. Returns "{}" if the file doesn't exist,
-/// callers merge over their defaults (and fall back to migrating any legacy
-/// keys still living in settings.json from before the split).
-#[tauri::command]
-fn load_tool_settings(app: tauri::AppHandle, tool_id: String) -> Result<String, String> {
-    let filename = tool_settings_filename(&tool_id)?;
-    match fs::read_to_string(get_data_path(&app, filename)) {
+fn load_tool_file(app: tauri::AppHandle, tool_id: String, kind: String) -> Result<String, String> {
+    let f = tool_file(&tool_id, &kind)?;
+    match fs::read_to_string(get_data_path(&app, f.name)) {
         Ok(content) => Ok(content),
-        Err(_) => Ok("{}".to_string()),
+        Err(_) => Ok(f.empty.to_string()),
     }
+}
+
+/* =============================================================================
+   TOOL SNAPSHOTS
+   -----------------------------------------------------------------------------
+   Browsing and restoring what save_tool_file captured. Kanban has its own pair
+   of these because its snapshots can be encrypted and are per board, which is a
+   different question to answer; everything else shares this.
+============================================================================= */
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ToolBackupFile {
+    /// The .bak filename inside the snapshot folder.
+    file: String,
+    /// Which row of the table it came from, so the front end can label it and
+    /// hand the right kind back to restore it.
+    kind: String,
+    bytes: u64,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ToolBackup {
+    /// The snapshot folder's name: its UTC timestamp in BACKUP_FOLDER_FORMAT.
+    name: String,
+    files: Vec<ToolBackupFile>,
+}
+
+/// Every snapshot folder holding something this tool owns, newest first.
+#[tauri::command]
+fn list_tool_backups(app: tauri::AppHandle, tool_id: String) -> Result<Vec<ToolBackup>, String> {
+    // Which filenames belong to this tool, and what kind each is. Built from
+    // the table so it cannot disagree with what save_tool_file writes.
+    let mut owned: Vec<(&'static str, String)> = Vec::new();
+    for kind in ["data", "settings", "draft", "presets"] {
+        if let Ok(f) = tool_file(&tool_id, kind) {
+            if !f.group.is_empty() {
+                owned.push((f.name, kind.to_string()));
+            }
+        }
+    }
+    if owned.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let root = match get_data_path(&app, "settings.json").parent() {
+        Some(p) => p.join("backups"),
+        None => return Ok(vec![]),
+    };
+    let entries = match fs::read_dir(&root) {
+        Ok(e) => e,
+        // No backups folder yet is a new install, not an error.
+        Err(_) => return Ok(vec![]),
+    };
+
+    let mut out: Vec<ToolBackup> = entries
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if !valid_bucket_name(&name) {
+                return None;
+            }
+            let mut files: Vec<ToolBackupFile> = Vec::new();
+            for (filename, kind) in &owned {
+                let path = e.path().join(format!("{filename}.bak"));
+                if let Ok(meta) = fs::metadata(&path) {
+                    files.push(ToolBackupFile {
+                        file: format!("{filename}.bak"),
+                        kind: kind.clone(),
+                        bytes: meta.len(),
+                    });
+                }
+            }
+            if files.is_empty() {
+                None
+            } else {
+                Some(ToolBackup { name, files })
+            }
+        })
+        .collect();
+
+    // The folder format sorts correctly as plain strings, so a reversed string
+    // sort is a true newest-first ordering with no date parsing.
+    out.sort_by(|a, b| b.name.cmp(&a.name));
+    Ok(out)
+}
+
+/// Returns one captured file's contents, WITHOUT writing anything.
+///
+/// Deliberately a read and not a restore, for the same reason Kanban's is:
+/// putting it back is an ordinary save, which snapshots the state being
+/// replaced on the way past, so restoring the wrong one is undone by restoring
+/// the newest. A command that copied the file into place directly would skip
+/// that and make the recovery tool the thing you needed recovering from.
+#[tauri::command]
+fn read_tool_backup(
+    app: tauri::AppHandle,
+    tool_id: String,
+    name: String,
+    kind: String,
+) -> Result<String, String> {
+    if !valid_bucket_name(&name) {
+        return Err("That snapshot name is not one of ours.".to_string());
+    }
+    // The filename comes from the table rather than from the front end, so
+    // nothing arriving here can name a file this tool does not own.
+    let f = tool_file(&tool_id, &kind)?;
+    if f.group.is_empty() {
+        return Err("That file is not snapshotted.".to_string());
+    }
+    let root = get_data_path(&app, "settings.json")
+        .parent()
+        .map(|p| p.join("backups"))
+        .ok_or_else(|| "No backups folder.".to_string())?;
+    let path = root.join(&name).join(format!("{}.bak", f.name));
+    fs::read_to_string(&path).map_err(|e| format!("Could not read that snapshot: {e}"))
+}
+
+/// Snapshot folder names are the UTC timestamp snapshot_group writes, so digits,
+/// dashes and one underscore. Same rule Kanban applies to the same names.
+pub(crate) fn valid_bucket_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 40
+        && name
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '-' || c == '_')
 }
 
 /* =============================================================================
@@ -706,6 +1033,7 @@ fn check_for_updates() -> Result<UpdateInfo, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(db::Db::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         // tauri-plugin-fs intentionally NOT registered. Nothing in the
@@ -719,8 +1047,14 @@ pub fn run() {
             // Shell-level commands
             merge_settings,
             load_settings,
-            save_tool_settings,
-            load_tool_settings,
+            save_tool_file,
+            load_tool_file,
+            list_tool_backups,
+            export_tool_json,
+            import_tool_json,
+            read_tool_backup,
+            db::list_db_backups,
+            db::restore_db_backup,
             save_window_size,
             load_window_size,
             save_shell_state,
@@ -734,10 +1068,6 @@ pub fn run() {
             lock_is_set,
             clear_lock_hash,
             // Time Tracker
-            tools::time_tracker::save_data,
-            tools::time_tracker::load_data,
-            tools::time_tracker::save_draft,
-            tools::time_tracker::load_draft,
             tools::time_tracker::export_csv,
             tools::time_tracker::import_csv,
             // Image CCR
@@ -752,8 +1082,6 @@ pub fn run() {
             // Dummy File Generator
             tools::file_gen::dfg_generate_files,
             // Auto-Backup
-            tools::auto_backup::save_backup_config,
-            tools::auto_backup::load_backup_config,
             tools::auto_backup::get_folder_stats,
             tools::auto_backup::get_free_space,
             tools::auto_backup::estimate_backup,
@@ -761,8 +1089,6 @@ pub fn run() {
             tools::auto_backup::validate_backup_config,
             tools::auto_backup::cancel_backup,
             tools::auto_backup::run_backup,
-            tools::auto_backup::save_backup_presets,
-            tools::auto_backup::load_backup_presets,
             // Budget Tracker
             tools::budget::save_budget_data,
             tools::budget::load_budget_data,
@@ -778,45 +1104,39 @@ pub fn run() {
             tools::budget::budget_disable_encryption,
             tools::budget::budget_set_session_unlock,
             // Game Stats
-            tools::game_stats::save_game_stats_data,
-            tools::game_stats::save_game_stats_draft,
-            tools::game_stats::load_game_stats_draft,
-            tools::game_stats::load_game_stats_data,
             tools::game_stats::read_game_stats_workbook,
             tools::game_stats::write_game_stats_download,
             // TTS Repeater
-            tools::tts_repeater::save_tts_repeater_data,
-            tools::tts_repeater::load_tts_repeater_data,
             tools::tts_repeater::tts_repeater_start_timer,
             tools::tts_repeater::tts_repeater_stop_timer,
             // Countdown
-            tools::countdown::save_countdown_data,
-            tools::countdown::load_countdown_data,
             tools::countdown::countdown_start_ticker,
             tools::countdown::countdown_stop_ticker,
             // RNGesus (random number generator)
-            tools::rng::save_rng_data,
-            tools::rng::load_rng_data,
             // Kanban Boards
-            tools::kanban::save_kanban_settings,
-            tools::kanban::load_kanban_settings,
+            tools::game_stats_db::gs_load,
+            tools::game_stats_db::gs_save,
+            tools::game_stats_db::gs_replace_all,
+            tools::game_stats_db::gs_migrate_from_json,
             tools::kanban::save_kanban_index,
             tools::kanban::load_kanban_index,
             tools::kanban::save_kanban_board,
             tools::kanban::load_kanban_board,
             tools::kanban::delete_kanban_board,
-            tools::kanban::kanban_lock_status,
-            tools::kanban::kanban_verify_password,
-            tools::kanban::kanban_decrypt_board,
-            tools::kanban::kanban_save_board_encrypted,
-            tools::kanban::kanban_encrypt_board,
-            tools::kanban::kanban_decrypt_board_to_plain,
-            tools::kanban::kanban_decrypt_envelope,
             tools::kanban::list_kanban_backups,
             tools::kanban::read_kanban_backup,
             tools::kanban::import_kanban_image,
             tools::kanban::delete_kanban_image,
-            tools::kanban::export_kanban_data,
+            tools::kanban::kanban_attachments_dir,
+            tools::kanban::import_kanban_attachment,
+            tools::kanban::paste_kanban_attachment,
+            tools::kanban::copy_kanban_attachment,
+            tools::kanban::delete_kanban_attachment,
+            tools::kanban::delete_kanban_board_attachments,
+            tools::kanban::sweep_kanban_attachments,
+            tools::kanban::open_kanban_attachment,
+            tools::kanban::kanban_attachments_exist,
+            tools::kanban::revive_kanban_attachments,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
