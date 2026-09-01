@@ -223,9 +223,7 @@ pub struct KanbanBackup {
 }
 
 fn backups_root(app: &AppHandle) -> Option<PathBuf> {
-    // The app's shared snapshot folder. Deriving it from the index would now
-    // give you kanban/backups, since the index moved into a tool folder.
-    Some(crate::backups_root(app))
+    Some(crate::backups_root(app, crate::tool_dir_of(INDEX_FILE)))
 }
 
 /// Filenames inside a snapshot folder, as offered by list_kanban_backups. Digits,
@@ -939,15 +937,15 @@ fn revive_attachment(app: &AppHandle, board_id: &str, attachment_id: &str) -> bo
 /// Called after the backup pruner has dropped the oldest buckets, which is the
 /// only moment the answer changes. See the section note for why a modified time
 /// is the whole test.
-/// Takes the backups folder rather than an AppHandle, because the one caller is
+/// Takes the DATA ROOT rather than an AppHandle, because the one caller is
 /// lib.rs's snapshot pruner, which is a plain function working on paths.
-/// `backups/` sits at the top of the data directory, so its parent is the data
-/// directory and the store is one tool folder down from there.
-pub fn prune_kanban_attachment_store_at(backups_root: &Path, cutoff: std::time::SystemTime) {
-    let root = match backups_root.parent() {
-        Some(p) => p.join(ATT_STORE_DIR),
-        None => return,
-    };
+///
+/// It used to take the backups folder and walk up to find the data root. That
+/// worked only while backups sat at the top of it; now that each tool has its
+/// own, walking up from kanban/backups lands in kanban/ and the store would be
+/// looked for at kanban/kanban/kanban-attachment-store.
+pub fn prune_kanban_attachment_store(data_root: &Path, cutoff: std::time::SystemTime) {
+    let root = data_root.join(ATT_STORE_DIR);
 
     let boards = match fs::read_dir(&root) {
         Ok(e) => e,

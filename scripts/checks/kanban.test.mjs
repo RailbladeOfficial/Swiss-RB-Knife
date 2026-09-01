@@ -1029,13 +1029,28 @@ test("retired attachments are pruned with the buckets that could want them", () 
   const body = lib.slice(at, lib.indexOf("\n}\n", at));
   assert.match(
     body,
-    /prune_kanban_attachment_store_at/,
+    /prune_kanban_attachment_store\(/,
     "nothing ever drops a retired attachment, so the store grows without limit",
   );
   assert.ok(
     body.indexOf("remove_dir_all(backups_root.join(old_name))") <
-      body.indexOf("prune_kanban_attachment_store_at"),
+      body.indexOf("prune_kanban_attachment_store("),
     "the store is pruned before the buckets are, so it measures against the wrong oldest bucket",
+  );
+  /* And only against KANBAN's buckets. Snapshots are per tool, so the oldest
+     bucket in someone else's folder says nothing about which attachments a
+     Kanban snapshot might still want back. */
+  assert.match(
+    body,
+    /if tool_dir == "kanban"/,
+    "another tool's retention would decide when Kanban's attachments are dropped",
+  );
+  // It takes the data root, not the backups folder. Walking up from a per-tool
+  // backups folder lands in the tool folder, not the data root.
+  assert.match(
+    body,
+    /prune_kanban_attachment_store\(&data_root\(app\)/,
+    "the store is looked for relative to the wrong folder",
   );
 
   // And the cutoff is the OLDEST SURVIVING bucket, taken after the drop.

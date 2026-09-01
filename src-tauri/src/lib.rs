@@ -38,17 +38,22 @@ mod tools;
    inside it rather than a bare filename:
 
      app/            the shell's own files: preferences, window size, the lock.
-     <tool>/         one folder per tool, holding everything that tool owns.
-     backups/        hourly snapshots, shared, flat. See backed_up_write_group.
+     <tool>/         one folder per tool, holding everything that tool owns,
+                     including <tool>/backups/ with that tool's own history.
 
-   Filenames keep their tool prefix inside their own folder, which looks
-   redundant and is not: a snapshot bucket is one flat folder shared by every
-   tool, and it stores a captured file under its BASENAME. Strip the prefixes
-   and Budget's settings and Time Tracker's settings become the same .bak.
+   SNAPSHOTS ARE PER TOOL, and that is a retention decision rather than a
+   tidiness one. Thirty hourly buckets are kept. Shared, those thirty are the
+   last thirty hours in which ANY tool was written, so an afternoon of dragging
+   Kanban cards would evict months of Budget history that nothing had touched.
+   Per tool, each keeps its own last thirty hours of its own edits, which for a
+   tool you open monthly is months.
 
-   backups/ stays at the top rather than being split per tool because a bucket
-   is a moment in time across the whole app, and because Kanban's group already
-   spans two of its own files.
+   It costs nothing structurally: every snapshot group is already one tool's
+   files, so no group is split by the move.
+
+   Filenames keep their tool prefix inside their own folder even now that the
+   folder says the same thing. A loose .bak still names what it is, and it is
+   what makes a bucket readable when you are looking at one by hand.
 ============================================================================= */
 
 /// The data directory itself, created if it is not there.
@@ -80,9 +85,21 @@ pub(crate) fn data_root(app: &tauri::AppHandle) -> PathBuf {
     }
 }
 
-/// Where the hourly snapshots live. One folder for the whole app.
-pub(crate) fn backups_root(app: &tauri::AppHandle) -> PathBuf {
-    data_root(app).join("backups")
+/// Where one tool's hourly snapshots live: <tool>/backups.
+///
+/// `tool_dir` is the folder name, which is also the tool id everywhere else in
+/// the app. See the section header for why this is per tool.
+pub(crate) fn backups_root(app: &tauri::AppHandle, tool_dir: &str) -> PathBuf {
+    data_root(app).join(tool_dir).join("backups")
+}
+
+/// The tool folder a data path belongs to: the part before the first slash.
+///
+/// Every path inside the data folder starts with the folder that owns it, so
+/// this is how a write finds the snapshot folder to capture into without being
+/// told twice which tool it is.
+pub(crate) fn tool_dir_of(relative: &str) -> &str {
+    relative.split('/').next().unwrap_or(relative)
 }
 
 /// Resolves a path inside the data directory, creating the folder it lands in.
@@ -112,9 +129,12 @@ pub(crate) fn get_data_path(app: &tauri::AppHandle, relative: &str) -> PathBuf {
    overwritten or deleted. So this cannot destroy anything, it can only fail to
    tidy, and a folder that is already in the new shape is a no-op.
 
-   backups/ is deliberately not touched. A bucket stores files under their
-   basename, and the basenames have not changed, so every existing snapshot is
-   still readable and still restorable.
+   THE OLD SHARED backups/ IS SPLIT the same way, a captured file at a time,
+   into the tool folder that owns it. A .bak is named after the file it came
+   from, so which tool owns it is a question its own name answers.
+
+   A .bak nothing claims is LEFT WHERE IT IS. Filing it under a guess would be
+   worse than leaving it somewhere a person can look at it.
 ============================================================================= */
 
 /// Old flat name to new relative path, for everything that is not a board file.
@@ -164,6 +184,85 @@ fn relocate(root: &std::path::Path, from: &str, to: &str) {
     let _ = fs::rename(&src, &dest);
 }
 
+/// Which tool folder a captured file belongs to, from the name it was captured
+/// under. None for anything the app does not recognise.
+fn owner_of_backup(bak_name: &str) -> Option<&'static str> {
+    let stem = bak_name.strip_suffix(".bak")?;
+    // Longest prefix first, so "game-stats-settings" is not read as a tool
+    // called "game" and "time-tracker-settings" beats a bare "time-tracker".
+    for (prefix, tool) in [
+        ("budget-", "budget"),
+        ("kanban-", "kanban"),
+        ("time-tracker", "time-tracker"),
+        ("game-stats", "game-stats"),
+        ("countdown", "countdown"),
+        ("rng", "rng"),
+        ("tts-repeater", "tts-repeater"),
+        ("auto-backup", "auto-backup"),
+        // The database, under the name it had when it held three tools.
+        ("tools.db", "game-stats"),
+    ] {
+        if stem.starts_with(prefix) {
+            return Some(tool);
+        }
+    }
+    None
+}
+
+/// Moves the one shared backups/ folder into a backups/ under each tool.
+///
+/// Buckets keep their names, so a snapshot taken before this still lines up
+/// with the ones taken after. A bucket left empty because nothing in it was
+/// recognised stays; an emptied one is removed, and remove_dir only succeeds
+/// on a folder that is already empty, which is the safety here.
+fn split_shared_backups(root: &std::path::Path) {
+    let shared = root.join("backups");
+    let buckets = match fs::read_dir(&shared) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for bucket in buckets.flatten() {
+        let dir = bucket.path();
+        if !dir.is_dir() {
+            continue;
+        }
+        let bucket_name = bucket.file_name().to_string_lossy().to_string();
+        if !valid_bucket_name(&bucket_name) {
+            continue;
+        }
+        let files = match fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for file in files.flatten() {
+            let name = file.file_name().to_string_lossy().to_string();
+            let tool = match owner_of_backup(&name) {
+                Some(t) => t,
+                None => continue,
+            };
+            // The database was captured under its old name.
+            let dest_name = if name == "tools.db.bak" {
+                "game-stats.db.bak".to_string()
+            } else {
+                name
+            };
+            let dest = root.join(tool).join("backups").join(&bucket_name).join(dest_name);
+            if dest.exists() {
+                continue;
+            }
+            if let Some(parent) = dest.parent() {
+                if fs::create_dir_all(parent).is_err() {
+                    continue;
+                }
+            }
+            let _ = fs::rename(file.path(), &dest);
+        }
+        // Only succeeds if everything in it was claimed and moved.
+        let _ = fs::remove_dir(&dir);
+    }
+    let _ = fs::remove_dir(&shared);
+}
+
 /// Puts a flat data folder into the per-tool shape. Safe to run every launch.
 pub(crate) fn migrate_data_layout(app: &tauri::AppHandle) {
     let root = data_root(app);
@@ -194,6 +293,10 @@ pub(crate) fn migrate_data_layout(app: &tauri::AppHandle) {
             &format!("game-stats/game-stats.db{suffix}"),
         );
     }
+
+    // The shared snapshot folder, split into one per tool. After the files
+    // above have moved, so a tool folder already exists to put them in.
+    split_shared_backups(&root);
 
     // Every board file, by pattern rather than by name.
     if let Ok(entries) = fs::read_dir(&root) {
@@ -420,7 +523,9 @@ pub(crate) fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> Result<(), S
 /// deliberately coarse, since the goal is surviving corruption discovered
 /// days or weeks later, not per-edit undo history.
 const BACKUP_MIN_INTERVAL_SECS: i64 = 3600;
-/// How many historical buckets to retain before pruning the oldest.
+/// How many historical buckets to retain per tool before pruning the oldest.
+/// Thirty hours OF THAT TOOL'S OWN EDITS, which for a tool you open monthly is
+/// months of history. See the FILE PATHS header.
 const BACKUP_KEEP_COUNT: usize = 30;
 
 /// Folder-name format for backup snapshots: sorts correctly as plain strings
@@ -465,14 +570,16 @@ pub(crate) fn backed_up_write_group(
         .iter()
         .map(|f| get_data_path(app, f))
         .collect();
-    snapshot_group(app, &group_paths);
+    /* Which tool's history this belongs in, taken from the file being written
+       rather than passed separately, so it cannot disagree with where the file
+       actually lands. Every group is one tool's files, so the group members
+       agree with this by construction. */
+    snapshot_group(app, tool_dir_of(write_filename), &group_paths);
     atomic_write(&get_data_path(app, write_filename), write_bytes)
 }
 
-fn snapshot_group(app: &tauri::AppHandle, group_paths: &[PathBuf]) {
-    // The app's one snapshot folder, not a sibling of whichever tool folder the
-    // written file happens to live in. Since the tool split, those differ.
-    let backups_root = backups_root(app);
+fn snapshot_group(app: &tauri::AppHandle, tool_dir: &str, group_paths: &[PathBuf]) {
+    let backups_root = backups_root(app, tool_dir);
     if fs::create_dir_all(&backups_root).is_err() {
         return;
     }
@@ -508,8 +615,8 @@ fn snapshot_group(app: &tauri::AppHandle, group_paths: &[PathBuf]) {
         let _ = fs::write(snapshot_dir.join(format!("{filename}.bak")), bytes);
     }
 
-    // Prune to the newest BACKUP_KEEP_COUNT buckets. Cheap enough (a
-    // directory listing of ~30 entries) to just do on every write rather
+    // Prune to the newest BACKUP_KEEP_COUNT buckets OF THIS TOOL. Cheap enough
+    // (a directory listing of ~30 entries) to just do on every write rather
     // than tracking whether this call started a new bucket.
     let mut existing_buckets: Vec<String> = fs::read_dir(&backups_root)
         .into_iter()
@@ -531,13 +638,15 @@ fn snapshot_group(app: &tauri::AppHandle, group_paths: &[PathBuf]) {
        moved aside when deleted instead, and dropped once the oldest surviving
        bucket is newer than the moment they left. This is the only place that
        answer changes, so it is the only place worth asking it. */
-    if let Some(oldest) = existing_buckets.first() {
-        let cutoff = chrono::NaiveDateTime::parse_from_str(oldest, BACKUP_FOLDER_FORMAT)
-            .ok()
-            .map(|naive| naive.and_utc().timestamp().max(0) as u64)
-            .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs));
-        if let Some(cutoff) = cutoff {
-            crate::tools::kanban::prune_kanban_attachment_store_at(&backups_root, cutoff);
+    if tool_dir == "kanban" {
+        if let Some(oldest) = existing_buckets.first() {
+            let cutoff = chrono::NaiveDateTime::parse_from_str(oldest, BACKUP_FOLDER_FORMAT)
+                .ok()
+                .map(|naive| naive.and_utc().timestamp().max(0) as u64)
+                .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs));
+            if let Some(cutoff) = cutoff {
+                crate::tools::kanban::prune_kanban_attachment_store(&data_root(app), cutoff);
+            }
         }
     }
 }
@@ -856,7 +965,7 @@ fn list_tool_backups(app: tauri::AppHandle, tool_id: String) -> Result<Vec<ToolB
         return Ok(vec![]);
     }
 
-    let root = backups_root(&app);
+    let root = backups_root(&app, &tool_id);
     let entries = match fs::read_dir(&root) {
         Ok(e) => e,
         // No backups folder yet is a new install, not an error.
@@ -919,7 +1028,7 @@ fn read_tool_backup(
     if f.group.is_empty() {
         return Err("That file is not snapshotted.".to_string());
     }
-    let root = backups_root(&app);
+    let root = backups_root(&app, &tool_id);
     let path = root.join(&name).join(format!("{}.bak", file_basename(f.name)));
     fs::read_to_string(&path).map_err(|e| format!("Could not read that snapshot: {e}"))
 }

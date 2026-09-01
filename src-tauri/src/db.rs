@@ -295,8 +295,9 @@ fn tables_for(tool_id: &str) -> Result<&'static [&'static str], String> {
 }
 
 fn backups_root(app: &AppHandle) -> Option<std::path::PathBuf> {
-    // The app's shared snapshot folder, not a sibling of the database.
-    Some(crate::backups_root(app))
+    // game-stats/backups. The database is Game Stats' alone, so its history
+    // is kept and pruned with the rest of that tool's.
+    Some(crate::backups_root(app, crate::tool_dir_of(DB_FILE)))
 }
 
 /// The bucket name for right now, in the same format and the same hourly

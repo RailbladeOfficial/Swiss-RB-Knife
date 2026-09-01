@@ -602,32 +602,108 @@ test("nothing the app writes lands loose in the data root", () => {
   );
 });
 
-test("no two tools can claim the same snapshot file", () => {
-  /* A snapshot bucket is ONE FLAT FOLDER shared by every tool, and a captured
-     file is stored in it under its basename. Two tools whose paths differ only
-     by their folder would write the same .bak and silently overwrite each
-     other's history. The tool prefixes on the filenames are what prevent that,
-     which is the whole reason they were kept when the folders arrived. */
+test("a snapshot group never spans two tools", () => {
+  /* THE INVARIANT PER-TOOL SNAPSHOTS RELY ON.
+
+     Snapshots live in <tool>/backups now, and backed_up_write_group works out
+     which tool from the file it is WRITING. Every other file in the group is
+     captured into that same folder. So a group that named files from two tools
+     would file one tool's history under the other's name, and that tool's
+     retention would then decide when it is dropped.
+
+     Nothing enforces this at the type level, so it is enforced here. */
   const lib = read("src-tauri/src/lib.rs");
-  const table = lib.slice(lib.indexOf("fn tool_file("), lib.indexOf("Ok(ToolFile {"));
-
-  const paths = [
-    ...[...table.matchAll(/"([a-z0-9./-]+\.json)"/g)].map((m) => m[1]),
-    ...[...read("src-tauri/src/tools/budget.rs").matchAll(/"(budget\/[a-z0-9.-]+)"/g)].map(
-      (m) => m[1],
-    ),
-    read("src-tauri/src/db.rs").match(/DB_FILE: &str = "([^"]+)"/)[1],
-    read("src-tauri/src/tools/kanban.rs").match(/INDEX_FILE: &str = "([^"]+)"/)[1],
+  const groups = [
+    ...[...lib.matchAll(
+      /const\s+([A-Z_0-9]+_GROUP):\s*&\[&str\]\s*=\s*\n?\s*&\[([^\]]*)\]/g,
+    )].map((m) => [m[1], m[2]]),
+    ...[...read("src-tauri/src/tools/budget.rs").matchAll(
+      /const\s+([A-Z_0-9]+_GROUP):\s*\[&str;\s*\d+\]\s*=\s*\[([^\]]*)\]/g,
+    )].map((m) => [m[1], m[2]]),
   ];
+  assert.ok(groups.length >= 3, `parsed ${groups.length} snapshot groups, expected at least 3`);
 
-  const byBase = new Map();
-  for (const p of paths) {
-    const base = p.split("/").pop();
-    if (!byBase.has(base)) byBase.set(base, new Set());
-    byBase.get(base).add(p);
+  const mixed = [];
+  for (const [name, body] of groups) {
+    const dirs = new Set(
+      [...body.matchAll(/"([^"]+)"/g)].map((m) => m[1].split("/")[0]),
+    );
+    if (dirs.size > 1) mixed.push(`${name}: ${[...dirs].join(" + ")}`);
   }
-  const clashes = [...byBase]
-    .filter(([, owners]) => owners.size > 1)
-    .map(([base, owners]) => `${base} <- ${[...owners].join(", ")}`);
-  assert.deepEqual(clashes, [], "these would overwrite each other in a snapshot bucket");
+  assert.deepEqual(mixed, [], "these snapshot groups would file one tool's history under another");
+
+  // Kanban's group is built at runtime from two constants rather than listed.
+  const kb = read("src-tauri/src/tools/kanban.rs");
+  const boardDir = kb.match(/BOARD_DIR: &str = "([^"]+)"/)[1];
+  const indexFile = kb.match(/INDEX_FILE: &str = "([^"]+)"/)[1];
+  assert.equal(
+    boardDir.split("/")[0],
+    indexFile.split("/")[0],
+    "a board and the index naming it would be captured into different tools",
+  );
+
+  // And the tool is taken from the file being written, not passed separately,
+  // so it cannot disagree with where that file actually lands.
+  assert.match(
+    lib,
+    /snapshot_group\(app, tool_dir_of\(write_filename\), &group_paths\)/,
+    "the snapshot folder is not derived from the file being written",
+  );
+});
+
+test("every tool's snapshots are pruned against its own history", () => {
+  /* The reason snapshots moved out of one shared folder. Thirty buckets shared
+     is the last thirty hours in which ANY tool was written, so an afternoon in
+     one tool evicts months of history from a tool nothing touched. */
+  const lib = read("src-tauri/src/lib.rs");
+  assert.match(
+    lib,
+    /pub\(crate\) fn backups_root\(app: &tauri::AppHandle, tool_dir: &str\) -> PathBuf \{\s*data_root\(app\)\.join\(tool_dir\)\.join\("backups"\)/,
+    "snapshots are not kept per tool",
+  );
+
+  // Every caller names a tool. A call with no tool would not compile, but a
+  // caller passing a constant that is not a tool folder would.
+  for (const [file, expected] of [
+    ["src-tauri/src/db.rs", "DB_FILE"],
+    ["src-tauri/src/tools/kanban.rs", "INDEX_FILE"],
+  ]) {
+    assert.match(
+      read(file),
+      new RegExp(`crate::backups_root\\(app, crate::tool_dir_of\\(${expected}\\)\\)`),
+      `${file} does not derive its snapshot folder from its own data path`,
+    );
+  }
+});
+
+test("splitting the old shared backups folder cannot lose a snapshot", () => {
+  const lib = read("src-tauri/src/lib.rs");
+  const at = lib.indexOf("fn split_shared_backups(");
+  const fn = lib.slice(at, lib.indexOf("\n}\n", at));
+
+  // Same rule as every other move: never over the top of something.
+  assert.match(fn, /if dest\.exists\(\) \{\s*continue;/, "the split would overwrite a snapshot");
+  assert.ok(!/remove_file|remove_dir_all/.test(fn), "the split deletes rather than moves");
+
+  /* A .bak nothing claims is LEFT WHERE IT IS, and the folders are removed with
+     remove_dir, which only succeeds when empty. So an unrecognised file keeps
+     both itself and the folder holding it. */
+  assert.match(fn, /None => continue/, "an unclaimed snapshot would not be left alone");
+  assert.ok(
+    !/remove_dir_all/.test(fn) && /fs::remove_dir\(/.test(fn),
+    "the split removes folders that may still hold something",
+  );
+
+  // The database was captured under the name it had when it held three tools.
+  assert.match(fn, /"tools\.db\.bak"/, "an old database snapshot would not be recognised");
+  assert.match(fn, /"game-stats\.db\.bak"/, "an old database snapshot keeps a misleading name");
+
+  // Every tool that snapshots has to be claimable, or its history is stranded.
+  const owner = lib.slice(lib.indexOf("fn owner_of_backup("));
+  for (const tool of ["budget", "kanban", "time-tracker", "game-stats"]) {
+    assert.ok(
+      owner.slice(0, owner.indexOf("\n}\n")).includes(`"${tool}"`),
+      `${tool}'s old snapshots would be stranded in the shared folder`,
+    );
+  }
 });
