@@ -26,10 +26,43 @@ aes-gcm = "0.10"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-image = "0.25"
+# Only the formats Image CCR actually accepts, and `rayon` so its parallel
+# resize/encode paths are unchanged. The default feature set adds AVIF, OpenEXR,
+# DDS, HDR, farbfeld, ICO, PNM, QOI and TGA decoders, none of which anything can
+# reach: every decode in image_ccr.rs goes through open_image_limited(), which
+# picks the format from the file EXTENSION rather than sniffing the content, and
+# the extension lists (RESIZE_SUPPORTED_EXTS, and the dialog filters in
+# image-ccr.ts) admit only these seven. Turning them off drops ravif, rav1e, exr
+# and their transitive trees, which is a smaller binary, a faster build, and
+# several thousand lines of image parser that no longer ship at all.
+#
+# A format added to those extension lists MUST be added here too, or it decodes
+# to "unsupported format" at runtime rather than failing to compile. The
+# every_accepted_format_actually_round_trips test in image_ccr.rs is what makes
+# that a test failure instead of a bug report.
+image = { version = "0.25", default-features = false, features = [
+    "rayon",
+    "bmp",
+    "gif",
+    "jpeg",
+    "png",
+    "tiff",
+    "webp",
+] }
 tauri-plugin-dialog = "2"
 chrono = { version = "0.4", features = ["clock"] }
 dirs = "5"
+# SQLite, bundled: the C source is compiled in, so nothing has to be installed
+# on a build machine and nothing has to be installed on a user's. This is the
+# store for the tools whose records grow without bound (Kanban, Time Tracker,
+# Game Stats). Settings stay JSON, because a preferences file is read once at
+# startup and gains nothing from a database.
+#
+# The ENCRYPTED build of SQLite (SQLCipher) is deliberately not used: it needs
+# OpenSSL, which needs a Perl toolchain to build on Windows, and the one tool in
+# this app that genuinely needs encryption (Budget) is also the one whose data
+# is bounded and therefore fine as an encrypted JSON file.
+rusqlite = { version = "0.32", features = ["bundled"] }
 zeroize = "1"
 # Update check — one blocking GET to the GitHub Releases API (see lib.rs
 # check_for_updates). Pinned to 2.x for a stable API; default features bundle a

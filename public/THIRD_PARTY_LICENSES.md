@@ -3,7 +3,7 @@
 Swiss RB Knife makes use of the following open-source packages and libraries.
 All credit and gratitude to their respective authors and maintainers.
 
-> **Generated automatically on 2026-08-24.**
+> **Generated automatically on 2026-09-01.**
 > Re-run `node generate-licenses.mjs` (or `npm run build`) to refresh.
 
 ---
@@ -45,6 +45,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [aead](https://github.com/RustCrypto/traits) | 0.5.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [aes](https://github.com/RustCrypto/block-ciphers) | 0.8.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [aes-gcm](https://github.com/RustCrypto/AEADs) | 0.10.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [ahash](https://github.com/tkaitchuck/ahash) | 0.8.12 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [aho-corasick](https://github.com/BurntSushi/aho-corasick) | 1.1.5 | [MIT OR Unlicense](https://spdx.org/licenses/MIT.html) |
 | [aligned](https://github.com/rust-embedded-community/aligned) | 0.4.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [aligned-vec](https://github.com/sarah-ek/aligned-vec/) | 0.6.4 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -168,6 +169,8 @@ All credit and gratitude to their respective authors and maintainers.
 | [event-listener](https://github.com/smol-rs/event-listener) | 5.4.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [event-listener-strategy](https://github.com/smol-rs/event-listener-strategy) | 0.5.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [exr](https://github.com/johannesvollmer/exrs) | 1.74.2 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
+| [fallible-iterator](https://github.com/sfackler/rust-fallible-iterator) | 0.3.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [fallible-streaming-iterator](https://github.com/sfackler/fallible-streaming-iterator) | 0.1.9 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [fastrand](https://github.com/smol-rs/fastrand) | 2.5.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [fax](https://github.com/pdf-rs/fax) | 0.2.7 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [fdeflate](https://github.com/image-rs/fdeflate) | 0.3.7 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -214,7 +217,9 @@ All credit and gratitude to their respective authors and maintainers.
 | [gtk3-macros](https://github.com/gtk-rs/gtk3-rs) | 0.18.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [half](https://github.com/VoidStarKat/half-rs) | 2.7.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [hashbrown](https://github.com/rust-lang/hashbrown) | 0.12.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [hashbrown](https://github.com/rust-lang/hashbrown) | 0.14.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [hashbrown](https://github.com/rust-lang/hashbrown) | 0.17.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [hashlink](https://github.com/kyren/hashlink) | 0.9.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [heck](https://github.com/withoutboats/heck) | 0.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [heck](https://github.com/withoutboats/heck) | 0.5.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [hermit-abi](https://github.com/hermit-os/hermit-rs) | 0.5.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -273,6 +278,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [libloading](https://github.com/nagisa/rust_libloading/) | 0.7.4 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [libm](https://github.com/rust-lang/compiler-builtins) | 0.2.16 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [libredox](https://gitlab.redox-os.org/redox-os/libredox.git) | 0.1.19 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [libsqlite3-sys](https://github.com/rusqlite/rusqlite) | 0.30.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [linux-raw-sys](https://github.com/sunfishcode/linux-raw-sys) | 0.12.1 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [litemap](https://github.com/unicode-org/icu4x) | 0.8.2 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
 | [lock_api](https://github.com/Amanieu/parking_lot) | 0.4.14 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -361,7 +367,6 @@ All credit and gratitude to their respective authors and maintainers.
 | [pulp](https://github.com/sarah-quinones/pulp/) | 0.22.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [pulp-wasm-simd-flag](https://github.com/sarah-quinones/pulp/) | 0.1.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [pxfm](https://github.com/awxkee/pxfm) | 0.1.30 | [Apache-2.0 OR BSD-3-Clause](https://spdx.org/licenses/Apache-2.0.html) |
-| [qoi](https://github.com/aldanor/qoi-rust) | 0.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [quick-error](http://github.com/tailhook/quick-error) | 2.0.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [quick-xml](https://github.com/tafia/quick-xml) | 0.41.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [quote](https://github.com/dtolnay/quote) | 1.0.47 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -390,6 +395,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [rfd](https://github.com/PolyMeilex/rfd) | 0.16.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [rgb](https://github.com/kornelski/rust-rgb) | 0.8.53 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [ring](https://github.com/briansmith/ring) | 0.17.14 | [Apache-2.0 AND ISC](https://spdx.org/licenses/Apache-2.0.html) |
+| [rusqlite](https://github.com/rusqlite/rusqlite) | 0.32.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [rustc_version](https://github.com/djc/rustc-version-rs) | 0.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustc-hash](https://github.com/rust-lang/rustc-hash) | 2.1.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustix](https://github.com/bytecodealliance/rustix) | 1.1.4 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -512,6 +518,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [utf8_iter](https://github.com/hsivonen/utf8_iter) | 1.0.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [uuid](https://github.com/uuid-rs/uuid) | 1.24.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [v_frame](https://github.com/rust-av/v_frame) | 0.3.9 | [BSD-2-Clause](https://spdx.org/licenses/BSD-2-Clause.html) |
+| [vcpkg](https://github.com/mcgoo/vcpkg-rs) | 0.2.15 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [version_check](https://github.com/SergioBenitez/version_check) | 0.9.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [version-compare](https://gitlab.com/timvisee/version-compare) | 0.2.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [vswhom](https://github.com/nabijaczleweli/vswhom.rs) | 0.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
