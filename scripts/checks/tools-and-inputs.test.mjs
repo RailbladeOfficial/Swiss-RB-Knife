@@ -486,6 +486,41 @@ test("a migration runs once and records that it did", () => {
   );
 });
 
+test("the import warning only offers an undo where there is one", () => {
+  /* The Data tab's import replaces everything a tool holds. Its confirmation
+     used to promise that a snapshot made this undoable, for all eight tools,
+     and for half of them that was simply false: four keep preferences and
+     short lists, snapshot nothing, and have no screen to put anything back.
+
+     `snapshots: true` is each tool's own claim, and a claim needs checking.
+     A tool makes it if and only if it actually draws a snapshot list. */
+  const declares = new Set();
+  const draws = new Set();
+  for (const file of filesUnder("src/tool", ".ts")) {
+    const text = read(file);
+    const at = text.indexOf("registerTransferable({");
+    if (at === -1) continue;
+    const id = /id:\s*"([a-z-]+)"/.exec(text.slice(at, at + 400))?.[1];
+    assert.ok(id, `${file} registers a transferable with no id`);
+
+    if (/snapshots:\s*true/.test(text.slice(at, at + 400))) declares.add(id);
+    // Either shared renderer, or Kanban's own per-board one.
+    if (/renderToolBackups\(|renderDbBackups\(|list_kanban_backups/.test(text)) draws.add(id);
+  }
+  assert.ok(declares.size > 0, "parsed no snapshot claims");
+
+  assert.deepEqual(
+    [...declares].filter((id) => !draws.has(id)),
+    [],
+    "these tools promise an import can be undone but show no snapshots to undo it with",
+  );
+  assert.deepEqual(
+    [...draws].filter((id) => !declares.has(id)),
+    [],
+    "these tools have snapshots but their import warning does not say so",
+  );
+});
+
 test("every file the app owns lives in a folder, not loose in the data root", () => {
   /* The data directory has a shape: app/ for the shell's own files, one folder
      per tool, and backups/ shared. A path with no slash in it would land loose

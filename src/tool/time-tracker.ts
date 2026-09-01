@@ -3228,6 +3228,7 @@ interface TimeTrackerExport {
 
 registerTransferable({
   id: "time-tracker",
+  snapshots: true,
   label: "Time Tracker",
   summary: () => `${entries.length} entries · ${activities.length} activities`,
   otherFormats: {

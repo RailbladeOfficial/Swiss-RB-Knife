@@ -3199,7 +3199,7 @@
               <div class="settings-label-col">
                 <span class="kb-label-with-info">Export to JSON
                   <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="Writes everything this tool holds to a file you name. Keep one somewhere outside the app: it is what rebuilds the tool if its data is ever lost.">&#8505;</button>
+                    data-tooltip="Writes everything this tool holds to a file you name, as readable JSON. The file is a complete copy: an import of it rebuilds the tool.">&#8505;</button>
                 </span>
               </div>
               <button id="dataExportBtn" class="settings-action-btn">Export</button>
@@ -3209,7 +3209,7 @@
               <div class="settings-label-col">
                 <span class="kb-label-with-info">Import from JSON
                   <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="Replaces everything this tool holds with the contents of the file. Asks first, and the state it replaces is captured in a snapshot you can restore from the tool's own Data tab.">&#8505;</button>
+                    data-tooltip="Replaces everything this tool holds with the contents of the file, after asking. Budget, Kanban, Time Tracker and Game Stats capture the state being replaced, and their own Data tabs put it back. The other tools keep no snapshots, so an import into one of them is final.">&#8505;</button>
                 </span>
               </div>
               <button id="dataImportBtn" class="settings-action-btn">Import</button>
@@ -5422,6 +5422,7 @@
           <button class="modal-tab" data-budget-tab="categories">Expense Categories</button>
           <button class="modal-tab" data-budget-tab="expenseSources">Expense Sources</button>
           <button class="modal-tab" data-budget-tab="preferences">Preferences</button>
+          <button class="modal-tab" data-budget-tab="data">Data</button>
         </div>
 
         <!-- INCOME SOURCES -->
@@ -5546,6 +5547,25 @@
                 <button id="budgetEncryptDisableBtn" class="settings-action-btn danger-btn" style="display:none;">Disable</button>
               </div>
             </div>
+
+          </div>
+        </div>
+
+        <!-- DATA -->
+        <div id="budgetTabData" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Snapshots
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Every save captures the files it overwrites, by hour. Restoring is itself captured, so an unwanted restore is undone by restoring the newest entry. A snapshot taken while encryption was on restores as encrypted, and opens with the password that was set at the time.">&#8505;</button>
+                </span>
+                <span id="budgetBackupSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="budgetBackupRefreshBtn" class="settings-action-btn">Refresh</button>
+            </div>
+            <div id="budgetBackupList" class="tool-backup-list"></div>
 
           </div>
         </div>

@@ -16,10 +16,14 @@
 
    WHY IMPORT REPLACES RATHER THAN MERGES. A merge has to answer "what happens
    when this already exists", and every answer is a guess at what someone meant.
-   A replace has exactly one meaning. It asks before it runs, and the state it
-   replaces is captured by the snapshot the write triggers, so importing the
-   wrong file is undone by restoring the newest snapshot from that tool's own
-   Data tab.
+   A replace has exactly one meaning, and it asks before it runs.
+
+   WHETHER IT CAN BE UNDONE DEPENDS ON THE TOOL, and the warning has to say so
+   rather than assume. Four of these tools capture the state a write replaces
+   and offer a screen to put it back; the other four keep preferences and short
+   lists, snapshot nothing, and an import into one of them is final. The
+   confirmation used to promise an undo for all eight, which for half of them
+   was not true. `snapshots` is what each tool says about itself.
 
    WHY THE CSV AND SPREADSHEET IMPORTERS ARE NOT HERE. Those read somebody
    else's file, so they need column matching, a preview and a per-row error
@@ -52,6 +56,10 @@ export interface Transferable {
   /** Shown under the buttons. Anything true and worth knowing before you press
    *  one, such as what an export does not carry. */
   note?: string;
+  /** Whether this tool captures what a write replaces AND has a screen to put
+   *  it back. Decides whether the import warning offers an undo. Set it only
+   *  where both halves are true: a snapshot nothing can reach is not an undo. */
+  snapshots?: boolean;
 }
 
 const TRANSFERABLE: Transferable[] = [];
@@ -213,8 +221,9 @@ async function doImport(): Promise<void> {
         title: `Replace all ${tool.label} data?`,
         message:
           `Everything ${tool.label} currently holds is replaced by the contents of this file. ` +
-          "A snapshot of the current state is taken first, so this is undoable from that " +
-          "tool's own Data tab.",
+          (tool.snapshots
+            ? `A snapshot of the current state is taken first, which the Data tab in ${tool.label}'s own settings can put back.`
+            : `${tool.label} keeps no snapshots, so this cannot be undone. Export the current data first if you might want it back.`),
         confirmLabel: "Replace",
       },
       () => {

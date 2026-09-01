@@ -8221,6 +8221,7 @@ interface KanbanExport {
 
 registerTransferable({
   id: "kanban",
+  snapshots: true,
   label: "Kanban",
   summary: () =>
     `${boards.length} boards · ${cards.filter((c) => !c.archived).length} cards`,

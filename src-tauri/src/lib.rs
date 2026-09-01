@@ -605,6 +605,18 @@ pub(crate) fn backed_up_write_group(
     atomic_write(&get_data_path(app, write_filename), write_bytes)
 }
 
+/// Captures the current contents of these files into this hour's bucket,
+/// without writing anything.
+///
+/// For a restore, which puts several files back at once and so cannot ride
+/// along with a single write the way backed_up_write_group does. What it
+/// protects is the same thing: the state being replaced, captured before it is
+/// replaced, so an unwanted restore is undone by restoring the newest.
+pub(crate) fn snapshot_files(app: &tauri::AppHandle, tool_dir: &str, filenames: &[&str]) {
+    let paths: Vec<PathBuf> = filenames.iter().map(|f| get_data_path(app, f)).collect();
+    snapshot_group(app, tool_dir, &paths);
+}
+
 fn snapshot_group(app: &tauri::AppHandle, tool_dir: &str, group_paths: &[PathBuf]) {
     let backups_root = backups_root(app, tool_dir);
     if fs::create_dir_all(&backups_root).is_err() {
@@ -999,19 +1011,19 @@ fn load_tool_file(app: tauri::AppHandle, tool_id: String, kind: String) -> Resul
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ToolBackupFile {
     /// The .bak filename inside the snapshot folder.
-    file: String,
+    pub(crate) file: String,
     /// Which row of the table it came from, so the front end can label it and
     /// hand the right kind back to restore it.
-    kind: String,
-    bytes: u64,
+    pub(crate) kind: String,
+    pub(crate) bytes: u64,
 }
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ToolBackup {
     /// The snapshot folder's name: its UTC timestamp in BACKUP_FOLDER_FORMAT.
-    name: String,
-    files: Vec<ToolBackupFile>,
+    pub(crate) name: String,
+    pub(crate) files: Vec<ToolBackupFile>,
 }
 
 /// Every snapshot folder holding something this tool owns, newest first.
@@ -1448,6 +1460,8 @@ pub fn run() {
             tools::budget::budget_enable_encryption,
             tools::budget::budget_disable_encryption,
             tools::budget::budget_set_session_unlock,
+            tools::budget::list_budget_backups,
+            tools::budget::restore_budget_backup,
             // Game Stats
             tools::game_stats::read_game_stats_workbook,
             tools::game_stats::write_game_stats_download,

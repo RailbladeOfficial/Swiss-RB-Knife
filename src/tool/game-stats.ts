@@ -695,6 +695,7 @@ async function refreshGsBackups(): Promise<void> {
 registerTransferable({
   id: "game-stats",
   label: "Game Stats",
+  snapshots: true,
   summary: () => `${games.length} games · ${profiles.length} profiles`,
   otherFormats: {
     // Navigates to the tool first; see the note on Time Tracker's.

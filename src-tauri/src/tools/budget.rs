@@ -63,6 +63,127 @@ const BUDGET_BACKUP_GROUP: [&str; 4] = [
 ];
 
 /* =============================================================================
+   SNAPSHOTS: BROWSING AND RESTORING
+   -----------------------------------------------------------------------------
+   Budget has captured every write since it shipped, and until now there was no
+   way to reach any of it short of opening the folder by hand. That is the wrong
+   way round: this whole mechanism exists because budget-data.enc became
+   undecryptable once, so Budget is the tool that most needs the way back.
+
+   It does not go through the shared tool-file store, and cannot. Its files are
+   a PAIR that swaps names: the records are budget-data.json when plaintext and
+   budget-data.enc when encrypted, and only one of each pair exists at a time.
+   So a restore has to put back whichever one the snapshot holds AND remove the
+   other, or the tool would find both and have to guess which is real.
+
+   An encrypted snapshot restores as ciphertext, untouched. Its envelope carries
+   its own salt, nonce and password hash, so it opens with whatever password was
+   set at the moment it was captured, which is not necessarily the current one.
+============================================================================= */
+
+/// The two things Budget keeps, and the two names each can be stored under.
+const BUDGET_PARTS: [(&str, &str, &str); 2] = [
+    ("data", "budget/budget-data.json", "budget/budget-data.enc"),
+    ("entities", "budget/budget-entities.json", "budget/budget-entities.enc"),
+];
+
+/// Every snapshot bucket holding something Budget owns, newest first.
+///
+/// Shaped like list_tool_backups' rows so the front end draws it with the same
+/// renderer every other tool uses. `kind` is "data" or "entities"; whether that
+/// row was encrypted is in `file`, which ends .enc.bak when it was.
+#[tauri::command]
+pub fn list_budget_backups(app: tauri::AppHandle) -> Result<Vec<crate::ToolBackup>, String> {
+    let root = crate::backups_root(&app, "budget");
+    let entries = match fs::read_dir(&root) {
+        Ok(e) => e,
+        // No backups folder yet is a new install, not an error.
+        Err(_) => return Ok(vec![]),
+    };
+
+    let mut out: Vec<crate::ToolBackup> = entries
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if !crate::valid_bucket_name(&name) {
+                return None;
+            }
+            let mut files = Vec::new();
+            for (kind, plain, encrypted) in BUDGET_PARTS {
+                for relative in [plain, encrypted] {
+                    let file = format!("{}.bak", crate::file_basename(relative));
+                    if let Ok(meta) = fs::metadata(e.path().join(&file)) {
+                        files.push(crate::ToolBackupFile {
+                            file,
+                            kind: kind.to_string(),
+                            bytes: meta.len(),
+                        });
+                    }
+                }
+            }
+            if files.is_empty() {
+                None
+            } else {
+                Some(crate::ToolBackup { name, files })
+            }
+        })
+        .collect();
+
+    // The folder format sorts correctly as plain strings, so a reversed string
+    // sort is a true newest-first ordering with no date parsing.
+    out.sort_by(|a, b| b.name.cmp(&a.name));
+    Ok(out)
+}
+
+/// Puts one half of a Budget snapshot back: either the records or the accounts
+/// and categories.
+///
+/// Unlike every other restore in the app, this one WRITES rather than handing
+/// bytes to the front end. Budget's records can be ciphertext, which the front
+/// end cannot read, cannot re-encrypt without the password, and has no business
+/// holding. The state being replaced is captured first, so restoring the wrong
+/// snapshot is undone by restoring the newest.
+#[tauri::command]
+pub fn restore_budget_backup(
+    app: tauri::AppHandle,
+    name: String,
+    kind: String,
+) -> Result<(), String> {
+    if !crate::valid_bucket_name(&name) {
+        return Err("That snapshot name is not one of ours.".to_string());
+    }
+    let (_, plain, encrypted) = BUDGET_PARTS
+        .iter()
+        .find(|(k, _, _)| *k == kind)
+        .ok_or_else(|| format!("'{kind}' is not something Budget keeps."))?;
+
+    let bucket = crate::backups_root(&app, "budget").join(&name);
+    let read_bak = |relative: &str| -> Option<Vec<u8>> {
+        fs::read(bucket.join(format!("{}.bak", crate::file_basename(relative)))).ok()
+    };
+
+    // Whichever of the pair that bucket holds. Both would mean a snapshot taken
+    // mid-changeover, and the encrypted one is the safer of the two to believe.
+    let (target, other, bytes) = match (read_bak(encrypted), read_bak(plain)) {
+        (Some(bytes), _) => (*encrypted, *plain, bytes),
+        (None, Some(bytes)) => (*plain, *encrypted, bytes),
+        (None, None) => return Err("That snapshot does not hold this part.".to_string()),
+    };
+
+    // The state being replaced, captured before it is replaced.
+    crate::snapshot_files(&app, "budget", &BUDGET_BACKUP_GROUP);
+
+    crate::atomic_write(&get_data_path(&app, target), &bytes)?;
+    /* And the other name goes, or the tool finds both halves of the pair and
+       has to guess which one is real. Restoring a plaintext snapshot over an
+       encrypted install genuinely does turn encryption off, which is what that
+       snapshot recorded. */
+    let _ = fs::remove_file(get_data_path(&app, other));
+    Ok(())
+}
+
+/* =============================================================================
    ENCRYPTED ENVELOPES
 ============================================================================= */
 

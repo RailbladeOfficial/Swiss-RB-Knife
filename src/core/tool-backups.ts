@@ -56,6 +56,10 @@ export function formatBackupBytes(bytes: number): string {
 export interface ToolBackupListOptions {
   /** Which tool's snapshots to list, matching lib.rs's tool_file table. */
   toolId: string;
+  /** How to fetch the list, when the shared tool-file store is not where the
+   *  answer is. Budget is the one tool that needs this: its records are a pair
+   *  that swaps names when encryption is on, which the store cannot describe. */
+  list?: () => Promise<ToolBackup[]>;
   /** Where the list is drawn. Emptied and rebuilt on every refresh. */
   host: HTMLElement;
   /** Optional element that gets a short "3 kept" style readout. */
@@ -81,7 +85,9 @@ export async function renderToolBackups(opts: ToolBackupListOptions): Promise<vo
 
   let items: ToolBackup[];
   try {
-    items = await invoke<ToolBackup[]>("list_tool_backups", { toolId: opts.toolId });
+    items = opts.list
+      ? await opts.list()
+      : await invoke<ToolBackup[]>("list_tool_backups", { toolId: opts.toolId });
   } catch (err) {
     if (summary) summary.textContent = "unavailable";
     const error = document.createElement("p");

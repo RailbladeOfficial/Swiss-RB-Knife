@@ -38,6 +38,8 @@ import {
 } from "../core/reminder-schedule";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
+import { devError } from "../core/dev-log";
+import { renderToolBackups, type ToolBackup } from "../core/tool-backups";
 
 /* =============================================================================
    TYPES
@@ -6565,6 +6567,7 @@ const SETUP_TABS = [
   "categories",
   "expenseSources",
   "preferences",
+  "data",
 ] as const;
 type SetupTab = (typeof SETUP_TABS)[number];
 
@@ -6579,8 +6582,61 @@ const setupTabs = new ModalTabs<SetupTab>({
     categories:     "budgetTabCategories",
     expenseSources: "budgetTabExpenseSources",
     preferences:    "budgetTabPreferences",
+    data:           "budgetTabData",
   },
 });
+
+/* -----------------------------------------------------------------------------
+   SNAPSHOTS
+   -----------------------------------------------------------------------------
+   Budget has captured every write since it shipped, and this is the first
+   screen that can reach any of it. It is also the tool that most needs one:
+   the snapshot mechanism exists because budget-data.enc became undecryptable
+   once, and until now the way back was to open the folder by hand.
+
+   The list comes from Budget's own command rather than the shared tool-file
+   store, because its records are a pair that swaps names when encryption is on
+   and the store cannot describe that. The restore is a backend write for the
+   same reason: an encrypted snapshot is ciphertext, which this side can neither
+   read nor re-encrypt, and has no business holding.
+----------------------------------------------------------------------------- */
+
+let budgetBackupRefreshWired = false;
+
+async function refreshBudgetBackups(): Promise<void> {
+  if (!budgetBackupRefreshWired) {
+    budgetBackupRefreshWired = true;
+    document
+      .getElementById("budgetBackupRefreshBtn")!
+      .addEventListener("click", () => void refreshBudgetBackups());
+  }
+
+  const host = document.getElementById("budgetBackupList")!;
+  await renderToolBackups({
+    toolId: "budget",
+    list: () => invoke<ToolBackup[]>("list_budget_backups"),
+    host,
+    summary: document.getElementById("budgetBackupSummary"),
+    labels: {
+      data: "Entries and monthly records",
+      entities: "Bills, categories and sources",
+    },
+    onRestore: async (entry, snapshot) => {
+      try {
+        await invoke("restore_budget_backup", { name: snapshot.name, kind: entry.kind });
+        // Re-read rather than trusting what was sent: a restore can turn
+        // encryption off, and only a fresh read knows which state it landed in.
+        await loadFromDisk();
+        renderAll();
+        await refreshBudgetBackups();
+        flash("Snapshot restored.", "success", 6000);
+      } catch (err) {
+        devError("[budget] snapshot restore failed", err);
+        flash(`Couldn't restore that snapshot: ${String(err)}`, "error", 9000);
+      }
+    },
+  });
+}
 
 function applyBudgetSettings(): void {
   budgetQuickDeleteToggle.checked = appSettings.quickDelete;
@@ -6635,6 +6691,9 @@ function getSetupModal(): Modal {
         renderSimpleList("categories");
         renderSimpleList("expenseSources");
         applyBudgetSettings();
+        // Read on the way in rather than on tab switch, so the Data tab is
+        // never the one still loading when you arrive at it.
+        void refreshBudgetBackups();
       },
     });
 
@@ -7755,6 +7814,7 @@ function _applyEncryptionSettingsUI(): void {
 registerTransferable({
   id: "budget",
   label: "Budget Tracker",
+  snapshots: true,
   summary: () =>
     `${data.recurringBills.length} bills · ${data.incomeSources.length} income sources`,
   note:
