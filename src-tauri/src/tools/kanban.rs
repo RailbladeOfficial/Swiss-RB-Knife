@@ -846,9 +846,9 @@ pub fn open_kanban_attachment(
 /// folder so two files called "report.pdf" cannot land on each other.
 fn handoff_copy(path: &Path, display: &str) -> Option<PathBuf> {
     let name = display_name(Path::new(display));
-    if Path::new(&name).extension().is_none() {
-        return None; // nothing to gain; open the original
-    }
+    // No extension on the original name either: nothing to gain from a copy,
+    // so the original opens and the shell asks what to use.
+    Path::new(&name).extension()?;
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .ok()?
