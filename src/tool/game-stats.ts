@@ -34,8 +34,11 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { devError, flash, setSubNavHandler, shortPath } from "../core/shell";
+import { devError, flash, setSubNavHandler, shortPath, navigateToTool } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
+import { renderDbBackups } from "../core/db-backups";
+import { registerTransferable } from "../core/data-transfer";
+import { diffRows } from "../core/row-diff";
 import { attachMenu } from "../menu/menu";
 import {
   buildFixedRounds,
@@ -186,20 +189,220 @@ function makeId(): string {
    PERSISTENCE
 ============================================================================= */
 
+/** What was last successfully written, as id -> serialised game. The diff
+ *  against this is what makes a save write the games that changed rather than
+ *  all of them; see core/row-diff.ts for why it compares rather than being
+ *  told. */
+let writtenGames = new Map<string, string>();
+
+/** What was last written for the profile and table lists, and for the
+ *  preferences. Same idea as writtenGames, one string each because they are
+ *  short lists that are always written whole. */
+let writtenLists = "";
+let writtenSettings = "";
+
+/** One round, as it travels to and from the database. `scores` runs parallel to
+ *  `participantIds`: position 2 is position 2's score, and null means the cell
+ *  has not been filled in, which is not the same as a score of zero. */
+interface RoundRow {
+  /** Derived from the game and the round number rather than minted, because a
+   *  round has no identity apart from the game it is in. Deterministic, so
+   *  rewriting a game reuses the same round ids it had before. */
+  id: string;
+  roundIndex: number;
+  isOvertime: boolean;
+  participantIds: string[];
+  scores: (number | null)[];
+}
+
+/** One game, with every field a column and every list a table on the other
+ *  side. Nothing here is JSON: see the header of game_stats_db.rs. */
+interface GameRow {
+  id: string;
+  /** DERIVED, not stored on the game: tableKeyOf() builds it from the game type
+   *  and the exact roster. It is a column so "every game at this table, in
+   *  order" is an index lookup rather than a scan, and it is written on every
+   *  save so it can never drift from the game it describes. */
+  tableKey: string;
+  gameType: string;
+  number: number;
+  date: string;
+  tieAccepted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** Entry order, which is what drives column order in the scoring grid. */
+  playerIds: string[];
+  rounds: RoundRow[];
+}
+
+interface ProfileRow {
+  id: string;
+  name: string;
+  status: string;
+}
+
+interface TableRow {
+  key: string;
+  gameType: string;
+  name: string;
+  playerIds: string[];
+}
+
+interface GsSnapshot {
+  games: GameRow[];
+  profiles: ProfileRow[];
+  tables: TableRow[];
+}
+
+/** The id a round is stored under. Not a field on RoundEntry: rounds are only
+ *  ever reached through their game, and a round number is unique within one. */
+function roundIdFor(gameId: string, roundIndex: number): string {
+  return `${gameId}:${roundIndex}`;
+}
+
+/** One game as rows. The only place the shape of storage is decided. */
+function gameToRow(g: GameInstance): GameRow {
+  return {
+    id: g.id,
+    tableKey: tableKeyOf(g),
+    gameType: g.gameType,
+    number: g.gameNumber,
+    date: g.date ?? "",
+    tieAccepted: g.tieAccepted === true,
+    createdAt: g.createdAt ?? "",
+    updatedAt: g.updatedAt ?? "",
+    playerIds: [...(g.playerIds ?? [])],
+    rounds: (g.rounds ?? []).map((r) => ({
+      id: roundIdFor(g.id, r.roundIndex),
+      roundIndex: r.roundIndex,
+      isOvertime: r.isOvertime === true,
+      participantIds: [...(r.participantIds ?? [])],
+      // Only the participants' scores travel. A score sitting against someone
+      // who did not play the round is not a result, and dropping it here is
+      // what keeps an overtime round to the players who were actually tied.
+      scores: (r.participantIds ?? []).map((id) => r.scores?.[id] ?? null),
+    })),
+  };
+}
+
+function rowToGame(row: GameRow): GameInstance | null {
+  if (typeof row?.id !== "string" || row.id.length === 0) return null;
+  const game: GameInstance = {
+    id: row.id,
+    gameType: row.gameType as GameType,
+    gameNumber: row.number,
+    date: row.date ?? "",
+    playerIds: row.playerIds ?? [],
+    rounds: (row.rounds ?? []).map((r) => {
+      const scores: Record<string, number | null> = {};
+      (r.participantIds ?? []).forEach((id, i) => {
+        scores[id] = r.scores?.[i] ?? null;
+      });
+      return {
+        roundIndex: r.roundIndex,
+        isOvertime: r.isOvertime,
+        participantIds: [...(r.participantIds ?? [])],
+        scores,
+      };
+    }),
+    createdAt: row.createdAt ?? "",
+    updatedAt: row.updatedAt ?? "",
+  };
+  // Set only when true, so a game that never had the field does not gain one.
+  if (row.tieAccepted) game.tieAccepted = true;
+  /* tableKey is deliberately NOT put back: it is derived from the game type and
+     the roster, so writing it onto the object would add a field the rest of the
+     tool does not have, and would let a stale copy survive a roster edit. */
+  return game;
+}
+
+function listsJson(): string {
+  return JSON.stringify({ profiles, tables });
+}
+
+async function saveToDisk(): Promise<void> {
+  const rows = games.map(gameToRow);
+  const diff = diffRows(rows, (r) => r.id, writtenGames);
+  const lists = listsJson();
+  const listsChanged = lists !== writtenLists;
+  const prefs = JSON.stringify(settings);
+  const prefsChanged = prefs !== writtenSettings;
+  const gamesChanged = diff.changed.length > 0 || diff.deleted.length > 0;
+  if (!gamesChanged && !listsChanged && !prefsChanged) return;
+  try {
+    if (gamesChanged || listsChanged) {
+      await invoke("gs_save", {
+        games: diff.changed,
+        deleted: diff.deleted,
+        // Both or neither: the lists are rewritten together because a table
+        // names its players by profile id.
+        profiles: listsChanged ? profiles : null,
+        tables: listsChanged ? tables : null,
+      });
+      // Only once the write has landed. Recording it first would mean a failed
+      // save left the next one thinking there was nothing to do.
+      writtenGames = diff.next;
+      writtenLists = lists;
+    }
+    if (prefsChanged) {
+      // Preferences stay a settings file, like every other tool's. They are two
+      // switches and a timestamp, read once at launch and never queried.
+      await invoke("save_tool_file", { toolId: "game-stats", kind: "settings", data: prefs });
+      writtenSettings = prefs;
+    }
+  } catch (err) {
+    devError("Game Stats: failed to save data", err);
+    flash(`Couldn't save Game Stats data: ${String(err)}`, "error", 9000);
+  }
+}
+
+async function loadSettingsFile(): Promise<void> {
+  try {
+    const raw = await invoke<string>("load_tool_file", { toolId: "game-stats", kind: "settings" });
+    settings = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<GameStatsSettings>) };
+  } catch {
+    // No file yet, or an unreadable one: the defaults are the answer either way.
+    settings = { ...DEFAULT_SETTINGS };
+  }
+  writtenSettings = JSON.stringify(settings);
+}
+
+/**
+ * Reads everything from the database, carrying over the old JSON file the first
+ * time. The migration only runs into an empty table and never deletes
+ * game-stats.json; see the header of game_stats_db.rs.
+ */
 async function loadFromDisk(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_game_stats_data");
-    const parsed = JSON.parse(raw) as Partial<GameStatsData>;
-    profiles = Array.isArray(parsed.profiles) ? parsed.profiles : [];
-    games = Array.isArray(parsed.games) ? parsed.games : [];
-    tables = Array.isArray(parsed.tables) ? parsed.tables : [];
-    settings = { ...DEFAULT_SETTINGS, ...parsed.settings };
+    let snapshot = await invoke<GsSnapshot>("gs_load");
+
+    if (snapshot.games.length === 0) {
+      const moved = await migrateGamesFromJson();
+      if (moved > 0) {
+        snapshot = await invoke<GsSnapshot>("gs_load");
+        flash(`Moved ${moved} games into the new storage.`, "success", 9000);
+      }
+    }
+    await loadSettingsFile();
+
+    games = snapshot.games.map(rowToGame).filter((g): g is GameInstance => g !== null);
+    profiles = (snapshot.profiles ?? []) as Profile[];
+    tables = (snapshot.tables ?? []) as GameTable[];
+    // Built from gameToRow rather than from what came back, so the strings the
+    // next save compares against are made by the same function that makes the
+    // ones it compares. See the note in core/row-diff.ts.
+    writtenGames = new Map(games.map(gameToRow).map((r) => [r.id, JSON.stringify(r)]));
+    writtenLists = listsJson();
   } catch (err) {
     devError("Game Stats: failed to load data", err);
+    flash(`Couldn't load Game Stats data: ${String(err)}`, "error", 9000);
     profiles = [];
     games = [];
     tables = [];
     settings = { ...DEFAULT_SETTINGS };
+    writtenGames = new Map();
+    writtenLists = "";
+    writtenSettings = "";
   }
   // Backfills table records for games logged before tables existed. Purely
   // additive. It never touches gameNumber, so historical numbering (and its
@@ -207,13 +410,39 @@ async function loadFromDisk(): Promise<void> {
   backfillTables();
 }
 
-async function saveToDisk(): Promise<void> {
-  const data: GameStatsData = { profiles, games, tables, settings };
+/** Reads the old game-stats.json and hands it to the database, once. */
+async function migrateGamesFromJson(): Promise<number> {
+  let parsed: Partial<GameStatsData>;
   try {
-    await invoke("save_game_stats_data", { data: JSON.stringify(data) });
-  } catch (err) {
-    devError("Game Stats: failed to save data", err);
+    const raw = await invoke<string>("load_tool_file", { toolId: "game-stats", kind: "data" });
+    parsed = JSON.parse(raw) as Partial<GameStatsData>;
+  } catch {
+    return 0;
   }
+  if (!parsed || !Array.isArray(parsed.games) || parsed.games.length === 0) return 0;
+
+  const carried = parsed.games
+    .filter((g): g is GameInstance => !!g && typeof g === "object" && typeof g.id === "string")
+    .map(gameToRow);
+  if (carried.length === 0) return 0;
+
+  const moved = await invoke<number>("gs_migrate_from_json", {
+    games: carried,
+    profiles: Array.isArray(parsed.profiles) ? parsed.profiles : [],
+    tables: Array.isArray(parsed.tables) ? parsed.tables : [],
+  });
+  // The preferences that were in the same file move with it, and only when the
+  // games actually moved, so a second launch does not overwrite a changed
+  // switch with the one the old file still remembers.
+  if (moved > 0 && parsed.settings) {
+    const merged = { ...DEFAULT_SETTINGS, ...parsed.settings };
+    await invoke("save_tool_file", {
+      toolId: "game-stats",
+      kind: "settings",
+      data: JSON.stringify(merged),
+    });
+  }
+  return moved;
 }
 
 /* =============================================================================
@@ -386,7 +615,7 @@ function renderProfilesList(): void {
    Module-level so the Add/Edit/Delete modals can reopen Setup afterward.
 ============================================================================= */
 
-type GsSetupTab = "profiles" | "tables" | "preferences";
+type GsSetupTab = "profiles" | "tables" | "preferences" | "data";
 let gsSetupModal: Modal | null = null;
 
 /** Setup's tab strip, on the shared ModalTabs controller (modal.ts). It owns
@@ -398,11 +627,111 @@ const gsSetupTabs = new ModalTabs<GsSetupTab>({
     profiles: "gsTabProfiles",
     tables: "gsTabTables",
     preferences: "gsTabPreferences",
+    data: "gsTabData",
+  },
+});
+
+/* -----------------------------------------------------------------------------
+   SNAPSHOTS
+   -----------------------------------------------------------------------------
+   Every save captures the file it is about to overwrite, the same hourly
+   capture Budget and Kanban have had since they shipped. Profiles, games,
+   tables and preferences share one file, so they come back together: this tool
+   has one thing to restore rather than several.
+----------------------------------------------------------------------------- */
+
+/** Wired once, on the first Setup open. */
+let gsBackupRefreshWired = false;
+
+function wireGsBackupRefresh(): void {
+  if (gsBackupRefreshWired) return;
+  gsBackupRefreshWired = true;
+  document
+    .getElementById("gsBackupRefreshBtn")!
+    .addEventListener("click", () => void refreshGsBackups());
+}
+
+async function refreshGsBackups(): Promise<void> {
+  wireGsBackupRefresh();
+  await renderDbBackups({
+    toolId: "game-stats",
+    host: document.getElementById("gsBackupList")!,
+    summary: document.getElementById("gsBackupSummary"),
+    label: "Profiles, games and tables",
+    note:
+      "One copy an hour, taken at the first change of that hour. The other tools " +
+      "capture on every save; Game Stats keeps its records in a database, where " +
+      "copying the whole database on every save would cost more than it protects.",
+    onRestored: async () => {
+      // Everything came from the database, so everything is re-read from it.
+      await loadFromDisk();
+      renderProfilesList();
+      renderTablesList();
+      refreshProfileDatalist();
+      renderHomeDashboard();
+    },
+  });
+}
+
+
+/* -----------------------------------------------------------------------------
+   EXPORT AND IMPORT
+   -----------------------------------------------------------------------------
+   Registered with the Data tab in App Settings, which owns the buttons.
+
+   Games, profiles, tables and preferences all go in one file, because they only
+   mean anything together: a game names its players by id, so a set of games
+   without the profiles they point at is a history of matches between nobody.
+----------------------------------------------------------------------------- */
+
+registerTransferable({
+  id: "game-stats",
+  label: "Game Stats",
+  summary: () => `${games.length} games · ${profiles.length} profiles`,
+  otherFormats: {
+    // Navigates to the tool first; see the note on Time Tracker's.
+    label: "Spreadsheet import and export",
+    open: () => {
+      navigateToTool("tracking", "game-stats");
+      openGsSetupOnTab("preferences");
+    },
+  },
+  gather: async () => ({ games, profiles, tables, settings }),
+  apply: async (parsed) => {
+    const payload = parsed as Partial<GameStatsData> | null;
+    if (!payload || !Array.isArray(payload.games)) {
+      throw new Error("that file does not hold a list of games");
+    }
+    const rows = payload.games
+      .filter((g): g is GameInstance => !!g && typeof g === "object" && typeof g.id === "string")
+      .map(gameToRow);
+
+    await invoke("gs_replace_all", {
+      games: rows,
+      profiles: Array.isArray(payload.profiles) ? payload.profiles : [],
+      tables: Array.isArray(payload.tables) ? payload.tables : [],
+    });
+    await invoke("save_tool_file", {
+      toolId: "game-stats",
+      kind: "settings",
+      data: JSON.stringify({ ...DEFAULT_SETTINGS, ...payload.settings }),
+    });
+
+    // Re-read rather than trusting what was just sent: the round trip is the
+    // same one a launch makes, so anything it would repair is repaired here.
+    await loadFromDisk();
+    renderProfilesList();
+    renderTablesList();
+    refreshProfileDatalist();
+    renderHomeDashboard();
   },
 });
 
 function openGsSetupOnTab(tab?: GsSetupTab): void {
   if (tab) gsSetupTabs.select(tab);
+  // Read on the way in rather than on tab switch, so the Data tab is never the
+  // one still loading when you arrive at it.
+  void refreshGsBackups();
   getGsSetupModal().open();
 }
 
@@ -2537,7 +2866,7 @@ function saveGameStatsDraft(): void {
   gsDraftSaveTimer = window.setTimeout(async () => {
     gsDraftSaveTimer = null;
     try {
-      await invoke("save_game_stats_draft", { data: snapshot });
+      await invoke("save_tool_file", { toolId: "game-stats", kind: "draft", data: snapshot });
     } catch (err) {
       devError("Game Stats: failed to save draft", err);
     }
@@ -2554,7 +2883,7 @@ function clearGameStatsDraft(): void {
     clearTimeout(gsDraftSaveTimer);
     gsDraftSaveTimer = null;
   }
-  invoke("save_game_stats_draft", { data: "null" }).catch((err) =>
+  invoke("save_tool_file", { toolId: "game-stats", kind: "draft", data: "null" }).catch((err) =>
     devError("Game Stats: failed to clear draft", err),
   );
 }
@@ -2567,7 +2896,7 @@ function clearGameStatsDraft(): void {
  *  saving it would file a game against a player who no longer exists. */
 async function loadGameStatsDraft(): Promise<boolean> {
   try {
-    const raw = await invoke<string>("load_game_stats_draft");
+    const raw = await invoke<string>("load_tool_file", { toolId: "game-stats", kind: "draft" });
     const stored = JSON.parse(raw);
     const game = stored?.game as GameInstance | undefined;
     if (!game || !Array.isArray(game.rounds) || !Array.isArray(game.playerIds)) return false;
@@ -2687,7 +3016,7 @@ function buildGameRow(game: GameInstance): HTMLElement {
           .map((id) => `${playerName(id)}: ${state.totals[id] ?? 0}`)
           .join(", ");
         void navigator.clipboard
-          .writeText(`${gameLabel(game)} — ${scores}`)
+          .writeText(`${gameLabel(game)} · ${scores}`)
           .then(() => flash("Game copied.", "success"))
           .catch(() => flash("Couldn't reach the clipboard.", "error"));
       },

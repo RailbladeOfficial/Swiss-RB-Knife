@@ -4,6 +4,7 @@ pub mod file_gen;
 pub mod auto_backup;
 pub mod budget;
 pub mod game_stats;
+pub mod game_stats_db;
 pub mod tts_repeater;
 pub mod countdown;
 pub mod rng;
