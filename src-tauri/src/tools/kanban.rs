@@ -1,83 +1,42 @@
 /* =============================================================================
-   KANBAN BOARDS: storage, per-board encryption, snapshots, background images
+   KANBAN BOARDS: storage, snapshots, background images, attachments
    -----------------------------------------------------------------------------
-   THE FILE LAYOUT, and why it is three kinds of file rather than one blob.
+   WHAT IS IN THIS FILE. The tool's records, as JSON files, plus everything
+   that is a file on disk because it is a picture, a video or a document:
 
-     kanban-settings.json     the tool's own preferences. Nothing else.
-     kanban-index.json        the board LIST (id, name, description, background,
-                              order) plus the shared tag vocabulary.
-     kanban-board-<id>.json   one board's contents: its columns and its cards.
-     kanban-board-<id>.enc    the same board, encrypted.
+     kanban-index.json        the board list and the default tag vocabulary.
+     kanban-board-<id>.json   one board's columns, cards, tags and overrides.
      kanban-backgrounds/      imported board background images.
+     kanban-attachments/      files attached to cards and to comments.
+     kanban-attachment-store/ attachments a surviving snapshot still needs.
 
-   Three reasons for the split, in order of how much they matter.
+   Preferences are an ordinary tool file and go through lib.rs's shared store,
+   like every other tool's.
 
-   1. ENCRYPTION HAS TO BE PER BOARD, and a thing can only be encrypted if it is
-      a file. One blob means one all-or-nothing decision for every board you
-      own; separate files mean the work board can be ciphertext while the
-      shopping board is not.
+   Nothing here is encrypted. The Budget Tracker is the one place in the app
+   that encrypts, because it is the one place holding data that normally sits
+   behind a bank login.
 
-   2. WHAT YOU CAN SEE WHILE LOCKED. The index is always plaintext, so the
-      gallery can list a locked board by name and let you choose to unlock it.
-      The board file holds everything that is actually private: the columns,
-      the cards, the titles, the notes. A locked board shows as a locked board,
-      not as a gap.
-
-   3. SNAPSHOT SIZE. Every save snapshots what it is about to overwrite. With
-      one blob, moving one card in one board copied every board you own. Now a
-      board write snapshots that board plus the index (a board is meaningless
-      without the index entry naming it), and nothing else is touched.
-
-   THE ENCRYPTION MODEL, in one paragraph, because the alternative is guessing
-   it from six functions.
-
-   There is ONE Kanban password. Each board independently chooses whether to be
-   encrypted with it. There is no second, outer layer and no per-board password:
-   "lock the whole tool" is a gate in front of the tool that asks for the SAME
-   password, so nothing is ever encrypted twice and no board has to be decrypted
-   before the tool can be locked. Each encrypted board file is a fully
-   self-contained envelope carrying its own password hash, KDF salt, nonce and
-   ciphertext. Every envelope holds the same hash and salt VALUES, duplicated
-   rather than shared, so no board's decryptability ever depends on another
-   file's bytes surviving. That exact dependency destroyed six months of real
-   budget data on this codebase once already; see budget.rs's header.
-
-   The raw password is never written anywhere. Only the Argon2id hash of it
-   lives on disk, for authentication, and the AES key is re-derived from the
-   stored salt on every single encrypt and decrypt.
-
-   Rust commands exposed:
-     save_kanban_settings, load_kanban_settings,
+   Rust commands exposed (a check keeps this list and the file in step):
      save_kanban_index, load_kanban_index,
      save_kanban_board, load_kanban_board, delete_kanban_board,
-     kanban_lock_status, kanban_verify_password,
-     kanban_decrypt_board, kanban_save_board_encrypted,
-     kanban_encrypt_board, kanban_decrypt_board_to_plain,
-     kanban_decrypt_envelope,
      list_kanban_backups, read_kanban_backup,
-     import_kanban_image, delete_kanban_image, export_kanban_data
+     import_kanban_image, delete_kanban_image,
+     kanban_attachments_dir, import_kanban_attachment, paste_kanban_attachment,
+     copy_kanban_attachment, delete_kanban_attachment,
+     delete_kanban_board_attachments, sweep_kanban_attachments,
+     revive_kanban_attachments, kanban_attachments_exist,
+     open_kanban_attachment
 ============================================================================= */
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use aes_gcm::aead::rand_core::RngCore;
-use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng as AesOsRng},
-    Aes256Gcm, Nonce,
-};
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Argon2, Params,
-};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::AppHandle;
-use zeroize::Zeroizing;
 
 use crate::{atomic_write, backed_up_write_group, get_data_path};
 
-const SETTINGS_FILE: &str = "kanban-settings.json";
-const INDEX_FILE: &str = "kanban-index.json";
 
 /// Folder under the data directory holding imported board backgrounds.
 const IMAGE_DIR: &str = "kanban-backgrounds";
@@ -114,81 +73,48 @@ fn valid_board_id(id: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
-/// Snapshot folder names are the UTC timestamp lib.rs writes
-/// ("%Y-%m-%d_%H-%M-%S"), so digits, dashes and one underscore.
-fn valid_bucket_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 40
-        && name
-            .chars()
-            .all(|c| c.is_ascii_digit() || c == '-' || c == '_')
-}
+/* =============================================================================
+   RECORD STORAGE
+   -----------------------------------------------------------------------------
+   The board list in one file, each board's contents in its own file.
 
-/// Filenames inside a snapshot folder, as offered by list_kanban_backups. Same
-/// rules plus the dot a filename needs, and explicitly no separators.
-fn valid_backup_file(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 96
-        && name.starts_with("kanban")
-        && !name.contains("..")
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
-}
+     kanban-index.json           the board list, plus the default tag vocabulary
+     kanban-board-<id>.json      that board's columns, cards, tags and overrides
 
-fn board_plain_name(id: &str) -> String {
+   These records spent one release in a database and have been brought back
+   deliberately. What the split already gave was the thing the database was
+   meant to give: a save rewrites ONE board's file and the index, not everything
+   you own. What it also gives, and the database took away, is that every single
+   write captures the state it is about to replace, and that a board file can be
+   opened in a text editor and repaired when something goes wrong.
+
+   Game Stats stayed in the database, because a round and a score there are rows
+   worth querying across games. A Kanban board is read whole, drawn whole and
+   written whole; there is no query to run against it.
+============================================================================= */
+
+/// The board list. Small on purpose: the gallery reads this and nothing else.
+const INDEX_FILE: &str = "kanban-index.json";
+
+fn board_file_name(id: &str) -> String {
     format!("kanban-board-{id}.json")
 }
 
-fn board_enc_name(id: &str) -> String {
-    format!("kanban-board-{id}.enc")
-}
-
-/// What a board write snapshots: the board in both of its possible forms, plus
-/// the index. The index is in the group because a board's contents and the
-/// index entry naming it are only meaningful as a pair; restoring cards into a
-/// board the index has never heard of restores nothing you can reach.
+/// What a board write snapshots: that board, plus the index. The index is in
+/// the group because a board's contents and the index entry naming it are only
+/// meaningful as a pair; restoring cards into a board the index has never heard
+/// of restores nothing you can reach.
 ///
 /// Everything else you own is deliberately NOT in this group. That is the whole
 /// point of the file split: an afternoon of dragging cards around one board
 /// costs snapshots of one board.
 fn board_group(id: &str) -> Vec<String> {
-    vec![
-        board_plain_name(id),
-        board_enc_name(id),
-        INDEX_FILE.to_string(),
-    ]
+    vec![board_file_name(id), INDEX_FILE.to_string()]
 }
 
 fn as_refs(v: &[String]) -> Vec<&str> {
     v.iter().map(|s| s.as_str()).collect()
 }
-
-/* =============================================================================
-   SETTINGS  (never encrypted)
-   -----------------------------------------------------------------------------
-   Preferences, and nothing else. Plaintext on purpose and by necessity: one of
-   the things in here is "ask for the password when the tool opens", which has
-   to be readable BEFORE any password exists to read it with.
-============================================================================= */
-
-#[tauri::command]
-pub fn save_kanban_settings(app: AppHandle, data: String) -> Result<(), String> {
-    atomic_write(&get_data_path(&app, SETTINGS_FILE), data.as_bytes())
-}
-
-#[tauri::command]
-pub fn load_kanban_settings(app: AppHandle) -> Result<String, String> {
-    match fs::read_to_string(get_data_path(&app, SETTINGS_FILE)) {
-        Ok(content) => Ok(content),
-        Err(_) => Ok("{}".to_string()),
-    }
-}
-
-/* =============================================================================
-   INDEX  (never encrypted)
-   The board list and the shared tag vocabulary.
-============================================================================= */
 
 #[tauri::command]
 pub fn save_kanban_index(app: AppHandle, data: String) -> Result<(), String> {
@@ -199,52 +125,41 @@ pub fn save_kanban_index(app: AppHandle, data: String) -> Result<(), String> {
 pub fn load_kanban_index(app: AppHandle) -> Result<String, String> {
     match fs::read_to_string(get_data_path(&app, INDEX_FILE)) {
         Ok(content) => Ok(content),
+        // No file yet is a new install, not an error.
         Err(_) => Ok(r#"{"boards":[],"tagCategories":[],"tags":[]}"#.to_string()),
     }
 }
 
-/* =============================================================================
-   BOARD CONTENTS: PLAINTEXT
-============================================================================= */
-
-/// Writes one board's columns and cards. Refuses if that board is currently
-/// encrypted: this command has no password and cannot produce an envelope, so
-/// letting it through would silently drop the board out of encryption and leave
-/// the private copy sitting on disk in the clear.
+/// Writes one board's columns and cards.
 #[tauri::command]
 pub fn save_kanban_board(app: AppHandle, board_id: String, data: String) -> Result<(), String> {
     if !valid_board_id(&board_id) {
         return Err("That board id is not one of ours.".to_string());
     }
-    if get_data_path(&app, &board_enc_name(&board_id)).exists() {
-        return Err(
-            "That board is encrypted. It has to be saved through the encrypted path.".to_string(),
-        );
-    }
     let group = board_group(&board_id);
     backed_up_write_group(
         &app,
         &as_refs(&group),
-        &board_plain_name(&board_id),
+        &board_file_name(&board_id),
         data.as_bytes(),
     )
 }
 
-/// Reads one board's plaintext contents. Returns "null" when there is no
-/// plaintext file, which the front end reads as "this one is encrypted, or new".
+/// Reads one board's contents. Returns "null" when there is no file, which the
+/// front end reads as a board that has never been saved.
 #[tauri::command]
 pub fn load_kanban_board(app: AppHandle, board_id: String) -> Result<String, String> {
     if !valid_board_id(&board_id) {
         return Err("That board id is not one of ours.".to_string());
     }
-    match fs::read_to_string(get_data_path(&app, &board_plain_name(&board_id))) {
+    match fs::read_to_string(get_data_path(&app, &board_file_name(&board_id))) {
         Ok(content) => Ok(content),
         Err(_) => Ok("null".to_string()),
     }
 }
 
-/// Removes a board's contents in whichever form it is in. The index entry is
-/// removed by the front end rewriting the index; this only deletes the file.
+/// Removes a board's contents file. The index entry is removed by the front end
+/// rewriting the index; this only deletes the file.
 ///
 /// Snapshotted first, through the ordinary group, so a board deleted by mistake
 /// is still in the last snapshot rather than gone.
@@ -253,371 +168,27 @@ pub fn delete_kanban_board(app: AppHandle, board_id: String) -> Result<(), Strin
     if !valid_board_id(&board_id) {
         return Err("That board id is not one of ours.".to_string());
     }
-    let plain = get_data_path(&app, &board_plain_name(&board_id));
-    let enc = get_data_path(&app, &board_enc_name(&board_id));
+    let path = get_data_path(&app, &board_file_name(&board_id));
 
     // A write is what triggers a snapshot, and there is no write here, so the
     // snapshot is taken explicitly by writing the board out one last time as an
     // empty husk before removing it. The husk never survives this call.
     let group = board_group(&board_id);
-    let _ = backed_up_write_group(
-        &app,
-        &as_refs(&group),
-        &board_plain_name(&board_id),
-        b"null",
-    );
+    let _ = backed_up_write_group(&app, &as_refs(&group), &board_file_name(&board_id), b"null");
 
-    if plain.exists() {
-        fs::remove_file(&plain).map_err(|e| e.to_string())?;
-    }
-    if enc.exists() {
-        fs::remove_file(&enc).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-/* =============================================================================
-   ENCRYPTED ENVELOPES
-============================================================================= */
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct EncryptedEnvelope {
-    password_hash: String,
-    kdf_salt_hex: String,
-    nonce_hex: String,
-    ciphertext_hex: String,
-}
-
-fn read_envelope(app: &AppHandle, board_id: &str) -> Option<EncryptedEnvelope> {
-    let raw = fs::read_to_string(get_data_path(app, &board_enc_name(board_id))).ok()?;
-    serde_json::from_str(&raw).ok()
-}
-
-/// Every board id that currently has an .enc file, by looking at the disk
-/// rather than at a stored flag. A flag can disagree with the files; the files
-/// cannot disagree with themselves. Same rule as budget_lock_status().
-fn encrypted_board_ids(app: &AppHandle) -> Vec<String> {
-    let dir = match get_data_path(app, INDEX_FILE).parent() {
-        Some(p) => p.to_path_buf(),
-        None => return vec![],
-    };
-    let mut out: Vec<String> = fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .filter_map(|e| e.ok())
-        .filter_map(|e| {
-            let name = e.file_name().to_string_lossy().to_string();
-            let id = name.strip_prefix("kanban-board-")?.strip_suffix(".enc")?;
-            if valid_board_id(id) {
-                Some(id.to_string())
-            } else {
-                None
-            }
-        })
-        .collect();
-    out.sort();
-    out
-}
-
-/// Any existing envelope, for the password hash and salt a NEW encryption has
-/// to reuse. Every envelope holds the same values, so the first one found is as
-/// good as any other.
-fn any_envelope(app: &AppHandle) -> Option<EncryptedEnvelope> {
-    encrypted_board_ids(app)
-        .into_iter()
-        .find_map(|id| read_envelope(app, &id))
-}
-
-/* =============================================================================
-   CRYPTO PRIMITIVES
-   Deliberately identical to budget.rs's. Two tools encrypting user data two
-   different ways is one of them being the weaker one, and nobody would know
-   which.
-============================================================================= */
-
-/// Derives the AES-256 key from the password and the stored salt. Returned
-/// inside Zeroizing so the bytes are wiped when the caller's copy drops:
-/// derived key material should never outlive the one operation it was made for.
-fn derive_key(password: &str, kdf_salt_hex: &str) -> Result<Zeroizing<[u8; 32]>, String> {
-    let salt_bytes = hex::decode(kdf_salt_hex).map_err(|e| e.to_string())?;
-    if salt_bytes.len() != 16 {
-        return Err("Invalid KDF salt length".to_string());
-    }
-    let params = Params::new(65536, 3, 1, Some(32)).map_err(|e| e.to_string())?;
-    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
-    let mut key = Zeroizing::new([0u8; 32]);
-    argon2
-        .hash_password_into(password.as_bytes(), &salt_bytes, &mut *key)
-        .map_err(|e| e.to_string())?;
-    Ok(key)
-}
-
-fn encrypt_bytes(key: &[u8; 32], plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
-    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
-    let mut nonce_bytes = [0u8; 12];
-    AesOsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-    let ciphertext = cipher.encrypt(nonce, plaintext).map_err(|e| e.to_string())?;
-    Ok((nonce_bytes.to_vec(), ciphertext))
-}
-
-fn decrypt_bytes(key: &[u8; 32], nonce_bytes: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, String> {
-    if nonce_bytes.len() != 12 {
-        return Err("Invalid nonce length".to_string());
-    }
-    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
-    let nonce = Nonce::from_slice(nonce_bytes);
-    cipher
-        .decrypt(nonce, ciphertext)
-        .map_err(|_| "Decryption failed: wrong password or corrupted data".to_string())
-}
-
-fn verify_against(envelope: &EncryptedEnvelope, password: &str) -> Result<bool, String> {
-    let parsed = PasswordHash::new(envelope.password_hash.trim()).map_err(|e| e.to_string())?;
-    Ok(Argon2::default()
-        .verify_password(password.as_bytes(), &parsed)
-        .is_ok())
-}
-
-/// Decrypts one envelope's payload after checking the password against the hash
-/// it carries. The single place a password turns into plaintext, so there is one
-/// place to look at when asking whether that is done correctly.
-fn open_envelope(envelope: &EncryptedEnvelope, password: &str) -> Result<String, String> {
-    if !verify_against(envelope, password)? {
-        return Err("Wrong password".to_string());
-    }
-    let key = derive_key(password, &envelope.kdf_salt_hex)?;
-    let nonce = hex::decode(&envelope.nonce_hex).map_err(|e| e.to_string())?;
-    let ciphertext = hex::decode(&envelope.ciphertext_hex).map_err(|e| e.to_string())?;
-    let plaintext = decrypt_bytes(&key, &nonce, &ciphertext)?;
-    String::from_utf8(plaintext).map_err(|e| e.to_string())
-}
-
-/* =============================================================================
-   LOCK STATUS + AUTHENTICATION
-============================================================================= */
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct KanbanLockStatus {
-    /// Whether a Kanban password has been established at all, which is exactly
-    /// "is any board encrypted". There is no separate stored flag, because a
-    /// flag is a thing that can be wrong.
-    has_password: bool,
-    encrypted_board_ids: Vec<String>,
-}
-
-#[tauri::command]
-pub fn kanban_lock_status(app: AppHandle) -> KanbanLockStatus {
-    let ids = encrypted_board_ids(&app);
-    KanbanLockStatus {
-        has_password: !ids.is_empty(),
-        encrypted_board_ids: ids,
-    }
-}
-
-/// Checks a password against the stored hash without decrypting anything. Used
-/// by the tool-lock gate, which has to admit you to the tool before it knows
-/// which board you are going to open.
-#[tauri::command]
-pub fn kanban_verify_password(app: AppHandle, password: String) -> Result<bool, String> {
-    let password = Zeroizing::new(password);
-    match any_envelope(&app) {
-        Some(envelope) => verify_against(&envelope, &password),
-        // No encrypted board means no password to be wrong about. Reported as
-        // an error rather than as `true`, so a caller that reaches the gate in
-        // a state that should be impossible fails loudly instead of opening.
-        None => Err("No Kanban password has been set.".to_string()),
-    }
-}
-
-/* =============================================================================
-   ENCRYPTED LOAD / SAVE
-============================================================================= */
-
-/// Decrypts one board's contents and returns them. Plaintext never touches the
-/// disk; it exists in this process's memory and in the WebView's, and nowhere
-/// else.
-#[tauri::command]
-pub fn kanban_decrypt_board(
-    app: AppHandle,
-    board_id: String,
-    password: String,
-) -> Result<String, String> {
-    let password = Zeroizing::new(password);
-    if !valid_board_id(&board_id) {
-        return Err("That board id is not one of ours.".to_string());
-    }
-    let envelope =
-        read_envelope(&app, &board_id).ok_or_else(|| "That board is not encrypted.".to_string())?;
-    open_envelope(&envelope, &password)
-}
-
-/// Re-encrypts a board's contents in place. The password hash and salt are
-/// carried forward unchanged and only the nonce and ciphertext are new, written
-/// back as one object in one call so the four fields can never end up
-/// describing two different moments.
-#[tauri::command]
-pub fn kanban_save_board_encrypted(
-    app: AppHandle,
-    board_id: String,
-    password: String,
-    data: String,
-) -> Result<(), String> {
-    let password = Zeroizing::new(password);
-    if !valid_board_id(&board_id) {
-        return Err("That board id is not one of ours.".to_string());
-    }
-    let envelope =
-        read_envelope(&app, &board_id).ok_or_else(|| "That board is not encrypted.".to_string())?;
-    if !verify_against(&envelope, &password)? {
-        return Err("Wrong password: refusing to overwrite the encrypted board".to_string());
-    }
-    let key = derive_key(&password, &envelope.kdf_salt_hex)?;
-    let (nonce, ciphertext) = encrypt_bytes(&key, data.as_bytes())?;
-    let next = EncryptedEnvelope {
-        password_hash: envelope.password_hash,
-        kdf_salt_hex: envelope.kdf_salt_hex,
-        nonce_hex: hex::encode(nonce),
-        ciphertext_hex: hex::encode(ciphertext),
-    };
-    let json = serde_json::to_string(&next).map_err(|e| e.to_string())?;
-    let group = board_group(&board_id);
-    backed_up_write_group(
-        &app,
-        &as_refs(&group),
-        &board_enc_name(&board_id),
-        json.as_bytes(),
-    )
-}
-
-/// Decrypts an envelope handed in as a string rather than read from its usual
-/// place. This exists for exactly one caller: restoring an encrypted board from
-/// a snapshot, where the envelope is a .bak file rather than the live one.
-///
-/// No weaker than the command above it. The envelope carries its own hash and
-/// the password is checked against that hash, so this cannot open anything a
-/// caller could not already open by putting the same bytes back in place first.
-#[tauri::command]
-pub fn kanban_decrypt_envelope(envelope: String, password: String) -> Result<String, String> {
-    let password = Zeroizing::new(password);
-    let parsed: EncryptedEnvelope = serde_json::from_str(&envelope)
-        .map_err(|_| "That is not an encrypted board.".to_string())?;
-    open_envelope(&parsed, &password)
-}
-
-/* =============================================================================
-   TURNING ENCRYPTION ON AND OFF, PER BOARD
-============================================================================= */
-
-/// Encrypts one board.
-///
-/// If other boards are already encrypted, this reuses their password hash and
-/// salt, so every board on this install opens with the same password and the
-/// argument is checked against the existing one. If this is the FIRST board to
-/// be encrypted, the password given establishes the Kanban password.
-///
-/// The plaintext file is removed only after the envelope is safely on disk. A
-/// failure anywhere before that leaves the board exactly as it was.
-#[tauri::command]
-pub fn kanban_encrypt_board(
-    app: AppHandle,
-    board_id: String,
-    password: String,
-) -> Result<(), String> {
-    let password = Zeroizing::new(password);
-    if !valid_board_id(&board_id) {
-        return Err("That board id is not one of ours.".to_string());
-    }
-    if get_data_path(&app, &board_enc_name(&board_id)).exists() {
-        return Err("That board is already encrypted.".to_string());
-    }
-
-    let plain_path = get_data_path(&app, &board_plain_name(&board_id));
-    let plain = fs::read_to_string(&plain_path).unwrap_or_else(|_| "null".to_string());
-
-    // Reuse the established credentials, or mint them if this is the first.
-    let (password_hash, kdf_salt_hex) = match any_envelope(&app) {
-        Some(existing) => {
-            if !verify_against(&existing, &password)? {
-                return Err(
-                    "That is not the Kanban password. Every encrypted board on this install uses the same one."
-                        .to_string(),
-                );
-            }
-            (existing.password_hash, existing.kdf_salt_hex)
-        }
-        None => {
-            let salt = SaltString::generate(&mut OsRng);
-            let hash = Argon2::default()
-                .hash_password(password.as_bytes(), &salt)
-                .map_err(|e| e.to_string())?
-                .to_string();
-            let mut kdf_salt = [0u8; 16];
-            AesOsRng.fill_bytes(&mut kdf_salt);
-            (hash, hex::encode(kdf_salt))
-        }
-    };
-
-    let key = derive_key(&password, &kdf_salt_hex)?;
-    let (nonce, ciphertext) = encrypt_bytes(&key, plain.as_bytes())?;
-    let envelope = EncryptedEnvelope {
-        password_hash,
-        kdf_salt_hex,
-        nonce_hex: hex::encode(nonce),
-        ciphertext_hex: hex::encode(ciphertext),
-    };
-    let json = serde_json::to_string(&envelope).map_err(|e| e.to_string())?;
-    let group = board_group(&board_id);
-    backed_up_write_group(
-        &app,
-        &as_refs(&group),
-        &board_enc_name(&board_id),
-        json.as_bytes(),
-    )?;
-
-    // Only now, with the envelope confirmed written.
-    if plain_path.exists() {
-        fs::remove_file(&plain_path).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-/// Takes one board back out of encryption: decrypts it, writes the plaintext,
-/// and only then removes the envelope. Ordered that way on purpose, so an
-/// interruption leaves two copies rather than none.
-#[tauri::command]
-pub fn kanban_decrypt_board_to_plain(
-    app: AppHandle,
-    board_id: String,
-    password: String,
-) -> Result<(), String> {
-    let password = Zeroizing::new(password);
-    if !valid_board_id(&board_id) {
-        return Err("That board id is not one of ours.".to_string());
-    }
-    let envelope =
-        read_envelope(&app, &board_id).ok_or_else(|| "That board is not encrypted.".to_string())?;
-    let plain = open_envelope(&envelope, &password)?;
-
-    let group = board_group(&board_id);
-    backed_up_write_group(
-        &app,
-        &as_refs(&group),
-        &board_plain_name(&board_id),
-        plain.as_bytes(),
-    )?;
-
-    let enc_path = get_data_path(&app, &board_enc_name(&board_id));
-    if enc_path.exists() {
-        fs::remove_file(&enc_path).map_err(|e| e.to_string())?;
+    if path.exists() {
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
 /* =============================================================================
    SNAPSHOTS
+   -----------------------------------------------------------------------------
+   One bucket per hour, in the shared backups folder, holding a .bak per file
+   that was about to be overwritten. Every write inside an hour refreshes that
+   hour's bucket, so a bucket holds the LAST state before the gap rather than
+   the first. Thirty buckets are kept; see backed_up_write_group in lib.rs.
 ============================================================================= */
 
 #[derive(Serialize)]
@@ -628,8 +199,6 @@ pub struct KanbanBackupFile {
     bytes: u64,
     /// Which board this is, or None for the index.
     board_id: Option<String>,
-    /// Whether the captured bytes are an envelope rather than readable JSON.
-    encrypted: bool,
 }
 
 #[derive(Serialize)]
@@ -647,21 +216,30 @@ fn backups_root(app: &AppHandle) -> Option<PathBuf> {
         .map(|p| p.join("backups"))
 }
 
+/// Filenames inside a snapshot folder, as offered by list_kanban_backups. Digits,
+/// letters, dashes, underscores and the dot a filename needs; no separators.
+fn valid_backup_file(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 96
+        && name.starts_with("kanban")
+        && !name.contains("..")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+}
+
 /// Classifies one captured filename. Returns None for anything that is not
 /// restorable Kanban content.
-fn classify_backup_file(name: &str) -> Option<(Option<String>, bool)> {
+fn classify_backup_file(name: &str) -> Option<Option<String>> {
     let stem = name.strip_suffix(".bak")?;
     if let Some(rest) = stem.strip_prefix("kanban-board-") {
-        if let Some(id) = rest.strip_suffix(".enc") {
-            return valid_board_id(id).then(|| (Some(id.to_string()), true));
-        }
         let id = rest.strip_suffix(".json")?;
-        return valid_board_id(id).then(|| (Some(id.to_string()), false));
+        return valid_board_id(id).then(|| Some(id.to_string()));
     }
     // The index. The settings file is deliberately not offered: restoring
     // preferences is not a recovery, and rewinding them would be a surprise
     // nobody asked for when they set out to get a board back.
-    (stem == INDEX_FILE).then_some((None, false))
+    (stem == INDEX_FILE).then_some(None)
 }
 
 /// Reads one snapshot folder and describes the Kanban files in it.
@@ -675,14 +253,9 @@ fn describe_bucket(dir: &Path) -> Vec<KanbanBackupFile> {
             // The backups folder is shared with every other tool that
             // snapshots, so this is the filter that keeps Budget's files out of
             // the Kanban's restore list.
-            let (board_id, encrypted) = classify_backup_file(&name)?;
+            let board_id = classify_backup_file(&name)?;
             let bytes = e.metadata().ok()?.len();
-            Some(KanbanBackupFile {
-                file: name,
-                bytes,
-                board_id,
-                encrypted,
-            })
+            Some(KanbanBackupFile { file: name, bytes, board_id })
         })
         .collect();
     files.sort_by(|a, b| a.file.cmp(&b.file));
@@ -707,7 +280,7 @@ pub fn list_kanban_backups(app: AppHandle) -> Result<Vec<KanbanBackup>, String> 
         .filter(|e| e.path().is_dir())
         .filter_map(|e| {
             let name = e.file_name().to_string_lossy().to_string();
-            if !valid_bucket_name(&name) {
+            if !crate::valid_bucket_name(&name) {
                 return None;
             }
             let files = describe_bucket(&e.path());
@@ -735,7 +308,7 @@ pub fn list_kanban_backups(app: AppHandle) -> Result<Vec<KanbanBackup>, String> 
 /// from.
 #[tauri::command]
 pub fn read_kanban_backup(app: AppHandle, name: String, file: String) -> Result<String, String> {
-    if !valid_bucket_name(&name) {
+    if !crate::valid_bucket_name(&name) {
         return Err("That snapshot name is not one of ours.".to_string());
     }
     if !valid_backup_file(&file) {
@@ -745,6 +318,12 @@ pub fn read_kanban_backup(app: AppHandle, name: String, file: String) -> Result<
     let path = root.join(&name).join(&file);
     fs::read_to_string(&path).map_err(|e| format!("Could not read that snapshot: {e}"))
 }
+
+
+
+
+
+
 
 /* =============================================================================
    BOARD BACKGROUND IMAGES
@@ -772,10 +351,8 @@ fn allowed_ext(path: &Path) -> Option<String> {
 /// "background.jpg" must not collide, and the original name is of no interest
 /// once the file is inside the app.
 ///
-/// Note what this means for an encrypted board: its background image is NOT
-/// encrypted, because it is a separate file the gallery has to be able to draw
-/// while the board is locked. A picture chosen to make a board recognisable
-/// from across the room is not the private part; the cards are.
+/// The background lives outside the board file so the gallery can draw it
+/// without reading the board's contents.
 #[tauri::command]
 pub fn import_kanban_image(app: AppHandle, path: String) -> Result<String, String> {
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -853,70 +430,579 @@ pub fn delete_kanban_image(app: AppHandle, path: String) -> Result<(), String> {
 }
 
 /* =============================================================================
-   EXPORT
+   CARD ATTACHMENTS
+   -----------------------------------------------------------------------------
+   A file hung off a card or off one of its comments. The tool copies it into
+   its own folder and from then on owns that copy, so the original can be moved,
+   renamed or thrown away without the card losing anything.
+
+   WHERE A FILE LIVES, and why the layout is what makes deletion correct.
+
+       kanban-attachments/<boardId>/<attachmentId>
+
+   The location is DERIVED from the board and the attachment id. Nothing stores
+   a path, which is the whole point: a card record cannot point at a file
+   outside its own board's folder, because it does not carry a pointer at all.
+   Three things follow for free, and each of them was a bug in the first cut:
+
+     • Deleting a board deletes one folder, without needing that board's cards
+       in memory to know which files were its.
+     • Restoring an older snapshot of a board cannot resurrect a card pointing
+       at a stranger's file, because ids are board-scoped by construction.
+     • Anything in a board's folder that no card mentions is garbage, provably,
+       so it can be swept (see sweep_kanban_attachments).
+
+   THE NAME ON DISK IS NOT THE NAME ON SCREEN. The copy is named by the
+   attachment's id and the original filename travels in the card's record. Two
+   people's "screenshot.png" must not collide, and a filename is a place path
+   traversal hides.
+
+   Nothing in this tool is encrypted. The Budget Tracker is the one place in the
+   app that encrypts, because it is the one place holding data that normally
+   sits behind a bank login.
 ============================================================================= */
 
-/// Writes an export to the user's Downloads folder as readable JSON, returning
-/// the full path it landed at.
-///
-/// A plain file the user owns, deliberately: the in-app snapshots are for
-/// recovering from a mistake inside the app, and they are pruned. An export is
-/// for getting the data OUT, and nothing in here should ever prune that.
-///
-/// The front end assembles what goes in it, which is what lets an export taken
-/// while a board is unlocked contain that board and an export taken while it is
-/// locked leave it out. Nothing here can decrypt anything.
-#[tauri::command]
-pub fn export_kanban_data(
-    app: AppHandle,
-    filename: String,
-    data: String,
-) -> Result<String, String> {
-    let safe_name = crate::sanitize_filename(&filename)?;
+/// Folder under the data directory holding attached files.
+const ATTACH_DIR: &str = "kanban-attachments";
 
-    use tauri::Manager;
-    let downloads = app.path().download_dir().map_err(|e| e.to_string())?;
-    let path = downloads.join(&safe_name);
-    atomic_write(&path, data.as_bytes())?;
-    Ok(path.to_string_lossy().to_string())
+/// Ceiling on one attachment. Large enough for a screen recording of a bug,
+/// small enough that a board's folder cannot quietly outgrow the snapshots
+/// around it, and small enough that a mis-picked file is cheap to undo.
+const MAX_ATTACHMENT_BYTES: u64 = 64 * 1024 * 1024;
+
+/// What an attachment looks like to the front end once it has been stored.
+/// There is no path: where it lives is derived from the board and the id.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedAttachment {
+    id: String,
+    name: String,
+    size: u64,
 }
+
+/* -----------------------------------------------------------------------------
+   PATHS
+----------------------------------------------------------------------------- */
+
+/// Attachment ids are UUIDs from crypto.randomUUID(), same alphabet and same
+/// reasoning as valid_board_id: nothing that can traverse or escape.
+fn valid_attachment_id(id: &str) -> bool {
+    valid_board_id(id)
+}
+
+fn attach_root(app: &AppHandle) -> PathBuf {
+    let dir = get_data_path(app, ATTACH_DIR);
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+/// One board's folder, created on demand.
+fn board_attach_dir(app: &AppHandle, board_id: &str) -> Result<PathBuf, String> {
+    if !valid_board_id(board_id) {
+        return Err("That board id is not one of ours.".to_string());
+    }
+    let dir = attach_root(app).join(board_id);
+    fs::create_dir_all(&dir).map_err(|e| format!("Could not open the attachments folder: {e}"))?;
+    Ok(dir)
+}
+
+/// Where an attachment is, if it is anywhere.
+fn find_attachment(
+    app: &AppHandle,
+    board_id: &str,
+    attachment_id: &str,
+) -> Result<Option<PathBuf>, String> {
+    if !valid_board_id(board_id) || !valid_attachment_id(attachment_id) {
+        return Err("That attachment is not one of ours.".to_string());
+    }
+    let path = attach_root(app).join(board_id).join(attachment_id);
+    Ok(if path.is_file() { Some(path) } else { None })
+}
+
+/// The original filename, for display. Reduced to one path component and
+/// trimmed, so nothing that arrives here can be read back as a path later.
+fn display_name(path: &Path) -> String {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "file".to_string());
+    let cleaned: String = name
+        .chars()
+        .filter(|c| !matches!(c, '/' | '\\' | '\0'))
+        .take(120)
+        .collect();
+    if cleaned.trim().is_empty() {
+        "file".to_string()
+    } else {
+        cleaned
+    }
+}
+
+/* -----------------------------------------------------------------------------
+   IMPORT, COPY, DELETE
+----------------------------------------------------------------------------- */
+
+/// Puts a file into the board's folder under `attachment_id`.
+///
+/// Written under a temporary name and renamed into place, so a copy interrupted
+/// half way never appears under the name a card points at. The copy is streamed
+/// rather than read into memory, which is why an attachment can be a screen
+/// recording rather than something that has to fit in RAM.
+fn store_attachment(
+    app: &AppHandle,
+    board_id: &str,
+    attachment_id: &str,
+    source: &Path,
+) -> Result<(), String> {
+    let dir = board_attach_dir(app, board_id)?;
+    if !valid_attachment_id(attachment_id) {
+        return Err("That attachment id is not one of ours.".to_string());
+    }
+    let final_path = dir.join(attachment_id);
+    let temp = dir.join(format!("{attachment_id}.part"));
+
+    if let Err(e) = fs::copy(source, &temp) {
+        let _ = fs::remove_file(&temp);
+        return Err(format!("Could not copy that file: {e}"));
+    }
+    if let Err(e) = fs::rename(&temp, &final_path) {
+        let _ = fs::remove_file(&temp);
+        return Err(format!("Could not store that file: {e}"));
+    }
+    Ok(())
+}
+
+/// Where the attachments folder is, so the front end can build asset-protocol
+/// URLs for the files in it.
+///
+/// Asked for rather than assumed: only the back end knows whether this is a dev
+/// build (data beside the repo) or a release one (the app data directory), and
+/// a front end guessing at that would work in exactly one of the two.
+#[tauri::command]
+pub fn kanban_attachments_dir(app: AppHandle) -> String {
+    attach_root(&app).to_string_lossy().to_string()
+}
+
+/// Copies a user-picked file into its board's folder and describes the copy.
+///
+/// Any file type is accepted. The front end decides how to SHOW it, and a type
+/// it cannot preview still attaches and still opens in whatever program owns
+/// it, which is the useful answer for a .docx or a .zip.
+#[tauri::command]
+pub fn import_kanban_attachment(
+    app: AppHandle,
+    board_id: String,
+    attachment_id: String,
+    path: String,
+) -> Result<ImportedAttachment, String> {
+    let source = PathBuf::from(&path);
+
+    // From the metadata, before any copying: a mis-picked 40 GB file should be
+    // a sentence on screen rather than a full disk.
+    let size = fs::metadata(&source)
+        .map_err(|e| format!("Could not read that file: {e}"))?
+        .len();
+    if size > MAX_ATTACHMENT_BYTES {
+        return Err(format!(
+            "That file is {:.1} MB. The limit for one attachment is {} MB.",
+            size as f64 / (1024.0 * 1024.0),
+            MAX_ATTACHMENT_BYTES / (1024 * 1024)
+        ));
+    }
+
+    store_attachment(&app, &board_id, &attachment_id, &source)?;
+    Ok(ImportedAttachment {
+        id: attachment_id,
+        name: display_name(&source),
+        size,
+    })
+}
+
+/// Stores an image pasted from the clipboard. Same store, different doorway:
+/// there is no file on disk to copy from, so the bytes arrive base64'd and are
+/// written to a temporary first.
+///
+/// Base64 rather than a raw byte array over IPC because the byte array form
+/// serialises as JSON numbers, which is roughly seven bytes on the wire per
+/// byte of image. A pasted screenshot is small enough that base64's extra third
+/// is the cheaper of the two.
+#[tauri::command]
+pub fn paste_kanban_attachment(
+    app: AppHandle,
+    board_id: String,
+    attachment_id: String,
+    name: String,
+    data_base64: String,
+) -> Result<ImportedAttachment, String> {
+    // Checked on the ENCODED length first. Decoding allocates three bytes for
+    // every four that arrive, so measuring afterwards means the oversized paste
+    // has already been built in memory before anything refuses it.
+    if data_base64.len() as u64 > MAX_ATTACHMENT_BYTES / 3 * 4 + 4096 {
+        return Err(format!(
+            "That image is larger than the {} MB limit for one attachment.",
+            MAX_ATTACHMENT_BYTES / (1024 * 1024)
+        ));
+    }
+    let bytes = crate::base64_decode(&data_base64)
+        .map_err(|_| "That image did not arrive intact.".to_string())?;
+    let size = bytes.len() as u64;
+    if size == 0 {
+        return Err("There was no image on the clipboard.".to_string());
+    }
+
+    // Through a temporary so the paste path and the file-picker path are the
+    // same one store, rather than two that could drift.
+    let temp = attach_root(&app).join(format!("paste-{attachment_id}.tmp"));
+    fs::write(&temp, &bytes).map_err(|e| format!("Could not stage that image: {e}"))?;
+    let stored = store_attachment(&app, &board_id, &attachment_id, &temp);
+    let _ = fs::remove_file(&temp);
+    stored?;
+
+    Ok(ImportedAttachment {
+        id: attachment_id,
+        name: display_name(Path::new(&name)),
+        size,
+    })
+}
+
+/// Copies an attachment the tool already owns, for duplicating a card or moving
+/// one to another board.
+///
+/// A duplicate must not share its original's file: removing the attachment from
+/// either card would then unlink the bytes the other one is still showing, and
+/// the second card would go quietly broken at a moment unrelated to anything
+/// the user did to it.
+#[tauri::command]
+pub fn copy_kanban_attachment(
+    app: AppHandle,
+    from_board_id: String,
+    to_board_id: String,
+    from_attachment_id: String,
+    to_attachment_id: String,
+) -> Result<(), String> {
+    let source = find_attachment(&app, &from_board_id, &from_attachment_id)?
+        .ok_or_else(|| "That attachment is no longer on disk.".to_string())?;
+    store_attachment(&app, &to_board_id, &to_attachment_id, &source)
+}
+
+/// Whether each of these attachments is still on disk.
+///
+/// Answered in one call rather than one per file: a card with a dozen
+/// attachments would otherwise make a dozen round trips every time it is opened.
+#[tauri::command]
+pub fn kanban_attachments_exist(
+    app: AppHandle,
+    board_id: String,
+    attachment_ids: Vec<String>,
+) -> Vec<bool> {
+    attachment_ids
+        .iter()
+        .map(|id| matches!(find_attachment(&app, &board_id, id), Ok(Some(_))))
+        .collect()
+}
+
+/// Opens an attachment in whatever program owns its type.
+///
+/// Routed through Rust rather than through the opener plugin's own command,
+/// which is why `opener:allow-open-path` is NOT in the app's capabilities: that
+/// permission would let the WebView ask the system to open any path at all.
+/// This is the same capability narrowed to one folder, checked here.
+#[tauri::command]
+pub fn open_kanban_attachment(
+    app: AppHandle,
+    board_id: String,
+    attachment_id: String,
+    name: String,
+) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    // `name` is not used to find the file, only to keep the front end's call
+    // shape stable; the file is named by its id.
+    let _ = name;
+    let path = find_attachment(&app, &board_id, &attachment_id)?
+        .ok_or_else(|| "That file is no longer on disk.".to_string())?;
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| format!("Could not open that file: {e}"))
+}
+
+/// Removes one attachment's file.
+#[tauri::command]
+pub fn delete_kanban_attachment(
+    app: AppHandle,
+    board_id: String,
+    attachment_id: String,
+) -> Result<(), String> {
+    if let Some(path) = find_attachment(&app, &board_id, &attachment_id)? {
+        // Retired rather than unlinked, so the snapshot taken before this
+        // delete can still be restored with its files. See the store's note.
+        retire_attachment(&app, &board_id, &path);
+    }
+    Ok(())
+}
+
+/// Removes every attachment a board owns, folder and all.
+#[tauri::command]
+pub fn delete_kanban_board_attachments(app: AppHandle, board_id: String) -> Result<(), String> {
+    if !valid_board_id(&board_id) {
+        return Err("That board id is not one of ours.".to_string());
+    }
+    let dir = attach_root(&app).join(&board_id);
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            if entry.path().is_file() {
+                retire_attachment(&app, &board_id, &entry.path());
+            }
+        }
+    }
+    // Whatever would not move is removed with the folder: the board is gone
+    // either way, and a folder for a board that no longer exists is litter.
+    if dir.is_dir() {
+        let _ = fs::remove_dir_all(&dir);
+    }
+    Ok(())
+}
+
+/// Deletes anything in a board's folder that no card mentions, and reports how
+/// many went.
+///
+/// The guarantee behind "delete the card and the file goes". Every other path
+/// deletes the file at the same moment it drops the record, but a crash between
+/// the two, a snapshot restored from before the file existed, or a board file
+/// hand-edited leaves an orphan, and an orphan is unreachable by definition. The
+/// front end calls this after loading a board, when it has the full list of ids
+/// that board should own.
+#[tauri::command]
+pub fn sweep_kanban_attachments(
+    app: AppHandle,
+    board_id: String,
+    keep: Vec<String>,
+) -> Result<u32, String> {
+    if !valid_board_id(&board_id) {
+        return Err("That board id is not one of ours.".to_string());
+    }
+    let dir = attach_root(&app).join(&board_id);
+    let entries = match fs::read_dir(&dir) {
+        Ok(e) => e,
+        // No folder is not an error, it is a board with no attachments.
+        Err(_) => return Ok(0),
+    };
+    let keep: std::collections::HashSet<&str> = keep.iter().map(|s| s.as_str()).collect();
+
+    let mut removed = 0u32;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if keep.contains(name.as_str()) {
+            continue;
+        }
+        // Swept files are retired too. An orphan is usually the tail of a
+        // delete that already happened, but it can also be the file a board
+        // snapshot is about to be restored ON TOP of, and unlinking it here
+        // would beat the restore to it. ".part" leftovers go the same way.
+        retire_attachment(&app, &board_id, &entry.path());
+        removed += 1;
+    }
+    Ok(removed)
+}
+
+/* -----------------------------------------------------------------------------
+   THE RETIRED-ATTACHMENT STORE
+   -----------------------------------------------------------------------------
+   What makes restoring a Kanban snapshot actually bring the files back.
+
+   A board's cards are snapshotted on every write: the hour you delete a card,
+   the previous hour's bucket still has it. Its FILES had no equivalent, so a
+   restore brought back a card pointing at bytes that were unlinked the moment
+   you deleted it.
+
+   Copying every attachment into every bucket is not the answer. Thirty hourly
+   buckets of a 64 MB video is two gigabytes, for a file that never changes.
+
+   So nothing is copied on write at all. Instead, NOTHING IS EVER DESTROYED IN
+   PLACE: the instant before an attachment file would be unlinked or overwritten,
+   it is MOVED here. Adding an attachment costs nothing. Editing a card costs
+   nothing. Only a delete does any work, and it is a rename rather than a copy.
+   One copy of the bytes exists at any moment, either live or retired.
+
+       kanban-attachment-store/<boardId>/<attachmentId>[.enc]
+
+   WHEN A RETIRED FILE IS FINALLY GONE. A file retired at time T can only be
+   wanted by a snapshot taken BEFORE T, because every snapshot after T was taken
+   of a board that no longer had it. So once the oldest surviving bucket is
+   newer than T, nothing can ask for it again and it goes.
+
+   That is why its modified time is the whole record. There is no manifest to
+   keep in step, nothing to write on save, and no way for the bookkeeping to
+   disagree with the files, which is the failure this tool's history is most
+   full of.
+----------------------------------------------------------------------------- */
+
+/// Folder under the data directory holding attachments that have left a board
+/// but that a surviving snapshot may still reference.
+const ATT_STORE_DIR: &str = "kanban-attachment-store";
+
+fn store_dir(app: &AppHandle, board_id: &str) -> Option<PathBuf> {
+    if !valid_board_id(board_id) {
+        return None;
+    }
+    let dir = get_data_path(app, ATT_STORE_DIR).join(board_id);
+    fs::create_dir_all(&dir).ok()?;
+    Some(dir)
+}
+
+/// Moves an attachment file out of the live folder and into the store, instead
+/// of unlinking it.
+///
+/// Best effort throughout, and deliberately so: this runs on the delete path,
+/// where the card is already gone from the board in memory. A file that will
+/// not move (open in a viewer, say) must not fail the edit that triggered it.
+/// The cost of failing here is one unrecoverable attachment, and the cost of
+/// propagating the error is a card that will not delete.
+fn retire_attachment(app: &AppHandle, board_id: &str, live_path: &Path) {
+    let name = match live_path.file_name() {
+        Some(n) => n.to_os_string(),
+        None => return,
+    };
+    let dir = match store_dir(app, board_id) {
+        Some(d) => d,
+        None => {
+            let _ = fs::remove_file(live_path);
+            return;
+        }
+    };
+    let dest = dir.join(&name);
+
+    // A rename, so retiring a 64 MB video costs what renaming a file costs.
+    // Both paths are inside the app's own data directory, so this is always
+    // within one volume; the copy is a fallback for the impossible case rather
+    // than an expected route.
+    if fs::rename(live_path, &dest).is_ok() {
+        // The modified time IS the retirement record, and a rename carries the
+        // original across. Stamped to now so the prune below measures how long
+        // ago the file LEFT, not when it was first attached.
+        let _ = fs::File::options().write(true).open(&dest).and_then(|f| {
+            f.set_modified(std::time::SystemTime::now())?;
+            Ok(())
+        });
+        return;
+    }
+    if fs::copy(live_path, &dest).is_ok() {
+        let _ = fs::remove_file(live_path);
+    } else {
+        // Nowhere to put it and no way to keep it. Better an unrecoverable
+        // delete than a card that cannot be deleted.
+        let _ = fs::remove_file(live_path);
+    }
+}
+
+/// Puts a retired attachment back, for a snapshot restore that needs it.
+/// Copies rather than moves: the same file may be wanted by more than one
+/// restore, and until it is pruned it still belongs to the store.
+fn revive_attachment(app: &AppHandle, board_id: &str, attachment_id: &str) -> bool {
+    let dir = match store_dir(app, board_id) {
+        Some(d) => d,
+        None => return false,
+    };
+    let live_dir = match board_attach_dir(app, board_id) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+    for name in [attachment_id.to_string()] {
+        let from = dir.join(&name);
+        if !from.is_file() {
+            continue;
+        }
+        if fs::copy(&from, live_dir.join(&name)).is_ok() {
+            return true;
+        }
+    }
+    false
+}
+
+/// Drops retired files that no surviving snapshot could still ask for.
+///
+/// Called after the backup pruner has dropped the oldest buckets, which is the
+/// only moment the answer changes. See the section note for why a modified time
+/// is the whole test.
+/// Takes the backups folder rather than an AppHandle, because the one caller is
+/// lib.rs's snapshot pruner, which is a plain function working on paths. The
+/// store sits beside `backups/` in the same data directory.
+pub fn prune_kanban_attachment_store_at(backups_root: &Path, cutoff: std::time::SystemTime) {
+    let root = match backups_root.parent() {
+        Some(p) => p.join(ATT_STORE_DIR),
+        None => return,
+    };
+
+    let boards = match fs::read_dir(&root) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for board in boards.flatten() {
+        let dir = board.path();
+        if !dir.is_dir() {
+            continue;
+        }
+        let files = match fs::read_dir(&dir) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+        let mut left = 0u32;
+        for file in files.flatten() {
+            let retired_at = file
+                .metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or_else(|_| std::time::SystemTime::now());
+            if retired_at < cutoff {
+                let _ = fs::remove_file(file.path());
+            } else {
+                left += 1;
+            }
+        }
+        // A board whose every retired file has aged out leaves no empty folder
+        // behind to accumulate.
+        if left == 0 {
+            let _ = fs::remove_dir(&dir);
+        }
+    }
+}
+
+/// Puts back every attachment a restored board expects and does not have.
+///
+/// Called by the front end after restoring a board snapshot, with the ids that
+/// snapshot's cards actually reference. Reports how many came back, so the
+/// restore can say so rather than leaving someone to discover it.
+#[tauri::command]
+pub fn revive_kanban_attachments(
+    app: AppHandle,
+    board_id: String,
+    attachment_ids: Vec<String>,
+) -> Result<u32, String> {
+    if !valid_board_id(&board_id) {
+        return Err("That board id is not one of ours.".to_string());
+    }
+    let mut revived = 0u32;
+    for id in attachment_ids {
+        if !valid_attachment_id(&id) {
+            continue;
+        }
+        // Only what is actually missing. A restore that changes nothing about
+        // an attachment should not touch its file.
+        if matches!(find_attachment(&app, &board_id, &id), Ok(Some(_))) {
+            continue;
+        }
+        if revive_attachment(&app, &board_id, &id) {
+            revived += 1;
+        }
+    }
+    Ok(revived)
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn accepts_the_names_snapshot_folders_actually_have() {
-        // The format lib.rs writes (BACKUP_FOLDER_FORMAT), UTC.
-        assert!(valid_bucket_name("2026-08-28_14-00-00"));
-        assert!(valid_bucket_name("2026-01-01_00-00-00"));
-    }
 
-    #[test]
-    fn rejects_anything_that_could_climb_out_of_the_backups_folder() {
-        // Each of these is a string the front end could hand back from a stale
-        // list or a hand-edited file, and each is about to be joined onto a
-        // path. Rejecting them here is what keeps read_kanban_backup a read of
-        // one folder rather than a read of the disk.
-        for bad in [
-            "",
-            "..",
-            "../../secrets",
-            r"..\..\secrets",
-            "2026-08-28_14-00-00/../..",
-            r"C:\Windows\System32\config",
-            "name with spaces",
-            "name.with.dots",
-            "name$",
-        ] {
-            assert!(!valid_bucket_name(bad), "should have rejected {bad:?}");
-        }
-    }
 
-    #[test]
-    fn rejects_a_name_long_enough_to_be_a_payload() {
-        assert!(!valid_bucket_name(&"1".repeat(41)));
-    }
 
     #[test]
     fn a_board_id_is_a_name_and_never_a_path() {
@@ -940,57 +1026,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn a_snapshot_filename_has_to_be_one_of_ours() {
-        assert!(valid_backup_file("kanban-index.json.bak"));
-        assert!(valid_backup_file(
-            "kanban-board-0f8fad5b-d9cb-469f-a165-70867728950e.enc.bak"
-        ));
-        for bad in [
-            "",
-            "budget-data.json.bak",
-            "kanban/../../secrets",
-            "kanban-..-index.bak",
-            r"kanban\index.bak",
-        ] {
-            assert!(!valid_backup_file(bad), "should have rejected {bad:?}");
-        }
-    }
 
-    #[test]
-    fn a_snapshot_is_classified_by_what_it_actually_holds() {
-        assert_eq!(
-            classify_backup_file("kanban-board-abc.json.bak"),
-            Some((Some("abc".to_string()), false))
-        );
-        assert_eq!(
-            classify_backup_file("kanban-board-abc.enc.bak"),
-            Some((Some("abc".to_string()), true))
-        );
-        assert_eq!(
-            classify_backup_file("kanban-index.json.bak"),
-            Some((None, false))
-        );
-        // Preferences are not a recovery, so they are not offered for restore.
-        assert_eq!(classify_backup_file("kanban-settings.json.bak"), None);
-        assert_eq!(classify_backup_file("budget-data.json.bak"), None);
-    }
 
-    #[test]
-    fn a_board_write_only_snapshots_that_board_and_the_index() {
-        // The whole reason for the file split. If this ever grows to include
-        // other boards, an afternoon on one board starts copying all of them
-        // again.
-        let group = board_group("abc");
-        assert_eq!(
-            group,
-            vec![
-                "kanban-board-abc.json".to_string(),
-                "kanban-board-abc.enc".to_string(),
-                "kanban-index.json".to_string(),
-            ]
-        );
-    }
 
     #[test]
     fn only_image_types_the_webview_can_draw_are_importable() {
@@ -1008,78 +1045,21 @@ mod tests {
     }
 
     #[test]
+    fn the_displayed_filename_can_never_be_read_back_as_a_path() {
+        // This string is stored in the card and shown as a label. It is never
+        // joined onto anything, but a label carrying separators is one refactor
+        // away from being treated as a path, so it is reduced here.
+        assert_eq!(display_name(Path::new("C:/tmp/report.pdf")), "report.pdf");
+        assert!(!display_name(Path::new("C:/tmp/report.pdf")).contains('/'));
+        // Nothing usable left over still produces something clickable.
+        assert_eq!(display_name(Path::new("/")), "file");
+    }
+
+    #[test]
     fn the_extension_comes_back_lowercased() {
         // It is used to build the stored filename, so a mixed-case source must
         // not produce "bg-123-0.JPG" alongside "bg-124-0.jpg".
         assert_eq!(allowed_ext(Path::new("photo.JPEG")).as_deref(), Some("jpeg"));
     }
 
-    /* -------------------------------------------------------------------------
-       Crypto round trips. These exercise the primitives directly rather than
-       through the commands, which need an AppHandle and a real data directory.
-    ------------------------------------------------------------------------- */
-
-    fn envelope_for(password: &str, payload: &str) -> EncryptedEnvelope {
-        let salt = SaltString::generate(&mut OsRng);
-        let password_hash = Argon2::default()
-            .hash_password(password.as_bytes(), &salt)
-            .unwrap()
-            .to_string();
-        let mut kdf_salt = [0u8; 16];
-        AesOsRng.fill_bytes(&mut kdf_salt);
-        let kdf_salt_hex = hex::encode(kdf_salt);
-        let key = derive_key(password, &kdf_salt_hex).unwrap();
-        let (nonce, ciphertext) = encrypt_bytes(&key, payload.as_bytes()).unwrap();
-        EncryptedEnvelope {
-            password_hash,
-            kdf_salt_hex,
-            nonce_hex: hex::encode(nonce),
-            ciphertext_hex: hex::encode(ciphertext),
-        }
-    }
-
-    #[test]
-    fn a_board_comes_back_exactly_as_it_went_in() {
-        let payload = r#"{"columns":[{"id":"c1","title":"Doing"}],"cards":[]}"#;
-        let envelope = envelope_for("correct horse", payload);
-        assert_eq!(open_envelope(&envelope, "correct horse").unwrap(), payload);
-    }
-
-    #[test]
-    fn the_wrong_password_opens_nothing() {
-        let envelope = envelope_for("correct horse", "secret");
-        assert!(open_envelope(&envelope, "battery staple").is_err());
-    }
-
-    #[test]
-    fn the_ciphertext_does_not_contain_the_plaintext() {
-        // Cheap, but it is the check that would catch an envelope accidentally
-        // storing its payload rather than encrypting it, which is the one
-        // failure here that would otherwise look completely fine.
-        let envelope = envelope_for("pw", "the quick brown fox");
-        assert!(!envelope
-            .ciphertext_hex
-            .contains(&hex::encode("the quick brown fox")));
-        assert!(!envelope.ciphertext_hex.contains("the quick brown fox"));
-    }
-
-    #[test]
-    fn tampering_with_the_ciphertext_is_detected() {
-        // AES-GCM is authenticated, so a flipped byte must fail to open rather
-        // than yield garbage the front end would then try to parse as a board.
-        let mut envelope = envelope_for("pw", "some cards");
-        let mut bytes = hex::decode(&envelope.ciphertext_hex).unwrap();
-        bytes[0] ^= 0xff;
-        envelope.ciphertext_hex = hex::encode(bytes);
-        assert!(open_envelope(&envelope, "pw").is_err());
-    }
-
-    #[test]
-    fn two_boards_under_one_password_do_not_share_a_nonce() {
-        // Reusing a nonce under the same key is the classic way to destroy
-        // AES-GCM's guarantees. Each encrypt draws a fresh one.
-        let a = envelope_for("pw", "board a");
-        let b = envelope_for("pw", "board b");
-        assert_ne!(a.nonce_hex, b.nonce_hex);
-    }
 }

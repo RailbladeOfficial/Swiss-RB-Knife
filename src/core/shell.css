@@ -2412,3 +2412,65 @@ input[type="checkbox"]:not(.toggle-switch input):checked::before {
   cursor: default;
   pointer-events: none;
 }
+
+/* =============================================================================
+   TOOL SNAPSHOTS
+   -----------------------------------------------------------------------------
+   The shared browse-and-restore list (src/core/tool-backups.ts), used by any
+   tool whose files are captured on write, Kanban included: its list names a
+   board per row rather than a file kind, but it is the same list.
+============================================================================= */
+
+.tool-backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.tool-backup-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tool-backup-group:last-child {
+  border-bottom: none;
+}
+
+.tool-backup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.tool-backup-when {
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-backup-row {
+  cursor: default;
+  gap: 8px;
+}
+
+.tool-backup-row:hover {
+  background: var(--color-bg);
+}
+
+.tool-backup-row .setup-item-name {
+  cursor: default;
+}
+
+.tool-backup-size {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

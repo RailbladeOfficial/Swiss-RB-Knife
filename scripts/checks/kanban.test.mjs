@@ -9,10 +9,12 @@
    entry that no ink reads well on produces a card that is simply hard to read,
    with nothing anywhere reporting a problem.
 
-   The second is that its PREFERENCES round-trip. Nine On/Off switches are each
-   wired in two separate places, one to write the setting and one to restore it
-   on the next open. Miss the second and the switch works perfectly right up
-   until you reopen Setup, where it has quietly reverted.
+   The second is that its PREFERENCES round-trip. Every On/Off switch is wired
+   in two separate places, one to write the setting and one to restore it on the
+   next open. Miss the second and the switch works perfectly right up until you
+   reopen Setup, where it has quietly reverted. The check counts the switches
+   off the page rather than against a number written here, which is what stops
+   this note going stale the next time one is added.
 
    Plus the usual house rule: the lists the code walks in parallel have to hold
    the same keys, and the one command that deletes a file has to be the one that
@@ -121,7 +123,7 @@ test("every Kanban preference is both saved and restored", () => {
   const html = read("index.html");
   const pane = html.slice(
     html.indexOf('id="kbTabPreferences"'),
-    html.indexOf('id="kbTabSecurity"'),
+    html.indexOf('id="kbTabData"'),
   );
   assert.ok(pane.length > 500, "could not isolate the Kanban preferences pane");
 
@@ -204,154 +206,14 @@ test("board background images can only be deleted from inside their own folder",
   );
 });
 
-test("a snapshot name from the front end is validated before it becomes a path", () => {
-  const rs = read("src-tauri/src/tools/kanban.rs");
-  const fn = rs.slice(rs.indexOf("pub fn read_kanban_backup"));
-  const body = fn.slice(0, fn.indexOf("\n}"));
-  assert.match(body, /valid_bucket_name\(&name\)/, "the snapshot name is not validated");
-  assert.ok(
-    body.indexOf("valid_bucket_name") < body.indexOf("join(&name)"),
-    "the name is joined onto a path before it is validated",
-  );
-});
 
-test("a restore goes through the ordinary save, so it snapshots what it replaces", () => {
-  // This is the whole reason read_kanban_backup is a read and not a restore: the
-  // state being replaced has to be captured on the way past, or the recovery
-  // feature becomes the thing you need recovering from.
-  const src = ts();
-  const fn = src.slice(src.indexOf("async function restoreBackup"));
-  const body = fn.slice(0, fn.indexOf("\n}"));
-  assert.match(body, /await flushSave\(\)/, "a queued edit would be lost before the restore");
-  assert.ok(
-    body.indexOf("flushSave") < body.indexOf("read_kanban_backup"),
-    "the pending edit must land before the snapshot is read",
-  );
 
-  // Every write path snapshots what it is about to overwrite. There are three
-  // now rather than one, and missing any of them means that kind of file is
-  // silently unrecoverable.
-  const rs = read("src-tauri/src/tools/kanban.rs");
-  for (const name of ["save_kanban_board", "save_kanban_index", "kanban_save_board_encrypted"]) {
-    const at = rs.indexOf(`pub fn ${name}`);
-    assert.notEqual(at, -1, `${name} does not exist`);
-    assert.match(
-      rs.slice(at, rs.indexOf("\n}", at)),
-      /backed_up_write_group/,
-      `${name} does not snapshot what it replaces`,
-    );
-  }
-});
 
-test("a board write snapshots that board and the index, and no other board", () => {
-  // The whole reason the files were split. If board_group ever grows, an
-  // afternoon spent on one board goes back to copying every board you own,
-  // which is exactly the problem the split was for.
-  const rs = read("src-tauri/src/tools/kanban.rs");
-  const at = rs.indexOf("fn board_group(");
-  assert.notEqual(at, -1, "board_group does not exist");
-  const body = rs.slice(at, rs.indexOf("\n}", at));
-  const entries = [...body.matchAll(/board_(?:plain|enc)_name\(id\)|INDEX_FILE/g)].map((m) => m[0]);
-  assert.deepEqual(
-    entries,
-    ["board_plain_name(id)", "board_enc_name(id)", "INDEX_FILE"],
-    "a board write should snapshot that board (both forms) and the index, nothing else",
-  );
-});
 
-test("the plaintext save path refuses a board that is encrypted", () => {
-  // save_kanban_board takes no password and cannot produce an envelope. If it
-  // ever wrote anyway, the board would silently drop out of encryption and its
-  // cards would land on disk in the clear, with the UI still showing a padlock.
-  const rs = read("src-tauri/src/tools/kanban.rs");
-  const at = rs.indexOf("pub fn save_kanban_board");
-  const body = rs.slice(at, rs.indexOf("\n}", at));
-  assert.ok(body.includes("board_enc_name(&board_id)"), "it never looks for an envelope");
-  assert.ok(body.includes("return Err"), "it does not refuse");
-});
 
-test("a locked board is never written from memory it does not have", () => {
-  // A locked board's contents are not in memory. Saving one would write an
-  // empty board over a full one, which is the single most destructive thing
-  // this tool could do, so it is refused rather than assumed impossible.
-  const src = ts();
-  const at = src.indexOf("async function saveNow(");
-  const body = src.slice(at, src.indexOf("\n}", at));
-  assert.ok(body.includes("board.locked"), "saveNow does not check whether the board is locked");
-});
 
-test("the tool lock is a gate and never a second layer of encryption", () => {
-  // The question this whole design exists to answer: three encrypted boards
-  // plus a locked tool must not mean anything is encrypted twice, and must not
-  // require decrypting anything first. That holds precisely as long as turning
-  // the gate on only ever touches a preference, and passing it only verifies.
-  const src = ts();
-  const gateAt = src.indexOf("function gateRequired(");
-  assert.notEqual(gateAt, -1, "the gate check does not exist");
 
-  const gate = src.slice(gateAt, src.indexOf("async function submitAuthGate"));
-  for (const forbidden of [
-    "kanban_encrypt_board",
-    "kanban_decrypt_board_to_plain",
-    "save_kanban_board",
-  ]) {
-    assert.ok(!gate.includes(forbidden), `the tool lock calls ${forbidden}, so it is not just a gate`);
-  }
 
-  const submitAt = src.indexOf("async function submitAuthGate");
-  const submit = src.slice(submitAt, src.indexOf("\n}", submitAt));
-  assert.ok(submit.includes("kanban_verify_password"), "the gate does not verify the password");
-  assert.ok(
-    !submit.includes("kanban_decrypt_board"),
-    "the gate decrypts a board, which is the job of opening one",
-  );
-});
-
-test("the lock-on-open preference cannot be set with no password to ask for", () => {
-  // Otherwise the gate would be on with nothing to check against, and would
-  // either lock the user out permanently or wave everyone through.
-  const src = ts();
-  const at = src.indexOf('const lockOnOpen = document.getElementById("kbLockOnOpenToggle")');
-  assert.notEqual(at, -1, "the lock-on-open switch is not wired");
-  assert.ok(
-    src.slice(at, at + 900).includes("encryptedBoardIds.size === 0"),
-    "it does not check that a password exists",
-  );
-});
-
-test("the password is held in memory and never written to a file", () => {
-  const src = ts();
-  assert.match(
-    src,
-    /let sessionPassword: string \| null = null;/,
-    "there is no single place the password is held",
-  );
-  // The three plaintext write commands must never be handed it, in any
-  // argument. Only the encrypted path takes a password, and it takes it as
-  // `password`, never as `data`.
-  for (const [call] of src.matchAll(
-    /invoke\(\s*"(?:save_kanban_settings|save_kanban_index|save_kanban_board)"[\s\S]{0,220}?\)/g,
-  )) {
-    assert.ok(!call.includes("sessionPassword"), `a plaintext write carries the password: ${call}`);
-  }
-});
-
-test("every Kanban security control is wired to something", () => {
-  // These live outside bindPreferenceControls/applySettingsToForm (they need
-  // the encrypted-board count, which is not a preference), so the earlier
-  // round-trip check does not cover them. This is their equivalent.
-  const html = read("index.html");
-  const pane = html.slice(html.indexOf('id="kbTabSecurity"'), html.indexOf('id="kbTabData"'));
-  assert.ok(pane.length > 300, "could not isolate the Kanban security pane");
-
-  const src = ts();
-  const controls = [...pane.matchAll(/id="(kb[A-Za-z]+(?:Toggle|Btn|List|Status))"/g)].map(
-    (m) => m[1],
-  );
-  assert.ok(controls.length >= 4, `expected the security controls, found ${controls.length}`);
-  const orphans = controls.filter((id) => !src.includes(`"${id}"`));
-  assert.deepEqual(orphans, [], "these security controls exist but nothing reads them");
-});
 
 test("card order is committed on dragend, not on drop", () => {
   // dragend fires however the drag ends (on a column, on the padding, outside
@@ -395,20 +257,22 @@ test("the tool refuses to be entered before it has initialised", () => {
 });
 
 test("only one place decides which pane is on screen", () => {
-  // View switching and the lock gate both used to set these displays, and they
-  // disagreed: clicking the sidebar icon while the gate was up unhid the
-  // gallery from behind it. Revealing a locked board has to be impossible by
-  // construction, so exactly one function may touch this.
+  // Two places used to set these displays and they disagreed with each other:
+  // clicking the sidebar icon while one had hidden a pane unhid it again. So
+  // exactly one function may touch them.
   const src = ts();
   const at = src.indexOf("function applyViewVisibility(");
   assert.notEqual(at, -1, "applyViewVisibility does not exist");
   const owner = src.slice(at, src.indexOf("\n}", at));
-  assert.ok(owner.includes("authGateShowing"), "the one owner does not consult the gate");
+  assert.ok(
+    owner.includes("viewBoards.style.display"),
+    "the one owner does not place the gallery",
+  );
 
-  // Every other assignment to those three elements' display is a bug.
+  // Every other assignment to these elements' display is a bug.
   const strays = [];
   for (const [line] of src.matchAll(
-    /^\s*(?:authView|viewBoards|viewBoard|boardStatsBtn)\.style\.display\s*=.*$/gm,
+    /^\s*(?:viewBoards|viewBoard|boardSetupBtn)\.style\.display\s*=.*$/gm,
   )) {
     if (!owner.includes(line.trim())) strays.push(line.trim());
   }
@@ -690,7 +554,7 @@ test("nothing in this tool stacks a modal on another", () => {
   // launched from, and every launch has to say how to get back.
   const src = ts();
 
-  for (const fn of ["function kbConfirm(", "function promptForPassword("]) {
+  for (const fn of ["function kbConfirm("]) {
     const at = src.indexOf(fn);
     assert.notEqual(at, -1, `${fn} does not exist`);
     const body = src.slice(at, src.indexOf("\n}", at));
@@ -704,7 +568,9 @@ test("nothing in this tool stacks a modal on another", () => {
   // drops you on the board rather than where you started.
   const missing = [];
   for (const m of src.matchAll(/kbConfirm\(\s*\{([\s\S]{0,700}?)\},/g)) {
-    if (!m[1].includes("reopen:")) {
+    // "reopen: fn" and the shorthand "reopen," are the same property; both
+    // count, and anything else is a confirm with no way back.
+    if (!/\breopen\s*[,:]/.test(m[1])) {
       const title = /title: ([^\n]*)/.exec(m[1]);
       missing.push(title ? title[1].trim() : m[1].slice(0, 60));
     }
@@ -818,4 +684,404 @@ test("every color well in this tool is sized, not stretched", () => {
   }
   assert.deepEqual(unsized, [], "these color inputs have no size class");
   assert.match(read("src/tool/kanban.css"), /\.kb-color-input \{/, "the size class is not defined");
+});
+
+/* -----------------------------------------------------------------------------
+   RICH TEXT AND ATTACHMENTS
+   -----------------------------------------------------------------------------
+   Card descriptions and comments are Markdown that a person typed, and the app
+   turns them into HTML and assigns it with innerHTML. That is a safe thing to do
+   for exactly as long as the renderer never lets a character of the source
+   through as markup, so the checks below pin the properties that make it safe
+   rather than the shape of the output.
+
+   The attachment checks are the file-lifetime ones. An attachment is a copy the
+   app owns, so every place a record is destroyed has to unlink the copy, and
+   nothing that takes a path from the front end may unlink anything outside the
+   one folder.
+----------------------------------------------------------------------------- */
+
+const rt = () => read("src/core/rich-text.ts");
+
+test("text a person typed is escaped before any of it becomes markup", () => {
+  const src = rt();
+
+  // The inline scan is the only place source characters reach the output. Every
+  // branch of it either escapes, or hands the text back to itself (which
+  // escapes at the bottom of the recursion).
+  const at = src.indexOf("function inline(");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /escapeHtmlText\(raw\.slice\(last, m\.index\)\)/, "text between matches is emitted unescaped");
+  assert.match(body, /out \+= escapeHtmlText\(raw\.slice\(last\)\);/, "the tail of the line is emitted unescaped");
+  assert.match(body, /escapeHtmlText\(g\.code/, "a code span is emitted unescaped");
+
+  // A fence is the one place a whole run of lines is emitted at once.
+  assert.ok(
+    !/out\.push\(`<pre[^`]*\$\{fence\.join/.test(src),
+    "a fenced block is emitted without escaping",
+  );
+  assert.match(src, /escapeHtmlText\(fence\.join\("\\n"\)\)/, "a fenced block is not escaped");
+
+  // The docs renderer deliberately passes raw HTML through. This one must not
+  // have grown the same habit.
+  for (const forbidden of ["HTML_BLOCK_TAGS", "inHtmlBlock", "htmlLines"]) {
+    assert.ok(!src.includes(forbidden), `${forbidden} means raw HTML passthrough reached user text`);
+  }
+});
+
+test("a link in someone's notes cannot carry a scheme the app will not open", () => {
+  const src = rt();
+  assert.match(src, /const SAFE_LINK_SCHEME = /, "no allowlist of link schemes");
+
+  // Written into a data attribute rather than an href, so nothing rendered is
+  // navigable without going through the handler that re-checks it.
+  const at = src.indexOf("function anchor(");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /SAFE_LINK_SCHEME\.test\(href\)/, "the destination is not checked");
+  assert.match(body, /data-rt-href=/, "the destination is not parked in a data attribute");
+  // A real href attribute is written with a space in front of it; the check has
+  // to not also match the data-rt-href the renderer does use.
+  assert.ok(!/ href="\$\{/.test(body), "a user-supplied destination reaches an href");
+
+  // And checked again at the handover, which is where it actually matters.
+  const bindAt = src.indexOf("export function bindRichTextLinks(");
+  const bind = src.slice(bindAt, src.indexOf("\n}", bindAt));
+  assert.match(bind, /SAFE_LINK_SCHEME\.test\(href\)/, "the click handler trusts the attribute");
+});
+
+test("card text uses the strict renderer and never the documents one", () => {
+  // docs.ts renders the app's own shipped documents and passes raw HTML through
+  // on purpose. Pointing a card description at it would make every card a place
+  // to write a <script> tag.
+  const src = ts();
+  assert.match(src, /from "\.\.\/core\/rich-text"/, "the Kanban does not use the strict renderer");
+  assert.ok(!/renderMarkdown/.test(src), "the Kanban is using the documents renderer");
+});
+
+test("an attachment cannot name a file outside its own board's folder", () => {
+  // Where a file lives is DERIVED from the board id and the attachment id, and
+  // no command takes a path from the front end at all. That is what replaced
+  // the containment check the first cut needed: there is no longer a path to
+  // contain. Both ids still have to be held to an alphabet that cannot carry a
+  // separator, or the derivation is right back where it started.
+  const rs = read("src-tauri/src/tools/kanban.rs");
+
+  const resolve = rs.slice(rs.indexOf("fn find_attachment"));
+  const body = resolve.slice(0, resolve.indexOf("\n}"));
+  assert.match(body, /valid_board_id\(board_id\)/, "the board id is not validated");
+  assert.match(body, /valid_attachment_id\(attachment_id\)/, "the attachment id is not validated");
+
+  // valid_attachment_id has to be the SAME rule as valid_board_id, not a
+  // looser one that happens to look similar.
+  const idFn = rs.slice(rs.indexOf("fn valid_attachment_id"));
+  assert.match(
+    idFn.slice(0, idFn.indexOf("\n}")),
+    /valid_board_id\(id\)/,
+    "attachment ids are validated by a second, separate rule",
+  );
+
+  // And the front end holds ids to the same alphabet before they are ever
+  // written into a card, so a hand-edited board file cannot smuggle one in.
+  const at = ts().indexOf("function normalizeAttachment(");
+  const norm = ts().slice(at, ts().indexOf("\n}", at));
+  assert.match(norm, /\[A-Za-z0-9_-\]\{1,64\}/, "an attachment id from disk is not checked");
+
+  // Nothing in the attachment surface may accept a path from the WebView. The
+  // one command that still does is the IMPORT, whose whole job is to be handed
+  // the file the user picked out of a native dialog.
+  const commands = [...rs.matchAll(/pub fn (\w*attachment\w*)\(([^)]*)\)/gs)];
+  assert.ok(commands.length >= 6, `expected the attachment commands, found ${commands.length}`);
+  for (const [, name, args] of commands) {
+    if (name === "import_kanban_attachment") continue;
+    assert.ok(
+      !/\bpath: String\b/.test(args),
+      `${name} takes a path from the front end; it should derive one from ids`,
+    );
+  }
+});
+
+test("an attachment is a copy the app owns, not the file that was picked", () => {
+  const rs = read("src-tauri/src/tools/kanban.rs");
+  const at = rs.indexOf("fn store_attachment");
+  const body = rs.slice(at, rs.indexOf("\n}\n", at));
+
+  // Streamed, never read whole: an attachment can be a screen recording, and
+  // the encrypted path has to hold one chunk rather than one file.
+  assert.match(body, /fs::copy\(source, &temp\)/, "the copy is not streamed");
+  assert.ok(!/fs::read\(/.test(body), "the whole file is read into memory to copy it");
+
+  // Through a temporary name, so a copy interrupted half way never appears
+  // under the name a card is about to point at.
+  assert.match(body, /fs::rename\(&temp, &final_path\)/, "the copy is not renamed into place");
+
+  // The name on disk is the id, never the name that was picked.
+  assert.ok(
+    !/display_name/.test(body),
+    "the original filename is being used to build a path",
+  );
+});
+
+
+
+
+test("everything that destroys an attachment record also unlinks its file", () => {
+  // A record is the only route to the file. Dropping one without the other
+  // leaves bytes in the data folder that nothing can ever reach to delete.
+  const src = ts();
+  for (const [fn, why] of [
+    ["function deleteCard(", "deleting a card"],
+    ["function requestDeleteComment(", "deleting a comment"],
+    ["function discardPendingComment(", "abandoning a half-written comment"],
+  ]) {
+    const at = src.indexOf(fn);
+    assert.notEqual(at, -1, `${fn} is missing`);
+    const body = src.slice(at, src.indexOf("\n}", at));
+    assert.match(body, /forgetAttachmentFiles\(/, `${why} leaves its files on disk`);
+  }
+
+  // Deleting a BOARD is one call and no card walk. Walking the cards would mean
+  // a board can only be deleted while its cards are in memory, and would miss
+  // any file whose card had already gone.
+  const at = src.indexOf("function deleteBoard(");
+  const board = src.slice(at, src.indexOf("\n}", at));
+  assert.match(board, /delete_kanban_board_attachments/, "deleting a board leaves its files on disk");
+  assert.ok(
+    !/forgetAttachmentFiles/.test(board),
+    "deleting a board walks its cards instead of clearing the folder",
+  );
+
+  // The guarantee behind all of the above: anything unreferenced is swept once
+  // the board's cards are actually in memory.
+  const load = src.slice(src.indexOf("async function loadRecords("));
+  assert.match(
+    load.slice(0, load.indexOf("\n}")),
+    /sweepBoardAttachments\(/,
+    "nothing collects files a crash or a restore orphaned",
+  );
+  const sweep = src.slice(src.indexOf("function sweepBoardAttachments("));
+  assert.match(
+    sweep.slice(0, sweep.indexOf("\n}")),
+    /if \(!getBoard\(boardId\)\) return;/,
+    "the sweep runs for a board that is not in memory, whose cards are not either, and deletes everything",
+  );
+
+  // The card's own list and each comment's list are both reachable from one
+  // place, so a delete path cannot walk one and forget the other.
+  const allAt = src.indexOf("function allAttachments(");
+  const allBody = src.slice(allAt, src.indexOf("\n}", allAt));
+  assert.match(allBody, /card\.attachments/, "allAttachments misses the card's own files");
+  assert.match(allBody, /comments\.flatMap/, "allAttachments misses the comments' files");
+});
+
+test("a card that changes board takes its files with it", () => {
+  // The folder is named after the board, so the file has to physically move.
+  const src = ts();
+  const at = src.indexOf("function moveCardToBoard(");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /moveAttachmentsToBoard\(/, "a moved card leaves its files on the old board");
+
+  const mv = src.slice(src.indexOf("async function moveAttachmentsToBoard("));
+  const mvBody = mv.slice(0, mv.indexOf("\n}\n"));
+  assert.match(mvBody, /copy_kanban_attachment/, "nothing copies the files across");
+  assert.match(mvBody, /delete_kanban_attachment/, "the old copies are left behind");
+});
+
+test("a pasted image is attached, and a pasted paragraph is not", () => {
+  // Ctrl+V of a screenshot should become an attachment. Ctrl+V of text, or of
+  // text that happens to carry a thumbnail alongside it (copying from a
+  // document usually does), must stay a text paste.
+  const src = ts();
+  const at = src.indexOf('area.addEventListener("paste"');
+  assert.notEqual(at, -1, "the editor does not handle paste at all");
+  const body = src.slice(at, src.indexOf("\n    });", at));
+  assert.match(body, /types\.includes\("text\/plain"\)/, "a text paste is not left alone");
+  assert.match(body, /startsWith\("image\/"\)/, "non-image clipboard items are not filtered out");
+
+  // All three places text can be typed accept one.
+  const uses = [...src.matchAll(/onPasteImage:/g)].length;
+  assert.equal(uses, 3, `${uses} of the 3 editors accept a pasted image`);
+});
+
+test("a player is emptied before the thing holding it is thrown away", () => {
+  // A <video> removed from the page while it still holds a source keeps its
+  // decoder and its buffer alive. These containers are rebuilt on every render.
+  const src = ts();
+  const at = src.indexOf("function releaseMedia(");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /\.pause\(\)/, "the player is not paused");
+  assert.match(body, /removeAttribute\("src"\)/, "the source is not cleared");
+  assert.match(body, /\.load\(\)/, "the player is not reloaded, so it keeps the old resource open");
+
+  // Every attachment list is emptied through the helper that does it.
+  assert.match(
+    src.slice(src.indexOf("function renderAttachmentList(")),
+    /clearMediaHost\(host\)/,
+    "an attachment list is emptied without releasing its players",
+  );
+  // And so is the card modal, on the way out.
+  const closeAt = src.indexOf("  _cardModal = new Modal(backdrop");
+  const close = src.slice(closeAt, src.indexOf("\n  });", closeAt));
+  assert.match(close, /releaseMedia\(backdrop\)/, "the card modal leaves its players running");
+});
+
+test("a half-written comment belongs to a named card, not to whatever is open", () => {
+  // The card modal steps aside for the picture viewer and for a confirm, and
+  // comes back. Neither of those may throw away what was being typed, and
+  // neither may leak it onto the next card opened.
+  const src = ts();
+  assert.match(src, /let pendingCommentCardId: string \| null = null;/, "the composer names no card");
+
+  const closeAt = src.indexOf("  _cardModal = new Modal(backdrop");
+  const close = src.slice(closeAt, src.indexOf("\n  });", closeAt));
+  assert.match(
+    close,
+    /if \(!topOpenKanbanModal\(\)\) \{/,
+    "the card modal discards the composer even when it is only stepping aside",
+  );
+
+  const openAt = src.indexOf("function openCard(");
+  const open = src.slice(openAt, src.indexOf("\n}", openAt));
+  assert.match(
+    open,
+    /pendingCommentCardId !== cardId/,
+    "another card's half-written comment can follow you onto this one",
+  );
+});
+
+test("two saves can never be in flight at once", () => {
+  // flushSave() is used as a barrier by four things that then change the world
+  // underneath a save: Lock Now takes the password away, Encrypt deletes the
+  // plaintext file, Decrypt does the reverse, and a snapshot restore replaces
+  // the state wholesale. If a flush can return while an earlier save is still
+  // mid-await, none of them is actually a barrier, and Encrypt's plaintext
+  // delete can land BEFORE the in-flight plaintext write, leaving a readable
+  // copy of an encrypted board's cards in the data folder for good, with the
+  // whole app reporting that board as encrypted.
+  const src = ts();
+  assert.match(src, /let saveChain: Promise<void>/, "saves are not serialised");
+
+  const at = src.indexOf("function saveNow(");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /saveChain = saveChain/, "saveNow does not queue behind the running save");
+  assert.match(body, /return saveChain;/, "saveNow does not resolve on its own write");
+
+  const flushAt = src.indexOf("async function flushSave(");
+  const flush = src.slice(flushAt, src.indexOf("\n}", flushAt));
+  assert.match(flush, /await saveNow\(\)/, "flushSave does not await the chain");
+
+  // Nothing may reach the writer except through the chain: its declaration,
+  // the one .then() that runs it, and the comment naming it.
+  const uses = [...src.matchAll(/\bwriteDirty\b/g)].length;
+  assert.equal(uses, 3, `writeDirty is named ${uses} times; only the declaration, the chain and one comment should mention it`);
+});
+
+test("an attachment is never destroyed in place", () => {
+  // A board's cards are snapshotted on every write, so the hour you delete a
+  // card, the hour before still has it. Its FILES only get the same deal if
+  // nothing ever unlinks one outright: every path that would destroy or
+  // overwrite an attachment moves it to the store instead, and the store drops
+  // it once no surviving bucket could ask for it.
+  const rs = read("src-tauri/src/tools/kanban.rs");
+
+  for (const [fn, why] of [
+    ["pub fn delete_kanban_attachment", "removing one attachment"],
+    ["pub fn delete_kanban_board_attachments", "deleting a board"],
+    ["pub fn sweep_kanban_attachments", "sweeping orphans"],
+  ]) {
+    const at = rs.indexOf(fn);
+    assert.notEqual(at, -1, `${fn} is missing`);
+    const body = rs.slice(at, rs.indexOf("\n}\n", at));
+    assert.match(body, /retire_attachment\(/, `${why} unlinks the file instead of retiring it`);
+  }
+
+  // Retiring is a rename, not a copy: a 64 MB video must not cost 64 MB of
+  // copying to delete, and one set of bytes must exist at a time.
+  const at = rs.indexOf("fn retire_attachment");
+  const body = rs.slice(at, rs.indexOf("\n}\n", at));
+  assert.match(body, /fs::rename\(live_path, &dest\)/, "retiring copies rather than moves");
+  assert.match(
+    body,
+    /set_modified\(std::time::SystemTime::now\(\)\)/,
+    "the retirement time is not stamped, so the prune cannot measure it",
+  );
+});
+
+test("a restored board asks for its files back", () => {
+  // The records come back from the database; the files were retired rather than
+  // unlinked, so they can come back too.
+  const src = ts();
+  const at = src.indexOf("async function refreshDataTab(");
+  const body = src.slice(at, src.indexOf("\n});", at));
+  assert.match(body, /revive_kanban_attachments/, "a restore brings back cards but not their files");
+  // Re-read from the database first, so the ids asked for are the restored
+  // ones rather than whatever was on screen.
+  assert.ok(
+    body.indexOf("loadRecords()") < body.indexOf("revive_kanban_attachments"),
+    "the revive runs against the pre-restore cards",
+  );
+});
+
+test("retired attachments are pruned with the buckets that could want them", () => {
+  // The store would otherwise grow forever. The prune has to hang off the one
+  // moment the answer changes, which is the backup pruner dropping a bucket.
+  const lib = read("src-tauri/src/lib.rs");
+  const at = lib.indexOf("fn snapshot_group");
+  const body = lib.slice(at, lib.indexOf("\n}\n", at));
+  assert.match(
+    body,
+    /prune_kanban_attachment_store_at/,
+    "nothing ever drops a retired attachment, so the store grows without limit",
+  );
+  assert.ok(
+    body.indexOf("remove_dir_all(backups_root.join(old_name))") <
+      body.indexOf("prune_kanban_attachment_store_at"),
+    "the store is pruned before the buckets are, so it measures against the wrong oldest bucket",
+  );
+
+  // And the cutoff is the OLDEST SURVIVING bucket, taken after the drop.
+  assert.match(body, /existing_buckets\.drain\(/, "the pruned buckets are still counted as surviving");
+  assert.match(body, /existing_buckets\.first\(\)/, "the cutoff is not the oldest surviving bucket");
+});
+
+test("the attachment size limit is the same number on both sides", () => {
+  // The front end refuses an oversized paste before encoding it and the back
+  // end refuses it again on arrival. Two copies of one number is a thing that
+  // drifts, and the drift shows up as a paste the app accepts and the back end
+  // then rejects with a different figure in the message.
+  const ts0 = ts();
+  const rs = read("src-tauri/src/tools/kanban.rs");
+  const front = /const MAX_ATTACHMENT_BYTES = (\d+) \* 1024 \* 1024;/.exec(ts0);
+  const back = /const MAX_ATTACHMENT_BYTES: u64 = (\d+) \* 1024 \* 1024;/.exec(rs);
+  assert.ok(front, "the front end has no attachment size limit");
+  assert.ok(back, "the back end has no attachment size limit");
+  assert.equal(front[1], back[1], "the two attachment size limits disagree");
+
+  // And the words on screen quote the same figure.
+  assert.match(
+    read("index.html"),
+    new RegExp(`${front[1]} MB per file`),
+    "the attachments block quotes a different limit than the code enforces",
+  );
+});
+
+test("the file header lists exactly the commands the file defines", () => {
+  // A header that names the surface is worth having and worthless once it is
+  // out of date, and it went out of date twice in one release. The list is now
+  // checked rather than trusted.
+  const rs = read("src-tauri/src/tools/kanban.rs");
+  // Only snake_case words count as a command name. The block carries prose
+  // as well as the list, and an earlier version of this read every long word
+  // in that prose as a command that did not exist.
+  const listed = new Set(
+    slice("src-tauri/src/tools/kanban.rs", "   Rust commands exposed", "=====")
+      .match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g) ?? [],
+  );
+  const defined = new Set(
+    [...rs.matchAll(/#\[tauri::command\][\s\S]{0,120}?fn\s+([a-z0-9_]+)/g)].map((m) => m[1]),
+  );
+
+  const undocumented = [...defined].filter((c) => !listed.has(c));
+  const phantom = [...listed].filter((c) => !defined.has(c));
+  assert.deepEqual(undocumented, [], "these commands exist but the header does not name them");
+  assert.deepEqual(phantom, [], "the header names these, and they do not exist");
 });

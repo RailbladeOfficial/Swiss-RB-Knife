@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="src/core/docs.css" />
   <link rel="stylesheet" href="src/core/landing.css" />
   <link rel="stylesheet" href="src/core/lockscreen.css" />
+  <link rel="stylesheet" href="src/core/rich-text.css" />
   <link rel="stylesheet" href="src/theme/theme-editor.css" />
   <link rel="stylesheet" href="src/tool/time-tracker.css" />
   <link rel="stylesheet" href="src/tool/image-ccr.css" />
@@ -1467,32 +1468,6 @@
             </nav>
           </div>
 
-          <!-- TOOL LOCK GATE
-               Shown instead of the views (never merely over them: a board
-               rendered behind a gate is a board whose card titles are one
-               screenshot away) when the Ask-on-Open preference is set and a
-               password exists. Passing it holds the password for the visit,
-               which is also what unlocks the encrypted boards behind it. -->
-          <div id="kbAuthView" class="kb-auth-view" style="display:none;">
-            <div class="kb-auth-card panel panel-accent-input">
-              <span class="kb-auth-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="4" y="10.5" width="16" height="10.5" rx="2" />
-                  <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
-                  <circle cx="12" cy="15.5" r="1.4" />
-                </svg>
-              </span>
-              <h2 class="kb-auth-title">Kanban is locked</h2>
-              <p class="kb-auth-note">Enter the Kanban password. This is the same password your encrypted boards
-                use, so entering it here opens them for this visit too.</p>
-              <input type="password" id="kbAuthInput" class="kb-auth-input" autocomplete="off" spellcheck="false"
-                placeholder="Password" />
-              <p id="kbAuthError" class="kb-password-error"></p>
-              <button id="kbAuthSubmitBtn">Unlock</button>
-            </div>
-          </div>
-
           <!-- VIEW: BOARD GALLERY -->
           <div id="kbViewBoards" class="kb-view">
             <div class="kb-gallery-bar panel panel-accent-input">
@@ -2930,6 +2905,7 @@
           <button class="modal-tab active" data-settings-tab="display">Display</button>
           <button class="modal-tab" data-settings-tab="audio">Audio</button>
           <button class="modal-tab" data-settings-tab="preferences">Preferences</button>
+          <button class="modal-tab" data-settings-tab="data">Data</button>
         </div>
 
         <!-- DISPLAY -->
@@ -3192,6 +3168,66 @@
 
           </div>
         </div>
+
+        <!-- DATA
+             One place for getting data out of a tool and back into it. The
+             tools that keep records in the database no longer have a file you
+             can open in a text editor, so an export is what replaces that: it
+             holds everything needed to rebuild the tool.
+
+             Import REPLACES. A merge would have to guess what you meant every
+             time something already existed, so it asks first instead, and the
+             state it replaces is captured in a snapshot on the way past.
+
+             The CSV and spreadsheet importers stay in their own tools: those
+             read somebody else's file, so they need per-tool column matching
+             and a preview. The buttons here walk you to them. -->
+        <div id="settingsTabData" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>Tool</span>
+                <span id="dataToolSummary" class="settings-status-badge"></span>
+              </div>
+              <select id="dataToolSelect" class="settings-select"></select>
+            </div>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Export to JSON
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Writes everything this tool holds to a file you name. Keep one somewhere outside the app: it is what rebuilds the tool if its data is ever lost.">&#8505;</button>
+                </span>
+              </div>
+              <button id="dataExportBtn" class="settings-action-btn">Export</button>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Import from JSON
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Replaces everything this tool holds with the contents of the file. Asks first, and the state it replaces is captured in a snapshot you can restore from the tool's own Data tab.">&#8505;</button>
+                </span>
+              </div>
+              <button id="dataImportBtn" class="settings-action-btn">Import</button>
+            </div>
+
+            <div id="dataOtherFormats" class="settings-row" style="display:none;">
+              <div class="settings-label-col">
+                <span id="dataOtherFormatsLabel">Other formats</span>
+                <span class="settings-status-badge">handled in the tool</span>
+              </div>
+              <button id="dataOtherFormatsBtn" class="settings-action-btn">Open</button>
+            </div>
+
+            <p id="dataToolNote" class="kb-section-hint"></p>
+
+          </div>
+        </div>
+
 
       </div>
     </div>
@@ -4284,6 +4320,7 @@
           <button class="modal-tab active" data-tt-tab="projects">Projects</button>
           <button class="modal-tab" data-tt-tab="activities">Activities</button>
           <button class="modal-tab" data-tt-tab="preferences">Preferences</button>
+          <button class="modal-tab" data-tt-tab="data">Data</button>
         </div>
 
         <!-- PROJECTS -->
@@ -4369,6 +4406,28 @@
               </div>
               <button id="ttCsvImportBtn" class="settings-action-btn">Import</button>
             </div>
+
+          </div>
+        </div>
+
+        <!-- DATA
+             Snapshots, the same hourly capture Budget and Kanban have had.
+             Every save records the file it is about to overwrite, so an entry
+             deleted by mistake is recoverable rather than gone. -->
+        <div id="ttTabData" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Snapshots
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Every save captures the file it overwrites, by hour. Restoring is itself captured, so an unwanted restore is undone by restoring the newest entry. Entries and the activity and project lists are captured together.">&#8505;</button>
+                </span>
+                <span id="ttBackupSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="ttBackupRefreshBtn" class="settings-action-btn">Refresh</button>
+            </div>
+            <div id="ttBackupList" class="tool-backup-list"></div>
 
           </div>
         </div>
@@ -7153,6 +7212,7 @@
           <button class="modal-tab active" data-gs-tab="profiles">Profiles</button>
           <button class="modal-tab" data-gs-tab="tables">Tables</button>
           <button class="modal-tab" data-gs-tab="preferences">Preferences</button>
+          <button class="modal-tab" data-gs-tab="data">Data</button>
         </div>
 
         <!-- PROFILES -->
@@ -7203,6 +7263,28 @@
               </div>
               <button id="gsImportBtn" class="settings-action-btn">Import</button>
             </div>
+
+          </div>
+        </div>
+
+        <!-- DATA
+             Snapshots, the same hourly capture Budget and Kanban have had.
+             Every save records the file it is about to overwrite, so a game
+             deleted by mistake is recoverable rather than gone. -->
+        <div id="gsTabData" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Snapshots
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="A copy is taken once an hour, at the first change of that hour, because these records live in a database rather than a file. Restoring is itself captured, so an unwanted restore is undone by restoring the newest entry. Preferences are a separate file and are not rewound by a restore.">&#8505;</button>
+                </span>
+                <span id="gsBackupSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="gsBackupRefreshBtn" class="settings-action-btn">Refresh</button>
+            </div>
+            <div id="gsBackupList" class="tool-backup-list"></div>
 
           </div>
         </div>
@@ -7516,7 +7598,6 @@
           <button class="modal-tab active" data-kb-tab="boards">Boards</button>
           <button class="modal-tab" data-kb-tab="tags">Tags</button>
           <button class="modal-tab" data-kb-tab="preferences">Preferences</button>
-          <button class="modal-tab" data-kb-tab="security">Security</button>
           <button class="modal-tab" data-kb-tab="data">Data</button>
         </div>
 
@@ -7735,81 +7816,22 @@
           </div>
         </div>
 
-        <!-- SECURITY
-             One password for the whole tool; each board opts in individually.
-             The tool lock is a door in front of that same password, not a
-             second layer of encryption, which is what keeps "three encrypted
-             boards plus a locked tool" from meaning anything is encrypted
-             twice. -->
-        <div id="kbTabSecurity" class="modal-tab-pane" style="display:none;">
-          <div class="setup-preferences-list">
-
-            <div class="settings-row">
-              <div class="settings-label-col">
-                <span class="kb-label-with-info">Kanban Password
-                  <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="One password covers the tool; each board chooses whether to use it. The password is never stored, only an Argon2id hash, copied into every encrypted board with its own salt.">&#8505;</button>
-                </span>
-                <span id="kbSecurityStatus" class="settings-status-badge">Not set</span>
-              </div>
-              <button id="kbLockNowBtn" class="settings-action-btn" disabled>Lock Now</button>
-            </div>
-
-            <div class="settings-row">
-              <span class="kb-label-with-info">Ask for the Password on Opening Kanban
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="A gate in front of the tool, using the same password the boards use. Encrypts nothing extra; passing it unlocks your encrypted boards for the visit. Needs one encrypted board.">&#8505;</button>
-              </span>
-              <div class="toggle-with-label">
-                <span id="kbLockOnOpenLabel">Off</span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="kbLockOnOpenToggle" />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-
-            <div class="settings-section-divider"></div>
-
-            <div class="settings-row">
-              <span class="kb-label-with-info">Boards
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="Switched on per board, in that board's own settings. Name, description and background stay readable for the gallery; columns and cards are ciphertext until you open it.">&#8505;</button>
-              </span>
-            </div>
-            <div id="kbSecurityBoardsList" class="setup-list"></div>
-
-          </div>
-        </div>
-
-        <!-- DATA -->
+                <!-- DATA -->
         <div id="kbTabData" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
 
-            <div class="settings-row">
-              <div class="settings-label-col">
-                <span class="kb-label-with-info">Export Everything
-                  <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="Writes every board, column, card and tag to one dated .json in Downloads. Background images are not included. Locked boards are listed by name and skipped.">&#8505;</button>
-                </span>
-                <span id="kbExportSummary" class="settings-status-badge"></span>
-              </div>
-              <button id="kbExportBtn" class="settings-action-btn">Export JSON</button>
-            </div>
-
-            <div class="settings-section-divider"></div>
 
             <div class="settings-row">
               <div class="settings-label-col">
                 <span class="kb-label-with-info">Snapshots
                   <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="Every save captures the file it overwrites, by hour and per board. Restoring affects only that board and is itself captured, so an unwanted restore is undone by restoring the newest entry.">&#8505;</button>
+                    data-tooltip="Every save captures the file it overwrites, by hour and per board. Restoring an older entry brings back its attached files with it. A restore is itself captured, so an unwanted one is undone by restoring the newest entry.">&#8505;</button>
                 </span>
                 <span id="kbBackupSummary" class="settings-status-badge"></span>
               </div>
               <button id="kbBackupRefreshBtn" class="settings-action-btn">Refresh</button>
             </div>
-            <div id="kbBackupList" class="kb-backup-list"></div>
+            <div id="kbBackupList" class="tool-backup-list"></div>
 
           </div>
         </div>
@@ -7818,47 +7840,7 @@
     </div>
   </div>
 
-  <!-- =====================================================================
-       KANBAN: PASSWORD PROMPT
-       One modal for every moment a password is needed: unlocking a board,
-       establishing the password, encrypting, decrypting, opening an encrypted
-       snapshot. Parameterised by promptForPassword() in kanban.ts, which
-       resolves a promise, so the callers read as straight-line code rather
-       than as a chain of callbacks.
-  ====================================================================== -->
-  <div id="kbPasswordBackdrop" class="modal-backdrop" style="display: none;">
-    <div id="kbPasswordModal" class="modal">
-      <div class="modal-header">
-        <span id="kbPasswordTitle">Unlock</span>
-        <button id="kbPasswordCloseBtn" class="modal-close-btn modal-header-right" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-      <div class="modal-body setup-body">
-        <div class="setup-form">
-          <p id="kbPasswordMessage" class="kb-password-message"></p>
-          <div class="setup-field">
-            <label for="kbPasswordInput">Password</label>
-            <input type="password" id="kbPasswordInput" autocomplete="off" spellcheck="false" />
-          </div>
-          <div class="setup-field" id="kbPasswordConfirmRow" style="display:none;">
-            <label for="kbPasswordConfirmInput">Confirm Password</label>
-            <input type="password" id="kbPasswordConfirmInput" autocomplete="off" spellcheck="false" />
-          </div>
-          <p id="kbPasswordError" class="kb-password-error"></p>
-          <div class="setup-actions">
-            <button id="kbPasswordOkBtn">Unlock</button>
-            <button id="kbPasswordCancelBtn" class="modal-cancel-btn">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- =====================================================================
+    <!-- =====================================================================
        KANBAN: NEW BOARD
        Just the name and description. Everything else about a board is edited
        live in Board Setup, which needs a board to exist first; this is the one
@@ -7985,20 +7967,6 @@
 
             <div class="settings-section-divider"></div>
 
-            <div class="settings-row">
-              <span class="kb-label-with-info">Encrypt This Board
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="Turns this board's columns, cards and tag names into ciphertext; name, description and background stay readable for the gallery. All encrypted boards share one password. Lose it and the board is unreadable.">&#8505;</button>
-              </span>
-              <div class="toggle-with-label">
-                <span id="kbBoardEncryptLabel">No</span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="kbBoardEncryptToggle" />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-
             <div class="setup-actions">
               <button id="kbBoardEditDelete" class="danger-btn">Delete Board</button>
             </div>
@@ -8119,10 +8087,13 @@
        (color, stats, duplicate, archive, delete) lives in the three-dot menu
        in the header, so the body is only ever the card itself.
 
-       The four blocks below carry data-kb-section and are reordered at open
-       time by renderCardModal(), from the Card Layout preference. The title and
-       the board/column row are deliberately outside that: they are what tells
-       you which card you are looking at, so they are always first.
+       The blocks below carry data-kb-section and are reordered at open time by
+       renderCardModal(), from the Card Layout preference. CARD_SECTIONS in
+       kanban.ts is the list; a check pins the two to each other, so a block
+       added here without a matching entry there fails the test rather than
+       going quietly unreorderable. The title and the board/column row are
+       deliberately outside all of it: they are what tells you which card you
+       are looking at, so they are always first.
   ====================================================================== -->
   <div id="kbCardBackdrop" class="modal-backdrop" style="display: none;">
     <div id="kbCardModal" class="modal modal-scrollable kb-card-modal">
@@ -8181,12 +8152,39 @@
             </div>
           </div>
 
+          <!-- DESCRIPTION
+               The editor itself (toolbar, textarea and rendered face) is built
+               in kanban.ts and mounted here, because the identical control is
+               also used by the comment composer and by each comment's inline
+               editor. Two hand-written copies of a nine-button strip would
+               drift apart, and the one that drifted would be the one nobody
+               was looking at. -->
           <div class="kb-section" data-kb-section="description">
             <div class="kb-section-head">
               <span class="kb-section-title">Description</span>
+              <span class="kb-section-note">Markdown</span>
             </div>
-            <textarea id="kbCardDescInput" class="kb-card-desc" rows="4" spellcheck="true"
-              placeholder="What this card actually is. Anything you would otherwise have to reconstruct later."></textarea>
+            <div id="kbCardDescHost"></div>
+          </div>
+
+          <!-- ATTACHMENTS
+               Files hung off the card itself. Pictures are shown, video and
+               sound get a player, anything else is a row that opens in whatever
+               program owns it. The comment blocks below carry their own,
+               separately, so a file is attached to the thing it is about. -->
+          <div class="kb-section" data-kb-section="attachments">
+            <div class="kb-section-head">
+              <span class="kb-section-title">Attachments</span>
+              <span id="kbCardAttachNote" class="kb-section-note"></span>
+              <button id="kbCardAttachAddBtn" class="settings-action-btn">Attach Files</button>
+            </div>
+            <div id="kbCardAttachList" class="rt-attach-list"></div>
+            <p class="kb-section-hint">
+              Files are copied into the app's own folder, so moving or deleting the original
+              leaves this card intact. Deleting the card, the comment or the board takes its
+              files with it. On an encrypted board the copies are encrypted too. Ctrl+V pastes
+              an image straight from the clipboard. 64 MB per file.
+            </p>
           </div>
 
           <div class="kb-section" data-kb-section="tags">
@@ -8223,6 +8221,20 @@
               <button id="kbCardAdvanceBtn">Start Work</button>
               <button id="kbCardUndoStageBtn" class="modal-cancel-btn">Undo</button>
             </div>
+          </div>
+
+          <!-- COMMENTS
+               Oldest first, read as a sequence. The composer is at the foot
+               because that is where the sequence continues. Ctrl+Enter posts;
+               plain Enter is a new line, since a comment is prose. -->
+          <div class="kb-section" data-kb-section="comments">
+            <div class="kb-section-head">
+              <span class="kb-section-title">Comments</span>
+              <span id="kbCardCommentSummary" class="kb-section-note"></span>
+            </div>
+            <div id="kbCardCommentList" class="kb-comment-list"></div>
+            <div id="kbCardCommentPending" class="rt-attach-list"></div>
+            <div id="kbCardCommentHost"></div>
           </div>
 
         </div>
@@ -8337,6 +8349,39 @@
       </div>
       <div class="modal-body setup-body">
         <div id="kbCardStatsBody" class="kb-stats-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       KANBAN: PICTURE VIEWER
+       An attached image at the size it was actually taken. Replaces the card
+       modal rather than stacking on it, like every other secondary modal in
+       this tool, and its back arrow says where it goes: back to the card it
+       was opened from.
+  ====================================================================== -->
+  <div id="kbLightboxBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbLightboxModal" class="modal kb-lightbox-modal">
+      <div class="modal-header">
+        <button id="kbLightboxBack" class="nav-back-btn modal-header-left" title="Back to the card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbLightboxTitle">Attachment</span>
+        <button id="kbLightboxClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body kb-lightbox-body">
+        <img id="kbLightboxImg" class="kb-lightbox-img" alt="" />
+      </div>
+      <div class="kb-lightbox-actions">
+        <button id="kbLightboxOpenBtn" class="modal-cancel-btn">Open in Default App</button>
       </div>
     </div>
   </div>
@@ -8514,6 +8559,27 @@
         <div class="exit-modal-actions">
           <button id="kbConfirmOkBtn" class="danger-btn">Delete</button>
           <button id="kbConfirmCancelBtn" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       APP CONFIRM
+       The shell's own "are you sure", for actions that belong to the app
+       rather than to one tool. Replaces what it was launched from, like every
+       other confirm in this app, and the caller says how to get back.
+  ====================================================================== -->
+  <div id="appConfirmBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="appConfirmModal" class="modal">
+      <div class="modal-header">
+        <span id="appConfirmTitle">Are you sure?</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="appConfirmMessage"></p>
+        <div class="exit-modal-actions">
+          <button id="appConfirmOkBtn" class="danger-btn">Confirm</button>
+          <button id="appConfirmCancelBtn" class="modal-cancel-btn">Cancel</button>
         </div>
       </div>
     </div>

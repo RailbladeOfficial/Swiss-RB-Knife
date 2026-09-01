@@ -1359,33 +1359,19 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   width: min(620px, 94vw);
 }
 
-.kb-archive-row .setup-item-name,
-.kb-backup-row .setup-item-name {
+.kb-archive-row .setup-item-name {
   cursor: default;
 }
 
-.kb-archive-row,
-.kb-backup-row {
+.kb-archive-row {
   cursor: default;
   gap: 8px;
 }
 
-.kb-archive-row:hover,
-.kb-backup-row:hover {
+.kb-archive-row:hover {
   background: var(--color-bg);
 }
 
-.kb-backup-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-  /* Thirty snapshots is the retention cap (BACKUP_KEEP_COUNT in lib.rs), which
-     is a long list inside a settings pane; it gets its own scroll rather than
-     pushing the rest of the tab off the bottom. */
-  max-height: 260px;
-  overflow-y: auto;
-}
 
 /* =============================================================================
    WIDER SETUP MODAL
@@ -1560,30 +1546,6 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
    now holds only the boards that were actually touched in that hour.
 ========================================================================== */
 
-.kb-backup-group {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.kb-backup-group:last-child {
-  border-bottom: none;
-}
-
-.kb-backup-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.kb-backup-when {
-  font-variant-numeric: tabular-nums;
-}
 
 /* =============================================================================
    THE DELETE BUTTON ON A CARD
@@ -1909,4 +1871,141 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+}
+
+/* =============================================================================
+   ATTACHMENTS, COMMENTS AND THE PICTURE VIEWER
+   -----------------------------------------------------------------------------
+   The rendered text and the attachment tiles themselves are styled in
+   src/core/rich-text.css, which is shared with anything else that ever renders
+   what a person typed. What is here is the Kanban-specific frame around them:
+   the comment list, the hint under the attachment block, the counters on a card
+   face, and the full-size picture viewer.
+============================================================================= */
+
+/* A sentence of standing fact under a block, as opposed to .kb-section-note,
+   which is a live readout of what the block currently holds. */
+.kb-section-hint {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+/* ── Comments ── */
+
+.kb-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kb-comment-list:empty {
+  display: none;
+}
+
+.kb-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-panel);
+}
+
+.kb-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-comment-stamp {
+  flex: 1 1 auto;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-comment-action {
+  padding: 2px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: var(--hover-transition);
+}
+
+.kb-comment-action:hover {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.kb-comment-danger:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+.kb-comment-body {
+  font-size: 0.85rem;
+}
+
+/* ── The counters on a card face ── */
+
+.kb-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+}
+
+.kb-card-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-card-meta-item svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Solid-colored cards choose their own ink; these have to follow it rather
+   than keep the muted theme color, which would vanish on a dark card. */
+.kb-card.kb-solid .kb-card-meta {
+  color: var(--kb-ink-soft);
+}
+
+/* ── Picture viewer ── */
+
+.kb-lightbox-modal {
+  width: min(92vw, 1400px);
+  max-width: min(92vw, 1400px);
+}
+
+.kb-lightbox-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: var(--color-bg);
+}
+
+.kb-lightbox-img {
+  max-width: 100%;
+  /* Leaves room for the modal's own chrome and the action strip below. */
+  max-height: 72vh;
+  object-fit: contain;
+}
+
+.kb-lightbox-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px 12px;
 }

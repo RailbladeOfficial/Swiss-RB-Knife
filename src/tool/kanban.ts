@@ -43,9 +43,37 @@
        at repeatedly, and a Save button on that is a way to lose a subtask you
        ticked. The board underneath re-renders from the same state on close.
 
+     • DESCRIPTIONS AND COMMENTS ARE MARKDOWN, rendered by src/core/rich-text.ts
+       and NOT by the renderer in docs.ts. That one passes raw HTML through
+       because the documents it draws ship with the app; this text was typed by
+       a person, so it is escaped before a single tag is emitted. The file it
+       lives in explains the split at length.
+
+     • AN ATTACHMENT IS A COPY THE TOOL OWNS, and its location is DERIVED rather
+       than stored: kanban-attachments/<boardId>/<attachmentId>. Cards never
+       point at the file you picked, so moving or deleting the original leaves
+       the card intact, and a card cannot name a file outside its own board
+       because it carries no path at all.
+
+     • DELETING SOMETHING TAKES ITS FILES, and a deleted file is set aside
+       rather than unlinked, so restoring an older snapshot brings them back for
+       as long as that snapshot survives. Two things keep that honest: every
+       board load sweeps files no card references, and the back end retires a
+       file instead of destroying it. See the store's note in kanban.rs.
+
    Rust commands used:
-     save_kanban_data, load_kanban_data, list_kanban_backups, read_kanban_backup,
-     import_kanban_image, delete_kanban_image, export_kanban_data
+     save_kanban_index, load_kanban_index,
+     save_kanban_board, load_kanban_board, delete_kanban_board,
+     list_kanban_backups, read_kanban_backup,
+     import_kanban_image, delete_kanban_image,
+     kanban_attachments_dir, import_kanban_attachment, paste_kanban_attachment,
+     copy_kanban_attachment, delete_kanban_attachment,
+     delete_kanban_board_attachments, sweep_kanban_attachments,
+     revive_kanban_attachments, kanban_attachments_exist,
+     open_kanban_attachment
+
+   Preferences go through lib.rs's shared tool-file store, like every other
+   tool's.
 ============================================================================= */
 
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
@@ -60,6 +88,15 @@ import {
 } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, closeMenu, openMenu, type MenuItem } from "../menu/menu";
+import { formatBackupName, formatBackupBytes as formatBytes } from "../core/tool-backups";
+import { registerTransferable } from "../core/data-transfer";
+import {
+  applyRichTextCommand,
+  bindRichTextLinks,
+  renderRichText,
+  richTextToPlain,
+  type RichTextCommand,
+} from "../core/rich-text";
 
 /* =============================================================================
    TYPES
@@ -168,6 +205,80 @@ export interface Subtask {
   done: boolean;
 }
 
+/**
+ * A file hung off a card or off one of its comments.
+ *
+ * `path` is the TOOL'S OWN COPY, inside kanban-attachments/, never the file the
+ * user picked. That is what makes an attachment survive its source being moved,
+ * renamed or thrown away, and it is what lets the copy be unlinked when the
+ * thing holding it goes.
+ *
+ * `name` is the original filename and exists only to be read: the copy on disk
+ * is named by the attachment's id, so two "screenshot.png" cannot collide.
+ *
+ * How it is DRAWN is derived from the name, never stored: see attachmentKind.
+ * Storing it would mean a file that renders as a picture today because the
+ * extension list said so then.
+ */
+export interface Attachment {
+  /** Also the FILENAME of the copy, inside its board's folder. There is
+   *  deliberately no path field: where the file lives is derived from the board
+   *  and this id, so a card cannot point at a file outside its own board, a
+   *  restored snapshot cannot resurrect a pointer to a stranger's file, and
+   *  deleting a board is deleting one folder rather than walking its cards. */
+  id: string;
+  /** The ORIGINAL filename, for display. The only place it survives: the copy
+   *  on disk is named by the id. */
+  name: string;
+  /** Bytes of the original, as measured when it was copied in. */
+  size: number;
+  addedAt: number;
+}
+
+/**
+ * A note added to a card after the fact, with its own formatting and its own
+ * files. Separate from the description because the two answer different
+ * questions: the description is what this card IS and gets edited in place,
+ * a comment is what happened and is appended.
+ */
+export interface CardComment {
+  id: string;
+  /** Markdown, same dialect as a description. */
+  body: string;
+  attachments: Attachment[];
+  createdAt: number;
+  /** Equal to createdAt until the comment is edited; the card shows "edited"
+   *  off the difference rather than off a separate flag. */
+  updatedAt: number;
+}
+
+/** The four shapes an attachment is drawn in, decided by its extension.
+ *  Anything unrecognised is a "file", which is a row you can open rather than
+ *  an error: the app not knowing how to preview a .docx is no reason to refuse
+ *  to hold one. */
+export type AttachmentKind = "image" | "video" | "audio" | "file";
+
+/** Extensions the WebView can draw or play. Deliberately narrower than what can
+ *  be ATTACHED: a format outside these lists still attaches and still opens in
+ *  whatever program owns it, it just is not previewed in the card. */
+const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif", "ico"]);
+const VIDEO_EXTS = new Set(["mp4", "webm", "ogv", "m4v", "mov"]);
+const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "oga", "m4a", "flac", "aac", "opus"]);
+
+export function attachmentExt(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? "" : name.slice(dot + 1).toLowerCase();
+}
+
+export function attachmentKind(name: string): AttachmentKind {
+  const ext = attachmentExt(name);
+  if (IMAGE_EXTS.has(ext)) return "image";
+  if (VIDEO_EXTS.has(ext)) return "video";
+  if (AUDIO_EXTS.has(ext)) return "audio";
+  return "file";
+}
+
+
 /** The three stamps the Advance button walks through, in order. `due` is
  *  deliberately not one of them: it is a target, not a thing that happened. */
 export const STAGES = ["started", "testing", "completed"] as const;
@@ -211,6 +322,9 @@ export interface Card {
   priority: Priority;
   tagIds: string[];
   subtasks: Subtask[];
+  /** Files hung off the card itself, as opposed to off one of its comments. */
+  attachments: Attachment[];
+  comments: CardComment[];
   dates: CardDates;
   /** Out of the board but not destroyed. Archived cards keep their column so
    *  restoring puts them back where they were. */
@@ -242,21 +356,17 @@ export interface BoardBackground {
 }
 
 /**
- * A board, as the app holds it in memory. On disk it is split in two, and the
- * seam runs right through this object:
+ * A board, as the app holds it in memory. On disk it is split in two:
  *
- *   the INDEX (kanban-index.json, always plaintext) carries id, name,
- *   description, background, createdAt and updatedAt, so the gallery can list
- *   and draw a board it cannot open;
+ *   the INDEX (kanban-index.json) carries id, name, description, background,
+ *   createdAt and updatedAt, so the gallery is one small read rather than a
+ *   read of every board you own;
  *
- *   the BOARD FILE (kanban-board-<id>.json or .enc) carries columns and
- *   nextCardNumber, alongside that board's cards.
+ *   the BOARD FILE (kanban-board-<id>.json) carries columns and nextCardNumber,
+ *   alongside that board's cards.
  *
- * `locked` is the whole reason the seam is where it is: an encrypted board
- * whose contents have not been decrypted this session is a real board with a
- * real name and a real background and no columns and no cards. Everything that
- * renders a board has to cope with that, and putting the flag on the board
- * itself is what makes the compiler and the reader agree about where.
+ * The split is what keeps a snapshot small: a board write captures that board
+ * and the index, and no other board.
  */
 export interface Board {
   id: string;
@@ -268,8 +378,6 @@ export interface Board {
   nextCardNumber: number;
   createdAt: number;
   updatedAt: number;
-  /** Encrypted and not opened this session: contents are empty. */
-  locked: boolean;
   /** THIS BOARD's tag vocabulary. See the note on KanbanIndex. */
   tagCategories: TagCategory[];
   tags: Tag[];
@@ -283,13 +391,12 @@ export interface Board {
 /** The board fields that live in the always-plaintext index. */
 export type BoardMeta = Omit<
   Board,
-  "columns" | "nextCardNumber" | "locked" | "tagCategories" | "tags" | "overrides"
+  "columns" | "nextCardNumber" | "tagCategories" | "tags" | "overrides"
 >;
 
-/** The board fields that live in the per-board file, which may be encrypted.
- *  Its tags are in here rather than in the index on purpose: a board's tag
- *  names ("v0.3.0-hotfix", a client name) are as revealing as its cards, so an
- *  encrypted board's vocabulary is encrypted with it. */
+/** The board fields that live in the per-board file. Its tags are in here
+ *  rather than in the index because they belong to that board's contents, not
+ *  to the list of boards. */
 export interface BoardContents {
   columns: Column[];
   cards: Card[];
@@ -327,22 +434,33 @@ export type NewCardPosition = "top" | "bottom";
 /** The blocks of the card modal, in the order they are shown. Reorderable, as
  *  a default and then per board, because which of these you look at first is a
  *  property of how you work rather than of the tool. */
-export type CardSection = "description" | "tags" | "subtasks" | "due" | "stages";
+export type CardSection =
+  | "description"
+  | "attachments"
+  | "tags"
+  | "subtasks"
+  | "due"
+  | "stages"
+  | "comments";
 
 export const CARD_SECTIONS: readonly CardSection[] = [
   "description",
+  "attachments",
   "tags",
   "subtasks",
   "due",
   "stages",
+  "comments",
 ];
 
 export const CARD_SECTION_LABELS: Record<CardSection, string> = {
   description: "Description",
+  attachments: "Attachments",
   tags: "Tags",
   subtasks: "Subtasks",
   due: "Due Date",
   stages: "Stage Dates",
+  comments: "Comments",
 };
 
 /**
@@ -378,7 +496,7 @@ export interface BoardScopedSettings {
 }
 
 /** Everything in BoardScopedSettings is a DEFAULT that a board may override.
- *  The three added here are tool-wide and cannot be overridden. */
+ *  The five added here are tool-wide and cannot be overridden. */
 export interface KbSettings extends BoardScopedSettings {
   overdueWarn: boolean;
   /** Comma-separated column titles a brand-new board starts with. */
@@ -388,17 +506,6 @@ export interface KbSettings extends BoardScopedSettings {
   /** One color per priority level. Global rather than per board: a level has
    *  to look the same everywhere or it stops being a shared scale. */
   priorityColors: Record<Priority, string>;
-  /**
-   * Ask for the Kanban password when the tool is opened, rather than only when
-   * an encrypted board is opened.
-   *
-   * This IS the "lock the whole tool" feature, and it is a gate rather than a
-   * second layer of encryption. Nothing is encrypted twice by turning it on and
-   * no board has to be decrypted first, because it asks for the same one
-   * password the boards already use. Meaningless (and ignored) when no board is
-   * encrypted, since there is then no password to ask for.
-   */
-  lockOnOpen: boolean;
 }
 
 /**
@@ -435,13 +542,42 @@ const SAVE_DEBOUNCE_MS = 400;
 
 /** Ceilings that exist to keep the board renderable rather than to ration
  *  anything: every card in a column is in the DOM at once, and the whole board
- *  re-renders after each drag. */
-const MAX_CARDS_PER_BOARD = 2000;
+ *  re-renders after each drag.
+ *
+ *  The card ceiling counts LIVE cards only. Archived ones are excluded, so
+ *  archiving finished work is the pressure valve rather than deleting it, and a
+ *  board's history is not what runs it out of room.
+ *
+ *  5,000 rather than the original 2,000, on measurement rather than nerve. A
+ *  5,000-card board of detailed cards (a paragraph of description, tags, five
+ *  subtasks, a couple of comments each) is 8.4 MB of JSON and takes 24 ms to
+ *  serialise, which is well inside the 400 ms save debounce. Even 10,000 is
+ *  survivable at 37 ms. The data side is simply not what gives out first.
+ *
+ *  What gives out first is the DOM, and that is why there is still a number
+ *  here at all: every live card is an element, the board rebuilds all of them
+ *  after each drag, and nothing is virtualised. In practice a board stops being
+ *  useful as a BOARD well before it stops being fast, because 5,000 cards is
+ *  not a thing anyone can scan. Treat this as the point past which the tool
+ *  stops pretending, not as a performance guarantee. */
+const MAX_CARDS_PER_BOARD = 5000;
 const MAX_COLUMNS_PER_BOARD = 24;
 const MAX_SUBTASKS_PER_CARD = 100;
 
 const MAX_TITLE_LEN = 200;
 const MAX_DESC_LEN = 8000;
+
+/** Ceilings on the two things a card can now accumulate without bound. A
+ *  comment thread and an attachment list are both rendered in full inside one
+ *  modal, so these are the same kind of limit MAX_SUBTASKS_PER_CARD is: what
+ *  keeps the card openable, not a ration. */
+const MAX_COMMENT_LEN = 8000;
+const MAX_COMMENTS_PER_CARD = 250;
+const MAX_ATTACHMENTS = 50;
+/** Kept in step with MAX_ATTACHMENT_BYTES in kanban.rs, which is the one that
+ *  actually enforces it. This copy exists so a paste can be refused before it
+ *  is encoded rather than after. */
+const MAX_ATTACHMENT_BYTES = 64 * 1024 * 1024;
 
 /** The card color swatches. Twelve hues at two lightnesses each would be a
  *  color picker; this is a palette, so it is one row of hues chosen to stay
@@ -484,14 +620,14 @@ const DEFAULT_SETTINGS: KbSettings = {
   showDue: true,
   cardColorMode: "manual",
   cardSize: "comfortable",
-  // What the card IS, then what it needs, then when it is wanted, then what has
-  // happened to it. Anything can be dragged anywhere; this is only the start.
-  sectionOrder: ["description", "tags", "subtasks", "due", "stages"],
+  // What the card IS and what came with it, then what it needs, then when it is
+  // wanted, then what has happened to it, then what was said about it since.
+  // Anything can be dragged anywhere; this is only the start.
+  sectionOrder: ["description", "attachments", "tags", "subtasks", "due", "stages", "comments"],
   overdueWarn: true,
   defaultColumns: SYSTEM_DEFAULT_COLUMNS,
   defaultBoardName: "",
   priorityColors: { ...DEFAULT_PRIORITY_COLORS },
-  lockOnOpen: false,
 };
 
 /* =============================================================================
@@ -517,42 +653,27 @@ let saveTimer: number | null = null;
 /* -----------------------------------------------------------------------------
    WHAT IS DIRTY
    -----------------------------------------------------------------------------
-   Saving used to be one call writing one blob. With the files split, "save" has
-   to know WHICH file changed, or renaming a board would rewrite every board you
-   own and the split would have bought nothing.
+   Saving is one call per file that changed, never one call that rewrites
+   everything. Renaming a board must not cost a write of every board you own.
 
-   Three flags, set by the mutation helpers (markIndex / markBoard / markSettings)
-   and cleared by the flush. Deliberately coarse: within one file the whole file
-   is rewritten, because a board file is a few KB and partial writes are how you
-   get a file that disagrees with itself.
+   Three flags, set by the mutation helpers (markIndex / markBoard / markCard /
+   markSettings) and cleared by the flush. Deliberately coarse WITHIN a file:
+   whichever board changed is written whole, because a board file is a few KB
+   and a partial write is how you get a file that disagrees with itself.
 ----------------------------------------------------------------------------- */
-let dirtyIndex = false;
 let dirtySettings = false;
+/** Boards whose contents file needs writing: columns, cards, tags, overrides. */
 const dirtyBoards = new Set<string>();
+/** Whether the index (the board list and the default tag vocabulary) needs
+ *  writing. */
+let dirtyIndex = false;
+/** Boards whose contents file should be deleted. Held separately because by
+ *  save time the board is already out of the `boards` array. */
+const deletedBoards = new Set<string>();
 
 /* -----------------------------------------------------------------------------
-   ENCRYPTION STATE
-   -----------------------------------------------------------------------------
-   One password for the whole tool; each board opts in individually. See the
-   header of kanban.rs for why it is one and not one per board.
+   VIEW STATE
 ----------------------------------------------------------------------------- */
-
-/** Board ids that have an .enc file on disk. Read from the backend, never
- *  inferred from a stored flag: a flag can disagree with the files. */
-let encryptedBoardIds = new Set<string>();
-
-/**
- * The password, held for as long as this visit to the tool lasts and never
- * written anywhere. Cleared by Lock Now, and by leaving the tool when
- * lockOnOpen is set.
- *
- * Held at all because the alternative is retyping it on every debounced save,
- * which would make an encrypted board unusable rather than secure.
- */
-let sessionPassword: string | null = null;
-
-/** True while the tool-lock gate is covering the tool. */
-let authGateShowing = false;
 
 /**
  * False until initKanban() has run.
@@ -603,7 +724,6 @@ let filterBtn: HTMLButtonElement;
 let boardSetupBtn: HTMLButtonElement;
 let headerNoticeWrap: HTMLElement;
 let headerNotice: HTMLElement;
-let authView: HTMLElement;
 
 /* =============================================================================
    SMALL UTILITIES
@@ -789,23 +909,19 @@ function applySolidColor(
 /* -----------------------------------------------------------------------------
    LOADING
 
-   Order matters and is not arbitrary:
-
-     1. settings, because lockOnOpen decides whether the tool even opens;
-     2. the index, which is the board list;
-     3. lock status, which says which of those boards are ciphertext;
-     4. the plaintext boards' contents.
-
-   Encrypted boards are NOT loaded here. They stay locked until asked for, which
-   is the entire point of encrypting them.
+   Three steps: the preferences file, the index, then one file per board. There
+   used to be five, and two of them were about deciding which boards were
+   ciphertext and which could be opened. Nothing here encrypts any more, so
+   every board is simply read.
 ----------------------------------------------------------------------------- */
 
 async function loadAll(): Promise<void> {
   try {
+    // Where the attachment files live. Asked for once, because every card that
+    // shows a picture needs it and only the back end knows the answer.
+    attachmentsRoot = await invoke<string>("kanban_attachments_dir");
     await loadSettings();
-    await loadIndex();
-    await refreshLockStatus();
-    await loadUnlockedBoards();
+    await loadRecords();
   } catch (err) {
     devError("[kanban] load failed", err);
     flash(`Couldn't load Kanban data: ${String(err)}`, "error", 8000);
@@ -816,19 +932,27 @@ async function loadAll(): Promise<void> {
     storeLoaded = true;
   }
   applySettingsToForm();
-  // Applied here as well as on tool entry, because the entry hook may have
-  // already run and returned early (see `initialised`) while this load was
-  // still in flight. Without it, launching straight into a locked Kanban shows
-  // no gate at all for that first visit.
-  showAuthGate(gateRequired());
   renderAll();
 }
 
 async function loadSettings(): Promise<void> {
-  const raw = await invoke<string>("load_kanban_settings");
+  const raw = await invoke<string>("load_tool_file", { toolId: "kanban", kind: "settings" });
   kbSettings = normalizeSettings((JSON.parse(raw) ?? {}) as Partial<KbSettings>);
 }
 
+/** The index, then every board's contents.
+ *
+ *  Every board rather than the open one, because the gallery shows real card
+ *  counts and overdue badges for every board: loading on demand would mean
+ *  every tile saying "open me to find out". */
+async function loadRecords(): Promise<void> {
+  await loadIndex();
+  for (const board of boards) await loadBoardContents(board);
+  reconcile();
+  for (const board of boards) sweepBoardAttachments(board.id);
+}
+
+/** The board list and the default tag vocabulary. */
 async function loadIndex(): Promise<void> {
   const raw = await invoke<string>("load_kanban_index");
   const parsed = (JSON.parse(raw) ?? {}) as Partial<KanbanIndex>;
@@ -839,51 +963,17 @@ async function loadIndex(): Promise<void> {
   globalTags = Array.isArray(parsed.tags)
     ? parsed.tags.map(normalizeTag).filter((t): t is Tag => t !== null)
     : [];
-  // Every board starts locked and empty. loadBoardContents() is the only thing
-  // that unlocks one, so a board whose file fails to load stays visibly locked
-  // rather than silently appearing to have no cards.
   boards = Array.isArray(parsed.boards)
     ? parsed.boards.map(normalizeBoardMeta).filter((b): b is Board => b !== null)
     : [];
   cards = [];
 }
 
-async function refreshLockStatus(): Promise<void> {
-  const status = await invoke<{ hasPassword: boolean; encryptedBoardIds: string[] }>(
-    "kanban_lock_status",
-  );
-  encryptedBoardIds = new Set(status.encryptedBoardIds);
-}
-
-/** Reads in every board that is not encrypted. Done up front rather than on
- *  demand so the gallery can show real card counts and column shapes: a tile
- *  that had to say "open me to find out" for an unencrypted board would be
- *  worse than no tile. */
-async function loadUnlockedBoards(): Promise<void> {
-  for (const board of boards) {
-    if (encryptedBoardIds.has(board.id)) continue;
-    await loadBoardContents(board);
-  }
-  reconcile();
-}
-
-/** Pulls one board's columns and cards into memory. `password` is required
- *  exactly when the board is encrypted. Returns false when the contents could
- *  not be read, leaving the board locked. */
-async function loadBoardContents(board: Board, password?: string): Promise<boolean> {
-  const encrypted = encryptedBoardIds.has(board.id);
-  let raw: string;
-  try {
-    raw = encrypted
-      ? await invoke<string>("kanban_decrypt_board", { boardId: board.id, password })
-      : await invoke<string>("load_kanban_board", { boardId: board.id });
-  } catch (err) {
-    devError("[kanban] board load failed", board.id, err);
-    throw err;
-  }
-
+/** Pulls one board's columns and cards into memory. A board file that is not
+ *  there yet is a brand-new board, not an error. */
+async function loadBoardContents(board: Board): Promise<void> {
+  const raw = await invoke<string>("load_kanban_board", { boardId: board.id });
   const parsed = JSON.parse(raw) as Partial<BoardContents> | null;
-  // A board file that does not exist yet is a brand-new board, not an error.
   const contents = normalizeContents(parsed ?? {});
 
   board.columns = contents.columns;
@@ -891,53 +981,36 @@ async function loadBoardContents(board: Board, password?: string): Promise<boole
   board.tagCategories = contents.tagCategories;
   board.tags = contents.tags;
   board.overrides = contents.overrides;
-  board.locked = false;
 
   // Replace rather than append, so re-loading a board (after a restore, say)
   // cannot leave two copies of the same card in the array.
   cards = cards.filter((c) => c.boardId !== board.id);
   for (const card of contents.cards) card.boardId = board.id;
   cards.push(...contents.cards);
-  return true;
 }
 
-/** Drops one board's contents back out of memory and marks it locked again.
- *  The counterpart to loadBoardContents, used by Lock Now and by leaving the
- *  tool: "loaded into memory only" has to have a moment where it stops. */
-function unloadBoardContents(board: Board): void {
-  board.columns = [];
-  board.nextCardNumber = 1;
-  board.tagCategories = [];
-  board.tags = [];
-  board.overrides = {};
-  board.locked = true;
-  cards = cards.filter((c) => c.boardId !== board.id);
-}
 
 /* -----------------------------------------------------------------------------
    SAVING
 ----------------------------------------------------------------------------- */
 
+/** Marks the index: the board list and the default tag vocabulary. */
 function markIndex(): void {
   dirtyIndex = true;
   queueSave();
 }
 
-function markSettings(): void {
-  dirtySettings = true;
+/** Marks the board a card belongs to. The one place card writes are queued
+ *  from, called by stampCard(), which every card mutation already went
+ *  through. */
+function markCard(cardId: string): void {
+  const card = getCard(cardId);
+  if (card) dirtyBoards.add(card.boardId);
   queueSave();
 }
 
-/** Marks every board that is actually in memory. For the two edits that reach
- *  across boards at once: deleting a tag, or deleting a category, strips that
- *  tag from cards on every board. A LOCKED board is deliberately skipped, and
- *  that is a real limitation worth stating: its cards keep the deleted tag's id
- *  until it is next unlocked, at which point reconcile() drops the dangling
- *  reference on load. Nothing is lost, and nothing is written blind. */
-function markEveryLoadedBoard(): void {
-  for (const board of boards) {
-    if (!board.locked) dirtyBoards.add(board.id);
-  }
+function markSettings(): void {
+  dirtySettings = true;
   queueSave();
 }
 
@@ -984,51 +1057,75 @@ function buildContents(board: Board): BoardContents {
  *  single most destructive thing this file could do, so it is refused here
  *  rather than assumed impossible.
  */
-async function saveNow(): Promise<void> {
+/** The save currently running, or a settled promise when nothing is.
+ *
+ *  Saves are SERIALISED through this rather than being allowed to overlap, and
+ *  that is a correctness requirement rather than tidiness. flushSave() is used
+ *  as a barrier by a snapshot restore, which replaces the state wholesale.
+ *
+ *  Without the chain, a flush that arrives while a debounced save is mid-await
+ *  finds the dirty flags already cleared and returns at once, so it is not a
+ *  barrier at all: the restore would then race the write it was waiting for. */
+let saveChain: Promise<void> = Promise.resolve();
+
+/** Queues a write of everything currently dirty, behind any write already in
+ *  flight, and resolves when THIS one has finished. */
+function saveNow(): Promise<void> {
+  // The catch keeps one failed write from poisoning every later one. writeDirty
+  // handles its own errors, so this only ever fires on something unforeseen.
+  saveChain = saveChain.catch(() => {}).then(writeDirty);
+  return saveChain;
+}
+
+async function writeDirty(): Promise<void> {
   if (!storeLoaded) return;
 
+  /* Everything that is dirty is taken and CLEARED before the write, so an edit
+     made while the write is in flight marks itself dirty again rather than
+     being cleared along with the one that is landing. Put back on failure. */
   const boardIds = [...dirtyBoards];
+  const goneBoards = [...deletedBoards];
   const wantIndex = dirtyIndex;
   const wantSettings = dirtySettings;
   dirtyBoards.clear();
+  deletedBoards.clear();
   dirtyIndex = false;
   dirtySettings = false;
 
   try {
     if (wantSettings) {
-      await invoke("save_kanban_settings", { data: JSON.stringify(kbSettings) });
+      await invoke("save_tool_file", {
+        toolId: "kanban",
+        kind: "settings",
+        data: JSON.stringify(kbSettings),
+      });
     }
+    /* The index goes FIRST. Every write snapshots what it is replacing, and a
+       board's contents and the index entry naming it are only meaningful as a
+       pair; a snapshot holding cards for a board the index has never heard of
+       restores nothing you can reach. */
     if (wantIndex) {
       await invoke("save_kanban_index", { data: JSON.stringify(buildIndex()) });
     }
     for (const id of boardIds) {
       const board = getBoard(id);
-      if (!board || board.locked) continue;
-      const data = JSON.stringify(buildContents(board));
-      if (encryptedBoardIds.has(id)) {
-        if (!sessionPassword) {
-          // Reached only if the password was cleared with an edit still queued,
-          // which lockNow() flushes to prevent. Re-flagged rather than dropped,
-          // so unlocking again writes it instead of losing it.
-          dirtyBoards.add(id);
-          continue;
-        }
-        await invoke("kanban_save_board_encrypted", {
-          boardId: id,
-          password: sessionPassword,
-          data,
-        });
-      } else {
-        await invoke("save_kanban_board", { boardId: id, data });
-      }
+      if (!board) continue;
+      await invoke("save_kanban_board", {
+        boardId: id,
+        data: JSON.stringify(buildContents(board)),
+      });
+    }
+    for (const id of goneBoards) {
+      await invoke("delete_kanban_board", { boardId: id });
     }
   } catch (err) {
     devError("[kanban] save failed", err);
-    // Put the flags back: an edit that failed to write is still an unsaved
-    // edit, and the next save should try again rather than pretend it landed.
+    // Put it all back: an edit that failed to write is still an unsaved edit,
+    // and the next save should try again rather than pretend it landed.
     if (wantSettings) dirtySettings = true;
     if (wantIndex) dirtyIndex = true;
     for (const id of boardIds) dirtyBoards.add(id);
+    for (const id of goneBoards) deletedBoards.add(id);
     flash(`Couldn't save Kanban data: ${String(err)}`, "error", 8000);
   }
 }
@@ -1046,8 +1143,8 @@ function queueSave(): void {
 
 /** Writes a queued edit NOW rather than letting it wait. Called before anything
  *  that replaces state wholesale (a snapshot restore) or that takes the
- *  password away (Lock Now, leaving the tool), so nothing is sitting in the
- *  debounce when the thing it needed goes. */
+ *  so nothing is left sitting in the debounce while the state it describes is
+ *  replaced underneath it. */
 async function flushSave(): Promise<void> {
   if (saveTimer !== null) {
     clearTimeout(saveTimer);
@@ -1167,7 +1264,6 @@ export function normalizeSettings(raw: Partial<KbSettings>): KbSettings {
     defaultBoardName:
       typeof raw.defaultBoardName === "string" ? raw.defaultBoardName.slice(0, 120) : "",
     priorityColors: normalizePriorityColors(raw.priorityColors),
-    lockOnOpen: bool(raw.lockOnOpen, DEFAULT_SETTINGS.lockOnOpen),
   };
 }
 
@@ -1308,7 +1404,6 @@ function normalizeBoardMeta(raw: unknown): Board | null {
     tagCategories: [],
     tags: [],
     overrides: {},
-    locked: true,
   };
 }
 
@@ -1350,6 +1445,56 @@ function normalizeSubtask(raw: unknown): Subtask | null {
   };
 }
 
+/** An attachment record from disk. The id is the whole thing: it names the file
+ *  as well as the record, so a record without one has nothing to point at and
+ *  is dropped rather than kept as a row that can only ever say "missing". */
+function normalizeAttachment(raw: unknown): Attachment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const a = raw as Partial<Attachment>;
+  if (typeof a.id !== "string" || !a.id) return null;
+  // The id becomes a filename, so it is held to the same alphabet Rust holds
+  // board ids to. A hand-edited file cannot introduce a separator here.
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(a.id)) return null;
+  const now = Date.now();
+  return {
+    id: a.id,
+    // A record hand-edited empty still has to show as something clickable.
+    name: trimTo(a.name, 200) || "file",
+    size: typeof a.size === "number" && a.size >= 0 ? Math.floor(a.size) : 0,
+    addedAt: typeof a.addedAt === "number" ? a.addedAt : now,
+  };
+}
+
+function normalizeAttachments(raw: unknown): Attachment[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(normalizeAttachment)
+    .filter((a): a is Attachment => a !== null)
+    .slice(0, MAX_ATTACHMENTS);
+}
+
+function normalizeComment(raw: unknown): CardComment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const c = raw as Partial<CardComment>;
+  if (typeof c.id !== "string" || !c.id) return null;
+  const body = trimTo(c.body, MAX_COMMENT_LEN);
+  const attachments = normalizeAttachments(c.attachments);
+  // A comment with neither words nor files is not a comment. Dropping it here
+  // is what stops an empty row appearing under a card with nothing to remove.
+  if (!body.trim() && attachments.length === 0) return null;
+  const created = typeof c.createdAt === "number" ? c.createdAt : Date.now();
+  return {
+    id: c.id,
+    body,
+    attachments,
+    createdAt: created,
+    // Never earlier than createdAt, so "edited" is a real comparison rather
+    // than an artefact of a hand-edited file.
+    updatedAt:
+      typeof c.updatedAt === "number" && c.updatedAt >= created ? c.updatedAt : created,
+  };
+}
+
 /** A date field is kept only if it is a real YYYY-MM-DD. Anything else becomes
  *  null rather than being carried through, because every duration in the tool
  *  is subtracted from these and a half-valid date would produce a number that
@@ -1384,6 +1529,20 @@ function normalizeCard(raw: unknown): Card | null {
           .filter((s): s is Subtask => s !== null)
           .slice(0, MAX_SUBTASKS_PER_CARD)
       : [],
+    // Absent from every card written before these existed, which is what the
+    // empty-array fallback is for: an older board loads with no attachments
+    // and no comments rather than failing to load. The Kanban has not shipped
+    // in a release yet, so this covers development data rather than anyone
+    // else's, but it costs nothing and it is the rule every other field here
+    // already follows.
+    attachments: normalizeAttachments(c.attachments),
+    comments: Array.isArray(c.comments)
+      ? c.comments
+          .map(normalizeComment)
+          .filter((x): x is CardComment => x !== null)
+          .sort((a, b) => a.createdAt - b.createdAt)
+          .slice(0, MAX_COMMENTS_PER_CARD)
+      : [],
     dates: {
       due: normalizeDay(d.due),
       started: normalizeDay(d.started),
@@ -1416,7 +1575,6 @@ function reconcile(): void {
 
   const liveTagIdsByBoard = new Map<string, Set<string>>();
   for (const board of boards) {
-    if (board.locked) continue;
     const categoryIds = new Set(board.tagCategories.map((c) => c.id));
     board.tags = board.tags.filter((t) => categoryIds.has(t.categoryId));
     liveTagIdsByBoard.set(board.id, new Set(board.tags.map((t) => t.id)));
@@ -1425,11 +1583,6 @@ function reconcile(): void {
   cards = cards.filter((card) => {
     const board = boardById.get(card.boardId);
     if (!board) return false;
-    // A locked board has no columns in memory, so every check below would read
-    // as "its column is gone" and delete the card. Nothing should ever put a
-    // card here for a locked board, but the cost of being wrong about that is
-    // deleting somebody's work, so it is checked rather than assumed.
-    if (board.locked) return true;
     if (!board.columns.some((col) => col.id === card.columnId)) {
       // Its column is gone. The first column is a place it can be seen and
       // dealt with; silently deleting someone's card because a column was
@@ -1695,7 +1848,12 @@ export function cardMatchesText(card: Card, needle: string): boolean {
   if (numeric && /^\d+$/.test(numeric) && String(card.number) === numeric) return true;
   if (card.title.toLowerCase().includes(q)) return true;
   if (card.description.toLowerCase().includes(q)) return true;
-  return card.subtasks.some((s) => s.text.toLowerCase().includes(q));
+  if (card.subtasks.some((s) => s.text.toLowerCase().includes(q))) return true;
+  // Comments and filenames are searched too. A card is often findable only by
+  // something written on it after the fact ("the crash log Bob sent"), and a
+  // filter that could not see those would quietly hide the card that has it.
+  if (card.comments.some((c) => c.body.toLowerCase().includes(q))) return true;
+  return allAttachments(card).some((a) => a.name.toLowerCase().includes(q));
 }
 
 function cardMatchesTags(card: Card): boolean {
@@ -1805,21 +1963,13 @@ function showKbView(view: KbView, boardId?: string): void {
   pushKbHistory(view, currentBoardId ?? undefined);
 }
 
-/**
- * The ONE place that decides which of the three top-level panes is on screen.
- *
- * There were two before (view switching and the lock gate) and they disagreed:
- * clicking the sidebar icon while the gate was up called showKbView, which
- * unhid the gallery from behind the gate. Anything that can reveal a locked
- * board has to be impossible by construction rather than by remembering, so
- * both callers now go through here and the gate always wins.
- */
+/** The ONE place that decides which of the two panes is on screen. There were
+ *  two such places once, and they disagreed with each other; everything that
+ *  changes the view goes through here now. */
 function applyViewVisibility(): void {
-  const gated = authGateShowing;
-  authView.style.display = gated ? "" : "none";
-  viewBoards.style.display = !gated && currentView === "boards" ? "" : "none";
-  viewBoard.style.display = !gated && currentView === "board" ? "" : "none";
-  boardSetupBtn.style.display = !gated && currentView === "board" ? "" : "none";
+  viewBoards.style.display = currentView === "boards" ? "" : "none";
+  viewBoard.style.display = currentView === "board" ? "" : "none";
+  boardSetupBtn.style.display = currentView === "board" ? "" : "none";
 }
 
 function pushKbHistory(view: KbView, boardId?: string): void {
@@ -1853,7 +2003,7 @@ function kbToolIsVisible(): boolean {
 function topOpenKanbanModal(): Modal | null {
   const stack = [
     _confirmModal,
-    _passwordModal,
+    _lightboxModal,
     _cardStatsModal,
     _boardStatsModal,
     _archiveModal,
@@ -2027,12 +2177,7 @@ function buildBoardTile(board: Board): HTMLElement {
 
   const stats = document.createElement("span");
   stats.className = "kb-board-tile-stats";
-  if (board.locked) {
-    // No counts, and not because they are being withheld for effect: the cards
-    // are ciphertext, so there is genuinely nothing here to count.
-    tile.classList.add("kb-board-tile-locked");
-    stats.textContent = "Encrypted · click to unlock";
-  } else {
+  {
     const todayStr = today();
     const overdue = live.filter((c) => isOverdue(c, todayStr)).length;
     const done = live.filter((c) => {
@@ -2046,17 +2191,6 @@ function buildBoardTile(board: Board): HTMLElement {
   }
   body.appendChild(stats);
 
-  if (board.locked) {
-    const padlock = document.createElement("span");
-    padlock.className = "kb-board-tile-lock";
-    padlock.title = "Encrypted";
-    padlock.innerHTML =
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
-      'stroke-linecap="round" stroke-linejoin="round">' +
-      '<rect x="4" y="10.5" width="16" height="10.5" rx="2" />' +
-      '<path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" /></svg>';
-    tile.appendChild(padlock);
-  }
 
   tile.appendChild(body);
 
@@ -2112,13 +2246,10 @@ function buildBoardTile(board: Board): HTMLElement {
    BOARD VIEW
 ============================================================================= */
 
-/** Entering a board from the gallery. Split out from showKbView because
- *  unlocking is asynchronous and showKbView is called from places (history
- *  replay, the icon shortcut) that cannot wait on a password prompt. */
-async function openBoardFromGallery(boardId: string): Promise<void> {
+/** Entering a board from the gallery. */
+function openBoardFromGallery(boardId: string): void {
   const board = getBoard(boardId);
   if (!board) return;
-  if (board.locked && !(await unlockBoard(board))) return;
   showKbView("board", board.id);
 }
 
@@ -2174,14 +2305,6 @@ function renderColumns(board: Board): void {
   const todayStr = today();
   columnsEl.replaceChildren();
 
-  if (board.locked) {
-    // Reachable through history replay (mouse-back into a board that was
-    // locked in the meantime), so it says what happened rather than looking
-    // like a board that lost its columns.
-    columnsEmpty.style.display = "";
-    columnsEmpty.textContent = "This board is encrypted and locked. Go back and open it again to unlock it.";
-    return;
-  }
   if (board.columns.length === 0) {
     columnsEmpty.style.display = "";
     columnsEmpty.textContent = "This board has no columns yet. Add one to start.";
@@ -2555,6 +2678,13 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
   const title = document.createElement("div");
   title.className = "kb-card-title";
   title.textContent = card.title || "Untitled";
+  // The description as a hover summary, with its formatting characters taken
+  // off: the point of the card face is not having to open the card to remember
+  // what it was, and a tooltip full of asterisks and brackets does not help.
+  if (card.description.trim()) {
+    const summary = richTextToPlain(card.description);
+    title.title = summary.length > 300 ? `${summary.slice(0, 300)}…` : summary;
+  }
   el.appendChild(title);
 
   if (settings.showTags && card.tagIds.length > 0) {
@@ -2589,6 +2719,48 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
     wrap.appendChild(label);
 
     el.appendChild(wrap);
+  }
+
+  /* How many files and how many comments the card is carrying. Shown whenever
+     there are any, with no preference behind it: unlike tags or subtasks, these
+     say nothing about the work itself, they say there is something inside this
+     card you cannot see from here, which is the one thing a card face cannot
+     afford to keep quiet about. */
+  const attachmentCount = allAttachments(card).length;
+  if (attachmentCount > 0 || card.comments.length > 0) {
+    const meta = document.createElement("div");
+    meta.className = "kb-card-meta";
+    const item = (svg: string, count: number, title: string): void => {
+      const span = document.createElement("span");
+      span.className = "kb-card-meta-item";
+      span.title = title;
+      span.innerHTML = svg;
+      const label = document.createElement("span");
+      label.textContent = String(count);
+      span.appendChild(label);
+      meta.appendChild(span);
+    };
+    if (attachmentCount > 0) {
+      item(
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+          'stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />' +
+          "</svg>",
+        attachmentCount,
+        `${attachmentCount} attached file(s)`,
+      );
+    }
+    if (card.comments.length > 0) {
+      item(
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+          'stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />' +
+          "</svg>",
+        card.comments.length,
+        `${card.comments.length} comment(s)`,
+      );
+    }
+    el.appendChild(meta);
   }
 
   el.addEventListener("click", () => openCard(card.id));
@@ -3086,7 +3258,8 @@ function createCard(
 ): Card | null {
   if (liveCardsOnBoard(board.id).length >= MAX_CARDS_PER_BOARD) {
     flash(
-      `This board is at its limit of ${MAX_CARDS_PER_BOARD} cards. Archive some finished work first.`,
+      `This board is at its limit of ${MAX_CARDS_PER_BOARD.toLocaleString()} cards on the board at once. ` +
+        "Archiving finished work frees room without deleting anything.",
       "error",
       8000,
     );
@@ -3107,6 +3280,8 @@ function createCard(
     priority: "none",
     tagIds: [],
     subtasks: [],
+    attachments: [],
+    comments: [],
     dates: { due: null, started: null, testing: null, completed: null },
     archived: false,
     createdAt: now,
@@ -3123,6 +3298,10 @@ function createCard(
 }
 
 function deleteCard(card: Card): void {
+  // The card's files go with it. Nothing else can reach them once the card is
+  // out of the array, so leaving them behind would be an orphan nobody could
+  // ever find to delete.
+  forgetAttachmentFiles(card.boardId, allAttachments(card));
   cards = cards.filter((c) => c.id !== card.id);
   const board = getBoard(card.boardId);
   if (board) {
@@ -3148,6 +3327,14 @@ function duplicateCard(card: Card): Card | null {
     // for it on the original.
     subtasks: card.subtasks.map((s) => ({ ...s, id: newId(), done: false })),
     tagIds: [...card.tagIds],
+    // The copy gets its OWN files. Sharing a path would mean removing the
+    // attachment from either card unlinks the bytes the other one still shows;
+    // the copy starts pointing at the original's files and is repointed at its
+    // own as each copy lands (see cloneAttachments).
+    attachments: card.attachments.map((a) => ({ ...a, id: newId() })),
+    // The comment thread is what was said about the ORIGINAL piece of work. A
+    // duplicate is a new piece of work, so it starts with nothing said about it.
+    comments: [],
     // The stage stamps belong to the work that was actually done, not to a new
     // copy of the card. The due date is a plan and does carry over.
     dates: { due: card.dates.due, started: null, testing: null, completed: null },
@@ -3160,6 +3347,7 @@ function duplicateCard(card: Card): Card | null {
   cards.push(copy);
   resequence(board.id);
   touchBoard(board);
+  void cloneAttachments(card, copy);
   return copy;
 }
 
@@ -3184,7 +3372,6 @@ let _archiveModal: Modal | null = null;
 let _tagCatEditModal: Modal | null = null;
 let _tagEditModal: Modal | null = null;
 let _confirmModal: Modal | null = null;
-let _passwordModal: Modal | null = null;
 
 /* =============================================================================
    CONFIRM
@@ -3272,7 +3459,6 @@ function getCardModal(): Modal {
 
   const backdrop = document.getElementById("kbCardBackdrop")!;
   const titleInput = document.getElementById("kbCardTitleInput") as HTMLInputElement;
-  const descInput = document.getElementById("kbCardDescInput") as HTMLTextAreaElement;
   const columnSelect = document.getElementById("kbCardColumnSelect") as HTMLSelectElement;
   const boardSelect = document.getElementById("kbCardBoardSelect") as HTMLSelectElement;
   const dueInput = document.getElementById("kbCardDueInput") as HTMLInputElement;
@@ -3284,6 +3470,21 @@ function getCardModal(): Modal {
     onClosed: () => {
       openCardId = null;
       closeMenu();
+      /* A comment being written is thrown away only when the card is really
+         being left. A handoff (the picture viewer, a confirm) has already
+         opened its replacement by the time this runs, so an open Kanban modal
+         here means the card is coming back and the half-written comment is
+         still wanted. */
+      if (!topOpenKanbanModal()) {
+        discardPendingComment();
+        // Same rule for the description: a card really left comes back showing
+        // whichever face its text calls for, rather than the one it happened to
+        // be on when it was closed.
+        descFieldCardId = null;
+      }
+      // The players in the card go quiet and give their buffers back here
+      // rather than whenever the collector next runs.
+      releaseMedia(backdrop);
       // The board behind was not being kept in step while the modal was open;
       // this is where it catches up in one pass.
       renderAll();
@@ -3301,13 +3502,6 @@ function getCardModal(): Modal {
     card.title = titleInput.value.slice(0, MAX_TITLE_LEN);
     stampCard(card);
     renderCardHeader(card);
-  });
-
-  descInput.addEventListener("input", () => {
-    const card = getCard(openCardId);
-    if (!card) return;
-    card.description = descInput.value.slice(0, MAX_DESC_LEN);
-    stampCard(card);
   });
 
   columnSelect.addEventListener("change", () => {
@@ -3389,6 +3583,26 @@ function getCardModal(): Modal {
       e.preventDefault();
       addSubtask();
     }
+  });
+
+  document.getElementById("kbCardAttachAddBtn")!.addEventListener("click", () => {
+    void (async () => {
+      const card = getCard(openCardId);
+      if (!card) return;
+      const boardId = card.boardId;
+      const added = await pickAttachments(boardId, card.attachments.length);
+      if (added.length === 0) return;
+      // Re-read the card: the picker is a native dialog, and the card modal can
+      // have been closed and another card opened while it was up.
+      const still = getCard(card.id);
+      if (!still) {
+        forgetAttachmentFiles(boardId, added);
+        return;
+      }
+      still.attachments.push(...added);
+      stampCard(still);
+      if (openCardId === still.id) renderCardAttachments(still);
+    })();
   });
 
   document.getElementById("kbCardManageTagsBtn")!.addEventListener("click", () => {
@@ -3499,9 +3713,21 @@ function stampCard(card: Card): void {
 function openCard(cardId: string): void {
   const card = getCard(cardId);
   if (!card) return;
+  // An inline comment editor belongs to the card it was opened on. Clearing it
+  // here rather than on close covers the reopen paths too (a confirm dismissed,
+  // the picture viewer's back arrow).
+  editingCommentId = null;
+  // A composer left holding a different card's words goes now, files included.
+  if (pendingCommentCardId && pendingCommentCardId !== cardId) discardPendingComment();
   openCardId = cardId;
+  // The composer is built on demand, so the first card opened is not paying for
+  // a control it may never use.
+  getCommentField();
   renderCardModal();
   getCardModal().open();
+  // Asked once per open, in the background: a file can vanish between sessions
+  // and the card should say so rather than showing a broken picture.
+  void refreshAttachmentPresence(card);
 }
 
 function renderCardModal(): void {
@@ -3511,7 +3737,10 @@ function renderCardModal(): void {
 
   renderCardHeader(card);
   (document.getElementById("kbCardTitleInput") as HTMLInputElement).value = card.title;
-  (document.getElementById("kbCardDescInput") as HTMLTextAreaElement).value = card.description;
+  renderCardDescription(card);
+  renderCardAttachments(card);
+  renderCardComments(card);
+  renderPendingCommentAttachments();
   renderCardPlacement(card);
   renderCardDue(card);
   renderCardSubtasks(card);
@@ -3615,6 +3844,7 @@ function moveCardToBoard(card: Card, boardId: string): void {
   }
 
   const previous = card.number;
+  const fromBoardId = card.boardId;
   card.boardId = target.id;
   card.columnId = target.columns[0].id;
   card.order = -1;
@@ -3627,6 +3857,10 @@ function moveCardToBoard(card: Card, boardId: string): void {
   if (from) resequence(from.id);
   resequence(target.id);
   stampCard(card);
+  // The files live in a folder named after the board, so a card crossing boards
+  // has to physically take them with it. If the two boards disagree about
+  // rather than a rename, so the copy is verified before the original goes.
+  if (fromBoardId) void moveAttachmentsToBoard(card, fromBoardId, target.id);
   flash(`Moved to ${target.name}. It is now #${card.number} (was #${previous}).`);
 }
 
@@ -3951,6 +4185,1139 @@ function renderCardColorPreview(card: Card, board: Board | null): void {
   const number = preview.querySelector<HTMLElement>(".kb-card-number");
   if (number) number.textContent = `#${card.number}`;
   applySolidColor(preview, resolveCardColor(card, board), card.textColor);
+}
+
+/* -----------------------------------------------------------------------------
+   ATTACHMENTS
+   -----------------------------------------------------------------------------
+   An attachment is a COPY the tool owns (see the Attachment type). Everything
+   here keeps three things in step: the record on the card, the file in that
+   board's folder, and what is on screen.
+
+   THE FILE'S LIFETIME IS THE RECORD'S. Remove the attachment, delete the
+   comment, delete the card, delete the board: the copy goes in that same
+   action. That is maintained by the paths below, but it is GUARANTEED by
+   something else: the file is named by the attachment id inside a folder named
+   by the board id, so anything in a board's folder that no card mentions is
+   provably garbage. sweepBoardAttachments() collects it after every board load,
+   which is what makes the rule survive a crash, a snapshot restore, or a
+   hand-edited board file.
+
+   These files are ordinary files. They reach the screen through the same asset
+   protocol the board backgrounds use, and open in another program through one
+   command scoped to this folder.
+----------------------------------------------------------------------------- */
+
+/** Every attachment on a card, its comments included. The one place that
+ *  question is answered, so a delete path cannot forget the comments' files. */
+function allAttachments(card: Card): Attachment[] {
+  return [...card.attachments, ...card.comments.flatMap((c) => c.attachments)];
+}
+
+/** "<boardId>/<attachmentId>" for attachments the last check said are not on
+ *  disk. Held so a card with a missing file draws it as missing on every render
+ *  rather than only on the render that discovered it. */
+const missingAttachments = new Set<string>();
+
+function attachmentKey(boardId: string, attachment: Attachment): string {
+  return `${boardId}/${attachment.id}`;
+}
+
+/** The URL the WebView loads an attachment from. The same asset protocol the
+ *  board backgrounds use: these are ordinary files on disk. */
+function attachmentUrl(boardId: string, attachment: Attachment): string {
+  return convertFileSrc(attachmentPath(boardId, attachment));
+}
+
+/** Where the file actually is. Derived, never stored; see the Attachment type. */
+function attachmentPath(boardId: string, attachment: Attachment): string {
+  return `${attachmentsRoot}/${boardId}/${attachment.id}`;
+}
+
+/** The absolute path of kanban-attachments/, learned once from the back end.
+ *  Needed because the asset protocol takes a real path, and only the back end
+ *  knows where the data directory is. */
+let attachmentsRoot = "";
+
+/** Unlinks the copies behind these records, best effort.
+ *
+ *  Deliberately fire-and-forget. The card edit that triggered it has already
+ *  happened in memory and is about to be written; a file that will not delete
+ *  (open in a viewer, say) is not a reason to fail that or to nag about it. */
+function forgetAttachmentFiles(boardId: string, list: Attachment[]): void {
+  for (const attachment of list) {
+    missingAttachments.delete(attachmentKey(boardId, attachment));
+    void invoke("delete_kanban_attachment", {
+      boardId,
+      attachmentId: attachment.id,
+    }).catch(() => {});
+  }
+}
+
+/**
+ * Deletes anything in a board's folder that no card on it mentions.
+ *
+ * This is the guarantee behind "delete the thing and the file goes". Every
+ * other path unlinks the file at the moment it drops the record, but a crash
+ * between the two, a snapshot restored from before the file existed, or a
+ * hand-edited board file leaves an orphan, and an orphan is unreachable by
+ * definition. Run after a board's contents are in memory, which is the only
+ * moment the full list of ids it should own actually exists.
+ */
+function sweepBoardAttachments(boardId: string): void {
+  if (!getBoard(boardId)) return;
+  const keep = cards
+    .filter((c) => c.boardId === boardId)
+    .flatMap((c) => allAttachments(c).map((a) => a.id));
+  void invoke<number>("sweep_kanban_attachments", { boardId, keep })
+    .then((removed) => {
+      if (removed > 0) devError(`[kanban] swept ${removed} unreferenced attachment(s)`);
+    })
+    .catch((err) => devError("[kanban] attachment sweep failed", err));
+}
+
+/** Asks which files are actually still there, in one round trip, and redraws if
+ *  the answer changed anything. Called when a card is opened: a file can go
+ *  missing between sessions and the card should say so rather than showing a
+ *  broken picture. */
+async function refreshAttachmentPresence(card: Card): Promise<void> {
+  const list = allAttachments(card);
+  if (list.length === 0) return;
+  const boardId = card.boardId;
+  try {
+    const present = await invoke<boolean[]>("kanban_attachments_exist", {
+      boardId,
+      attachmentIds: list.map((a) => a.id),
+    });
+    let changed = false;
+    list.forEach((attachment, i) => {
+      const key = attachmentKey(boardId, attachment);
+      const missing = present[i] === false;
+      if (missing === missingAttachments.has(key)) return;
+      changed = true;
+      if (missing) missingAttachments.add(key);
+      else missingAttachments.delete(key);
+    });
+    // Only if this is still the card on screen: the answer can arrive after the
+    // user has moved on, and redrawing then would draw the wrong card.
+    if (changed && openCardId === card.id) {
+      renderCardAttachments(card);
+      renderCardComments(card);
+    }
+  } catch {
+    // A failed check means "no news", not "everything is missing".
+  }
+}
+
+/**
+ * Gives a duplicated card its own copies of the original's files.
+ *
+ * Runs after the duplicate is already on the board, on purpose: the copy is
+ * usable immediately, and each attachment gets its own file as that copy lands.
+ * A copy that fails leaves the record pointing at nothing, which the presence
+ * check then reports as missing; that is the honest outcome and it is far
+ * better than two cards sharing one file, where removing the attachment from
+ * either would silently break the other.
+ */
+async function cloneAttachments(original: Card, copy: Card): Promise<void> {
+  if (copy.attachments.length === 0) return;
+  for (let i = 0; i < copy.attachments.length; i++) {
+    try {
+      await invoke("copy_kanban_attachment", {
+        fromBoardId: original.boardId,
+        toBoardId: copy.boardId,
+        fromAttachmentId: original.attachments[i].id,
+        toAttachmentId: copy.attachments[i].id,
+      });
+    } catch (err) {
+      devError("[kanban] attachment copy failed", err);
+    }
+  }
+  stampCard(copy);
+  if (openCardId === copy.id) renderCardAttachments(copy);
+}
+
+/**
+ * Moves a card's files into another board's folder.
+ *
+ * A cross-board move is the one thing the derive-the-path design costs, and it
+ * is worth the price: the file has to physically follow the card. Handled in
+ * Rust, one call per file.
+ */
+async function moveAttachmentsToBoard(
+  card: Card,
+  fromBoardId: string,
+  toBoardId: string,
+): Promise<void> {
+  const list = allAttachments(card);
+  if (list.length === 0 || fromBoardId === toBoardId) return;
+  for (const attachment of list) {
+    try {
+      await invoke("copy_kanban_attachment", {
+        fromBoardId,
+        toBoardId,
+        fromAttachmentId: attachment.id,
+        // Same id on the other side: it is unique per board by construction and
+        // keeping it means the card's records need no rewriting.
+        toAttachmentId: attachment.id,
+      });
+      await invoke("delete_kanban_attachment", {
+        boardId: fromBoardId,
+        attachmentId: attachment.id,
+      });
+    } catch (err) {
+      flash(`Couldn't move an attached file: ${String(err)}`, "error", 8000);
+      devError("[kanban] attachment move failed", err);
+    }
+  }
+  if (openCardId === card.id) {
+    renderCardAttachments(card);
+    renderCardComments(card);
+  }
+}
+
+/**
+ * Runs the file picker and copies what was chosen into the board's folder.
+ * Returns the records to append; the caller decides where they go and saves.
+ *
+ * `have` is how many the target already holds, so the ceiling is enforced
+ * before anything is copied rather than after.
+ */
+async function pickAttachments(boardId: string, have: number): Promise<Attachment[]> {
+  if (have >= MAX_ATTACHMENTS) {
+    flash(`That already holds the maximum of ${MAX_ATTACHMENTS} files.`, "error");
+    return [];
+  }
+  const picked = await openDialog({ multiple: true, directory: false });
+  const paths = Array.isArray(picked) ? picked : typeof picked === "string" ? [picked] : [];
+  if (paths.length === 0) return [];
+
+  const room = MAX_ATTACHMENTS - have;
+  if (paths.length > room) {
+    flash(`Only ${room} more file(s) fit here; the rest were skipped.`, "error", 6000);
+  }
+
+  const out: Attachment[] = [];
+  for (const path of paths.slice(0, room)) {
+    // The id is minted HERE, before the copy, because it is the filename the
+    // copy will be written under.
+    const id = newId();
+    try {
+      const stored = await invoke<{ id: string; name: string; size: number }>(
+        "import_kanban_attachment",
+        { boardId, attachmentId: id, path },
+      );
+      out.push({ id: stored.id, name: stored.name, size: stored.size, addedAt: Date.now() });
+    } catch (err) {
+      flash(String(err), "error", 8000);
+    }
+  }
+  return out;
+}
+
+/**
+ * Stores an image that arrived on the clipboard.
+ *
+ * The bytes go over as base64 rather than as a byte array: an array serialises
+ * as JSON numbers, which is several bytes on the wire per byte of image, and a
+ * screenshot is small enough that base64's 33% is the cheaper of the two.
+ */
+async function attachPastedImage(
+  boardId: string,
+  blob: Blob,
+  have: number,
+): Promise<Attachment | null> {
+  if (have >= MAX_ATTACHMENTS) {
+    flash(`That already holds the maximum of ${MAX_ATTACHMENTS} files.`, "error");
+    return null;
+  }
+  // Refused before the blob is turned into a string, which is where a large
+  // paste would cost the most: the base64 form is a third larger again, and
+  // both live at once while it is being built.
+  if (blob.size > MAX_ATTACHMENT_BYTES) {
+    flash(
+      `That image is ${(blob.size / (1024 * 1024)).toFixed(1)} MB. The limit for one attachment is ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB.`,
+      "error",
+      8000,
+    );
+    return null;
+  }
+  try {
+    const buffer = new Uint8Array(await blob.arrayBuffer());
+    // Chunked rather than spread into one apply() call: a few megabytes of
+    // image is more arguments than the stack will take at once.
+    let binary = "";
+    const STEP = 0x8000;
+    for (let i = 0; i < buffer.length; i += STEP) {
+      binary += String.fromCharCode(...buffer.subarray(i, i + STEP));
+    }
+
+    const ext = (blob.type.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "").slice(0, 8);
+    const stamp = new Date().toLocaleString("sv-SE").replace(/[: ]/g, "-");
+    const id = newId();
+    const stored = await invoke<{ id: string; name: string; size: number }>(
+      "paste_kanban_attachment",
+      {
+        boardId,
+        attachmentId: id,
+        // A pasted image has no filename of its own, so it is given one that
+        // says where it came from and when.
+        name: `pasted-${stamp}.${ext || "png"}`,
+        dataBase64: btoa(binary),
+      },
+    );
+    return { id: stored.id, name: stored.name, size: stored.size, addedAt: Date.now() };
+  } catch (err) {
+    flash(String(err), "error", 8000);
+    return null;
+  }
+}
+
+/** Hands a file to whatever program owns its type. */
+function openAttachment(boardId: string, attachment: Attachment): void {
+  void invoke("open_kanban_attachment", {
+    boardId,
+    attachmentId: attachment.id,
+    name: attachment.name,
+  }).catch((err) => flash(String(err), "error", 8000));
+}
+
+/**
+ * Releases the media elements inside a container before it is emptied.
+ *
+ * A <video> that is removed from the DOM while still holding a source keeps its
+ * decoder and its buffered data alive until the collector gets to it, and this
+ * container is rebuilt on every keystroke-driven re-render. Pausing and
+ * clearing the source first is what makes closing a card with three videos in
+ * it give the memory back at that moment rather than eventually.
+ */
+function releaseMedia(host: HTMLElement): void {
+  for (const el of host.querySelectorAll<HTMLMediaElement>("video, audio")) {
+    el.pause();
+    el.removeAttribute("src");
+    // Required as well as removing the attribute: without the reload the
+    // element keeps the old resource open.
+    el.load();
+  }
+}
+
+/** Empties a container that may be holding media, without leaking the decoders.
+ *  Every attachment list is redrawn through this rather than through a bare
+ *  replaceChildren. */
+function clearMediaHost(host: HTMLElement): void {
+  releaseMedia(host);
+  host.replaceChildren();
+}
+
+interface AttachmentListOptions {
+  /** Which board's folder these live in. */
+  boardId: string;
+  /** Called after the record has been taken out of its list, to save and redraw.
+   *  The file itself is unlinked here. */
+  onRemove: (attachment: Attachment) => void;
+}
+
+/**
+ * Draws one list of attachments into `host`.
+ *
+ * Three shapes, chosen by extension and never by a stored field: a picture is
+ * shown, a video or a sound gets a player, and everything else is a row that
+ * opens in whatever program owns it. A file that is no longer on disk keeps its
+ * row and says so, because a card silently losing a line is worse than a card
+ * telling you something went missing.
+ */
+function renderAttachmentList(
+  host: HTMLElement,
+  list: Attachment[],
+  opts: AttachmentListOptions,
+): void {
+  clearMediaHost(host);
+
+  for (const attachment of list) {
+    const missing = missingAttachments.has(attachmentKey(opts.boardId, attachment));
+    const kind = missing ? "file" : attachmentKind(attachment.name);
+    const src = attachmentUrl(opts.boardId, attachment);
+
+    const wrap = document.createElement("div");
+    wrap.className = "rt-attach";
+    if (missing) wrap.classList.add("rt-attach-missing");
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "rt-attach-remove";
+    remove.title = `Remove ${attachment.name}`;
+    remove.textContent = "×";
+    remove.addEventListener("click", (e) => {
+      e.stopPropagation();
+      opts.onRemove(attachment);
+    });
+
+    const label = (): HTMLElement => {
+      const name = document.createElement("button");
+      name.type = "button";
+      name.className = "rt-attach-name";
+      name.textContent = missing ? `${attachment.name} (missing)` : attachment.name;
+      name.title = missing ? "This file is no longer in the app's folder." : attachment.name;
+      if (missing) name.disabled = true;
+      else name.addEventListener("click", () => openAttachment(opts.boardId, attachment));
+      return name;
+    };
+    const size = (): HTMLElement => {
+      const el = document.createElement("span");
+      el.className = "rt-attach-size";
+      el.textContent = formatBytes(attachment.size);
+      return el;
+    };
+
+    if (kind === "image") {
+      const img = document.createElement("img");
+      img.className = "rt-attach-img";
+      img.src = src;
+      img.alt = attachment.name;
+      img.loading = "lazy";
+      img.title = "Click to view full size";
+      img.addEventListener("click", () => openAttachmentLightbox(opts.boardId, attachment));
+      // A file deleted from outside the app between the presence check and this
+      // render still has to read as missing rather than as a broken icon. So
+      // does one on a board that has since been locked, which the handler
+      // answers with a refusal rather than with bytes.
+      img.addEventListener("error", () => {
+        missingAttachments.add(attachmentKey(opts.boardId, attachment));
+        wrap.classList.add("rt-attach-missing");
+        img.remove();
+      });
+      wrap.appendChild(img);
+    } else if (kind === "video") {
+      const video = document.createElement("video");
+      video.className = "rt-attach-media";
+      video.src = src;
+      video.controls = true;
+      // Metadata only: a card with four videos on it should not start pulling
+      // four files off disk, and decrypting them, the moment it is opened.
+      video.preload = "metadata";
+      wrap.appendChild(video);
+    } else if (kind === "audio") {
+      const audio = document.createElement("audio");
+      audio.className = "rt-attach-audio";
+      audio.src = src;
+      audio.controls = true;
+      audio.preload = "metadata";
+      wrap.appendChild(audio);
+    }
+
+    const strip = document.createElement("div");
+    strip.className = kind === "file" ? "rt-attach-row" : "rt-attach-caption";
+    if (kind === "file") {
+      const icon = document.createElement("span");
+      icon.className = "rt-attach-icon";
+      icon.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+        'stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M14 3v5h5" /><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" />' +
+        "</svg>";
+      strip.appendChild(icon);
+    }
+    strip.appendChild(label());
+    strip.appendChild(size());
+    strip.appendChild(remove);
+    wrap.appendChild(strip);
+
+    host.appendChild(wrap);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   THE PICTURE VIEWER
+   -----------------------------------------------------------------------------
+   A card's images are drawn at whatever width the modal has, which is not
+   enough to read a screenshot of an error message. This is the full-size view
+   of one of them, and it REPLACES the card modal rather than stacking on it,
+   like every other secondary modal in this tool; its back arrow says which card
+   it goes back to.
+----------------------------------------------------------------------------- */
+
+let _lightboxModal: Modal | null = null;
+/** The card to reopen when the viewer is dismissed. Named rather than
+ *  remembered: there is exactly one route in, and it knows the answer. */
+let lightboxReturnCardId: string | null = null;
+
+function getLightboxModal(): Modal {
+  if (_lightboxModal) return _lightboxModal;
+
+  const backdrop = document.getElementById("kbLightboxBackdrop")!;
+  const img = document.getElementById("kbLightboxImg") as HTMLImageElement;
+
+  _lightboxModal = new Modal(backdrop, {
+    closeOnEsc: true,
+    onClosed: () => {
+      // The source goes when the viewer does. A full-size image left in an
+      // <img> that is merely hidden stays decoded in memory for as long as the
+      // app runs.
+      img.removeAttribute("src");
+      lightboxAttachment = null;
+      lightboxReturnCardId = null;
+    },
+  });
+
+  // Back returns to the card; the X and Escape do not. Same split as Card
+  // Stats and Card Color, and it is a real distinction rather than two names
+  // for one action: the X means you are done looking at this card.
+  document.getElementById("kbLightboxClose")!.addEventListener("click", () => {
+    _lightboxModal!.close();
+  });
+  document.getElementById("kbLightboxBack")!.addEventListener("click", () => {
+    const back = lightboxReturnCardId;
+    _lightboxModal!.close({ handoff: true });
+    if (back) openCard(back);
+  });
+  document.getElementById("kbLightboxOpenBtn")!.addEventListener("click", () => {
+    if (lightboxAttachment) openAttachment(lightboxAttachment.boardId, lightboxAttachment.file);
+  });
+
+  return _lightboxModal;
+}
+
+/** Which picture the viewer is showing, so its Open button knows what to hand
+ *  over. Held as the record rather than as a URL, because opening a file and
+ *  displaying it are two different routes to it. */
+let lightboxAttachment: { boardId: string; file: Attachment } | null = null;
+
+function openAttachmentLightbox(boardId: string, attachment: Attachment): void {
+  const modal = getLightboxModal();
+  const img = document.getElementById("kbLightboxImg") as HTMLImageElement;
+  img.src = attachmentUrl(boardId, attachment);
+  img.alt = attachment.name;
+  lightboxAttachment = { boardId, file: attachment };
+  document.getElementById("kbLightboxTitle")!.textContent = attachment.name;
+  lightboxReturnCardId = openCardId;
+  if (_cardModal?.isOpen) _cardModal.close({ handoff: true });
+  modal.open();
+}
+
+/* -----------------------------------------------------------------------------
+   THE TEXT EDITOR
+   -----------------------------------------------------------------------------
+   One control, built once and reused for the description and for every comment,
+   so formatting behaves identically wherever text is typed. It has two faces
+   and only one of them is in the layout at a time: the textarea you write in,
+   and the rendered result you read. Both being present at once would make the
+   block change height every time you switched.
+
+   Which face it opens on is derived from the text, never remembered: something
+   written opens rendered (that is the thing you came to read), and something
+   empty opens ready to type. Clicking the rendered text puts you in the
+   textarea at once, because the fastest way from noticing a wrong word to
+   fixing it should not be a trip to a button.
+----------------------------------------------------------------------------- */
+
+interface RichTextField {
+  root: HTMLElement;
+  area: HTMLTextAreaElement;
+  /** Puts `value` in the field and redraws whichever face is showing. */
+  setValue(value: string): void;
+  /** Chooses the face from the current text and shows it. */
+  showDefaultFace(): void;
+  setMode(mode: "edit" | "preview"): void;
+  focusEditor(): void;
+}
+
+interface RichTextFieldOptions {
+  placeholder: string;
+  emptyText: string;
+  rows: number;
+  maxLength: number;
+  /** Fires on every keystroke, already clamped to maxLength. */
+  onInput: (value: string) => void;
+  /** An extra button for the right-hand end of the strip (Attach, Post…). */
+  extras?: HTMLElement[];
+  /** When set, the field has no preview face and no view switch: it is a
+   *  composer, and what you are doing in it is writing. */
+  editOnly?: boolean;
+  /** Called with an image that arrived on the clipboard. Where it goes differs
+   *  by field (the card's own list, the comment being written, the comment
+   *  being edited), so the field only reports it. Absent means paste is left to
+   *  the browser, which for an image is nothing at all. */
+  onPasteImage?: (blob: Blob) => void;
+}
+
+/** The buttons, in strip order. Kept as data so the row cannot drift out of
+ *  step with what applyRichTextCommand understands. */
+const RICH_TEXT_TOOLS: ReadonlyArray<{
+  command: RichTextCommand;
+  label: string;
+  title: string;
+  className?: string;
+}> = [
+  { command: "bold", label: "B", title: "Bold  **text**", className: "rt-tool-bold" },
+  { command: "italic", label: "I", title: "Italic  *text*", className: "rt-tool-italic" },
+  { command: "strike", label: "S", title: "Strikethrough  ~~text~~", className: "rt-tool-strike" },
+  { command: "code", label: "<>", title: "Code  `text`", className: "rt-tool-code" },
+  { command: "heading", label: "H", title: "Heading  ## text" },
+  { command: "bullet", label: "•", title: "Bullet list  - text" },
+  { command: "numbered", label: "1.", title: "Numbered list  1. text" },
+  { command: "quote", label: "❝", title: "Quote  > text" },
+  { command: "link", label: "🔗", title: "Link  [text](https://…)" },
+];
+
+function createRichTextField(opts: RichTextFieldOptions): RichTextField {
+  const root = document.createElement("div");
+  root.className = "rt-editor";
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "rt-toolbar";
+  root.appendChild(toolbar);
+
+  const area = document.createElement("textarea");
+  area.className = "kb-card-desc";
+  area.rows = opts.rows;
+  area.spellcheck = true;
+  area.placeholder = opts.placeholder;
+  area.maxLength = opts.maxLength;
+
+  const preview = document.createElement("div");
+  preview.className = "rt-preview rt-body";
+  // One delegated listener for the life of this field, not one per render.
+  bindRichTextLinks(preview);
+
+  const drawPreview = (): void => {
+    const html = renderRichText(area.value);
+    if (html) {
+      preview.innerHTML = html;
+      preview.classList.remove("rt-preview-empty");
+    } else {
+      preview.textContent = opts.emptyText;
+      preview.classList.add("rt-preview-empty");
+    }
+  };
+
+  const formatButtons: HTMLButtonElement[] = [];
+  for (const tool of RICH_TEXT_TOOLS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `rt-tool-btn${tool.className ? ` ${tool.className}` : ""}`;
+    btn.title = tool.title;
+    btn.textContent = tool.label;
+    btn.addEventListener("click", () => {
+      applyRichTextCommand(area, tool.command);
+      // applyRichTextCommand makes a native edit and deliberately does not
+      // announce it; the field is what decides that an edit means "changed".
+      area.dispatchEvent(new Event("input"));
+    });
+    toolbar.appendChild(btn);
+    formatButtons.push(btn);
+  }
+
+  const gap = document.createElement("span");
+  gap.className = "rt-toolbar-gap";
+  toolbar.appendChild(gap);
+
+  let editBtn: HTMLButtonElement | null = null;
+  let previewBtn: HTMLButtonElement | null = null;
+
+  const setMode = (mode: "edit" | "preview"): void => {
+    if (opts.editOnly) return;
+    const editing = mode === "edit";
+    area.hidden = !editing;
+    preview.hidden = editing;
+    for (const btn of formatButtons) btn.hidden = !editing;
+    editBtn?.classList.toggle("rt-view-active", editing);
+    previewBtn?.classList.toggle("rt-view-active", !editing);
+    if (!editing) drawPreview();
+  };
+
+  if (!opts.editOnly) {
+    const makeView = (label: string, mode: "edit" | "preview"): HTMLButtonElement => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "rt-view-btn";
+      btn.textContent = label;
+      btn.addEventListener("click", () => {
+        setMode(mode);
+        if (mode === "edit") area.focus();
+      });
+      toolbar.appendChild(btn);
+      return btn;
+    };
+    editBtn = makeView("Write", "edit");
+    previewBtn = makeView("Preview", "preview");
+  }
+
+  for (const extra of opts.extras ?? []) toolbar.appendChild(extra);
+
+  area.addEventListener("input", () => {
+    if (area.value.length > opts.maxLength) area.value = area.value.slice(0, opts.maxLength);
+    opts.onInput(area.value);
+  });
+
+  /* A screenshot on the clipboard becomes an attachment. Ctrl+V into a card is
+     what people actually do with a screenshot of the thing they are describing,
+     and the alternative is saving it to disk first purely so it can be picked
+     back off it.
+
+     Only images are intercepted. A paste carrying text is left alone entirely,
+     including a paste that carries BOTH (copying from a document often does),
+     because the text is what was meant and swallowing it to grab a thumbnail
+     would be maddening. */
+  if (opts.onPasteImage) {
+    area.addEventListener("paste", (e) => {
+      const data = e.clipboardData;
+      if (!data) return;
+      if (data.types.includes("text/plain")) return;
+      const item = Array.from(data.items).find((i) => i.type.startsWith("image/"));
+      const blob = item?.getAsFile();
+      if (!blob) return;
+      e.preventDefault();
+      opts.onPasteImage!(blob);
+    });
+  }
+
+  root.appendChild(area);
+  if (!opts.editOnly) {
+    root.appendChild(preview);
+    preview.addEventListener("click", (e) => {
+      // A click on a link inside the text follows the link; a click on the text
+      // around it starts editing.
+      if ((e.target as HTMLElement).closest("[data-rt-href]")) return;
+      setMode("edit");
+      area.focus();
+    });
+  }
+
+  const showDefaultFace = (): void => {
+    setMode(area.value.trim() ? "preview" : "edit");
+  };
+
+  if (opts.editOnly) {
+    area.hidden = false;
+    preview.hidden = true;
+    for (const btn of formatButtons) btn.hidden = false;
+  }
+
+  return {
+    root,
+    area,
+    setValue(value: string) {
+      area.value = value;
+      drawPreview();
+    },
+    showDefaultFace,
+    setMode,
+    focusEditor() {
+      setMode("edit");
+      area.focus();
+    },
+  };
+}
+
+/* -----------------------------------------------------------------------------
+   THE CARD'S DESCRIPTION
+----------------------------------------------------------------------------- */
+
+let descField: RichTextField | null = null;
+/** The card the description field is currently showing. Which face it opens on
+ *  is decided once, when the card changes; renderCardModal() also runs when the
+ *  column or board select is used, and resetting the face there would drop
+ *  someone out of the text they were in the middle of typing. */
+let descFieldCardId: string | null = null;
+
+function getDescField(): RichTextField {
+  if (descField) return descField;
+  descField = createRichTextField({
+    rows: 6,
+    maxLength: MAX_DESC_LEN,
+    placeholder:
+      "What this card actually is. Anything you would otherwise have to reconstruct later.",
+    emptyText: "No description yet. Click here to write one.",
+    onInput: (value) => {
+      const card = getCard(openCardId);
+      if (!card) return;
+      card.description = value;
+      stampCard(card);
+    },
+    onPasteImage: (blob) => {
+      void (async () => {
+        const card = getCard(openCardId);
+        if (!card) return;
+        const added = await attachPastedImage(card.boardId, blob, card.attachments.length);
+        if (!added) return;
+        // Re-read: storing it was a round trip, and the card can have changed
+        // underneath in the meantime.
+        const still = getCard(card.id);
+        if (!still) {
+          forgetAttachmentFiles(card.boardId, [added]);
+          return;
+        }
+        still.attachments.push(added);
+        stampCard(still);
+        if (openCardId === still.id) renderCardAttachments(still);
+        flash("Pasted image attached to this card.");
+      })();
+    },
+  });
+  document.getElementById("kbCardDescHost")!.appendChild(descField.root);
+  return descField;
+}
+
+function renderCardDescription(card: Card): void {
+  const field = getDescField();
+  if (descFieldCardId === card.id) {
+    // Same card, redrawn for some other reason. The text in the box is already
+    // this card's, and it may be mid-edit.
+    return;
+  }
+  descFieldCardId = card.id;
+  field.setValue(card.description);
+  field.showDefaultFace();
+}
+
+/* -----------------------------------------------------------------------------
+   THE CARD'S OWN ATTACHMENTS
+----------------------------------------------------------------------------- */
+
+function renderCardAttachments(card: Card): void {
+  const host = document.getElementById("kbCardAttachList")!;
+  renderAttachmentList(host, card.attachments, {
+    boardId: card.boardId,
+    onRemove: (attachment) => {
+      card.attachments = card.attachments.filter((a) => a.id !== attachment.id);
+      forgetAttachmentFiles(card.boardId, [attachment]);
+      stampCard(card);
+      renderCardAttachments(card);
+    },
+  });
+  const note = document.getElementById("kbCardAttachNote")!;
+  note.textContent =
+    card.attachments.length === 0
+      ? "None yet."
+      : `${card.attachments.length} of ${MAX_ATTACHMENTS}`;
+}
+
+/* -----------------------------------------------------------------------------
+   COMMENTS
+   -----------------------------------------------------------------------------
+   Appended rather than edited in place, which is what makes them a record of
+   what happened rather than a second description. Oldest first, because they
+   are read as a sequence.
+
+   The composer at the foot is always in writing mode: what you are doing in it
+   is writing. An existing comment is the other way round, and turns into an
+   editor only when you say so.
+----------------------------------------------------------------------------- */
+
+let commentField: RichTextField | null = null;
+/** Files staged on the composer, before the comment they belong to exists. */
+let pendingCommentAttachments: Attachment[] = [];
+/** Which board's folder those staged files were written into. Held separately
+ *  from the card id because discarding them has to work after the card itself
+ *  has gone: deleting the card that was being commented on is exactly when the
+ *  staged files most need clearing up. */
+let pendingCommentBoardId: string | null = null;
+/** Which card the composer's contents belong to.
+ *
+ *  Declared rather than remembered, because the composer survives the card modal
+ *  stepping aside. Opening a picture full size, or answering a confirm, closes
+ *  the card modal and reopens it, and a half-written comment must not be thrown
+ *  away by that; it must also not reappear under the next card. Naming the card
+ *  answers both without either path having to know about the other. */
+let pendingCommentCardId: string | null = null;
+/** The comment currently open in an inline editor, if any. */
+let editingCommentId: string | null = null;
+
+function getCommentField(): RichTextField {
+  if (commentField) return commentField;
+
+  const attachBtn = document.createElement("button");
+  attachBtn.type = "button";
+  attachBtn.className = "rt-tool-btn";
+  attachBtn.title = "Attach a file to this comment";
+  attachBtn.textContent = "📎";
+  attachBtn.addEventListener("click", () => {
+    void (async () => {
+      const card = getCard(openCardId);
+      if (!card) return;
+      const added = await pickAttachments(card.boardId, pendingCommentAttachments.length);
+      if (added.length === 0) return;
+      pendingCommentAttachments.push(...added);
+      pendingCommentCardId = card.id;
+      pendingCommentBoardId = card.boardId;
+      renderPendingCommentAttachments();
+    })();
+  });
+
+  const postBtn = document.createElement("button");
+  postBtn.type = "button";
+  postBtn.className = "rt-view-btn rt-view-active";
+  postBtn.textContent = "Post";
+  postBtn.title = "Add this comment (Ctrl+Enter)";
+  postBtn.addEventListener("click", () => postComment());
+
+  commentField = createRichTextField({
+    rows: 3,
+    maxLength: MAX_COMMENT_LEN,
+    editOnly: true,
+    placeholder: "What happened, what you tried, what it needs next.",
+    emptyText: "",
+    extras: [attachBtn, postBtn],
+    onInput: () => {},
+    onPasteImage: (blob) => {
+      void (async () => {
+        const card = getCard(openCardId);
+        if (!card) return;
+        const added = await attachPastedImage(
+          card.boardId,
+          blob,
+          pendingCommentAttachments.length,
+        );
+        if (!added) return;
+        pendingCommentAttachments.push(added);
+        pendingCommentCardId = card.id;
+        pendingCommentBoardId = card.boardId;
+        renderPendingCommentAttachments();
+      })();
+    },
+  });
+  commentField.area.addEventListener("input", () => {
+    pendingCommentCardId = openCardId;
+  });
+  commentField.area.addEventListener("keydown", (e) => {
+    // Ctrl+Enter posts. Plain Enter is a new line: a comment is prose, and the
+    // most common thing after a line is another line.
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      postComment();
+    }
+  });
+  document.getElementById("kbCardCommentHost")!.appendChild(commentField.root);
+  return commentField;
+}
+
+function renderPendingCommentAttachments(): void {
+  const host = document.getElementById("kbCardCommentPending")!;
+  const boardId = pendingCommentBoardId ?? getCard(openCardId)?.boardId ?? "";
+  renderAttachmentList(host, pendingCommentAttachments, {
+    boardId,
+    onRemove: (attachment) => {
+      pendingCommentAttachments = pendingCommentAttachments.filter((a) => a.id !== attachment.id);
+      forgetAttachmentFiles(boardId, [attachment]);
+      renderPendingCommentAttachments();
+    },
+  });
+}
+
+/** Throws away anything staged on the composer without posting it, files
+ *  included. Called when the card modal closes: a half-written comment on card
+ *  A must not appear under card B. */
+function discardPendingComment(): void {
+  if (pendingCommentAttachments.length > 0 && pendingCommentBoardId) {
+    forgetAttachmentFiles(pendingCommentBoardId, pendingCommentAttachments);
+  }
+  pendingCommentAttachments = [];
+  pendingCommentBoardId = null;
+  pendingCommentCardId = null;
+  editingCommentId = null;
+  if (commentField) commentField.setValue("");
+  const pending = document.getElementById("kbCardCommentPending");
+  if (pending) clearMediaHost(pending);
+}
+
+function postComment(): void {
+  const card = getCard(openCardId);
+  if (!card) return;
+  const field = getCommentField();
+  const body = field.area.value.trim();
+  if (!body && pendingCommentAttachments.length === 0) {
+    flash("Write something or attach a file first.", "error");
+    return;
+  }
+  if (card.comments.length >= MAX_COMMENTS_PER_CARD) {
+    flash(`This card is at its limit of ${MAX_COMMENTS_PER_CARD} comments.`, "error", 6000);
+    return;
+  }
+  const now = Date.now();
+  card.comments.push({
+    id: newId(),
+    body: body.slice(0, MAX_COMMENT_LEN),
+    // Taken, not copied: these records already point at files that were
+    // imported for this comment, and clearing the staging list is what stops
+    // the discard path unlinking them.
+    attachments: pendingCommentAttachments,
+    createdAt: now,
+    updatedAt: now,
+  });
+  pendingCommentAttachments = [];
+  pendingCommentCardId = null;
+  pendingCommentBoardId = null;
+  field.setValue("");
+  renderPendingCommentAttachments();
+  stampCard(card);
+  renderCardComments(card);
+}
+
+/** When a comment was added, in the same words and the same date order the
+ *  rest of the tool uses.
+ *
+ *  Local time throughout. toISOString() would have been shorter and would have
+ *  put a comment written at 11pm on the following day, which is exactly the
+ *  kind of off-by-one nobody notices until they are reading back a week. */
+function commentStamp(comment: CardComment): string {
+  const when = new Date(comment.createdAt);
+  const day = when.toLocaleDateString("en-CA");
+  const time = when.toTimeString().slice(0, 5);
+  const stamp = `${formatDate(day)} ${time}`;
+  return comment.updatedAt > comment.createdAt ? `${stamp} · edited` : stamp;
+}
+
+function renderCardComments(card: Card): void {
+  const list = document.getElementById("kbCardCommentList")!;
+  clearMediaHost(list);
+
+  for (const comment of card.comments) {
+    const row = document.createElement("div");
+    row.className = "kb-comment";
+
+    const head = document.createElement("div");
+    head.className = "kb-comment-head";
+    const stamp = document.createElement("span");
+    stamp.className = "kb-comment-stamp";
+    stamp.textContent = commentStamp(comment);
+    head.appendChild(stamp);
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "kb-comment-action";
+    editBtn.textContent = editingCommentId === comment.id ? "Done" : "Edit";
+    editBtn.addEventListener("click", () => {
+      editingCommentId = editingCommentId === comment.id ? null : comment.id;
+      renderCardComments(card);
+    });
+    head.appendChild(editBtn);
+
+    const attachBtn = document.createElement("button");
+    attachBtn.type = "button";
+    attachBtn.className = "kb-comment-action";
+    attachBtn.textContent = "Attach";
+    attachBtn.addEventListener("click", () => {
+      void (async () => {
+        const added = await pickAttachments(card.boardId, comment.attachments.length);
+        if (added.length === 0) return;
+        comment.attachments.push(...added);
+        comment.updatedAt = Date.now();
+        stampCard(card);
+        renderCardComments(card);
+      })();
+    });
+    head.appendChild(attachBtn);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "kb-comment-action kb-comment-danger";
+    removeBtn.textContent = "Delete";
+    removeBtn.addEventListener("click", () => requestDeleteComment(card, comment));
+    head.appendChild(removeBtn);
+
+    row.appendChild(head);
+
+    if (editingCommentId === comment.id) {
+      // Built fresh for this one comment and thrown away when editing ends. A
+      // pool of reusable editors would have to be told which comment each one
+      // is currently pointing at, which is the state this tool keeps getting
+      // bitten by.
+      const field = createRichTextField({
+        rows: 4,
+        maxLength: MAX_COMMENT_LEN,
+        editOnly: true,
+        placeholder: "Edit this comment.",
+        emptyText: "",
+        onInput: (value) => {
+          comment.body = value;
+          comment.updatedAt = Date.now();
+          stampCard(card);
+        },
+        onPasteImage: (blob) => {
+          void (async () => {
+            const added = await attachPastedImage(
+              card.boardId,
+              blob,
+              comment.attachments.length,
+            );
+            if (!added) return;
+            comment.attachments.push(added);
+            comment.updatedAt = Date.now();
+            stampCard(card);
+            renderCardComments(card);
+          })();
+        },
+      });
+      field.setValue(comment.body);
+      row.appendChild(field.root);
+      // Focused after it is in the document, or the caret goes nowhere.
+      requestAnimationFrame(() => field.focusEditor());
+    } else {
+      const body = document.createElement("div");
+      body.className = "rt-body kb-comment-body";
+      const html = renderRichText(comment.body);
+      if (html) {
+        body.innerHTML = html;
+        bindRichTextLinks(body);
+      } else {
+        body.classList.add("rt-preview-empty");
+        body.textContent = "No text, files only.";
+      }
+      row.appendChild(body);
+    }
+
+    const files = document.createElement("div");
+    files.className = "rt-attach-list";
+    renderAttachmentList(files, comment.attachments, {
+      boardId: card.boardId,
+      onRemove: (attachment) => {
+        comment.attachments = comment.attachments.filter((a) => a.id !== attachment.id);
+        comment.updatedAt = Date.now();
+        forgetAttachmentFiles(card.boardId, [attachment]);
+        stampCard(card);
+        renderCardComments(card);
+      },
+    });
+    row.appendChild(files);
+
+    list.appendChild(row);
+  }
+
+  const summary = document.getElementById("kbCardCommentSummary")!;
+  summary.textContent =
+    card.comments.length === 0 ? "None yet." : `${card.comments.length} comment(s)`;
+}
+
+/** Deleting a comment takes its files with it, and asks first on a board that
+ *  asks about deletes. Same preference, same confirm modal, same reopen rule as
+ *  deleting a card. */
+function requestDeleteComment(card: Card, comment: CardComment): void {
+  const remove = (): void => {
+    forgetAttachmentFiles(card.boardId, comment.attachments);
+    card.comments = card.comments.filter((c) => c.id !== comment.id);
+    if (editingCommentId === comment.id) editingCommentId = null;
+    stampCard(card);
+    renderCardComments(card);
+  };
+  if (!effectiveForCard(card).confirmDelete) {
+    remove();
+    return;
+  }
+  kbConfirm(
+    {
+      title: "Delete this comment?",
+      message:
+        comment.attachments.length > 0
+          ? `The comment and its ${comment.attachments.length} attached file(s) go for good.`
+          : "The comment goes for good.",
+      confirmLabel: "Delete",
+      reopen: () => openCard(card.id),
+    },
+    () => {
+      remove();
+      openCard(card.id);
+    },
+  );
 }
 
 /* -----------------------------------------------------------------------------
@@ -4627,9 +5994,6 @@ function getNewBoardModal(): Modal {
       overrides: {},
       createdAt: now,
       updatedAt: now,
-      // Open by definition: it has no contents to be locked out of, and
-      // encrypting it is a later, deliberate act.
-      locked: false,
     };
     boards.push(board);
     markBoard(board.id);
@@ -4780,22 +6144,6 @@ function getBoardSetupModal(): Modal {
   blurRange.addEventListener("input", onSlide);
   brightRange.addEventListener("input", onSlide);
 
-  const encryptToggle = document.getElementById("kbBoardEncryptToggle") as HTMLInputElement;
-  encryptToggle.addEventListener("change", () => {
-    const board = getBoard(boardEditId);
-    if (!board) return;
-    // The switch is put back to what the FILES say straight away, and only
-    // moves for real once the backend confirms. A toggle that showed
-    // "encrypted" because it had been clicked would be the worst possible lie
-    // this tool could tell.
-    const wanted = encryptToggle.checked;
-    encryptToggle.checked = encryptedBoardIds.has(board.id);
-    void (wanted ? encryptBoard(board) : decryptBoardToPlain(board)).then(() => {
-      renderBoardSetupBoardTab();
-      renderSecurityTab();
-    });
-  });
-
   document.getElementById("kbBoardCopyDefaultTagsBtn")!.addEventListener(
     "click",
     withBoard((board) => copyDefaultTagsToBoard(board)),
@@ -4861,10 +6209,6 @@ function renderBoardSetupBoardTab(): void {
     board.background?.brightness ?? 100,
   );
   renderBoardBgPreview();
-
-  const on = encryptedBoardIds.has(board.id);
-  (document.getElementById("kbBoardEncryptToggle") as HTMLInputElement).checked = on;
-  document.getElementById("kbBoardEncryptLabel")!.textContent = on ? "Yes" : "No";
 }
 
 function renderBoardBgPreview(): void {
@@ -5393,17 +6737,32 @@ function renderPriorityColors(): void {
 }
 
 function deleteBoard(board: Board): void {
+  // Every file this board owns, in one call, WITHOUT needing its cards. That is
+  // the whole reason attachments are grouped into a folder per board: deleting
+  // a board you cannot open still takes its files with it, which the first cut
+  // of this could not do and quietly orphaned them instead.
+  void invoke("delete_kanban_board_attachments", { boardId: board.id }).catch((e) =>
+    devError("[kanban] board attachment delete failed", e),
+  );
+  // The missing-file notes for this board go with it. Nothing will ever ask
+  // about them again, and the set is the one thing here that outlives the board.
+  for (const key of [...missingAttachments]) {
+    if (key.startsWith(`${board.id}/`)) missingAttachments.delete(key);
+  }
   cards = cards.filter((c) => c.boardId !== board.id);
   boards = boards.filter((b) => b.id !== board.id);
   if (board.background) {
     void invoke("delete_kanban_image", { path: board.background.path }).catch(() => {});
   }
-  // The board's own file has to go too, or a board deleted from the list leaves
-  // its cards on disk forever, still readable and no longer reachable.
-  void invoke("delete_kanban_board", { boardId: board.id }).catch((e) =>
-    devError("[kanban] board file delete failed", e),
-  );
+  /* Queued with the rest of this edit rather than deleted here and now. The
+     delete snapshots the board on its way out, and the index write that stops
+     naming it has to land in the same flush, or a crash between the two leaves
+     a board listed with no file behind it.
+
+     Dropped from the dirty set first: writing a board that is about to be
+     deleted would recreate the file the delete just removed. */
   dirtyBoards.delete(board.id);
+  deletedBoards.add(board.id);
   markIndex();
   if (currentBoardId === board.id) showKbView("boards");
   else renderAll();
@@ -5433,7 +6792,6 @@ function duplicateBoardAsTemplate(board: Board): void {
     overrides: { ...board.overrides },
     createdAt: now,
     updatedAt: now,
-    locked: false,
   };
   boards.push(copy);
   markBoard(copy.id);
@@ -5606,7 +6964,7 @@ function saveColumnEditor(): void {
    SETUP MODAL
 ============================================================================= */
 
-type KbSetupTab = "boards" | "tags" | "preferences" | "security" | "data";
+type KbSetupTab = "boards" | "tags" | "preferences" | "data";
 
 let _setupTabs: ModalTabs<KbSetupTab> | null = null;
 
@@ -5619,7 +6977,6 @@ function getSetupTabs(): ModalTabs<KbSetupTab> {
         boards: "kbTabBoards",
         tags: "kbTabTags",
         preferences: "kbTabPreferences",
-        security: "kbTabSecurity",
         data: "kbTabData",
       },
       onActivate: (tab) => {
@@ -5631,7 +6988,6 @@ function getSetupTabs(): ModalTabs<KbSetupTab> {
           tagEditBoardId = null;
           renderTagCategoriesList();
         }
-        if (tab === "security") renderSecurityTab();
         // The snapshot list is a disk read, so it is fetched when its tab is
         // actually looked at rather than on every open of the modal.
         if (tab === "data") void refreshDataTab();
@@ -5653,7 +7009,6 @@ function getSetupModal(): Modal {
       tagEditScope = "global";
       tagEditBoardId = null;
       renderTagCategoriesList();
-      renderSecurityTab();
     },
     onClosed: () => renderAll(),
   });
@@ -5685,28 +7040,7 @@ function getSetupModal(): Modal {
 
   bindPreferenceControls();
 
-  const lockOnOpen = document.getElementById("kbLockOnOpenToggle") as HTMLInputElement;
-  lockOnOpen.addEventListener("change", () => {
-    if (lockOnOpen.checked && encryptedBoardIds.size === 0) {
-      // Nothing to ask for. Refused rather than stored, so the preference can
-      // never be on in a state where it silently does nothing.
-      lockOnOpen.checked = false;
-      flash("Encrypt at least one board first: the gate asks for that password.", "error", 8000);
-      return;
-    }
-    kbSettings.lockOnOpen = lockOnOpen.checked;
-    document.getElementById("kbLockOnOpenLabel")!.textContent = lockOnOpen.checked ? "On" : "Off";
-    markSettings();
-  });
 
-  document.getElementById("kbLockNowBtn")!.addEventListener("click", () => {
-    void lockNow().then(() => {
-      renderSecurityTab();
-      flash("Locked. Encrypted boards are out of memory again.");
-    });
-  });
-
-  document.getElementById("kbExportBtn")!.addEventListener("click", () => void exportAll());
   document
     .getElementById("kbBackupRefreshBtn")!
     .addEventListener("click", () => void refreshDataTab());
@@ -5719,67 +7053,6 @@ function openSetupOnTab(tab?: KbSetupTab): void {
   getSetupModal().open();
 }
 
-/** The Security tab: what the password situation is, and which boards use it.
- *  The per-board switch itself lives in each board's own settings, so this list
- *  is a read-out plus a shortcut rather than a second place to change things
- *  from. */
-function renderSecurityTab(): void {
-  const status = document.getElementById("kbSecurityStatus")!;
-  const lockBtn = document.getElementById("kbLockNowBtn") as HTMLButtonElement;
-  const lockOnOpen = document.getElementById("kbLockOnOpenToggle") as HTMLInputElement;
-  const lockLabel = document.getElementById("kbLockOnOpenLabel")!;
-
-  const count = encryptedBoardIds.size;
-  status.textContent =
-    count === 0
-      ? "Not set"
-      : `Set · ${count} board${count === 1 ? "" : "s"} encrypted · ${sessionPassword ? "unlocked" : "locked"}`;
-
-  lockBtn.disabled = count === 0 || sessionPassword === null;
-  lockOnOpen.checked = kbSettings.lockOnOpen && count > 0;
-  lockLabel.textContent = lockOnOpen.checked ? "On" : "Off";
-
-  const list = document.getElementById("kbSecurityBoardsList")!;
-  list.replaceChildren();
-  if (boards.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "placeholder-text";
-    empty.textContent = "No boards yet.";
-    list.appendChild(empty);
-    return;
-  }
-
-  for (const board of boards) {
-    const row = document.createElement("div");
-    row.className = "setup-item";
-
-    const name = document.createElement("span");
-    name.className = "setup-item-name";
-    name.textContent = board.name;
-    row.appendChild(name);
-
-    const state = document.createElement("span");
-    state.className = "setup-item-count";
-    state.textContent = encryptedBoardIds.has(board.id)
-      ? board.locked
-        ? "Encrypted · locked"
-        : "Encrypted · open"
-      : "Not encrypted";
-    row.appendChild(state);
-
-    const open = document.createElement("button");
-    open.type = "button";
-    open.className = "settings-action-btn";
-    open.textContent = "Settings";
-    open.addEventListener("click", () => {
-      _setupModal!.close({ handoff: true });
-      openBoardSetup(board, "board");
-    });
-    row.appendChild(open);
-
-    list.appendChild(row);
-  }
-}
 
 /* -----------------------------------------------------------------------------
    TAGS
@@ -5818,7 +7091,7 @@ function scopedTagList(): Tag[] {
 
 /** Writes the vocabulary that was just edited to the file it lives in. The
  *  defaults are in the index; a board's are in that board's own file, which is
- *  what makes an encrypted board's tag names encrypted too. */
+ *  what keeps one board's vocabulary out of every other board's file. */
 function commitTagScope(): void {
   const board = tagScopeBoard();
   if (board) markBoard(board.id);
@@ -6574,84 +7847,26 @@ function applySettingsToForm(): void {
    SNAPSHOTS
    -----------------------------------------------------------------------------
    One bucket per hour, shared with every other tool that snapshots, holding one
-   .bak per file that was about to be overwritten. Since the split, that means a
-   bucket holds the boards you actually touched in that hour and the index, and
-   not the boards you did not.
+   .bak per file that was about to be overwritten. Every write inside an hour
+   refreshes that hour's bucket, so what a bucket holds is the LAST state before
+   the gap, not the first. Thirty are kept.
+
+   Because the files are split, a bucket holds the boards you actually touched
+   in that hour and the index, and not the boards you did not.
 
    Restoring is per file. Restoring one board puts that board's cards back
-   without touching any other board, which is the thing the old single-blob
-   layout could not do at all.
+   without touching any other board.
 ----------------------------------------------------------------------------- */
 
 interface KanbanBackupFileInfo {
   file: string;
   bytes: number;
   boardId: string | null;
-  encrypted: boolean;
 }
 
 interface KanbanBackupInfo {
   name: string;
   files: KanbanBackupFileInfo[];
-}
-
-/** The export is the one place the old self-contained shape is still written:
- *  a file you take out of the app has to stand on its own, not reference five
- *  other files it did not come with.
- *
- *  Locked boards are listed by name and left empty, and the export says so
- *  rather than quietly omitting them. An export that silently dropped half your
- *  boards would be worse than one that refused. */
-async function exportAll(): Promise<void> {
-  const lockedNames = boards.filter((b) => b.locked).map((b) => b.name);
-
-  const store: KanbanStore & { lockedBoards?: string[] } = {
-    version: STORE_VERSION,
-    boards: boards.filter((b) => !b.locked),
-    cards,
-    tagCategories: globalTagCategories,
-    tags: globalTags,
-    settings: kbSettings,
-  };
-  if (lockedNames.length > 0) store.lockedBoards = lockedNames;
-
-  try {
-    const path = await invoke<string>("export_kanban_data", {
-      filename: `kanban-${today()}.json`,
-      // Indented: an export is for reading and diffing outside this app, which
-      // one long line is useless for.
-      data: JSON.stringify(store, null, 2),
-    });
-    if (lockedNames.length > 0) {
-      flash(
-        `Exported to ${shortPath(path)}. ${lockedNames.length} locked board(s) were left out: unlock them and export again to include them.`,
-        "success",
-        10000,
-      );
-    } else {
-      flash(`Exported to ${shortPath(path)}`, "success", 8000);
-    }
-  } catch (err) {
-    flash(`Export failed: ${String(err)}`, "error", 8000);
-  }
-}
-
-/** Turns a snapshot folder name (UTC, "%Y-%m-%d_%H-%M-%S") into a local date
- *  and time. Shown local because "when was I working" is a local question, and
- *  a UTC stamp on a list of your own edits is a puzzle. */
-export function formatBackupName(name: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/.exec(name);
-  if (!m) return name;
-  const date = new Date(
-    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6])),
-  );
-  return Number.isNaN(date.getTime()) ? name : date.toLocaleString();
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 /** What one captured file is, in words. The board name is looked up rather than
@@ -6660,17 +7875,10 @@ function formatBytes(bytes: number): string {
 function describeBackupFile(entry: KanbanBackupFileInfo): string {
   if (!entry.boardId) return "Board list and tags";
   const board = getBoard(entry.boardId);
-  const name = board ? board.name : "a deleted board";
-  return entry.encrypted ? `${name} (encrypted)` : name;
+  return board ? board.name : "a deleted board";
 }
 
 async function refreshDataTab(): Promise<void> {
-  const live = cards.filter((c) => !c.archived).length;
-  const locked = boards.filter((b) => b.locked).length;
-  document.getElementById("kbExportSummary")!.textContent =
-    `${boards.length} boards · ${live} cards · ${globalTags.length} default tags` +
-    (locked > 0 ? ` · ${locked} locked` : "");
-
   const list = document.getElementById("kbBackupList")!;
   const summary = document.getElementById("kbBackupSummary")!;
   list.replaceChildren();
@@ -6693,19 +7901,20 @@ async function refreshDataTab(): Promise<void> {
     const empty = document.createElement("p");
     empty.className = "placeholder-text";
     empty.textContent =
-      "No snapshots yet. The first one is taken the next time you change something, capturing the state from before that change.";
+      "No snapshots yet. The first one is taken the next time you change something, " +
+      "capturing the state from before that change.";
     list.appendChild(empty);
     return;
   }
 
   items.forEach((item, index) => {
     const group = document.createElement("div");
-    group.className = "kb-backup-group";
+    group.className = "tool-backup-group";
 
     const head = document.createElement("div");
-    head.className = "kb-backup-head";
+    head.className = "tool-backup-head";
     const when = document.createElement("span");
-    when.className = "kb-backup-when";
+    when.className = "tool-backup-when";
     when.textContent = formatBackupName(item.name);
     head.appendChild(when);
     if (index === 0) {
@@ -6718,7 +7927,7 @@ async function refreshDataTab(): Promise<void> {
 
     for (const entry of item.files) {
       const row = document.createElement("div");
-      row.className = "setup-item kb-backup-row";
+      row.className = "setup-item tool-backup-row";
 
       const what = document.createElement("span");
       what.className = "setup-item-name";
@@ -6726,7 +7935,7 @@ async function refreshDataTab(): Promise<void> {
       row.appendChild(what);
 
       const size = document.createElement("span");
-      size.className = "setup-item-count";
+      size.className = "tool-backup-size";
       size.textContent = formatBytes(entry.bytes);
       row.appendChild(size);
 
@@ -6743,7 +7952,8 @@ async function refreshDataTab(): Promise<void> {
             title: "Restore this snapshot?",
             message:
               `This replaces ${scope} with the state from ${formatBackupName(item.name)}. ` +
-              "What is there now is snapshotted on the way past, so restoring the newest entry afterwards undoes this.",
+              "What is there now is snapshotted on the way past, so restoring the newest " +
+              "entry afterwards undoes this.",
             confirmLabel: "Restore",
             reopen: () => openSetupOnTab("data"),
           },
@@ -6773,12 +7983,8 @@ async function restoreBackup(name: string, entry: KanbanBackupFileInfo): Promise
     await flushSave();
 
     const raw = await invoke<string>("read_kanban_backup", { name, file: entry.file });
-
-    if (!entry.boardId) {
-      await restoreIndexSnapshot(raw);
-    } else {
-      await restoreBoardSnapshot(entry, raw);
-    }
+    if (!entry.boardId) await restoreIndexSnapshot(raw);
+    else await restoreBoardSnapshot(entry.boardId, raw);
 
     applySettingsToForm();
     renderTagCategoriesList();
@@ -6800,23 +8006,19 @@ async function restoreIndexSnapshot(raw: string): Promise<void> {
   if (!Array.isArray(parsed.boards)) {
     throw new Error("that snapshot is not a board list");
   }
-  const restored = parsed.boards
-    .map(normalizeBoardMeta)
-    .filter((b): b is Board => b !== null);
+  const restored = parsed.boards.map(normalizeBoardMeta).filter((b): b is Board => b !== null);
 
   // Contents already in memory are carried across onto the restored metadata,
-  // so restoring the list does not silently lock every board you had open.
+  // so restoring the list does not empty every board you had open.
   const current = new Map(boards.map((b) => [b.id, b]));
   for (const board of restored) {
     const live = current.get(board.id);
-    if (live && !live.locked) {
-      board.columns = live.columns;
-      board.nextCardNumber = live.nextCardNumber;
-      board.tagCategories = live.tagCategories;
-      board.tags = live.tags;
-      board.overrides = live.overrides;
-      board.locked = false;
-    }
+    if (!live) continue;
+    board.columns = live.columns;
+    board.nextCardNumber = live.nextCardNumber;
+    board.tagCategories = live.tagCategories;
+    board.tags = live.tags;
+    board.overrides = live.overrides;
   }
   boards = restored;
   globalTagCategories = Array.isArray(parsed.tagCategories)
@@ -6831,56 +8033,34 @@ async function restoreIndexSnapshot(raw: string): Promise<void> {
   const known = new Set(boards.map((b) => b.id));
   cards = cards.filter((c) => known.has(c.boardId));
 
-  // Boards named by the snapshot that were not loaded stay locked until asked
-  // for, exactly as they would after a normal launch.
+  // A board the snapshot names that was NOT in memory has just come back, so
+  // its file is read the same way a launch reads it.
   for (const board of boards) {
-    if (board.locked && !encryptedBoardIds.has(board.id)) {
-      await loadBoardContents(board).catch(() => undefined);
-    }
+    if (!current.has(board.id)) await loadBoardContents(board).catch(() => undefined);
   }
 
   reconcile();
   if (currentBoardId && !getBoard(currentBoardId)) showKbView("boards");
   dirtyIndex = true;
-  await saveNow();
+  await flushSave();
+  await reviveAttachmentsFor(boards.map((b) => b.id));
 }
 
 /** Restoring a board replaces that board's columns and cards and nothing else.
  *  Its index entry (name, description, background) is left alone, because those
  *  are not what you are recovering when you reach for a snapshot. */
-async function restoreBoardSnapshot(
-  entry: KanbanBackupFileInfo,
-  raw: string,
-): Promise<void> {
-  const boardId = entry.boardId!;
+async function restoreBoardSnapshot(boardId: string, raw: string): Promise<void> {
   const board = getBoard(boardId);
-  if (!board) {
-    throw new Error("that board is no longer in the board list");
-  }
+  if (!board) throw new Error("that board is no longer in the board list");
 
-  let payload = raw;
-  if (entry.encrypted) {
-    const password = sessionPassword ?? (await promptForPassword({
-      title: "Unlock the Snapshot",
-      message: `That snapshot of "${board.name}" is encrypted. Enter the Kanban password to read it.`,
-      reopen: () => openSetupOnTab("data"),
-    }));
-    if (!password) throw new Error("cancelled");
-    // Decrypted from the snapshot's own envelope rather than from the live
-    // file, which is the only reason kanban_decrypt_envelope exists.
-    payload = await invoke<string>("kanban_decrypt_envelope", {
-      envelope: raw,
-      password,
-    });
-    sessionPassword = password;
-  }
-
-  const parsed = JSON.parse(payload) as Partial<BoardContents> | null;
+  const parsed = JSON.parse(raw) as Partial<BoardContents> | null;
   const contents = normalizeContents(parsed ?? {});
 
   board.columns = contents.columns;
   board.nextCardNumber = contents.nextCardNumber;
-  board.locked = false;
+  board.tagCategories = contents.tagCategories;
+  board.tags = contents.tags;
+  board.overrides = contents.overrides;
   cards = cards.filter((c) => c.boardId !== boardId);
   for (const card of contents.cards) card.boardId = boardId;
   cards.push(...contents.cards);
@@ -6888,291 +8068,33 @@ async function restoreBoardSnapshot(
   reconcile();
   markBoard(boardId);
   await flushSave();
+  await reviveAttachmentsFor([boardId]);
 }
 
-/* =============================================================================
-   ENCRYPTION: THE PASSWORD PROMPT, THE GATE, AND PER-BOARD OPT-IN
-   -----------------------------------------------------------------------------
-   The model in one line: ONE Kanban password, each board opts in individually,
-   and "lock the tool" asks for that same password before letting you in rather
-   than encrypting anything a second time.
-
-   That is what makes the obvious worry go away. Three encrypted boards plus a
-   locked tool is not four layers of encryption and does not require decrypting
-   anything first: the boards stay exactly as they are, and the lock is a door
-   in front of them.
-============================================================================= */
-
-interface PasswordRequest {
-  title: string;
-  message: string;
-  /** Ask twice and require a match. For establishing a password, where a typo
-   *  you cannot see would encrypt a board you can never open again. */
-  confirm?: boolean;
-  okLabel?: string;
-  /** How to get back to whatever this replaced, once it is done. Same contract
-   *  and same reason as kbConfirm's: nothing here stacks. */
-  reopen?: () => void;
-}
-
-let passwordResolve: ((value: string | null) => void) | null = null;
-
-function getPasswordModal(): Modal {
-  if (_passwordModal) return _passwordModal;
-
-  const input = document.getElementById("kbPasswordInput") as HTMLInputElement;
-  const confirmInput = document.getElementById("kbPasswordConfirmInput") as HTMLInputElement;
-
-  _passwordModal = new Modal(document.getElementById("kbPasswordBackdrop")!, {
-    closeOnEsc: true,
-    onOpen: () => setTimeout(() => input.focus(), 50),
-    onClosed: () => {
-      // Cleared on the way out, always. A password left sitting in a DOM node
-      // is a password on screen the next time the modal opens.
-      input.value = "";
-      confirmInput.value = "";
-      document.getElementById("kbPasswordError")!.textContent = "";
-      // Resolves null if the modal was dismissed rather than submitted, so a
-      // caller awaiting it is never left hanging.
-      passwordResolve?.(null);
-      passwordResolve = null;
-    },
-  });
-
-  const submit = (): void => {
-    const value = input.value;
-    const errorEl = document.getElementById("kbPasswordError")!;
-    if (!value) {
-      errorEl.textContent = "Enter a password.";
-      return;
-    }
-    const confirmRow = document.getElementById("kbPasswordConfirmRow") as HTMLElement;
-    if (confirmRow.style.display !== "none" && value !== confirmInput.value) {
-      errorEl.textContent = "The two entries do not match.";
-      return;
-    }
-    const resolve = passwordResolve;
-    passwordResolve = null;
-    _passwordModal!.close();
-    resolve?.(value);
-  };
-
-  document.getElementById("kbPasswordOkBtn")!.addEventListener("click", submit);
-  for (const id of ["kbPasswordCancelBtn", "kbPasswordCloseBtn"]) {
-    document.getElementById(id)!.addEventListener("click", () => _passwordModal!.close());
-  }
-  for (const el of [input, confirmInput]) {
-    el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        submit();
-      }
-    });
-  }
-
-  return _passwordModal;
-}
-
-/** Asks for a password and resolves to it, or to null if dismissed. */
-function promptForPassword(request: PasswordRequest): Promise<string | null> {
-  // Replaces rather than stacks; see kbConfirm.
-  topOpenKanbanModal()?.close({ handoff: true });
-
-  const modal = getPasswordModal();
-  document.getElementById("kbPasswordTitle")!.textContent = request.title;
-  document.getElementById("kbPasswordMessage")!.textContent = request.message;
-  document.getElementById("kbPasswordOkBtn")!.textContent = request.okLabel ?? "Unlock";
-  (
-    document.getElementById("kbPasswordConfirmRow") as HTMLElement
-  ).style.display = request.confirm ? "" : "none";
-
-  return new Promise<string | null>((resolve) => {
-    // Wrapped so the caller's "put it back" runs on every ending: submitted,
-    // cancelled, or dismissed with Escape.
-    passwordResolve = (value) => {
-      request.reopen?.();
-      resolve(value);
-    };
-    modal.open();
-  });
-}
-
-/** Opens a locked board, asking for the password if this session does not
- *  already hold it. Returns false when the user cancelled or got it wrong. */
-async function unlockBoard(board: Board): Promise<boolean> {
-  if (!board.locked) return true;
-
-  if (sessionPassword) {
+/** Brings back the files the restored cards expect.
+ *
+ *  Deleting a card retires its attachments rather than unlinking them (see the
+ *  store's note in kanban.rs), so a restore that brings the card back can bring
+ *  its files back too, for as long as the snapshot describing them survives. */
+async function reviveAttachmentsFor(boardIds: string[]): Promise<void> {
+  let revived = 0;
+  for (const boardId of boardIds) {
+    const wanted = cards
+      .filter((c) => c.boardId === boardId)
+      .flatMap((c) => allAttachments(c).map((a) => a.id));
+    if (wanted.length === 0) continue;
     try {
-      await loadBoardContents(board, sessionPassword);
-      return true;
-    } catch {
-      // The held password does not open this board, which should not happen
-      // (there is only one) but is recoverable by asking again.
-      sessionPassword = null;
+      revived += await invoke<number>("revive_kanban_attachments", {
+        boardId,
+        attachmentIds: wanted,
+      });
+    } catch (err) {
+      // The cards are back either way, and their files then report themselves
+      // as missing rather than the restore failing over them.
+      devError("[kanban] attachment revive failed", err);
     }
   }
-
-  const password = await promptForPassword({
-    title: `Unlock "${board.name}"`,
-    message: "This board is encrypted. Its cards are decrypted into memory only, never back to disk in the clear.",
-  });
-  if (!password) return false;
-
-  try {
-    await loadBoardContents(board, password);
-    sessionPassword = password;
-    reconcile();
-    return true;
-  } catch (err) {
-    flash(String(err), "error", 8000);
-    return false;
-  }
-}
-
-/** Turns encryption on for one board. Establishes the Kanban password if this
- *  is the first board to be encrypted, and otherwise checks against it. */
-async function encryptBoard(board: Board): Promise<void> {
-  if (encryptedBoardIds.has(board.id)) return;
-
-  const hasPassword = encryptedBoardIds.size > 0;
-  const password =
-    sessionPassword ??
-    (await promptForPassword({
-      title: hasPassword ? "Encrypt This Board" : "Set the Kanban Password",
-      message: hasPassword
-        ? "Enter the Kanban password. Every encrypted board on this install uses the same one."
-        : "This password encrypts the boards you choose. It cannot be recovered, and no encrypted board can be read without it. Put it somewhere safe.",
-      confirm: !hasPassword,
-      okLabel: "Encrypt",
-      reopen: () => openBoardSetup(board, "board"),
-    }));
-  if (!password) return;
-
-  try {
-    // The board's current state has to be on disk before it is encrypted, or
-    // encryption captures whatever was last written rather than what is on
-    // screen.
-    markBoard(board.id);
-    await flushSave();
-    await invoke("kanban_encrypt_board", { boardId: board.id, password });
-    sessionPassword = password;
-    await refreshLockStatus();
-    renderAll();
-    flash(`"${board.name}" is now encrypted.`);
-  } catch (err) {
-    flash(String(err), "error", 9000);
-  }
-}
-
-/** Takes one board back out of encryption, writing it to disk in the clear. */
-async function decryptBoardToPlain(board: Board): Promise<void> {
-  if (!encryptedBoardIds.has(board.id)) return;
-
-  const password =
-    sessionPassword ??
-    (await promptForPassword({
-      title: `Decrypt "${board.name}"`,
-      message: "Enter the Kanban password. This board's cards will be written to disk in the clear.",
-      okLabel: "Decrypt",
-      reopen: () => openBoardSetup(board, "board"),
-    }));
-  if (!password) return;
-
-  try {
-    if (!board.locked) {
-      markBoard(board.id);
-      await flushSave();
-    }
-    await invoke("kanban_decrypt_board_to_plain", { boardId: board.id, password });
-    sessionPassword = password;
-    await refreshLockStatus();
-    if (board.locked) await loadBoardContents(board);
-    reconcile();
-
-    // That may have been the last encrypted board, and the tool lock asks for a
-    // password that no longer exists. Left set, it would come back on its own
-    // the next time any board was encrypted, which nobody asked for.
-    if (encryptedBoardIds.size === 0 && kbSettings.lockOnOpen) {
-      kbSettings.lockOnOpen = false;
-      markSettings();
-      flash(
-        "No boards are encrypted any more, so the Kanban lock has been switched off with them.",
-        "success",
-        8000,
-      );
-    }
-
-    renderAll();
-    flash(`"${board.name}" is no longer encrypted.`);
-  } catch (err) {
-    flash(String(err), "error", 9000);
-  }
-}
-
-/** Forgets the password and drops every decrypted board back out of memory.
- *  The "only into memory" promise needs a moment where that memory is given
- *  up, and this is it. */
-async function lockNow(): Promise<void> {
-  // Anything queued has to land while the password is still held, or the edit
-  // is stuck until the next unlock.
-  await flushSave();
-  sessionPassword = null;
-  for (const board of boards) {
-    if (encryptedBoardIds.has(board.id)) unloadBoardContents(board);
-  }
-  if (currentBoardId && getBoard(currentBoardId)?.locked) showKbView("boards");
-  else renderAll();
-}
-
-/* -----------------------------------------------------------------------------
-   THE TOOL-LOCK GATE
-   -----------------------------------------------------------------------------
-   Shown over the whole tool when lockOnOpen is set and a password exists. It is
-   a door, not a cipher: passing it holds the password for the visit, which is
-   also what unlocks the encrypted boards behind it, so one password entry does
-   both jobs and nothing is encrypted twice.
------------------------------------------------------------------------------ */
-
-function gateRequired(): boolean {
-  return kbSettings.lockOnOpen && encryptedBoardIds.size > 0 && sessionPassword === null;
-}
-
-function showAuthGate(show: boolean): void {
-  authGateShowing = show;
-  // The views are HIDDEN rather than merely covered: a board rendered behind a
-  // gate is a board whose card titles are one screenshot away.
-  applyViewVisibility();
-  if (!show) return;
-  (document.getElementById("kbAuthError") as HTMLElement).textContent = "";
-  const input = document.getElementById("kbAuthInput") as HTMLInputElement;
-  input.value = "";
-  setTimeout(() => input.focus(), 60);
-}
-
-async function submitAuthGate(): Promise<void> {
-  const input = document.getElementById("kbAuthInput") as HTMLInputElement;
-  const errorEl = document.getElementById("kbAuthError")!;
-  const value = input.value;
-  if (!value) {
-    errorEl.textContent = "Enter the Kanban password.";
-    return;
-  }
-  try {
-    const ok = await invoke<boolean>("kanban_verify_password", { password: value });
-    if (!ok) {
-      errorEl.textContent = "Incorrect password.";
-      input.select();
-      return;
-    }
-  } catch (err) {
-    errorEl.textContent = String(err);
-    return;
-  }
-  sessionPassword = value;
-  input.value = "";
-  showAuthGate(false);
-  renderAll();
+  if (revived > 0) flash(`Restored ${revived} attached file(s) with it.`);
 }
 
 /* =============================================================================
@@ -7253,6 +8175,115 @@ function bindInfoTooltips(): void {
    INIT + SHELL HOOKS
 ============================================================================= */
 
+/* -----------------------------------------------------------------------------
+   EXPORT AND IMPORT
+   -----------------------------------------------------------------------------
+   Registered with the Data tab in App Settings, which owns the buttons; this is
+   only what "everything the Kanban holds" means and how to put it back.
+
+   The FILES are not in it. Board backgrounds and card attachments are pictures,
+   videos and documents, and a JSON file that inlined them would be enormous and
+   unreadable. They are named in the export, so an import restores every card
+   with its attachment list intact and those files reported as missing, which is
+   the honest outcome: the records came back and the bytes did not.
+----------------------------------------------------------------------------- */
+
+interface KanbanExport {
+  boards: Board[];
+  cards: Card[];
+  tagCategories: TagCategory[];
+  tags: Tag[];
+}
+
+registerTransferable({
+  id: "kanban",
+  label: "Kanban",
+  summary: () =>
+    `${boards.length} boards · ${cards.filter((c) => !c.archived).length} cards`,
+  note:
+    "Board backgrounds and attached files are named in the export but not included, " +
+    "so an import brings the cards back and reports their files as missing.",
+  gather: async () => ({
+    boards,
+    cards,
+    tagCategories: globalTagCategories,
+    tags: globalTags,
+  }),
+  apply: async (parsed) => {
+    const payload = parsed as Partial<KanbanExport> | null;
+    if (!payload || !Array.isArray(payload.boards) || !Array.isArray(payload.cards)) {
+      throw new Error("that file does not hold a board list");
+    }
+    // Normalised on the way in, exactly as a load is. A hand-edited export is
+    // outside input like any other, and this is the one path where it reaches
+    // the app.
+    const nextBoards = payload.boards
+      .map((raw) => {
+        const board = normalizeBoardMeta(raw);
+        if (!board) return null;
+        /* An exported board carries its CONTENTS as well, and normalizeBoardMeta
+           drops them on purpose: its job is reading an index entry, where a
+           board's columns and vocabulary are not. So they are layered back on
+           from the same record. Without this, importing an export returns every
+           board with no columns and no tags. */
+        const contents = normalizeContents((raw ?? {}) as Partial<BoardContents>);
+        board.columns = contents.columns;
+        board.nextCardNumber = contents.nextCardNumber;
+        board.tagCategories = contents.tagCategories;
+        board.tags = contents.tags;
+        board.overrides = contents.overrides;
+        return board;
+      })
+      .filter((b): b is Board => b !== null);
+    // The cards travel as their own list, not inside their boards, so
+    // contents.cards above is always empty and is deliberately not used.
+    const nextCards = payload.cards
+      .map(normalizeCard)
+      .filter((c): c is Card => c !== null);
+
+    /* Written straight to the files, one board at a time, rather than by
+       loading them into memory and letting the ordinary save path do it. An
+       import replaces everything, and every one of those writes snapshots what
+       it replaced, so the state you had before the import is still in the last
+       bucket if the file turns out to be the wrong one.
+
+       Boards that existed before and are not in the import are deleted, or the
+       tool would end up showing the union of the two, which is not what
+       "replace" means anywhere else in the app. */
+    const incoming = new Set(nextBoards.map((b) => b.id));
+    for (const board of boards) {
+      if (!incoming.has(board.id)) {
+        await invoke("delete_kanban_board", { boardId: board.id }).catch(() => {});
+      }
+    }
+
+    boards = nextBoards;
+    cards = nextCards;
+    globalTagCategories = Array.isArray(payload.tagCategories)
+      ? payload.tagCategories.map(normalizeTagCategory).filter((c): c is TagCategory => c !== null)
+      : [];
+    globalTags = Array.isArray(payload.tags)
+      ? payload.tags.map(normalizeTag).filter((t): t is Tag => t !== null)
+      : [];
+
+    // Drops cards pointing at a board the file did not carry, and tag ids no
+    // vocabulary in it defines. The same pass a launch makes.
+    reconcile();
+
+    await invoke("save_kanban_index", { data: JSON.stringify(buildIndex()) });
+    for (const board of boards) {
+      await invoke("save_kanban_board", {
+        boardId: board.id,
+        data: JSON.stringify(buildContents(board)),
+      });
+    }
+    for (const board of boards) sweepBoardAttachments(board.id);
+
+    if (currentBoardId && !getBoard(currentBoardId)) showKbView("boards");
+    renderAll();
+  },
+});
+
 export function initKanban(): void {
   viewBoards = document.getElementById("kbViewBoards")!;
   viewBoard = document.getElementById("kbViewBoard")!;
@@ -7271,7 +8302,6 @@ export function initKanban(): void {
   boardSetupBtn = document.getElementById("kbBoardSetupBtn") as HTMLButtonElement;
   headerNoticeWrap = document.getElementById("kbHeaderNoticeWrap")!;
   headerNotice = document.getElementById("kbHeaderNotice")!;
-  authView = document.getElementById("kbAuthView")!;
 
   /* ── Header ── */
   document.getElementById("kbSetupBtn")!.addEventListener("click", () => openSetupOnTab("tags"));
@@ -7315,16 +8345,6 @@ export function initKanban(): void {
     ]);
   });
 
-  /* ── Tool lock gate ── */
-  const authInput = document.getElementById("kbAuthInput") as HTMLInputElement;
-  document.getElementById("kbAuthSubmitBtn")!.addEventListener("click", () => void submitAuthGate());
-  authInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      void submitAuthGate();
-    }
-  });
-
   bindInfoTooltips();
 
   // Claimed once, for the life of the app. The handler checks whether this
@@ -7345,40 +8365,23 @@ export function initKanban(): void {
  *  when you left is overdue when you come back the next morning. */
 export function onKanbanToolEntry(): void {
   // See `initialised`: the shell can route into this tool before init() has
-  // reached it. loadAll() applies the gate and renders once it finishes, so
-  // there is nothing lost by doing nothing here.
+  // reached it. loadAll() renders once it finishes, so there is nothing lost
+  // by doing nothing here.
   if (!initialised) return;
   clearFilters();
-  // The gate has to be decided before anything renders, or a board flashes on
-  // screen for a frame on the way to being hidden.
-  showAuthGate(gateRequired());
   renderAll();
 }
 
-/**
- * Called by shell.ts when the Kanban is navigated away from.
- *
- * Two jobs, and the order matters: land any queued edit while the password is
- * still held, THEN give the password up. Reversed, an edit made in the last
- * half-second before leaving would be stuck until the next unlock.
- *
- * The password is only given up when the tool lock is on. Without it, the
- * session password is what stops an encrypted board asking again every time you
- * step out to another tool and back, and there is nothing to protect it from:
- * the gate is the feature that says "forget me when I leave".
- */
+/** Called by shell.ts when the Kanban is navigated away from. Lands anything
+ *  still sitting in the save debounce, so an edit made in the last half-second
+ *  before leaving is not waiting on the next visit. */
 export async function onKanbanToolExit(): Promise<void> {
   if (!initialised) return;
+  // Leaving the tool ends any comment that was only half written. Its files
+  // were already imported, so this is also the last chance to unlink them
+  // before nothing points at them any more.
+  discardPendingComment();
   await flushSave();
-  if (!kbSettings.lockOnOpen || encryptedBoardIds.size === 0) return;
-  sessionPassword = null;
-  for (const board of boards) {
-    if (encryptedBoardIds.has(board.id)) unloadBoardContents(board);
-  }
-  if (currentBoardId && getBoard(currentBoardId)?.locked) {
-    currentBoardId = null;
-    currentView = "boards";
-  }
 }
 
 /** Called by shell.ts only when the sidebar icon or Home tile is clicked

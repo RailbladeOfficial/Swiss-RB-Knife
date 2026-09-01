@@ -12,7 +12,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { read, htmlIds, themeFiles } from "./_source.mjs";
+import { read, htmlIds, themeFiles, filesUnder } from "./_source.mjs";
 
 const PANEL_ACCENTS = [
   "--color-accent-input",
@@ -96,4 +96,30 @@ test("the per-tile color is confined to the border", () => {
     !icon.includes("--gs-card-accent"),
     "the tile icon is per-tile; it should match its label, which is not",
   );
+});
+
+test("no source file carries an invisible control character", () => {
+  // A regex written as \b in a heredoc, or pasted through the wrong tool, can
+  // arrive as a literal backspace (0x08). Nothing renders it, the file looks
+  // right, and the pattern quietly stops matching what it was written to match.
+  // That happened to module-init.test.mjs's own function-body stripper, where
+  // the two boundaries around "function" were backspaces for long enough that
+  // the check was only ever half doing its job.
+  //
+  // Tab, newline and carriage return are the only control characters a source
+  // file has any business containing.
+  const offenders = [];
+  for (const dir of ["src", "scripts", "src-tauri/src"]) {
+    for (const ext of [".ts", ".mjs", ".rs", ".css"]) {
+    for (const file of filesUnder(dir, ext)) {
+      const text = read(file);
+      // eslint-disable-next-line no-control-regex
+      const hit = /[\x00-\x08\x0b\x0c\x0e-\x1f]/.exec(text);
+      if (!hit) continue;
+      const line = text.slice(0, hit.index).split("\n").length;
+      offenders.push(`${file}:${line} (0x${hit[0].charCodeAt(0).toString(16).padStart(2, "0")})`);
+    }
+    }
+  }
+  assert.deepEqual(offenders, [], "these files contain an invisible control character");
 });
