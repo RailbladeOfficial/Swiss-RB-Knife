@@ -54,7 +54,7 @@ pub const DB_FILE: &str = "tools.db";
 
 /// Bumped when the schema changes. `migrate` walks from whatever the file says
 /// to this, one step at a time, so a version can never be skipped.
-const SCHEMA_VERSION: i32 = 3;
+const SCHEMA_VERSION: i32 = 4;
 
 /// The one connection, opened on first use and held for the life of the app.
 ///
@@ -111,16 +111,36 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         return Ok(());
     }
 
-    /* Neither earlier version of this schema ever left development, and
-       nothing in either one was the only copy of anything: every row in them
-       came from a JSON file that a migration never deletes. So both older
-       versions are handled the same way, by dropping what they made and
-       building v3 fresh.
+    /* WHAT A STEP MAY DROP. Only a table whose contents are not the only copy
+       of anything. Once Game Stats has migrated, its tables ARE the only copy:
+       game-stats.json is left on disk but stops being written to, so dropping
+       gs_* throws away every game logged since. That is why the v3 step below
+       leaves them alone and the schema is created with IF NOT EXISTS.
 
-       v1 kept `payload` JSON columns and two `meta` tables that were one row
-       holding one blob. v2 removed those, and also held Kanban and Time
-       Tracker, which have since gone back to files. v3 is Game Stats alone. */
-    if current < 3 {
+       v1 is the exception, and deliberately. It kept `payload` JSON columns and
+       two `meta` tables holding one blob each; there is no read path left for
+       that shape, so those tables go and the tool re-reads the JSON file, which
+       is the same path a fresh install takes. v1 existed for one afternoon in
+       development, so what that can cost is one afternoon of edits. */
+    if current < 2 {
+        conn.execute_batch(
+            "DROP TABLE IF EXISTS kb_card;
+             DROP TABLE IF EXISTS kb_board;
+             DROP TABLE IF EXISTS kb_meta;
+             DROP TABLE IF EXISTS tt_entry;
+             DROP TABLE IF EXISTS gs_game;
+             DROP TABLE IF EXISTS gs_meta;",
+        )?;
+    }
+
+    /* Kanban and Time Tracker went back to JSON files. Their tables hold
+       nothing that is not already in those files, so they go.
+
+       Keyed on 4 rather than 3 because one database in development reached
+       version 3 with these tables still in it. A version number exists exactly
+       so that can be fixed by counting up rather than by guessing what a file
+       contains. Children before parents, or the foreign keys refuse. */
+    if current < 4 {
         conn.execute_batch(
             "DROP TABLE IF EXISTS kb_attachment;
              DROP TABLE IF EXISTS kb_comment;
@@ -134,18 +154,13 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
              DROP TABLE IF EXISTS kb_board_override;
              DROP TABLE IF EXISTS kb_board;
              DROP TABLE IF EXISTS kb_meta;
-             DROP TABLE IF EXISTS tt_entry;
-             DROP TABLE IF EXISTS gs_round_score;
-             DROP TABLE IF EXISTS gs_round;
-             DROP TABLE IF EXISTS gs_game_player;
-             DROP TABLE IF EXISTS gs_game;
-             DROP TABLE IF EXISTS gs_table_player;
-             DROP TABLE IF EXISTS gs_table;
-             DROP TABLE IF EXISTS gs_profile;
-             DROP TABLE IF EXISTS gs_meta;",
+             DROP TABLE IF EXISTS tt_entry;",
         )?;
-        conn.execute_batch(SCHEMA)?;
     }
+
+    // Every statement is IF NOT EXISTS, so this both builds a new database and
+    // fills in whatever an older one is missing, without touching what it has.
+    conn.execute_batch(SCHEMA)?;
 
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())
@@ -156,7 +171,7 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
 ----------------------------------------------------------------------------- */
 
 const SCHEMA: &str = r#"
-CREATE TABLE gs_profile (
+CREATE TABLE IF NOT EXISTS gs_profile (
   id     TEXT PRIMARY KEY,
   name   TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'active'
@@ -165,20 +180,20 @@ CREATE TABLE gs_profile (
 -- A table is one exact group of players at one game type. Its key is derived
 -- from those two things rather than invented, so the same three people playing
 -- the same game always land at the same table.
-CREATE TABLE gs_table (
+CREATE TABLE IF NOT EXISTS gs_table (
   key       TEXT PRIMARY KEY,
   game_type TEXT NOT NULL DEFAULT '',
   name      TEXT NOT NULL DEFAULT ''
 );
 
-CREATE TABLE gs_table_player (
+CREATE TABLE IF NOT EXISTS gs_table_player (
   table_key TEXT NOT NULL REFERENCES gs_table(key) ON DELETE CASCADE,
   position  INTEGER NOT NULL,
   player_id TEXT NOT NULL,
   PRIMARY KEY (table_key, position)
 );
 
-CREATE TABLE gs_game (
+CREATE TABLE IF NOT EXISTS gs_game (
   id           TEXT PRIMARY KEY,
   table_key    TEXT NOT NULL DEFAULT '',
   game_type    TEXT NOT NULL DEFAULT '',
@@ -191,25 +206,25 @@ CREATE TABLE gs_game (
   updated_at   TEXT NOT NULL DEFAULT ''
 );
 -- Games are read per table, in play order, which is what `number` is.
-CREATE INDEX gs_game_table ON gs_game(table_key, number);
-CREATE INDEX gs_game_played ON gs_game(played_at);
+CREATE INDEX IF NOT EXISTS gs_game_table ON gs_game(table_key, number);
+CREATE INDEX IF NOT EXISTS gs_game_played ON gs_game(played_at);
 
 -- Entry order, which drives column order in the scoring grid.
-CREATE TABLE gs_game_player (
+CREATE TABLE IF NOT EXISTS gs_game_player (
   game_id   TEXT NOT NULL REFERENCES gs_game(id) ON DELETE CASCADE,
   position  INTEGER NOT NULL,
   player_id TEXT NOT NULL,
   PRIMARY KEY (game_id, position)
 );
-CREATE INDEX gs_game_player_player ON gs_game_player(player_id);
+CREATE INDEX IF NOT EXISTS gs_game_player_player ON gs_game_player(player_id);
 
-CREATE TABLE gs_round (
+CREATE TABLE IF NOT EXISTS gs_round (
   id          TEXT PRIMARY KEY,
   game_id     TEXT NOT NULL REFERENCES gs_game(id) ON DELETE CASCADE,
   round_index INTEGER NOT NULL DEFAULT 0,
   is_overtime INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX gs_round_game ON gs_round(game_id, round_index);
+CREATE INDEX IF NOT EXISTS gs_round_game ON gs_round(game_id, round_index);
 
 -- One row per player per round. `score` is NULL until it has been entered,
 -- which is a different thing from a score of zero and has to stay that way:
@@ -218,14 +233,14 @@ CREATE INDEX gs_round_game ON gs_round(game_id, round_index);
 -- Participation is what having a row MEANS. Rounds 3 to 13 have a row for every
 -- player; an overtime round only has rows for the players who were tied, which
 -- is exactly what participantIds used to say.
-CREATE TABLE gs_round_score (
+CREATE TABLE IF NOT EXISTS gs_round_score (
   round_id  TEXT NOT NULL REFERENCES gs_round(id) ON DELETE CASCADE,
   position  INTEGER NOT NULL,
   player_id TEXT NOT NULL,
   score     INTEGER,
   PRIMARY KEY (round_id, position)
 );
-CREATE INDEX gs_round_score_player ON gs_round_score(player_id);
+CREATE INDEX IF NOT EXISTS gs_round_score_player ON gs_round_score(player_id);
 "#;
 
 /* -----------------------------------------------------------------------------
