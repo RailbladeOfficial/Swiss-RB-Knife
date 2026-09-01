@@ -4,8 +4,12 @@
    WHAT IS IN THIS FILE. The tool's records, as JSON files, plus everything
    that is a file on disk because it is a picture, a video or a document:
 
+   All of it under kanban/ in the data directory:
+
      kanban-index.json        the board list and the default tag vocabulary.
-     kanban-board-<id>.json   one board's columns, cards, tags and overrides.
+     kanban-settings.json     preferences.
+     kanban-boards/           one file per board: its columns, cards, tags
+                              and the settings it overrides.
      kanban-backgrounds/      imported board background images.
      kanban-attachments/      files attached to cards and to comments.
      kanban-attachment-store/ attachments a surviving snapshot still needs.
@@ -38,8 +42,8 @@ use tauri::AppHandle;
 use crate::{atomic_write, backed_up_write_group, get_data_path};
 
 
-/// Folder under the data directory holding imported board backgrounds.
-const IMAGE_DIR: &str = "kanban-backgrounds";
+/// Folder holding imported board backgrounds.
+const IMAGE_DIR: &str = "kanban/kanban-backgrounds";
 
 /// Ceiling on a board background. A background is scaled to fill a panel and
 /// then blurred, so there is nothing to gain past a couple of thousand pixels
@@ -94,10 +98,23 @@ fn valid_board_id(id: &str) -> bool {
 ============================================================================= */
 
 /// The board list. Small on purpose: the gallery reads this and nothing else.
-const INDEX_FILE: &str = "kanban-index.json";
+const INDEX_FILE: &str = "kanban/kanban-index.json";
 
+/// One folder holding every board file. Boards are the thing there can be
+/// fifty of, and fifty files loose beside the index is a folder you cannot
+/// read at a glance.
+const BOARD_DIR: &str = "kanban/kanban-boards";
+
+/// A board file keeps its "kanban-board-" prefix inside that folder, and that
+/// is not redundant: a snapshot bucket is one flat folder shared with every
+/// other tool, and a captured file is stored there under its basename.
 fn board_file_name(id: &str) -> String {
     format!("kanban-board-{id}.json")
+}
+
+/// That file's path inside the data directory.
+fn board_path(id: &str) -> String {
+    format!("{BOARD_DIR}/{}", board_file_name(id))
 }
 
 /// What a board write snapshots: that board, plus the index. The index is in
@@ -109,7 +126,7 @@ fn board_file_name(id: &str) -> String {
 /// point of the file split: an afternoon of dragging cards around one board
 /// costs snapshots of one board.
 fn board_group(id: &str) -> Vec<String> {
-    vec![board_file_name(id), INDEX_FILE.to_string()]
+    vec![board_path(id), INDEX_FILE.to_string()]
 }
 
 fn as_refs(v: &[String]) -> Vec<&str> {
@@ -137,12 +154,7 @@ pub fn save_kanban_board(app: AppHandle, board_id: String, data: String) -> Resu
         return Err("That board id is not one of ours.".to_string());
     }
     let group = board_group(&board_id);
-    backed_up_write_group(
-        &app,
-        &as_refs(&group),
-        &board_file_name(&board_id),
-        data.as_bytes(),
-    )
+    backed_up_write_group(&app, &as_refs(&group), &board_path(&board_id), data.as_bytes())
 }
 
 /// Reads one board's contents. Returns "null" when there is no file, which the
@@ -152,7 +164,7 @@ pub fn load_kanban_board(app: AppHandle, board_id: String) -> Result<String, Str
     if !valid_board_id(&board_id) {
         return Err("That board id is not one of ours.".to_string());
     }
-    match fs::read_to_string(get_data_path(&app, &board_file_name(&board_id))) {
+    match fs::read_to_string(get_data_path(&app, &board_path(&board_id))) {
         Ok(content) => Ok(content),
         Err(_) => Ok("null".to_string()),
     }
@@ -168,13 +180,13 @@ pub fn delete_kanban_board(app: AppHandle, board_id: String) -> Result<(), Strin
     if !valid_board_id(&board_id) {
         return Err("That board id is not one of ours.".to_string());
     }
-    let path = get_data_path(&app, &board_file_name(&board_id));
+    let path = get_data_path(&app, &board_path(&board_id));
 
     // A write is what triggers a snapshot, and there is no write here, so the
     // snapshot is taken explicitly by writing the board out one last time as an
     // empty husk before removing it. The husk never survives this call.
     let group = board_group(&board_id);
-    let _ = backed_up_write_group(&app, &as_refs(&group), &board_file_name(&board_id), b"null");
+    let _ = backed_up_write_group(&app, &as_refs(&group), &board_path(&board_id), b"null");
 
     if path.exists() {
         fs::remove_file(&path).map_err(|e| e.to_string())?;
@@ -211,9 +223,9 @@ pub struct KanbanBackup {
 }
 
 fn backups_root(app: &AppHandle) -> Option<PathBuf> {
-    get_data_path(app, INDEX_FILE)
-        .parent()
-        .map(|p| p.join("backups"))
+    // The app's shared snapshot folder. Deriving it from the index would now
+    // give you kanban/backups, since the index moved into a tool folder.
+    Some(crate::backups_root(app))
 }
 
 /// Filenames inside a snapshot folder, as offered by list_kanban_backups. Digits,
@@ -236,10 +248,14 @@ fn classify_backup_file(name: &str) -> Option<Option<String>> {
         let id = rest.strip_suffix(".json")?;
         return valid_board_id(id).then(|| Some(id.to_string()));
     }
-    // The index. The settings file is deliberately not offered: restoring
-    // preferences is not a recovery, and rewinding them would be a surprise
-    // nobody asked for when they set out to get a board back.
-    (stem == INDEX_FILE).then_some(None)
+    /* The index. Compared against the BASENAME, not against INDEX_FILE: that is
+       a path inside the data folder now, and a snapshot bucket is one flat
+       folder that stores a captured file under its filename alone.
+
+       The settings file is deliberately not offered: restoring preferences is
+       not a recovery, and rewinding them would be a surprise nobody asked for
+       when they set out to get a board back. */
+    (stem == crate::file_basename(INDEX_FILE)).then_some(None)
 }
 
 /// Reads one snapshot folder and describes the Kanban files in it.
@@ -463,7 +479,7 @@ pub fn delete_kanban_image(app: AppHandle, path: String) -> Result<(), String> {
 ============================================================================= */
 
 /// Folder under the data directory holding attached files.
-const ATTACH_DIR: &str = "kanban-attachments";
+const ATTACH_DIR: &str = "kanban/kanban-attachments";
 
 /// Ceiling on one attachment. Large enough for a screen recording of a bug,
 /// small enough that a board's folder cannot quietly outgrow the snapshots
@@ -838,7 +854,7 @@ pub fn sweep_kanban_attachments(
 
 /// Folder under the data directory holding attachments that have left a board
 /// but that a surviving snapshot may still reference.
-const ATT_STORE_DIR: &str = "kanban-attachment-store";
+const ATT_STORE_DIR: &str = "kanban/kanban-attachment-store";
 
 fn store_dir(app: &AppHandle, board_id: &str) -> Option<PathBuf> {
     if !valid_board_id(board_id) {
@@ -924,8 +940,9 @@ fn revive_attachment(app: &AppHandle, board_id: &str, attachment_id: &str) -> bo
 /// only moment the answer changes. See the section note for why a modified time
 /// is the whole test.
 /// Takes the backups folder rather than an AppHandle, because the one caller is
-/// lib.rs's snapshot pruner, which is a plain function working on paths. The
-/// store sits beside `backups/` in the same data directory.
+/// lib.rs's snapshot pruner, which is a plain function working on paths.
+/// `backups/` sits at the top of the data directory, so its parent is the data
+/// directory and the store is one tool folder down from there.
 pub fn prune_kanban_attachment_store_at(backups_root: &Path, cutoff: std::time::SystemTime) {
     let root = match backups_root.parent() {
         Some(p) => p.join(ATT_STORE_DIR),

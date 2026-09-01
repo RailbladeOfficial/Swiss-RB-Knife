@@ -56,10 +56,10 @@ use zeroize::Zeroizing;
 /// just skips whichever don't currently exist, so listing all four here
 /// means a snapshot always captures whichever pair is live.
 const BUDGET_BACKUP_GROUP: [&str; 4] = [
-    "budget-data.json",
-    "budget-data.enc",
-    "budget-entities.json",
-    "budget-entities.enc",
+    "budget/budget-data.json",
+    "budget/budget-data.enc",
+    "budget/budget-entities.json",
+    "budget/budget-entities.enc",
 ];
 
 /* =============================================================================
@@ -87,12 +87,12 @@ struct EntitiesEncryptedEnvelope {
 }
 
 fn read_data_envelope(app: &tauri::AppHandle) -> Option<EncryptedEnvelope> {
-    let raw = fs::read_to_string(get_data_path(app, "budget-data.enc")).ok()?;
+    let raw = fs::read_to_string(get_data_path(app, "budget/budget-data.enc")).ok()?;
     serde_json::from_str(&raw).ok()
 }
 
 fn read_entities_envelope(app: &tauri::AppHandle) -> Option<EntitiesEncryptedEnvelope> {
-    let raw = fs::read_to_string(get_data_path(app, "budget-entities.enc")).ok()?;
+    let raw = fs::read_to_string(get_data_path(app, "budget/budget-entities.enc")).ok()?;
     serde_json::from_str(&raw).ok()
 }
 
@@ -112,7 +112,7 @@ struct PlaintextEntitiesFile {
 }
 
 fn read_plaintext_entities(app: &tauri::AppHandle) -> Option<PlaintextEntitiesFile> {
-    let raw = fs::read_to_string(get_data_path(app, "budget-entities.json")).ok()?;
+    let raw = fs::read_to_string(get_data_path(app, "budget/budget-entities.json")).ok()?;
     serde_json::from_str(&raw).ok()
 }
 
@@ -185,13 +185,13 @@ fn decrypt_bytes(key: &[u8; 32], nonce_bytes: &[u8], ciphertext: &[u8]) -> Resul
 /// to disk, plaintext.
 #[tauri::command]
 pub fn save_budget_data(app: tauri::AppHandle, data: String) -> Result<(), String> {
-    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-data.json", data.as_bytes())
+    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-data.json", data.as_bytes())
 }
 
 /// Loads the entries JSON from disk. Returns "{}" if it doesn't exist yet.
 #[tauri::command]
 pub fn load_budget_data(app: tauri::AppHandle) -> Result<String, String> {
-    match fs::read_to_string(get_data_path(&app, "budget-data.json")) {
+    match fs::read_to_string(get_data_path(&app, "budget/budget-data.json")) {
         Ok(content) => Ok(content),
         Err(_) => Ok("{}".to_string()),
     }
@@ -213,7 +213,7 @@ pub fn save_budget_entities(app: tauri::AppHandle, data: String) -> Result<(), S
         entities: entities_value,
     };
     let json = serde_json::to_string(&wrapper).map_err(|e| e.to_string())?;
-    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-entities.json", json.as_bytes())
+    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-entities.json", json.as_bytes())
 }
 
 /// Loads just the entities JSON from disk, sessionUnlock is stripped back
@@ -247,9 +247,9 @@ pub struct BudgetLockStatus {
 /// quietly empty tool is not.
 #[tauri::command]
 pub fn budget_lock_status(app: tauri::AppHandle) -> BudgetLockStatus {
-    let entities_envelope_exists = get_data_path(&app, "budget-entities.enc").exists();
-    let legacy_artifacts_present = get_data_path(&app, "budget-data.enc").exists()
-        || get_data_path(&app, "budget-lock.json").exists();
+    let entities_envelope_exists = get_data_path(&app, "budget/budget-entities.enc").exists();
+    let legacy_artifacts_present = get_data_path(&app, "budget/budget-data.enc").exists()
+        || get_data_path(&app, "budget/budget-lock.json").exists();
     BudgetLockStatus {
         enabled: entities_envelope_exists || legacy_artifacts_present,
         session_unlock: read_session_unlock(&app),
@@ -274,8 +274,8 @@ pub fn budget_verify_password(app: tauri::AppHandle, password: String) -> Result
             // detected. Say so plainly instead of returning Ok(false), which
             // the frontend shows as "Incorrect password.", misleading when
             // the actual problem is an unrecognized on-disk format.
-            let legacy = get_data_path(&app, "budget-data.enc").exists()
-                || get_data_path(&app, "budget-lock.json").exists();
+            let legacy = get_data_path(&app, "budget/budget-data.enc").exists()
+                || get_data_path(&app, "budget/budget-lock.json").exists();
             if legacy {
                 return Err(
                     "Found an older-format encrypted budget file this version can't read. \
@@ -336,7 +336,7 @@ pub fn budget_save_encrypted(app: tauri::AppHandle, password: String, data: Stri
         ciphertext_hex: hex::encode(ciphertext),
     };
     let json = serde_json::to_string(&new_envelope).map_err(|e| e.to_string())?;
-    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-data.enc", json.as_bytes())
+    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-data.enc", json.as_bytes())
 }
 
 /* =============================================================================
@@ -385,7 +385,7 @@ pub fn budget_save_entities_encrypted(app: tauri::AppHandle, password: String, d
         session_unlock: envelope.session_unlock,
     };
     let json = serde_json::to_string(&new_envelope).map_err(|e| e.to_string())?;
-    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-entities.enc", json.as_bytes())
+    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-entities.enc", json.as_bytes())
 }
 
 /* =============================================================================
@@ -399,10 +399,10 @@ pub fn budget_save_entities_encrypted(app: tauri::AppHandle, password: String, d
 pub fn budget_enable_encryption(app: tauri::AppHandle, password: String) -> Result<(), String> {
     // Wipe the password from memory when this function returns (all paths).
     let password = Zeroizing::new(password);
-    let data_path = get_data_path(&app, "budget-data.json");
+    let data_path = get_data_path(&app, "budget/budget-data.json");
     let plain_data = fs::read_to_string(&data_path).unwrap_or_else(|_| "{}".to_string());
 
-    let entities_path = get_data_path(&app, "budget-entities.json");
+    let entities_path = get_data_path(&app, "budget/budget-entities.json");
     let (plain_entities, session_unlock) = match read_plaintext_entities(&app) {
         Some(wrapper) => (
             serde_json::to_string(&wrapper.entities).unwrap_or_else(|_| "{}".to_string()),
@@ -433,7 +433,7 @@ pub fn budget_enable_encryption(app: tauri::AppHandle, password: String) -> Resu
         ciphertext_hex: hex::encode(data_ciphertext),
     };
     let data_json = serde_json::to_string(&data_envelope).map_err(|e| e.to_string())?;
-    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-data.enc", data_json.as_bytes())?;
+    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-data.enc", data_json.as_bytes())?;
 
     let (entities_nonce, entities_ciphertext) = encrypt_bytes(&key, plain_entities.as_bytes())?;
     let entities_envelope = EntitiesEncryptedEnvelope {
@@ -451,8 +451,8 @@ pub fn budget_enable_encryption(app: tauri::AppHandle, password: String) -> Resu
     // message, when the truth is simply "enabling failed, nothing changed."
     // The plaintext files are still untouched at this point, so backing out
     // loses nothing.
-    if let Err(e) = backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-entities.enc", entities_json.as_bytes()) {
-        let _ = fs::remove_file(get_data_path(&app, "budget-data.enc"));
+    if let Err(e) = backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-entities.enc", entities_json.as_bytes()) {
+        let _ = fs::remove_file(get_data_path(&app, "budget/budget-data.enc"));
         return Err(e);
     }
 
@@ -505,20 +505,20 @@ pub fn budget_disable_encryption(app: tauri::AppHandle, password: String) -> Res
         serde_json::from_slice(&plain_entities_bytes).map_err(|e| e.to_string())?;
 
     // Write both plaintexts first, only remove the envelopes after both succeed.
-    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-data.json", &plain_data)?;
+    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-data.json", &plain_data)?;
 
     let entities_wrapper = PlaintextEntitiesFile {
         session_unlock: entities_envelope.session_unlock,
         entities: entities_value,
     };
     let entities_json = serde_json::to_string(&entities_wrapper).map_err(|e| e.to_string())?;
-    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-entities.json", entities_json.as_bytes())?;
+    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-entities.json", entities_json.as_bytes())?;
 
-    let data_enc_path = get_data_path(&app, "budget-data.enc");
+    let data_enc_path = get_data_path(&app, "budget/budget-data.enc");
     if data_enc_path.exists() {
         fs::remove_file(&data_enc_path).map_err(|e| e.to_string())?;
     }
-    let entities_enc_path = get_data_path(&app, "budget-entities.enc");
+    let entities_enc_path = get_data_path(&app, "budget/budget-entities.enc");
     if entities_enc_path.exists() {
         fs::remove_file(&entities_enc_path).map_err(|e| e.to_string())?;
     }
@@ -538,7 +538,7 @@ pub fn budget_set_session_unlock(app: tauri::AppHandle, session_unlock: bool) ->
     if let Some(mut envelope) = read_entities_envelope(&app) {
         envelope.session_unlock = session_unlock;
         let json = serde_json::to_string(&envelope).map_err(|e| e.to_string())?;
-        return backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-entities.enc", json.as_bytes());
+        return backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-entities.enc", json.as_bytes());
     }
 
     let wrapper = PlaintextEntitiesFile {
@@ -551,5 +551,5 @@ pub fn budget_set_session_unlock(app: tauri::AppHandle, session_unlock: bool) ->
     let json = serde_json::to_string(&wrapper).map_err(|e| e.to_string())?;
     // Low-stakes and doesn't touch the ledger, but goes through the same
     // path as everything else for consistency.
-    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget-entities.json", json.as_bytes())
+    backed_up_write_group(&app, &BUDGET_BACKUP_GROUP, "budget/budget-entities.json", json.as_bytes())
 }

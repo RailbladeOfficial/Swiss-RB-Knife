@@ -33,38 +33,176 @@ mod tools;
 
 /* =============================================================================
    FILE PATHS
+   -----------------------------------------------------------------------------
+   THE DATA FOLDER HAS A SHAPE, and every name passed to get_data_path is a path
+   inside it rather than a bare filename:
+
+     app/            the shell's own files: preferences, window size, the lock.
+     <tool>/         one folder per tool, holding everything that tool owns.
+     backups/        hourly snapshots, shared, flat. See backed_up_write_group.
+
+   Filenames keep their tool prefix inside their own folder, which looks
+   redundant and is not: a snapshot bucket is one flat folder shared by every
+   tool, and it stores a captured file under its BASENAME. Strip the prefixes
+   and Budget's settings and Time Tracker's settings become the same .bak.
+
+   backups/ stays at the top rather than being split per tool because a bucket
+   is a moment in time across the whole app, and because Kanban's group already
+   spans two of its own files.
 ============================================================================= */
 
-/// Resolves the path to a named file in the app data directory.
+/// The data directory itself, created if it is not there.
 ///
-/// - **Dev builds** (`debug_assertions` on): resolves to `../data/` relative to
-///   the Cargo workspace root, so data files sit next to `src-tauri/` and are
-///   easy to inspect during development.
-/// - **Release builds**: resolves to the OS app-data directory via Tauri's
-///   `app_data_dir()` (e.g. `%APPDATA%\Swiss RB Knife\` on Windows).
-///
-/// Creates the directory if it doesn't exist in either case.
+/// - **Dev builds** (`debug_assertions` on): `../data/` relative to the Cargo
+///   workspace root, so the files sit next to `src-tauri/` and are easy to
+///   inspect during development.
+/// - **Release builds**: the OS app-data directory via Tauri's `app_data_dir()`
+///   (`%APPDATA%\Swiss RB Knife\` on Windows).
 #[allow(unused_variables)]
-pub(crate) fn get_data_path(app: &tauri::AppHandle, filename: &str) -> PathBuf {
+pub(crate) fn data_root(app: &tauri::AppHandle) -> PathBuf {
     #[cfg(debug_assertions)]
     {
         let mut path = std::env::current_dir().unwrap();
         path.pop();
         path.push("data");
         let _ = std::fs::create_dir_all(&path);
-        path.push(filename);
         path
     }
 
     #[cfg(not(debug_assertions))]
     {
-        let mut path = app
+        let path = app
             .path()
             .app_data_dir()
             .expect("Failed to resolve app data dir");
         let _ = std::fs::create_dir_all(&path);
-        path.push(filename);
         return path;
+    }
+}
+
+/// Where the hourly snapshots live. One folder for the whole app.
+pub(crate) fn backups_root(app: &tauri::AppHandle) -> PathBuf {
+    data_root(app).join("backups")
+}
+
+/// Resolves a path inside the data directory, creating the folder it lands in.
+///
+/// `relative` is a path, not a filename: "app/settings.json", "kanban/
+/// kanban-index.json", "kanban/kanban-boards/kanban-board-<id>.json". Callers
+/// pass a constant or something built from one of the allowlists in this file,
+/// never a name that arrived from the front end unchecked.
+pub(crate) fn get_data_path(app: &tauri::AppHandle, relative: &str) -> PathBuf {
+    let path = data_root(app).join(relative);
+    // The folder, not the file. A tool's first write is what creates its folder,
+    // so nothing has to remember to make them up front.
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    path
+}
+
+/* =============================================================================
+   MOVING AN OLD DATA FOLDER INTO THE NEW SHAPE
+   -----------------------------------------------------------------------------
+   Everything used to sit flat in one directory. This moves each file to where
+   it now belongs, once, on the way up and before anything reads.
+
+   IT ONLY EVER MOVES A FILE TO A PLACE NOTHING IS. If the destination already
+   exists the source is left exactly where it is, untouched, rather than being
+   overwritten or deleted. So this cannot destroy anything, it can only fail to
+   tidy, and a folder that is already in the new shape is a no-op.
+
+   backups/ is deliberately not touched. A bucket stores files under their
+   basename, and the basenames have not changed, so every existing snapshot is
+   still readable and still restorable.
+============================================================================= */
+
+/// Old flat name to new relative path, for everything that is not a board file.
+const RELOCATIONS: [(&str, &str); 21] = [
+    ("settings.json", "app/settings.json"),
+    ("shell-state.json", "app/shell-state.json"),
+    ("window.json", "app/window.json"),
+    ("lock.json", "app/lock.json"),
+    ("custom-themes.json", "app/custom-themes.json"),
+    ("auto-backup.json", "auto-backup/auto-backup.json"),
+    ("auto-backup-presets.json", "auto-backup/auto-backup-presets.json"),
+    ("budget-data.json", "budget/budget-data.json"),
+    ("budget-data.enc", "budget/budget-data.enc"),
+    ("budget-entities.json", "budget/budget-entities.json"),
+    ("budget-entities.enc", "budget/budget-entities.enc"),
+    ("budget-settings.json", "budget/budget-settings.json"),
+    ("budget-lock.json", "budget/budget-lock.json"),
+    ("countdown.json", "countdown/countdown.json"),
+    ("game-stats.json", "game-stats/game-stats.json"),
+    ("game-stats-draft.json", "game-stats/game-stats-draft.json"),
+    ("game-stats-settings.json", "game-stats/game-stats-settings.json"),
+    ("kanban-index.json", "kanban/kanban-index.json"),
+    ("kanban-settings.json", "kanban/kanban-settings.json"),
+    ("rng.json", "rng/rng.json"),
+    ("tts-repeater.json", "tts-repeater/tts-repeater.json"),
+];
+
+/// Folders that moved whole.
+const FOLDER_RELOCATIONS: [(&str, &str); 3] = [
+    ("kanban-attachments", "kanban/kanban-attachments"),
+    ("kanban-backgrounds", "kanban/kanban-backgrounds"),
+    ("kanban-attachment-store", "kanban/kanban-attachment-store"),
+];
+
+fn relocate(root: &std::path::Path, from: &str, to: &str) {
+    let src = root.join(from);
+    let dest = root.join(to);
+    // Never over the top of something. See the section header.
+    if !src.exists() || dest.exists() {
+        return;
+    }
+    if let Some(parent) = dest.parent() {
+        if fs::create_dir_all(parent).is_err() {
+            return;
+        }
+    }
+    let _ = fs::rename(&src, &dest);
+}
+
+/// Puts a flat data folder into the per-tool shape. Safe to run every launch.
+pub(crate) fn migrate_data_layout(app: &tauri::AppHandle) {
+    let root = data_root(app);
+
+    for (from, to) in RELOCATIONS {
+        relocate(&root, from, to);
+    }
+    for (from, to) in FOLDER_RELOCATIONS {
+        relocate(&root, from, to);
+    }
+
+    // Time Tracker's files, one of which is named for nothing in particular.
+    relocate(&root, "time-tracker.json", "time-tracker/time-tracker.json");
+    relocate(&root, "time-tracker-settings.json", "time-tracker/time-tracker-settings.json");
+    relocate(&root, "draft.json", "time-tracker/time-tracker-draft.json");
+
+    /* The database, with its write-ahead log and shared-memory file. All three
+       or none: the .db on its own is only the state as of the last checkpoint,
+       so leaving the -wal behind would silently roll back whatever is in it.
+
+       It is named for its tool now. It held three tools for about a day, and
+       "tools.db" was a reasonable name for that and a misleading one for what
+       it actually is, which is the Game Stats history. */
+    for suffix in ["", "-wal", "-shm"] {
+        relocate(
+            &root,
+            &format!("tools.db{suffix}"),
+            &format!("game-stats/game-stats.db{suffix}"),
+        );
+    }
+
+    // Every board file, by pattern rather than by name.
+    if let Ok(entries) = fs::read_dir(&root) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with("kanban-board-") && name.ends_with(".json") {
+                relocate(&root, &name, &format!("kanban/kanban-boards/{name}"));
+            }
+        }
     }
 }
 
@@ -327,15 +465,14 @@ pub(crate) fn backed_up_write_group(
         .iter()
         .map(|f| get_data_path(app, f))
         .collect();
-    snapshot_group(&group_paths);
+    snapshot_group(app, &group_paths);
     atomic_write(&get_data_path(app, write_filename), write_bytes)
 }
 
-fn snapshot_group(group_paths: &[PathBuf]) {
-    let backups_root = match group_paths.first().and_then(|p| p.parent()) {
-        Some(p) => p.join("backups"),
-        None => return,
-    };
+fn snapshot_group(app: &tauri::AppHandle, group_paths: &[PathBuf]) {
+    // The app's one snapshot folder, not a sibling of whichever tool folder the
+    // written file happens to live in. Since the tool split, those differ.
+    let backups_root = backups_root(app);
     if fs::create_dir_all(&backups_root).is_err() {
         return;
     }
@@ -448,7 +585,7 @@ fn import_tool_json(path: String) -> Result<String, String> {
 /// Called by shell.ts on every window resize (debounced 300 ms).
 #[tauri::command]
 fn save_window_size(app: tauri::AppHandle, data: String) -> Result<(), String> {
-    atomic_write(&get_data_path(&app, "window.json"), data.as_bytes())
+    atomic_write(&get_data_path(&app, "app/window.json"), data.as_bytes())
 }
 
 /// Loads the saved window size JSON from disk.
@@ -456,7 +593,7 @@ fn save_window_size(app: tauri::AppHandle, data: String) -> Result<(), String> {
 /// which shell.ts treats as a signal to use the tauri.conf.json defaults.
 #[tauri::command]
 fn load_window_size(app: tauri::AppHandle) -> Result<String, String> {
-    match fs::read_to_string(get_data_path(&app, "window.json")) {
+    match fs::read_to_string(get_data_path(&app, "app/window.json")) {
         Ok(content) => Ok(content),
         Err(_) => Err("no saved size".to_string()),
     }
@@ -501,7 +638,7 @@ fn merge_settings(app: tauri::AppHandle, patch: String) -> Result<(), String> {
     static SETTINGS_LOCK: Mutex<()> = Mutex::new(());
     let _guard = SETTINGS_LOCK.lock().map_err(|e| e.to_string())?;
 
-    let path = get_data_path(&app, "settings.json");
+    let path = get_data_path(&app, "app/settings.json");
 
     // Existing file → JSON object; missing or corrupt → start from empty.
     let mut on_disk: serde_json::Value = fs::read_to_string(&path)
@@ -532,7 +669,7 @@ fn merge_settings(app: tauri::AppHandle, patch: String) -> Result<(), String> {
 /// merges over DEFAULT_SETTINGS so every key gets a safe fallback value.
 #[tauri::command]
 fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
-    match fs::read_to_string(get_data_path(&app, "settings.json")) {
+    match fs::read_to_string(get_data_path(&app, "app/settings.json")) {
         Ok(content) => Ok(content),
         Err(_) => Ok("{}".to_string()),
     }
@@ -586,51 +723,65 @@ struct ToolFile {
 /// hour of entries restored beside the list of activities from that same hour
 /// is a coherent state; entries alone can point at activities that were since
 /// renamed away.
-const TT_GROUP: &[&str] = &["time-tracker.json", "time-tracker-settings.json"];
+const TT_GROUP: &[&str] =
+    &["time-tracker/time-tracker.json", "time-tracker/time-tracker-settings.json"];
 
 /// Game Stats keeps profiles, games and settings in one file, so its group is
 /// itself. Listed explicitly rather than left empty, because empty means "do
 /// not snapshot" and that is a different statement.
-const GS_GROUP: &[&str] = &["game-stats.json"];
+const GS_GROUP: &[&str] = &["game-stats/game-stats.json"];
 
 const NO_SNAPSHOT: &[&str] = &[];
 
 fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
     let (name, empty, group) = match (tool_id, kind) {
-        ("time-tracker", "settings") => ("time-tracker-settings.json", "{}", TT_GROUP),
-        ("time-tracker", "data") => ("time-tracker.json", "[]", TT_GROUP),
+        ("time-tracker", "settings") => {
+            ("time-tracker/time-tracker-settings.json", "{}", TT_GROUP)
+        }
+        ("time-tracker", "data") => ("time-tracker/time-tracker.json", "[]", TT_GROUP),
         ("time-tracker", "draft") => (
-            "draft.json",
+            "time-tracker/time-tracker-draft.json",
             r#"{"activity":"","start":"","end":"","notes":""}"#,
             NO_SNAPSHOT,
         ),
-        ("budget", "settings") => ("budget-settings.json", "{}", NO_SNAPSHOT),
-        ("kanban", "settings") => ("kanban-settings.json", "{}", NO_SNAPSHOT),
-        ("countdown", "data") => ("countdown.json", r#"{"session":null,"log":[]}"#, NO_SNAPSHOT),
+        ("budget", "settings") => ("budget/budget-settings.json", "{}", NO_SNAPSHOT),
+        ("kanban", "settings") => ("kanban/kanban-settings.json", "{}", NO_SNAPSHOT),
+        ("countdown", "data") => {
+            ("countdown/countdown.json", r#"{"session":null,"log":[]}"#, NO_SNAPSHOT)
+        }
         ("game-stats", "data") => (
-            "game-stats.json",
+            "game-stats/game-stats.json",
             r#"{"profiles":[],"games":[],"settings":{}}"#,
             GS_GROUP,
         ),
-        ("game-stats", "settings") => ("game-stats-settings.json", "{}", NO_SNAPSHOT),
-        ("game-stats", "draft") => ("game-stats-draft.json", "null", NO_SNAPSHOT),
-        ("rng", "data") => ("rng.json", r#"{"settings":null,"results":[]}"#, NO_SNAPSHOT),
+        ("game-stats", "settings") => ("game-stats/game-stats-settings.json", "{}", NO_SNAPSHOT),
+        ("game-stats", "draft") => ("game-stats/game-stats-draft.json", "null", NO_SNAPSHOT),
+        ("rng", "data") => ("rng/rng.json", r#"{"settings":null,"results":[]}"#, NO_SNAPSHOT),
         ("tts-repeater", "data") => (
-            "tts-repeater.json",
+            "tts-repeater/tts-repeater.json",
             r#"{"settings":null,"presets":[],"display":null}"#,
             NO_SNAPSHOT,
         ),
         ("auto-backup", "data") => (
-            "auto-backup.json",
+            "auto-backup/auto-backup.json",
             r#"{"sources":[],"destinations":[],"copySpeed":31457280}"#,
             NO_SNAPSHOT,
         ),
-        ("auto-backup", "presets") => ("auto-backup-presets.json", "[]", NO_SNAPSHOT),
+        ("auto-backup", "presets") => ("auto-backup/auto-backup-presets.json", "[]", NO_SNAPSHOT),
         // An allowlist, not a filename built from the arguments. Both of these
         // arrive from the front end and would otherwise be joined onto a path.
         _ => return Err(format!("Unknown tool file '{tool_id}/{kind}'")),
     };
     Ok(ToolFile { name, empty, group })
+}
+
+/// The filename part of a tool-file path.
+///
+/// A snapshot bucket is ONE FLAT FOLDER shared by every tool, so a captured
+/// file is stored under its basename. Every lookup of a .bak has to agree with
+/// that, which is why this exists rather than each caller slicing the string.
+pub(crate) fn file_basename(relative: &str) -> &str {
+    relative.rsplit('/').next().unwrap_or(relative)
 }
 
 /// Writes one of a tool's own files. Atomic, like every other write in the app.
@@ -697,7 +848,7 @@ fn list_tool_backups(app: tauri::AppHandle, tool_id: String) -> Result<Vec<ToolB
     for kind in ["data", "settings", "draft", "presets"] {
         if let Ok(f) = tool_file(&tool_id, kind) {
             if !f.group.is_empty() {
-                owned.push((f.name, kind.to_string()));
+                owned.push((file_basename(f.name), kind.to_string()));
             }
         }
     }
@@ -705,10 +856,7 @@ fn list_tool_backups(app: tauri::AppHandle, tool_id: String) -> Result<Vec<ToolB
         return Ok(vec![]);
     }
 
-    let root = match get_data_path(&app, "settings.json").parent() {
-        Some(p) => p.join("backups"),
-        None => return Ok(vec![]),
-    };
+    let root = backups_root(&app);
     let entries = match fs::read_dir(&root) {
         Ok(e) => e,
         // No backups folder yet is a new install, not an error.
@@ -771,11 +919,8 @@ fn read_tool_backup(
     if f.group.is_empty() {
         return Err("That file is not snapshotted.".to_string());
     }
-    let root = get_data_path(&app, "settings.json")
-        .parent()
-        .map(|p| p.join("backups"))
-        .ok_or_else(|| "No backups folder.".to_string())?;
-    let path = root.join(&name).join(format!("{}.bak", f.name));
+    let root = backups_root(&app);
+    let path = root.join(&name).join(format!("{}.bak", file_basename(f.name)));
     fs::read_to_string(&path).map_err(|e| format!("Could not read that snapshot: {e}"))
 }
 
@@ -797,7 +942,7 @@ pub(crate) fn valid_bucket_name(name: &str) -> bool {
 /// The payload is an array of CustomTheme objects serialised by shell.ts.
 #[tauri::command]
 fn save_custom_themes(app: tauri::AppHandle, data: String) -> Result<(), String> {
-    atomic_write(&get_data_path(&app, "custom-themes.json"), data.as_bytes())
+    atomic_write(&get_data_path(&app, "app/custom-themes.json"), data.as_bytes())
 }
 
 /// Loads the saved custom themes JSON from disk.
@@ -805,7 +950,7 @@ fn save_custom_themes(app: tauri::AppHandle, data: String) -> Result<(), String>
 /// as a signal that no custom themes have been created.
 #[tauri::command]
 fn load_custom_themes(app: tauri::AppHandle) -> Result<String, String> {
-    match fs::read_to_string(get_data_path(&app, "custom-themes.json")) {
+    match fs::read_to_string(get_data_path(&app, "app/custom-themes.json")) {
         Ok(content) => Ok(content),
         Err(_) => Ok("[]".to_string()),
     }
@@ -819,14 +964,14 @@ fn load_custom_themes(app: tauri::AppHandle) -> Result<String, String> {
 /// Called by shell.ts on every navigation action.
 #[tauri::command]
 fn save_shell_state(app: tauri::AppHandle, data: String) -> Result<(), String> {
-    atomic_write(&get_data_path(&app, "shell-state.json"), data.as_bytes())
+    atomic_write(&get_data_path(&app, "app/shell-state.json"), data.as_bytes())
 }
 
 /// Loads the saved shell state JSON from disk.
 /// Returns a default state pointing at "home" if no file exists yet.
 #[tauri::command]
 fn load_shell_state(app: tauri::AppHandle) -> Result<String, String> {
-    match fs::read_to_string(get_data_path(&app, "shell-state.json")) {
+    match fs::read_to_string(get_data_path(&app, "app/shell-state.json")) {
         Ok(content) => Ok(content),
         Err(_) => Ok(r#"{"activeSection":"home"}"#.to_string()),
     }
@@ -852,7 +997,7 @@ fn save_lock_hash(app: tauri::AppHandle, credential: String) -> Result<(), Strin
         .hash_password(credential.as_bytes(), &salt)
         .map_err(|e| e.to_string())?
         .to_string();
-    atomic_write(&get_data_path(&app, "lock.json"), hash.as_bytes())
+    atomic_write(&get_data_path(&app, "app/lock.json"), hash.as_bytes())
 }
 
 /// Reads lock.json and returns the stored hash only if it is actually a usable
@@ -868,7 +1013,7 @@ fn save_lock_hash(app: tauri::AppHandle, credential: String) -> Result<(), Strin
 /// only ways out were the Exit App button or deleting the file by hand. One
 /// corrupt file meant a permanently unopenable app.
 fn read_valid_lock_hash(app: &tauri::AppHandle) -> Option<String> {
-    let stored = fs::read_to_string(get_data_path(app, "lock.json")).ok()?;
+    let stored = fs::read_to_string(get_data_path(app, "app/lock.json")).ok()?;
     let stored = stored.trim().to_string();
     if is_usable_lock_hash(&stored) {
         Some(stored)
@@ -932,7 +1077,7 @@ fn lock_is_set(app: tauri::AppHandle) -> bool {
 /// Removes the stored lock hash, disabling the lock entirely.
 #[tauri::command]
 fn clear_lock_hash(app: tauri::AppHandle) -> Result<(), String> {
-    let path = get_data_path(&app, "lock.json");
+    let path = get_data_path(&app, "app/lock.json");
     if path.exists() {
         fs::remove_file(path).map_err(|e| e.to_string())?;
     }
@@ -1040,6 +1185,9 @@ pub fn run() {
         // frontend uses it (all file I/O goes through custom commands), so
         // shipping it would only widen the attack surface for no benefit.
         .setup(|app| {
+            // FIRST, before any command can read a file: an install from before
+            // the data folder had a shape needs its files moved into it.
+            migrate_data_layout(app.handle());
             session_watch::init(app.handle());
             Ok(())
         })

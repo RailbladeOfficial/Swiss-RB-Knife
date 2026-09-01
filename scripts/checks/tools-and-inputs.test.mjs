@@ -426,7 +426,7 @@ test("every tool that keeps records you would miss also snapshots them", () => {
   // any file whose tool_file entry names a group.
   assert.match(
     read("src-tauri/src/lib.rs"),
-    /\("time-tracker", "data"\) => \("time-tracker\.json", "\[\]", TT_GROUP\)/,
+    /\("time-tracker", "data"\) => \("[^"]*time-tracker\.json", "\[\]", TT_GROUP\)/,
     "Time Tracker's entries are not in a snapshot group",
   );
 });
@@ -458,5 +458,73 @@ test("a migration only ever runs into an empty table", () => {
     read("src/tool/game-stats.ts"),
     /length === 0[\s\S]{0,120}migrateGamesFromJson\(/,
     "Game Stats would migrate over records that are already there",
+  );
+});
+
+test("every file the app owns lives in a folder, not loose in the data root", () => {
+  /* The data directory has a shape: app/ for the shell's own files, one folder
+     per tool, and backups/ shared. A path with no slash in it would land loose
+     at the top and quietly undo that, which is exactly how it looked before. */
+  const lib = read("src-tauri/src/lib.rs");
+
+  const table = lib.slice(lib.indexOf("fn tool_file("), lib.indexOf("Ok(ToolFile {"));
+  // Every .json the table names. The default-shape strings beside them are raw
+  // JSON literals rather than filenames, so they do not match.
+  const paths = [...table.matchAll(/"([a-z0-9./-]+\.json)"/g)].map((m) => m[1]);
+  assert.ok(paths.length >= 13, `only found ${paths.length} tool files; did the table move?`);
+  for (const path of paths) {
+    assert.ok(path.includes("/"), `${path} would sit loose in the data root`);
+  }
+
+  // The shell's own files, named directly rather than through the table.
+  for (const name of ["settings", "shell-state", "window", "lock", "custom-themes"]) {
+    assert.ok(lib.includes(`"app/${name}.json"`), `${name}.json is not in the app folder`);
+    assert.ok(
+      !new RegExp(`get_data_path\\([^)]*"${name}\\.json"`).test(lib),
+      `${name}.json is still read from the data root`,
+    );
+  }
+
+  // Kanban's records and Game Stats' database.
+  const kb = read("src-tauri/src/tools/kanban.rs");
+  assert.match(kb, /const INDEX_FILE: &str = "kanban\/kanban-index\.json"/);
+  assert.match(kb, /const BOARD_DIR: &str = "kanban\/kanban-boards"/);
+  assert.match(
+    read("src-tauri/src/db.rs"),
+    /pub const DB_FILE: &str = "game-stats\/game-stats\.db"/,
+    "the database is not named for the one tool that uses it",
+  );
+
+  /* A snapshot bucket is one flat folder, so a captured file is stored under
+     its basename. Anything looking one up has to say so. */
+  assert.ok(
+    lib.includes("fn file_basename("),
+    "nothing reduces a tool-file path to the name its .bak is stored under",
+  );
+});
+
+test("moving an old data folder into the new shape cannot destroy anything", () => {
+  const lib = read("src-tauri/src/lib.rs");
+  const at = lib.indexOf("fn relocate(");
+  const fn = lib.slice(at, lib.indexOf("\n}\n", at));
+
+  // The one rule that makes this safe to run on every launch: never write over
+  // something, so a half-migrated folder is tidied rather than clobbered.
+  assert.match(
+    fn,
+    /if !src\.exists\(\) \|\| dest\.exists\(\) \{\s*return;/,
+    "relocate would overwrite a file already at the destination",
+  );
+  assert.ok(!/remove_file|remove_dir/.test(fn), "relocate deletes rather than moves");
+
+  // The database moves with its write-ahead log, or the last writes are lost.
+  const migrate = lib.slice(lib.indexOf("pub(crate) fn migrate_data_layout"));
+  assert.match(migrate, /\["", "-wal", "-shm"\]/, "the database moves without its WAL");
+
+  // And it runs before any command can read a file.
+  assert.match(
+    lib,
+    /\.setup\(\|app\|[\s\S]{0,300}migrate_data_layout\(app\.handle\(\)\);/,
+    "the layout migration does not run at startup",
   );
 });

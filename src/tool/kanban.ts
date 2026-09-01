@@ -356,14 +356,15 @@ export interface BoardBackground {
 }
 
 /**
- * A board, as the app holds it in memory. On disk it is split in two:
+ * A board, as the app holds it in memory. On disk, inside kanban/, it is split
+ * in two:
  *
  *   the INDEX (kanban-index.json) carries id, name, description, background,
  *   createdAt and updatedAt, so the gallery is one small read rather than a
  *   read of every board you own;
  *
- *   the BOARD FILE (kanban-board-<id>.json) carries columns and nextCardNumber,
- *   alongside that board's cards.
+ *   the BOARD FILE (kanban-boards/kanban-board-<id>.json) carries columns and
+ *   nextCardNumber, alongside that board's cards.
  *
  * The split is what keeps a snapshot small: a board write captures that board
  * and the index, and no other board.
@@ -511,7 +512,7 @@ export interface KbSettings extends BoardScopedSettings {
 /**
  * The shape of an EXPORT, and only of an export. Nothing on disk looks like
  * this: the live data is split across kanban-settings.json, kanban-index.json
- * and one file per board.
+ * and one file per board in kanban-boards/.
  *
  * Deliberately self-contained rather than mirroring that split. A file you take
  * out of the app has to stand on its own; an export that referenced five other

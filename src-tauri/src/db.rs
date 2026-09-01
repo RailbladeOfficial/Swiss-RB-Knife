@@ -49,8 +49,12 @@ use tauri::{AppHandle, Manager};
 
 use crate::get_data_path;
 
-/// The database filename, beside the JSON files in the data directory.
-pub const DB_FILE: &str = "tools.db";
+/// The database, in the Game Stats folder with the rest of that tool.
+///
+/// Named for its tool rather than for the app. It held three tools for about
+/// a day, and "tools.db" was a fair name for that and a misleading one for
+/// what it is, which is the Game Stats history.
+pub const DB_FILE: &str = "game-stats/game-stats.db";
 
 /// Bumped when the schema changes. `migrate` walks from whatever the file says
 /// to this, one step at a time, so a version can never be skipped.
@@ -291,7 +295,8 @@ fn tables_for(tool_id: &str) -> Result<&'static [&'static str], String> {
 }
 
 fn backups_root(app: &AppHandle) -> Option<std::path::PathBuf> {
-    get_data_path(app, DB_FILE).parent().map(|p| p.join("backups"))
+    // The app's shared snapshot folder, not a sibling of the database.
+    Some(crate::backups_root(app))
 }
 
 /// The bucket name for right now, in the same format and the same hourly
@@ -317,7 +322,7 @@ pub fn snapshot_if_due(app: &AppHandle) {
         None => return,
     };
     let dir = root.join(current_bucket());
-    let dest = dir.join("tools.db.bak");
+    let dest = dir.join("game-stats.db.bak");
     if dest.exists() {
         return; // this hour is already captured
     }
@@ -362,7 +367,7 @@ pub fn list_db_backups(app: AppHandle) -> Result<Vec<DbBackup>, String> {
             if !crate::valid_bucket_name(&name) {
                 return None;
             }
-            let meta = std::fs::metadata(e.path().join("tools.db.bak")).ok()?;
+            let meta = std::fs::metadata(e.path().join("game-stats.db.bak")).ok()?;
             Some(DbBackup { name, bytes: meta.len() })
         })
         .collect();
@@ -388,7 +393,7 @@ pub fn restore_db_backup(app: AppHandle, tool_id: String, name: String) -> Resul
     }
     let tables = tables_for(&tool_id)?;
     let root = backups_root(&app).ok_or_else(|| "No backups folder.".to_string())?;
-    let src = root.join(&name).join("tools.db.bak");
+    let src = root.join(&name).join("game-stats.db.bak");
     if !src.is_file() {
         return Err("That snapshot does not hold a database.".to_string());
     }
