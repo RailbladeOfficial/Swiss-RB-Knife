@@ -49,7 +49,7 @@ use image::{DynamicImage, GenericImageView, ImageFormat};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -128,6 +128,32 @@ fn validate_output_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/* WHY EACH PREVIEW PATH IS HANDED TO THE ASSET SCOPE.
+   -----------------------------------------------------------------------------
+   The webview draws these images with convertFileSrc(), which goes through
+   Tauri's asset protocol, and that protocol serves nothing the scope has not
+   been told about. The scope starts holding only the app's own data folder
+   (see the setup() in lib.rs), because a scope of "**" means a webview that
+   ever ran something it should not could read any file on the disk by asking
+   for it as an image.
+
+   Image CCR is the one tool that legitimately renders files from anywhere: the
+   sources someone picked, and the results it wrote where they asked. So each of
+   those files is allowed ONE AT A TIME, at the moment this process has itself
+   opened it and knows what it is. What is granted is what the tool actually
+   produced or was pointed at, never a pattern.
+
+   AND ONLY AFTER IT HAS READ AS AN IMAGE. Each of these calls grants its path
+   at the END, past the point where the file has been decoded or written by this
+   process. A path that is not one of the seven formats this build can read
+   never reaches the grant, so what the scope can accumulate is images, not
+   whatever file a caller cared to name. */
+fn allow_preview(app: &AppHandle, path: &str) {
+    // Best effort: a preview that cannot be granted shows a broken thumbnail,
+    // which must not fail the operation that produced the file.
+    let _ = app.asset_protocol_scope().allow_file(path);
+}
+
 // =============================================================================
 //  get_image_info
 // =============================================================================
@@ -137,8 +163,8 @@ fn validate_output_name(name: &str) -> Result<(), String> {
 /// image::open() decode. This command only needs width/height/size, and the
 /// Combine tab may call it once per file across a whole multi-select.
 #[tauri::command]
-pub async fn get_image_info(path: String) -> Result<ImageInfo, String> {
-    tauri::async_runtime::spawn_blocking(move || -> Result<ImageInfo, String> {
+pub async fn get_image_info(app: AppHandle, path: String) -> Result<ImageInfo, String> {
+    let info = tauri::async_runtime::spawn_blocking(move || -> Result<ImageInfo, String> {
         let p = Path::new(&path);
 
         let size_bytes = std::fs::metadata(p)
@@ -163,7 +189,9 @@ pub async fn get_image_info(path: String) -> Result<ImageInfo, String> {
         })
     })
     .await
-    .map_err(|e| format!("Image info task failed: {e}"))?
+    .map_err(|e| format!("Image info task failed: {e}"))??;
+    allow_preview(&app, &info.path);
+    Ok(info)
 }
 
 // =============================================================================
@@ -446,6 +474,7 @@ fn composite_streaming(
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn preview_combine(
+    app: AppHandle,
     paths: Vec<String>,
     direction: String,
     gap: Option<u32>,
@@ -455,7 +484,7 @@ pub async fn preview_combine(
     border_color: Option<String>,
     output_format: Option<String>,
 ) -> Result<PreviewResult, String> {
-    tauri::async_runtime::spawn_blocking(move || -> Result<PreviewResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<PreviewResult, String> {
         if paths.len() < 2 {
             return Err("Need at least 2 images.".to_string());
         }
@@ -506,7 +535,9 @@ pub async fn preview_combine(
         })
     })
     .await
-    .map_err(|e| format!("Preview task failed: {e}"))?
+    .map_err(|e| format!("Preview task failed: {e}"))??;
+    allow_preview(&app, &result.temp_path);
+    Ok(result)
 }
 
 // =============================================================================
@@ -520,6 +551,7 @@ pub async fn preview_combine(
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn combine_images(
+    app: AppHandle,
     paths: Vec<String>,
     direction: String,
     output_folder: Option<String>,
@@ -531,7 +563,7 @@ pub async fn combine_images(
     border_color: Option<String>,
     output_format: Option<String>,
 ) -> Result<CombineResult, String> {
-    tauri::async_runtime::spawn_blocking(move || -> Result<CombineResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<CombineResult, String> {
         if paths.len() < 2 {
             return Err("Need at least 2 images to combine.".to_string());
         }
@@ -586,7 +618,9 @@ pub async fn combine_images(
         })
     })
     .await
-    .map_err(|e| format!("Combine task failed: {e}"))?
+    .map_err(|e| format!("Combine task failed: {e}"))??;
+    allow_preview(&app, &result.output_path);
+    Ok(result)
 }
 
 // =============================================================================
@@ -595,12 +629,13 @@ pub async fn combine_images(
 
 #[tauri::command]
 pub async fn compress_image(
+    app: AppHandle,
     path: String,
     percentage: u32,
     output_folder: Option<String>,
     output_name: String,
 ) -> Result<CompressResult, String> {
-    tauri::async_runtime::spawn_blocking(move || -> Result<CompressResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<CompressResult, String> {
         if !(1..=99).contains(&percentage) {
             return Err("Percentage must be between 1 and 99.".to_string());
         }
@@ -656,7 +691,9 @@ pub async fn compress_image(
         })
     })
     .await
-    .map_err(|e| format!("Compress task failed: {e}"))?
+    .map_err(|e| format!("Compress task failed: {e}"))??;
+    allow_preview(&app, &result.output_path);
+    Ok(result)
 }
 
 // =============================================================================

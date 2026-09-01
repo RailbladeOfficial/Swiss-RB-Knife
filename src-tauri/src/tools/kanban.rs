@@ -492,6 +492,10 @@ pub struct ImportedAttachment {
     id: String,
     name: String,
     size: u64,
+    /// What the copy is actually called inside its board's folder: the id plus
+    /// the original file's extension. Kept on the card so the front end can
+    /// point at it without guessing. See stored_name.
+    file: String,
 }
 
 /* -----------------------------------------------------------------------------
@@ -520,6 +524,79 @@ fn board_attach_dir(app: &AppHandle, board_id: &str) -> Result<PathBuf, String> 
     Ok(dir)
 }
 
+/* THE COPY KEEPS THE ORIGINAL'S EXTENSION, and it has to.
+   -----------------------------------------------------------------------------
+   The file used to be stored under the bare attachment id, with the extension
+   deliberately dropped, on the reasoning that the original name was of no
+   interest once the file was inside the app. That is true of the NAME and false
+   of the EXTENSION, because on Windows the extension is the file's type.
+
+   Previews survived it, because Tauri's asset protocol sniffs the leading bytes
+   and answers with a content type it worked out for itself. Opening did not: the
+   Open button hands the path to the shell, and a file with no extension has
+   nothing for the shell to associate, so a .pdf or a .docx landed on "How do you
+   want to open this file?" instead of in the program that owns it.
+
+   So the copy is <attachmentId>.<ext>. The id is still what names it, which is
+   what keeps a card unable to point outside its own board; the extension is
+   carried along beside it. Anything already stored under a bare id still opens:
+   every lookup checks the exact id first and then anything that is the id plus
+   an extension, so nothing has to be renamed on disk. */
+
+/// The extension of `source`, lowercased and reduced to something that can only
+/// ever be an extension. Empty when there is nothing usable.
+fn stored_ext(source: &Path) -> String {
+    let ext = match source.extension().and_then(|e| e.to_str()) {
+        Some(e) => e.to_lowercase(),
+        None => return String::new(),
+    };
+    // Letters and digits only, and short. An "extension" carrying a separator,
+    // a dot or a device name is not one, and this string is about to be joined
+    // onto a path.
+    if ext.is_empty()
+        || ext.len() > 16
+        || !ext.chars().all(|c| c.is_ascii_alphanumeric())
+        || crate::is_reserved_device_name(&ext)
+    {
+        return String::new();
+    }
+    ext
+}
+
+/// What one attachment's copy is called on disk.
+fn stored_name(attachment_id: &str, source: &Path) -> String {
+    let ext = stored_ext(source);
+    if ext.is_empty() {
+        attachment_id.to_string()
+    } else {
+        format!("{attachment_id}.{ext}")
+    }
+}
+
+/// Every filename in `dir` that belongs to this attachment: the bare id, as
+/// stored before extensions were kept, and the id plus any one extension.
+///
+/// Ordered exact-first, so a folder somehow holding both answers the same way
+/// every lookup does.
+fn attachment_files(dir: &Path, attachment_id: &str) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let exact = dir.join(attachment_id);
+    if exact.is_file() {
+        out.push(exact);
+    }
+    let prefix = format!("{attachment_id}.");
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            // Not the half-written temp from an interrupted copy.
+            if name.starts_with(&prefix) && !name.ends_with(".part") && entry.path().is_file() {
+                out.push(entry.path());
+            }
+        }
+    }
+    out
+}
+
 /// Where an attachment is, if it is anywhere.
 fn find_attachment(
     app: &AppHandle,
@@ -529,8 +606,8 @@ fn find_attachment(
     if !valid_board_id(board_id) || !valid_attachment_id(attachment_id) {
         return Err("That attachment is not one of ours.".to_string());
     }
-    let path = attach_root(app).join(board_id).join(attachment_id);
-    Ok(if path.is_file() { Some(path) } else { None })
+    let dir = attach_root(app).join(board_id);
+    Ok(attachment_files(&dir, attachment_id).into_iter().next())
 }
 
 /// The original filename, for display. Reduced to one path component and
@@ -562,17 +639,22 @@ fn display_name(path: &Path) -> String {
 /// half way never appears under the name a card points at. The copy is streamed
 /// rather than read into memory, which is why an attachment can be a screen
 /// recording rather than something that has to fit in RAM.
+/// `type_from` is what the extension is taken from, which is not always the
+/// file being copied: a pasted image is staged under a temporary name, and it
+/// is the name the paste was given that says what it is.
 fn store_attachment(
     app: &AppHandle,
     board_id: &str,
     attachment_id: &str,
     source: &Path,
-) -> Result<(), String> {
+    type_from: &Path,
+) -> Result<String, String> {
     let dir = board_attach_dir(app, board_id)?;
     if !valid_attachment_id(attachment_id) {
         return Err("That attachment id is not one of ours.".to_string());
     }
-    let final_path = dir.join(attachment_id);
+    let name = stored_name(attachment_id, type_from);
+    let final_path = dir.join(&name);
     let temp = dir.join(format!("{attachment_id}.part"));
 
     if let Err(e) = fs::copy(source, &temp) {
@@ -583,7 +665,7 @@ fn store_attachment(
         let _ = fs::remove_file(&temp);
         return Err(format!("Could not store that file: {e}"));
     }
-    Ok(())
+    Ok(name)
 }
 
 /// Where the attachments folder is, so the front end can build asset-protocol
@@ -624,11 +706,12 @@ pub fn import_kanban_attachment(
         ));
     }
 
-    store_attachment(&app, &board_id, &attachment_id, &source)?;
+    let file = store_attachment(&app, &board_id, &attachment_id, &source, &source)?;
     Ok(ImportedAttachment {
         id: attachment_id,
         name: display_name(&source),
         size,
+        file,
     })
 }
 
@@ -668,14 +751,17 @@ pub fn paste_kanban_attachment(
     // same one store, rather than two that could drift.
     let temp = attach_root(&app).join(format!("paste-{attachment_id}.tmp"));
     fs::write(&temp, &bytes).map_err(|e| format!("Could not stage that image: {e}"))?;
-    let stored = store_attachment(&app, &board_id, &attachment_id, &temp);
+    // The extension comes from the name the paste was given, not from the
+    // staging file: "paste-<id>.tmp" would store every screenshot as a .tmp.
+    let stored = store_attachment(&app, &board_id, &attachment_id, &temp, Path::new(&name));
     let _ = fs::remove_file(&temp);
-    stored?;
+    let file = stored?;
 
     Ok(ImportedAttachment {
         id: attachment_id,
         name: display_name(Path::new(&name)),
         size,
+        file,
     })
 }
 
@@ -693,10 +779,12 @@ pub fn copy_kanban_attachment(
     to_board_id: String,
     from_attachment_id: String,
     to_attachment_id: String,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let source = find_attachment(&app, &from_board_id, &from_attachment_id)?
         .ok_or_else(|| "That attachment is no longer on disk.".to_string())?;
-    store_attachment(&app, &to_board_id, &to_attachment_id, &source)
+    // Returns what the copy is called, because the copy carries its own id and
+    // therefore its own filename, and the card pointing at it needs to know.
+    store_attachment(&app, &to_board_id, &to_attachment_id, &source, &source)
 }
 
 /// Whether each of these attachments is still on disk.
@@ -729,14 +817,46 @@ pub fn open_kanban_attachment(
     name: String,
 ) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
-    // `name` is not used to find the file, only to keep the front end's call
-    // shape stable; the file is named by its id.
-    let _ = name;
+    /* `name` is the ORIGINAL filename and is not what finds the file: the copy
+       is named by its id. It stays in the signature because it is what the
+       front end has, and because a copy stored before extensions were kept has
+       nothing for the shell to associate; the fallback below uses it. */
     let path = find_attachment(&app, &board_id, &attachment_id)?
         .ok_or_else(|| "That file is no longer on disk.".to_string())?;
+
+    /* A copy stored before extensions were kept has no type for the shell to
+       look up, so it would open the "how do you want to open this" picker. For
+       those, and only those, a correctly named copy is put in a temp folder and
+       that is what opens. It is a copy: edits made in whatever opens it do not
+       come back, which is the honest cost of a file that was stored without its
+       type. Anything attached since keeps its extension and opens in place. */
+    let target = if path.extension().is_none() {
+        handoff_copy(&path, &name).unwrap_or(path)
+    } else {
+        path
+    };
+
     app.opener()
-        .open_path(path.to_string_lossy().to_string(), None::<&str>)
+        .open_path(target.to_string_lossy().to_string(), None::<&str>)
         .map_err(|e| format!("Could not open that file: {e}"))
+}
+
+/// A correctly named copy of an extension-less attachment, in its own temp
+/// folder so two files called "report.pdf" cannot land on each other.
+fn handoff_copy(path: &Path, display: &str) -> Option<PathBuf> {
+    let name = display_name(Path::new(display));
+    if Path::new(&name).extension().is_none() {
+        return None; // nothing to gain; open the original
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("swiss-rb-knife-open-{stamp}"));
+    fs::create_dir_all(&dir).ok()?;
+    let dest = dir.join(name);
+    fs::copy(path, &dest).ok()?;
+    Some(dest)
 }
 
 /// Removes one attachment's file.
@@ -920,12 +1040,13 @@ fn revive_attachment(app: &AppHandle, board_id: &str, attachment_id: &str) -> bo
         Ok(d) => d,
         Err(_) => return false,
     };
-    for name in [attachment_id.to_string()] {
-        let from = dir.join(&name);
-        if !from.is_file() {
-            continue;
-        }
-        if fs::copy(&from, live_dir.join(&name)).is_ok() {
+    /* Whatever the store has under this id, which is the bare id for anything
+       retired before extensions were kept and id.ext for everything since. It
+       goes back under the name it was retired with, so a revived file is the
+       same file the card was pointing at. */
+    for from in attachment_files(&dir, attachment_id) {
+        let Some(name) = from.file_name() else { continue };
+        if fs::copy(&from, live_dir.join(name)).is_ok() {
             return true;
         }
     }

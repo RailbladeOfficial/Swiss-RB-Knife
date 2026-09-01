@@ -683,21 +683,72 @@ fn snapshot_group(app: &tauri::AppHandle, tool_dir: &str, group_paths: &[PathBuf
    its own shape; the front end assembles one and applies the other.
 ============================================================================= */
 
-/// Writes an export to a path the user chose, returning where it landed.
-#[tauri::command]
-fn export_tool_json(path: String, data: String) -> Result<String, String> {
+/* THE DIALOG IS OPENED HERE, NOT IN THE FRONT END, and that is the whole point
+   of these two.
+
+   They used to take a path as an argument. Every other write in this app is
+   pinned to a name from one of the allowlists above, for the reason get_data_path
+   states: nothing joins a path that arrived from the front end unchecked. These
+   two broke that rule, and this app runs elevated, so `export_tool_json` was a
+   write-anywhere-as-Administrator command with nothing but a convention in
+   front of it. The dialog was that convention: real, but enforced on the wrong
+   side of the boundary.
+
+   Now the destination is whatever the person at the keyboard picked in an OS
+   dialog this process opened. There is no argument to lie about. The front end
+   suggests a FILENAME, which is checked like every other filename before it is
+   put in front of anyone.
+
+   `#[tauri::command(async)]` on a sync function is what puts these on a worker
+   thread. The blocking dialog calls must not run on the main thread, which is
+   where a plain #[tauri::command] would put them, and where they would freeze
+   the event loop the dialog needs in order to answer. */
+
+/// Asks where to put an export and writes it there, returning where it landed.
+/// `Ok(None)` means the dialog was cancelled, which is not an error.
+#[tauri::command(async)]
+fn export_tool_json(
+    app: tauri::AppHandle,
+    suggested_name: String,
+    data: String,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let name = sanitize_filename(&suggested_name)?;
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Export")
+        .set_file_name(name)
+        .add_filter("JSON", &["json"])
+        .blocking_save_file();
+    let Some(dest) = picked.and_then(|p| p.as_path().map(|p| p.to_path_buf())) else {
+        return Ok(None);
+    };
     // Through the atomic helper like every other write: an export interrupted
     // half way must not leave a file that looks complete and is not.
-    let dest = PathBuf::from(&path);
     atomic_write(&dest, data.as_bytes())?;
-    Ok(dest.to_string_lossy().to_string())
+    Ok(Some(dest.to_string_lossy().to_string()))
 }
 
-/// Reads a file the user picked. Returns its text; deciding what it means is
-/// the tool's job.
-#[tauri::command]
-fn import_tool_json(path: String) -> Result<String, String> {
-    fs::read_to_string(PathBuf::from(&path)).map_err(|e| format!("Could not read that file: {e}"))
+/// Asks for a file and returns its text. `Ok(None)` means the dialog was
+/// cancelled. Deciding what the text MEANS is the tool's job.
+#[tauri::command(async)]
+fn import_tool_json(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("Import")
+        .add_filter("JSON", &["json"])
+        .blocking_pick_file();
+    let Some(src) = picked.and_then(|p| p.as_path().map(|p| p.to_path_buf())) else {
+        return Ok(None);
+    };
+    fs::read_to_string(&src)
+        .map(Some)
+        .map_err(|e| format!("Could not read that file: {e}"))
 }
 
 /* =============================================================================
@@ -1312,6 +1363,28 @@ pub fn run() {
             // FIRST, before any command can read a file: an install from before
             // the data folder had a shape needs its files moved into it.
             migrate_data_layout(app.handle());
+
+            /* WHAT THE WEBVIEW MAY RENDER FROM DISK.
+               ---------------------------------------------------------------
+               tauri.conf.json declares the asset protocol with an EMPTY scope,
+               so out of the box it serves nothing. It used to declare "**",
+               which is every file on the machine: a webview that ever ran
+               something it should not could then read any file it could name
+               by asking for it as an image.
+
+               The app's own data folder is granted here, which covers Kanban's
+               attachments and board backgrounds. It is done at runtime rather
+               than in the config because the folder is not the same place in a
+               dev build as in a release one, and a config pattern can only
+               name one of them.
+
+               Image CCR is the one tool that renders files from outside, and
+               it grants them one at a time as it opens them. See allow_preview
+               in image_ccr.rs. */
+            let _ = app
+                .asset_protocol_scope()
+                .allow_directory(data_root(app.handle()), true);
+
             session_watch::init(app.handle());
             Ok(())
         })

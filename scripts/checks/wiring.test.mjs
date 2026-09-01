@@ -69,7 +69,11 @@ test("every action the app asks the backend to run actually exists there", () =>
 
   const defined = new Set();
   for (const file of filesUnder("src-tauri/src", ".rs")) {
-    for (const m of read(file).matchAll(/#\[tauri::command\][\s\S]{0,120}?fn\s+([a-z0-9_]+)/g)) {
+    // `#[tauri::command]` or `#[tauri::command(async)]`. The second form is what
+    // puts a sync command on a worker thread, and a regex that only knew the
+    // first reported those commands as missing.
+    const decl = /#\[tauri::command(?:\([^)]*\))?\][\s\S]{0,120}?fn\s+([a-z0-9_]+)/g;
+    for (const m of read(file).matchAll(decl)) {
       defined.add(m[1]);
     }
   }
@@ -108,7 +112,11 @@ test("no backend action exists that nothing ever calls", () => {
   // UI, wire it up or take it out; do not just delete the test.
   const defined = new Map();
   for (const file of filesUnder("src-tauri/src", ".rs")) {
-    for (const m of read(file).matchAll(/#\[tauri::command\][\s\S]{0,120}?fn\s+([a-z0-9_]+)/g)) {
+    // `#[tauri::command]` or `#[tauri::command(async)]`. The second form is what
+    // puts a sync command on a worker thread, and a regex that only knew the
+    // first reported those commands as missing.
+    const decl = /#\[tauri::command(?:\([^)]*\))?\][\s\S]{0,120}?fn\s+([a-z0-9_]+)/g;
+    for (const m of read(file).matchAll(decl)) {
       defined.set(m[1], file);
     }
   }

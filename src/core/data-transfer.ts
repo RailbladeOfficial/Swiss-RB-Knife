@@ -32,7 +32,6 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 
 import { devError } from "./dev-log";
 
@@ -154,16 +153,16 @@ function suggestedName(tool: Transferable): string {
   return `${tool.id}-${day}.json`;
 }
 
+/* THE FILE DIALOGS BELONG TO THE BACKEND, not to this module, and that is why
+   neither of these opens one. A path chosen here would be a path the backend
+   had to take on trust, and it writes as Administrator. The command opens the
+   dialog itself and returns null if it was closed. See the note above
+   export_tool_json in lib.rs. */
+
 async function doExport(): Promise<void> {
   const tool = current();
   if (!tool) return;
   try {
-    const path = await saveDialog({
-      defaultPath: suggestedName(tool),
-      filters: [{ name: "JSON", extensions: ["json"] }],
-    });
-    if (!path) return;
-
     const envelope: ExportEnvelope = {
       app: "swiss-rb-knife",
       tool: tool.id,
@@ -173,10 +172,11 @@ async function doExport(): Promise<void> {
     };
     // Indented: an export is meant to be readable and diffable outside this
     // app, which one long line is useless for.
-    const written = await invoke<string>("export_tool_json", {
-      path,
+    const written = await invoke<string | null>("export_tool_json", {
+      suggestedName: suggestedName(tool),
       data: JSON.stringify(envelope, null, 2),
     });
+    if (written === null) return; // dialog closed
     flashFn(`Exported ${tool.label} to ${written}`, "success", 8000);
   } catch (err) {
     devError("[data] export failed", err);
@@ -188,14 +188,9 @@ async function doImport(): Promise<void> {
   const tool = current();
   if (!tool) return;
   try {
-    const picked = await openDialog({
-      multiple: false,
-      directory: false,
-      filters: [{ name: "JSON", extensions: ["json"] }],
-    });
-    if (typeof picked !== "string") return;
+    const raw = await invoke<string | null>("import_tool_json");
+    if (raw === null) return; // dialog closed
 
-    const raw = await invoke<string>("import_tool_json", { path: picked });
     const envelope = JSON.parse(raw) as Partial<ExportEnvelope>;
 
     // Checked before anything is replaced. Importing Game Stats into the Kanban

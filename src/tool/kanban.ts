@@ -227,12 +227,21 @@ export interface Attachment {
    *  restored snapshot cannot resurrect a pointer to a stranger's file, and
    *  deleting a board is deleting one folder rather than walking its cards. */
   id: string;
-  /** The ORIGINAL filename, for display. The only place it survives: the copy
-   *  on disk is named by the id. */
+  /** The ORIGINAL filename, for display. The copy on disk is named by the id,
+   *  and keeps only this name's extension. */
   name: string;
   /** Bytes of the original, as measured when it was copied in. */
   size: number;
   addedAt: number;
+  /** What the copy is called inside its board's folder: the id plus the
+   *  original's extension. Absent on anything attached before the extension was
+   *  kept, where the file is named by the bare id and that is the fallback.
+   *
+   *  Written down rather than derived from `name`, so a rule change in the back
+   *  end can never leave the front end pointing at a filename that is not
+   *  there. It is still only ever the id plus an extension, so it cannot name a
+   *  file outside its own board. */
+  file?: string;
 }
 
 /**
@@ -4232,7 +4241,7 @@ function attachmentUrl(boardId: string, attachment: Attachment): string {
 
 /** Where the file actually is. Derived, never stored; see the Attachment type. */
 function attachmentPath(boardId: string, attachment: Attachment): string {
-  return `${attachmentsRoot}/${boardId}/${attachment.id}`;
+  return `${attachmentsRoot}/${boardId}/${attachment.file ?? attachment.id}`;
 }
 
 /** The absolute path of kanban-attachments/, learned once from the back end.
@@ -4324,7 +4333,9 @@ async function cloneAttachments(original: Card, copy: Card): Promise<void> {
   if (copy.attachments.length === 0) return;
   for (let i = 0; i < copy.attachments.length; i++) {
     try {
-      await invoke("copy_kanban_attachment", {
+      // The copy has its own id, so it has its own filename. Recorded on the
+      // duplicate rather than left to be guessed at.
+      copy.attachments[i].file = await invoke<string>("copy_kanban_attachment", {
         fromBoardId: original.boardId,
         toBoardId: copy.boardId,
         fromAttachmentId: original.attachments[i].id,
@@ -4354,7 +4365,7 @@ async function moveAttachmentsToBoard(
   if (list.length === 0 || fromBoardId === toBoardId) return;
   for (const attachment of list) {
     try {
-      await invoke("copy_kanban_attachment", {
+      attachment.file = await invoke<string>("copy_kanban_attachment", {
         fromBoardId,
         toBoardId,
         fromAttachmentId: attachment.id,
@@ -4404,11 +4415,17 @@ async function pickAttachments(boardId: string, have: number): Promise<Attachmen
     // copy will be written under.
     const id = newId();
     try {
-      const stored = await invoke<{ id: string; name: string; size: number }>(
+      const stored = await invoke<{ id: string; name: string; size: number; file: string }>(
         "import_kanban_attachment",
         { boardId, attachmentId: id, path },
       );
-      out.push({ id: stored.id, name: stored.name, size: stored.size, addedAt: Date.now() });
+      out.push({
+        id: stored.id,
+        name: stored.name,
+        size: stored.size,
+        file: stored.file,
+        addedAt: Date.now(),
+      });
     } catch (err) {
       flash(String(err), "error", 8000);
     }
@@ -4456,7 +4473,7 @@ async function attachPastedImage(
     const ext = (blob.type.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "").slice(0, 8);
     const stamp = new Date().toLocaleString("sv-SE").replace(/[: ]/g, "-");
     const id = newId();
-    const stored = await invoke<{ id: string; name: string; size: number }>(
+    const stored = await invoke<{ id: string; name: string; size: number; file: string }>(
       "paste_kanban_attachment",
       {
         boardId,
@@ -4467,7 +4484,13 @@ async function attachPastedImage(
         dataBase64: btoa(binary),
       },
     );
-    return { id: stored.id, name: stored.name, size: stored.size, addedAt: Date.now() };
+    return {
+      id: stored.id,
+      name: stored.name,
+      size: stored.size,
+      file: stored.file,
+      addedAt: Date.now(),
+    };
   } catch (err) {
     flash(String(err), "error", 8000);
     return null;
