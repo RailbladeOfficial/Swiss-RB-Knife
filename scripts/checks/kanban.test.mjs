@@ -1049,12 +1049,33 @@ test("a board background is found by name, not by a path it remembered", () => {
     "these draw a background straight from the stored path",
   );
 
-  // And the resolver reduces the record to its last segment, so a board still
-  // carrying an old absolute path resolves to the file that exists today.
+  // And the resolver reduces the record to its last segment, on BOTH separators.
+  //
+  // This is checked by running it, not by matching the source. The first cut of
+  // this test asserted only that backgroundSrc called .split(, and it passed
+  // happily over a character class that had lost a backslash and therefore
+  // matched forward slashes alone. Against a Windows path that split nothing,
+  // handed back the whole stale record, and the background stayed missing.
   const at = src.indexOf("function backgroundSrc(");
   const body = src.slice(at, src.indexOf("\n}", at));
-  assert.match(body, /\.split\(/, "backgroundSrc does not reduce the record to a filename");
   assert.match(body, /backgroundsRoot/, "backgroundSrc does not resolve against the reported folder");
+
+  const reduce = new Function(
+    "p",
+    `${body.slice(body.indexOf("{") + 1, body.lastIndexOf("return"))} return file;`
+      .replace(/bg\.path/g, "p"),
+  );
+  for (const [stored, expected] of [
+    [String.raw`D:\app\data\kanban-backgrounds\bg-1.jpg`, "bg-1.jpg"],
+    ["D:/app/data/kanban-backgrounds/bg-2.png", "bg-2.png"],
+    ["bg-3.webp", "bg-3.webp"],
+  ]) {
+    assert.equal(
+      reduce(stored),
+      expected,
+      `backgroundSrc does not reduce ${JSON.stringify(stored)} to its filename`,
+    );
+  }
 
   // The importer hands back a name, so new records cannot carry a path at all.
   const rs = read("src-tauri/src/tools/kanban.rs");

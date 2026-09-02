@@ -4273,7 +4273,12 @@ let backgroundsRoot = "";
  * reason: a stored path is a guess about the future that a tidy-up can break.
  */
 function backgroundSrc(bg: BoardBackground): string {
-  const file = bg.path.split(/[\/]/).pop() ?? bg.path;
+  // lastIndexOf twice rather than a regex character class. The class that
+  // belongs here is [\\/], and a single missing backslash makes it match only
+  // forward slashes, which silently does nothing to a Windows path and hands
+  // back the whole stale record. This form cannot be got wrong quietly.
+  const cut = Math.max(bg.path.lastIndexOf("/"), bg.path.lastIndexOf("\\"));
+  const file = cut === -1 ? bg.path : bg.path.slice(cut + 1);
   return convertFileSrc(`${backgroundsRoot}/${file}`);
 }
 
