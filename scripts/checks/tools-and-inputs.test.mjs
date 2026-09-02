@@ -431,6 +431,39 @@ test("every tool that keeps records you would miss also snapshots them", () => {
   );
 });
 
+test("a schema version never decides whether a table exists", () => {
+  /* THE BUG THIS EXISTS TO STOP, which has happened once.
+
+     migrate() returned as soon as the file's version matched the code's, so
+     the CREATE TABLE statements sat behind that check. A database that reached
+     a version WITHOUT the table that version added could then never get it: the
+     only thing that creates it never ran again. Reads of that table failed
+     forever and Game Stats loaded empty with every game still on disk.
+
+     A version number records which ONE-WAY steps have run. Every statement in
+     SCHEMA is IF NOT EXISTS, so it costs microseconds to run on every open and
+     it makes that state unreachable. */
+  const rs = read("src-tauri/src/db.rs");
+  const at = rs.indexOf("fn migrate(");
+  assert.notEqual(at, -1, "migrate is missing");
+  const body = rs.slice(at, rs.indexOf("\n}\n", at));
+
+  assert.ok(
+    !/if current >= SCHEMA_VERSION \{\s*return Ok\(\)/.test(body),
+    "migrate returns before creating its tables, so a missing one can never be repaired",
+  );
+  assert.match(body, /conn\.execute_batch\(SCHEMA\)/, "migrate never applies the schema");
+
+  // And every table it creates has to be creatable more than once.
+  const schema = rs.slice(rs.indexOf("const SCHEMA"), rs.indexOf('"#;', rs.indexOf("const SCHEMA")));
+  const creates = [...schema.matchAll(/CREATE (TABLE|INDEX)([^(]*)/g)];
+  assert.ok(creates.length >= 8, `parsed ${creates.length} schema statements, expected more`);
+  const unguarded = creates
+    .filter((m) => !m[2].includes("IF NOT EXISTS"))
+    .map((m) => `${m[1]}${m[2]}`.trim());
+  assert.deepEqual(unguarded, [], "these would fail on the second open, so the schema cannot re-run");
+});
+
 test("a migration runs once and records that it did", () => {
   /* Game Stats has shipped, so game-stats.json holds real history. The move
      happens ONCE, and "once" has to be a thing the database REMEMBERS.
@@ -481,7 +514,7 @@ test("a migration runs once and records that it did", () => {
   // And the front end asks the recorded answer, not the row count.
   assert.match(
     read("src/tool/game-stats.ts"),
-    /!snapshot\.jsonMigrated[\s\S]{0,120}migrateGamesFromJson\(/,
+    /!snapshot\.jsonMigrated[\s\S]{0,700}migrateGamesFromJson\(/,
     "Game Stats decides whether to migrate from how many games it can see",
   );
 });

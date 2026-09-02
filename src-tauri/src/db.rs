@@ -110,9 +110,21 @@ fn configure(conn: &Connection) -> rusqlite::Result<()> {
 
 fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     let current: i32 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
-    if current >= SCHEMA_VERSION {
-        return Ok(());
-    }
+
+    /* THE ONE-WAY STEPS ARE GATED ON THE VERSION. THE SCHEMA IS NOT.
+       -----------------------------------------------------------------------
+       This used to return here the moment the version matched, which made a
+       missing table permanent. That is not hypothetical: v5 added gs_meta, and
+       a database that reached version 5 without it could never get it, because
+       the only statement that creates it sat behind this check. Every read of
+       that table then failed, and Game Stats loaded empty while all 175 games
+       sat there untouched.
+
+       A version number records which ONE-WAY steps have run. It is not a
+       promise about what the file contains, and treating it as one puts a
+       database one interrupted upgrade away from being permanently wrong.
+       Every statement in SCHEMA is IF NOT EXISTS, so running it on every open
+       costs microseconds and cannot get stuck. */
 
     /* WHAT A STEP MAY DROP. Only a table whose contents are not the only copy
        of anything. Once Game Stats has migrated, its tables ARE the only copy:
@@ -183,7 +195,9 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         }
     }
 
-    conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    if current < SCHEMA_VERSION {
+        conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    }
     Ok(())
 }
 

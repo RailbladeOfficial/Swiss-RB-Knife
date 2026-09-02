@@ -86,6 +86,29 @@ pub(crate) fn data_root(app: &tauri::AppHandle) -> PathBuf {
     }
 }
 
+/// Lets the webview render a path through the asset protocol.
+///
+/// CANONICALIZED FIRST, and that is the whole reason this is a function rather
+/// than one line at each call site. Tauri canonicalizes the path it is asked
+/// for before testing it against the scope, and on Windows that produces a
+/// verbatim path: `\\?\D:\...`. A pattern registered as plain `D:\...` never
+/// matches one, so the grant silently does nothing and the picture just does
+/// not appear. Registering the canonical form gets both, because Tauri also
+/// stores the prefix-stripped version of anything given to it with a prefix.
+///
+/// Best effort throughout: a path that cannot be canonicalized is registered as
+/// it stands, and a grant that fails costs a broken thumbnail rather than the
+/// operation that produced it.
+pub(crate) fn allow_asset_path(app: &tauri::AppHandle, path: &std::path::Path, dir: bool) {
+    let resolved = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let scope = app.asset_protocol_scope();
+    let _ = if dir {
+        scope.allow_directory(&resolved, true)
+    } else {
+        scope.allow_file(&resolved)
+    };
+}
+
 /// Where one tool's hourly snapshots live: <tool>/backups.
 ///
 /// `tool_dir` is the folder name, which is also the tool id everywhere else in
@@ -1388,9 +1411,7 @@ pub fn run() {
                Image CCR is the one tool that renders files from outside, and
                it grants them one at a time as it opens them. See allow_preview
                in image_ccr.rs. */
-            let _ = app
-                .asset_protocol_scope()
-                .allow_directory(data_root(app.handle()), true);
+            allow_asset_path(app.handle(), &data_root(app.handle()), true);
 
             session_watch::init(app.handle());
             Ok(())
@@ -1566,3 +1587,4 @@ mod filename_tests {
         }
     }
 }
+

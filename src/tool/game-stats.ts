@@ -385,9 +385,19 @@ async function loadFromDisk(): Promise<void> {
     let snapshot = await invoke<GsSnapshot>("gs_load");
 
     if (!snapshot.jsonMigrated) {
-      const moved = await migrateGamesFromJson();
-      snapshot = await invoke<GsSnapshot>("gs_load");
-      if (moved > 0) flash(`Moved ${moved} games into the new storage.`, "success", 9000);
+      /* THE MIGRATION MUST NEVER COST YOU THE GAMES YOU ALREADY HAVE. It is a
+         one-off tidy-up of a file from before the database; the records came
+         back from gs_load a line ago and are fine either way. So a failure here
+         is reported and stepped over, rather than thrown into the catch below,
+         which empties the tool on screen and makes an intact history look lost. */
+      try {
+        const hadGames = snapshot.games.length > 0;
+        const moved = await migrateGamesFromJson(hadGames);
+        snapshot = await invoke<GsSnapshot>("gs_load");
+        if (moved > 0) flash(`Moved ${moved} games into the new storage.`, "success", 9000);
+      } catch (err) {
+        devError("Game Stats: could not finish the one-off JSON migration", err);
+      }
     }
     await loadSettingsFile();
 
@@ -416,8 +426,13 @@ async function loadFromDisk(): Promise<void> {
   backfillTables();
 }
 
-/** Reads the old game-stats.json and hands it to the database, once ever. */
-async function migrateGamesFromJson(): Promise<number> {
+/** Reads the old game-stats.json and hands it to the database, once ever.
+ *
+ *  `hadGames` says whether the database already held records. When it did,
+ *  this call is only recording that the old file has been dealt with, and the
+ *  preferences in that file are from before the move and must NOT be written
+ *  over the ones in use. */
+async function migrateGamesFromJson(hadGames: boolean): Promise<number> {
   let parsed: Partial<GameStatsData> = {};
   try {
     const raw = await invoke<string>("load_tool_file", { toolId: "game-stats", kind: "data" });
@@ -438,11 +453,14 @@ async function migrateGamesFromJson(): Promise<number> {
     tables: Array.isArray(parsed.tables) ? parsed.tables : [],
   });
   /* The preferences in that same file move with it, tied to the file being read
-     for the first time rather than to games having moved. A history of no games
-     and a switch someone had set is still a switch someone had set, and the old
-     rule dropped it. This runs at most once, so it cannot overwrite a later
-     change with what the old file still remembers. */
-  if (parsed.settings && Object.keys(parsed.settings).length > 0) {
+     for the first time rather than to games having moved: a history of no games
+     and a switch someone had set is still a switch someone had set.
+
+     But only into a database that was EMPTY. On one that already holds records,
+     this call is just recording that the old file is dealt with, and writing
+     that file's preferences over the ones in use would rewind settings nobody
+     asked to change. */
+  if (!hadGames && parsed.settings && Object.keys(parsed.settings).length > 0) {
     const merged = { ...DEFAULT_SETTINGS, ...parsed.settings };
     await invoke("save_tool_file", {
       toolId: "game-stats",

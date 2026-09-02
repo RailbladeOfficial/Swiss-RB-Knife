@@ -49,7 +49,7 @@ use image::{DynamicImage, GenericImageView, ImageFormat};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -149,9 +149,9 @@ fn validate_output_name(name: &str) -> Result<(), String> {
    never reaches the grant, so what the scope can accumulate is images, not
    whatever file a caller cared to name. */
 fn allow_preview(app: &AppHandle, path: &str) {
-    // Best effort: a preview that cannot be granted shows a broken thumbnail,
-    // which must not fail the operation that produced the file.
-    let _ = app.asset_protocol_scope().allow_file(path);
+    // Through the shared helper, which canonicalizes first. A path registered
+    // in the form the front end sent it does not match the form Tauri checks.
+    crate::allow_asset_path(app, Path::new(path), false);
 }
 
 // =============================================================================
