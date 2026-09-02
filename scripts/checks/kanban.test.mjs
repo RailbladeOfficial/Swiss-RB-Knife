@@ -1021,6 +1021,52 @@ test("a restored board asks for its files back", () => {
   );
 });
 
+test("a board background is found by name, not by a path it remembered", () => {
+  /* THE BUG THIS EXISTS TO STOP, which shipped once and went unnoticed.
+
+     A background used to be recorded as a whole absolute path. When the data
+     folder was split into one folder per tool, kanban-backgrounds moved, and
+     every board went on pointing at where it used to be. The board then drew a
+     background that was not there, with nothing on screen to say why: a missing
+     image is just an empty panel.
+
+     A record says WHICH image. Where the folder is, is the back end's answer,
+     asked for at load the way the attachments folder already is. */
+  const src = ts();
+
+  assert.match(src, /function backgroundSrc\(/, "there is no single place a background is resolved");
+  assert.match(
+    src,
+    /backgroundsRoot = await invoke<string>\("kanban_backgrounds_dir"\)/,
+    "the backgrounds folder is guessed rather than asked for",
+  );
+
+  // Every drawing site goes through it, or the one that does not keeps the bug.
+  const direct = [...src.matchAll(/convertFileSrc\(([^)]*)\)/g)].map((m) => m[1].trim());
+  assert.deepEqual(
+    direct.filter((arg) => /\bbg\.path|background\.path/.test(arg)),
+    [],
+    "these draw a background straight from the stored path",
+  );
+
+  // And the resolver reduces the record to its last segment, so a board still
+  // carrying an old absolute path resolves to the file that exists today.
+  const at = src.indexOf("function backgroundSrc(");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /\.split\(/, "backgroundSrc does not reduce the record to a filename");
+  assert.match(body, /backgroundsRoot/, "backgroundSrc does not resolve against the reported folder");
+
+  // The importer hands back a name, so new records cannot carry a path at all.
+  const rs = read("src-tauri/src/tools/kanban.rs");
+  const importAt = rs.indexOf("pub fn import_kanban_image(");
+  assert.notEqual(importAt, -1, "import_kanban_image is missing");
+  assert.match(
+    rs.slice(importAt, rs.indexOf("\n}\n", importAt)),
+    /\.file_name\(\)/,
+    "import_kanban_image still returns a whole path for a board to remember",
+  );
+});
+
 test("retired attachments are pruned with the buckets that could want them", () => {
   // The store would otherwise grow forever. The prune has to hang off the one
   // moment the answer changes, which is the backup pruner dropping a bucket.

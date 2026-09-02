@@ -1502,6 +1502,7 @@ pub fn run() {
             tools::kanban::read_kanban_backup,
             tools::kanban::import_kanban_image,
             tools::kanban::delete_kanban_image,
+            tools::kanban::kanban_backgrounds_dir,
             tools::kanban::kanban_attachments_dir,
             tools::kanban::import_kanban_attachment,
             tools::kanban::paste_kanban_attachment,

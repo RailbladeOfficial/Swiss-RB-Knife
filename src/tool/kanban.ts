@@ -65,7 +65,7 @@
      save_kanban_index, load_kanban_index,
      save_kanban_board, load_kanban_board, delete_kanban_board,
      list_kanban_backups, read_kanban_backup,
-     import_kanban_image, delete_kanban_image,
+     import_kanban_image, delete_kanban_image, kanban_backgrounds_dir,
      kanban_attachments_dir, import_kanban_attachment, paste_kanban_attachment,
      copy_kanban_attachment, delete_kanban_attachment,
      delete_kanban_board_attachments, sweep_kanban_attachments,
@@ -356,7 +356,12 @@ export interface Column {
 }
 
 export interface BoardBackground {
-  /** Absolute path inside the app's kanban-backgrounds/ folder. */
+  /** The image's FILENAME inside the app's kanban-backgrounds/ folder.
+   *
+   *  Records written before the data folder was split per tool hold a whole
+   *  absolute path into the old flat layout instead. Only the filename is ever
+   *  read, so those keep working and repair themselves the next time the board
+   *  is saved. See backgroundSrc. */
   path: string;
   /** CSS blur radius in px, 0-24. */
   blur: number;
@@ -930,6 +935,7 @@ async function loadAll(): Promise<void> {
     // Where the attachment files live. Asked for once, because every card that
     // shows a picture needs it and only the back end knows the answer.
     attachmentsRoot = await invoke<string>("kanban_attachments_dir");
+    backgroundsRoot = await invoke<string>("kanban_backgrounds_dir");
     await loadSettings();
     await loadRecords();
   } catch (err) {
@@ -2138,7 +2144,7 @@ function buildBoardTile(board: Board): HTMLElement {
   const bg = document.createElement("span");
   bg.className = "kb-board-tile-bg";
   if (board.background) {
-    bg.style.backgroundImage = `url("${convertFileSrc(board.background.path)}")`;
+    bg.style.backgroundImage = `url("${backgroundSrc(board.background)}")`;
     bg.style.filter = `blur(${board.background.blur}px) brightness(${board.background.brightness}%)`;
     // A blurred layer fades out at its own edges, so it is grown past the tile
     // and the tile clips it. Scaled by the blur radius rather than a fixed
@@ -2286,7 +2292,7 @@ function applyBoardBackground(board: Board): void {
     return;
   }
   boardBgLayer.style.display = "";
-  boardBgLayer.style.backgroundImage = `url("${convertFileSrc(bg.path)}")`;
+  boardBgLayer.style.backgroundImage = `url("${backgroundSrc(bg)}")`;
   boardBgLayer.style.filter = `blur(${bg.blur}px) brightness(${bg.brightness}%)`;
   // Same edge-bleed correction as the gallery tile; see the note there.
   boardBgLayer.style.transform = `scale(${1 + bg.blur / 90})`;
@@ -4248,6 +4254,28 @@ function attachmentPath(boardId: string, attachment: Attachment): string {
  *  Needed because the asset protocol takes a real path, and only the back end
  *  knows where the data directory is. */
 let attachmentsRoot = "";
+
+/** The same, for kanban-backgrounds/. */
+let backgroundsRoot = "";
+
+/**
+ * Where a board background actually is.
+ *
+ * ALWAYS REBUILT FROM THE FILENAME, never used as stored. A background used to
+ * be recorded as a whole absolute path, and when the data folder was split into
+ * one folder per tool, the file moved and every record kept pointing at where
+ * it used to be. The board then drew a background that was not there, with
+ * nothing on screen to say why.
+ *
+ * Taking the last path segment and joining it to the folder the back end
+ * reports means the record only has to remember which image, and the app
+ * answers where. This is the same rule attachments follow, and for the same
+ * reason: a stored path is a guess about the future that a tidy-up can break.
+ */
+function backgroundSrc(bg: BoardBackground): string {
+  const file = bg.path.split(/[\/]/).pop() ?? bg.path;
+  return convertFileSrc(`${backgroundsRoot}/${file}`);
+}
 
 /** Unlinks the copies behind these records, best effort.
  *
@@ -6253,7 +6281,7 @@ function renderBoardBgPreview(): void {
     return;
   }
   img.style.display = "";
-  img.style.backgroundImage = `url("${convertFileSrc(bg.path)}")`;
+  img.style.backgroundImage = `url("${backgroundSrc(bg)}")`;
   img.style.filter = `blur(${blur}px) brightness(${brightness}%)`;
   img.style.transform = `scale(${1 + blur / 90})`;
   empty.style.display = "none";
@@ -6271,6 +6299,7 @@ async function pickBoardBackground(): Promise<void> {
   if (typeof picked !== "string") return;
 
   try {
+    // The filename, not a path. See backgroundSrc and BoardBackground.path.
     const stored = await invoke<string>("import_kanban_image", { path: picked });
     // The blur and brightness already dialled in survive a swap of the image:
     // changing the picture is not changing how it is treated.

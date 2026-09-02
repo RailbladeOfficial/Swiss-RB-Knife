@@ -25,7 +25,7 @@
      save_kanban_index, load_kanban_index,
      save_kanban_board, load_kanban_board, delete_kanban_board,
      list_kanban_backups, read_kanban_backup,
-     import_kanban_image, delete_kanban_image,
+     import_kanban_image, delete_kanban_image, kanban_backgrounds_dir,
      kanban_attachments_dir, import_kanban_attachment, paste_kanban_attachment,
      copy_kanban_attachment, delete_kanban_attachment,
      delete_kanban_board_attachments, sweep_kanban_attachments,
@@ -350,6 +350,18 @@ fn image_dir(app: &AppHandle) -> PathBuf {
     dir
 }
 
+/// Where board backgrounds live, so the front end can build asset-protocol URLs
+/// for them.
+///
+/// Asked for rather than assumed, exactly as the attachments folder is: only
+/// the back end knows whether this is a dev build or a release one. This is
+/// also what lets a board record survive the folder moving, because the record
+/// then only has to remember the FILENAME.
+#[tauri::command]
+pub fn kanban_backgrounds_dir(app: AppHandle) -> String {
+    image_dir(&app).to_string_lossy().to_string()
+}
+
 /// Lowercased extension of `path`, if it is one we can render.
 fn allowed_ext(path: &Path) -> Option<String> {
     let ext = path.extension()?.to_string_lossy().to_lowercase();
@@ -360,11 +372,17 @@ fn allowed_ext(path: &Path) -> Option<String> {
     }
 }
 
-/// Copies a user-picked image into kanban-backgrounds/ and returns the path of
-/// the copy. The name is a timestamp plus a counter rather than the original
+/// Copies a user-picked image into kanban-backgrounds/ and returns the FILENAME
+/// of the copy. The name is a timestamp plus a counter rather than the original
 /// filename: two boards backed by two different photos both called
 /// "background.jpg" must not collide, and the original name is of no interest
 /// once the file is inside the app.
+///
+/// A filename rather than a path, because a path is a guess about the future.
+/// Records that stored one stopped working the day the data folder was split
+/// per tool: the file moved and every board went on pointing at where it had
+/// been. Where the folder is, is a question the back end answers on request
+/// (kanban_backgrounds_dir), the way it already does for attachments.
 ///
 /// The background lives outside the board file so the gallery can draw it
 /// without reading the board's contents.
@@ -408,7 +426,10 @@ pub fn import_kanban_image(app: AppHandle, path: String) -> Result<String, Strin
     // half-copied background that the board already points at would render as a
     // broken panel with no obvious cause.
     atomic_write(&dest, &bytes)?;
-    Ok(dest.to_string_lossy().to_string())
+    Ok(dest
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default())
 }
 
 /// Removes a background image the tool imported.
@@ -421,7 +442,17 @@ pub fn import_kanban_image(app: AppHandle, path: String) -> Result<String, Strin
 #[tauri::command]
 pub fn delete_kanban_image(app: AppHandle, path: String) -> Result<(), String> {
     let dir = image_dir(&app);
-    let target = PathBuf::from(&path);
+    /* A BARE FILENAME IS RESOLVED HERE, an absolute path is taken as given and
+       then checked. Board records written before the data folder was split per
+       tool hold an absolute path into the OLD flat layout, so joining a record's
+       whole path would look for a file that moved; taking its filename finds the
+       one that exists. Either way the containment check below is what decides. */
+    let target = match Path::new(&path).file_name() {
+        Some(name) if Path::new(&path).parent().is_none_or(|p| p.as_os_str().is_empty()) => {
+            dir.join(name)
+        }
+        _ => PathBuf::from(&path),
+    };
 
     // canonicalize resolves "..", symlinks and short paths, so the containment
     // check is on where the path actually LANDS rather than on how it reads. A
