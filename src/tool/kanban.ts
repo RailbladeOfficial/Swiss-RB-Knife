@@ -661,7 +661,13 @@ export interface BoardScopedSettings {
   cardColorMode: CardColorMode;
   cardSize: CardSize;
   sectionOrder: CardSection[];
-  /** Skip the reading face and open every card ready to type in.
+  /** Cards open with their fields live and stay that way.
+   *
+   *  NOT "start an edit session automatically". There is no session: every
+   *  field writes as you leave it and closing the card finishes the job, which
+   *  is how this tool worked before the reading face existed. So there is
+   *  nothing to save and nothing to discard, and none of the three header
+   *  controls are drawn.
    *
    *  Per board because it tracks how a board is USED: a board you are actively
    *  building wants the fields, and one you mostly consult wants the reading
@@ -755,7 +761,7 @@ const MAX_ATTACHMENTS = 50;
 /** Kept in step with MAX_ATTACHMENT_BYTES in kanban.rs, which is the one that
  *  actually enforces it. This copy exists so a paste can be refused before it
  *  is encoded rather than after. */
-const MAX_ATTACHMENT_BYTES = 64 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 256 * 1024 * 1024;
 
 /** The card color swatches. Twelve hues at two lightnesses each would be a
  *  color picker; this is a palette, so it is one row of hues chosen to stay
@@ -4151,6 +4157,22 @@ type KbCardTab = "basic" | "subtasks" | "comments";
 
 let cardEditing = false;
 
+/* TWO WAYS TO BE EDITING, and they are not the same thing.
+   -----------------------------------------------------------------------------
+   Pressing the pencil starts a SESSION: it takes a snapshot, offers save and
+   discard, and ends when you pick one. That is for a card you mostly read.
+
+   "Open Cards in Edit Mode" is not a session, it is the tool's old behavior:
+   the fields are simply live, every one of them writes as you leave it, and
+   closing the card is a perfectly good way to finish. There is nothing to save
+   because it is already saved, and nothing to discard because there was never a
+   point at which it had not been written.
+
+   So when this is on there is no snapshot, no save, no discard and no pencil.
+   Conflating the two put a Save button on a card that had already saved and a
+   Discard button that would silently undo edits made ten minutes ago. */
+let cardAlwaysEditing = false;
+
 /** The card as it was when editing began, for Cancel to put back. A structured
  *  clone rather than a shallow copy: subtasks, tags and dates are all nested,
  *  and a shallow copy would have Cancel restoring the same arrays it just
@@ -4187,19 +4209,30 @@ function setCardEditing(on: boolean): void {
   cardEditing = on;
   const modal = document.getElementById("kbCardModal")!;
   modal.dataset.kbEditing = on ? "true" : "false";
+  // Drives the CSS that hides all three header controls. See cardAlwaysEditing.
+  modal.dataset.kbAlwaysEditing = cardAlwaysEditing ? "true" : "false";
 
   const card = getCard(openCardId);
-  // Snapshotted on the way IN only, so re-rendering mid-edit cannot overwrite
-  // the thing Cancel is supposed to go back to.
-  if (on && card && !cardEditSnapshot) cardEditSnapshot = structuredClone(card);
+  /* Snapshotted on the way IN only, so re-rendering mid-edit cannot overwrite
+     the thing Discard is supposed to go back to. Never taken when the board is
+     always in edit mode: there is no discard to serve it, and holding a copy of
+     the card for a button that does not exist is just a way to get it wrong
+     later. */
+  if (on && !cardAlwaysEditing && card && !cardEditSnapshot) {
+    cardEditSnapshot = structuredClone(card);
+  }
   if (!on) cardEditSnapshot = null;
 
   if (card) renderCardModal();
 }
 
-/** Leaves edit mode, keeping the changes. Everything was already written as it
- *  was typed, so this only has to put the board in step and change face. */
+/** Ends the edit session, keeping the changes. Everything was already written
+ *  as it was typed, so this only has to put the board in step and change face.
+ *
+ *  A no-op on a board that is always editing: there is no session to end, and
+ *  dropping to the reading face would contradict the preference. */
 function saveCardEdit(): void {
+  if (cardAlwaysEditing) return;
   setCardEditing(false);
   void flushSave();
   renderAll();
@@ -4207,6 +4240,7 @@ function saveCardEdit(): void {
 
 /** Leaves edit mode, putting back what was there when it started. */
 function cancelCardEdit(): void {
+  if (cardAlwaysEditing) return;
   const card = getCard(openCardId);
   if (card && cardEditSnapshot) {
     // Restored IN PLACE. Everything else in the tool holds this same object,
@@ -4239,11 +4273,13 @@ function openCard(cardId: string, tab?: KbCardTab): void {
      tab you wanted last time says nothing about this card. */
   getCardTabs().select(tab ?? "basic");
 
-  // Straight into the fields when the board asks for it, and the snapshot is
-  // taken here so Cancel works on a card that opened already editing.
-  // setCardEditing renders, so there is no second render here.
+  /* Which of the two shapes this board wants. Read per card rather than held,
+     because a card dragged to a board with the other preference has to open the
+     way THAT board works. setCardEditing renders, so there is no second render
+     here. */
   cardEditSnapshot = null;
-  setCardEditing(effectiveForCard(card).openCardsInEditMode);
+  cardAlwaysEditing = effectiveForCard(card).openCardsInEditMode;
+  setCardEditing(cardAlwaysEditing);
 
   getCardModal().open();
   // Asked once per open, in the background: a file can vanish between sessions
@@ -7097,7 +7133,7 @@ const BOARD_OVERRIDE_ROWS: OverrideRow[] = [
   {
     key: "openCardsInEditMode",
     label: "Open Cards in Edit Mode",
-    info: "Skip the reading face and open every card with its fields ready to type in. Subtasks and comments work either way.",
+    info: "Cards open with their fields live, the way this tool always worked: each one saves as you leave it, and closing the card is a fine way to finish. No edit, save or discard buttons. Off, a card opens as something to read and the pencil switches to the fields.",
   },
 ];
 

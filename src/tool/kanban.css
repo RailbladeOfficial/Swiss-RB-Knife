@@ -1813,6 +1813,16 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 /* Save is the affirmative one, so it carries the accent. Discard stays the
    header's own muted color until you are on it: an icon that looks dangerous
    at rest makes the corner feel like somewhere not to point the mouse. */
+/* ALWAYS EDITING: none of the three header controls belong.
+   The pencil has nothing to switch to, Save has nothing to save because the
+   field wrote itself when you left it, and Discard has no point to go back to.
+   This is the tool's original behavior, which had none of them either. */
+#kbCardModal[data-kb-always-editing="true"] #kbCardEditBtn,
+#kbCardModal[data-kb-always-editing="true"] #kbCardSaveBtn,
+#kbCardModal[data-kb-always-editing="true"] #kbCardCancelBtn {
+  display: none;
+}
+
 .kb-card-save-btn {
   color: var(--color-success);
 }

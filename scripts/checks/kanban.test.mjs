@@ -805,8 +805,17 @@ test("cancelling an edit puts back what was there", () => {
   assert.match(body, /structuredClone\(card\)/, "the snapshot is not a deep copy");
   assert.match(
     body,
-    /if \(on && card && !cardEditSnapshot\)/,
-    "the snapshot is retaken mid-edit, so Cancel would restore the edits",
+    /!cardEditSnapshot/,
+    "the snapshot is retaken mid-edit, so Discard would restore the edits",
+  );
+  /* And never taken at all on a board that is always editing. There is no
+     discard button there to serve it, and every field has already written
+     itself, so a snapshot would only be a way to undo work nobody asked to
+     undo. */
+  assert.match(
+    body,
+    /!cardAlwaysEditing/,
+    "a snapshot is taken on a board with no discard button to use it",
   );
 
   const cancel = src.slice(src.indexOf("function cancelCardEdit("));
@@ -815,6 +824,34 @@ test("cancelling an edit puts back what was there", () => {
     /Object\.assign\(card, structuredClone\(cardEditSnapshot\)\)/,
     "Cancel replaces the card object instead of restoring it in place",
   );
+});
+
+test("always-editing boards have no session to save or discard", () => {
+  /* "Open Cards in Edit Mode" is not "start an edit session automatically".
+     It is the tool's original behavior: fields are live, each writes as you
+     leave it, and closing the card finishes. So there is nothing to save and
+     nothing to discard, and a Save button on a card that already saved, or a
+     Discard that silently reverts ten minutes of work, would both be lies. */
+  const src = ts();
+
+  for (const fn of ["function saveCardEdit(", "function cancelCardEdit("]) {
+    const at = src.indexOf(fn);
+    assert.notEqual(at, -1, `${fn} is gone`);
+    const body = src.slice(at, src.indexOf("\n}", at));
+    assert.match(
+      body,
+      /if \(cardAlwaysEditing\) return;/,
+      `${fn} still runs on a board that is always editing`,
+    );
+  }
+
+  // And all three header controls are hidden there, not just unwired.
+  const css = read("src/tool/kanban.css");
+  const block = css.slice(css.indexOf('[data-kb-always-editing="true"]'));
+  const rule = block.slice(0, block.indexOf("}"));
+  for (const id of ["#kbCardEditBtn", "#kbCardSaveBtn", "#kbCardCancelBtn"]) {
+    assert.ok(rule.includes(id), `${id} is still drawn on an always-editing board`);
+  }
 });
 
 test("a card opened from a count lands on the tab that count belongs to", () => {

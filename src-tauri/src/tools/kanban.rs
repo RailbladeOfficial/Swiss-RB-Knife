@@ -219,7 +219,7 @@ pub struct KanbanBackupFile {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KanbanBackup {
-    /// The snapshot folder's name, which is its UTC timestamp in
+    /// The snapshot folder's name, which is its LOCAL timestamp in
     /// "%Y-%m-%d_%H-%M-%S" form (BACKUP_FOLDER_FORMAT in lib.rs).
     name: String,
     files: Vec<KanbanBackupFile>,
@@ -514,7 +514,7 @@ const ATTACH_DIR: &str = "kanban/kanban-attachments";
 /// Ceiling on one attachment. Large enough for a screen recording of a bug,
 /// small enough that a board's folder cannot quietly outgrow the snapshots
 /// around it, and small enough that a mis-picked file is cheap to undo.
-const MAX_ATTACHMENT_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES: u64 = 256 * 1024 * 1024;
 
 /// What an attachment looks like to the front end once it has been stored.
 /// There is no path: where it lives is derived from the board and the id.
