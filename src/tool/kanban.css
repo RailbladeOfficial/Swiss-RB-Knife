@@ -874,22 +874,6 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   gap: 8px;
 }
 
-.kb-tag-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-
-.kb-tag-group-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  min-width: 84px;
-}
-
 .kb-tag-toggle {
   padding: 2px 9px;
   font-size: 0.74rem;
@@ -926,22 +910,6 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   font-size: 1.05rem;
   font-weight: 700;
   padding: 8px 10px;
-}
-
-.kb-card-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-@media (max-width: 620px) {
-  .kb-card-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.kb-card-field select {
-  width: 100%;
 }
 
 /* Each block of the card modal is a small titled section rather than a run of
@@ -1781,11 +1749,10 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* Reading: the values show, the controls do not. The two that END an edit go
    with them, since there is no edit to end. */
-#kbCardModal[data-kb-editing="false"] .kb-card-field select,
+#kbCardModal[data-kb-editing="false"] .kb-card-line-value select,
 #kbCardModal[data-kb-editing="false"] #kbCardTitleInput,
 #kbCardModal[data-kb-editing="false"] #kbCardSaveBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardCancelBtn,
-#kbCardModal[data-kb-editing="false"] #kbCardManageTagsBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardAttachAddBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardDueClearBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardDueInput,
@@ -1849,47 +1816,102 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 }
 
 /* -----------------------------------------------------------------------------
-   THE THREE COLUMNS
-   Where it lives, what it weighs, what it is about. Collapses to two and then
-   to one, because three columns of selects in a narrow window is three columns
-   of nothing legible.
+   THE TOP ROWS
+   -----------------------------------------------------------------------------
+   Label left, value right, five of them stacked. A fixed label column so the
+   values line up into a column you can read straight down, and it holds its
+   width whether the label is "Board" or "Priority".
+
+   The label column does NOT shrink and the value column does, because the value
+   is the part that can be long: a card with nine tags should wrap them, not
+   squeeze "Priority" onto two lines.
 ----------------------------------------------------------------------------- */
 
 .kb-card-top {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-@media (min-width: 620px) {
-  .kb-card-top {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 900px) {
-  .kb-card-top {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  /* The tag column is the one that grows, so it gets the slack. */
-  .kb-card-top-tags {
-    grid-column: 3;
-  }
-}
-
-.kb-card-top-col {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.kb-card-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
   min-width: 0;
 }
 
-/* The picker scrolls inside its column rather than stretching it: a card with
-   thirty tags must not make the other two columns tall and empty. */
-.kb-card-top-tags .kb-tag-picker {
-  max-height: 132px;
-  overflow-y: auto;
+.kb-card-line-label {
+  flex: 0 0 auto;
+  width: 74px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.kb-card-line-value {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The selects do not stretch the whole modal. A column name is short and a
+   full-width select next to a 74px label reads as a form, which is the thing
+   the reading face exists to avoid. */
+.kb-card-line-value select {
+  max-width: 320px;
+  width: 100%;
+}
+
+.kb-card-line-value .kb-card-readonly {
+  padding: 0;
+}
+
+/* -----------------------------------------------------------------------------
+   THE TAG ROW
+   Chips the card wears, then one button that opens the chooser. Wraps, because
+   this is the field with no upper bound on how much it holds.
+----------------------------------------------------------------------------- */
+
+.kb-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* A worn tag. Clicking takes it off, so it has to look pressable without
+   looking like it is asking to be pressed. */
+.kb-tag-chip-btn {
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.kb-tag-chip-btn:hover {
+  filter: brightness(1.12);
+}
+
+.kb-tag-none {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.kb-tag-add-btn {
+  cursor: pointer;
+  padding: 2px 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.kb-tag-add-btn:hover {
+  border-color: var(--color-accent-input);
+  color: var(--color-accent-input);
 }
 
 /* -----------------------------------------------------------------------------

@@ -715,7 +715,6 @@ test("a card being read has no live control left in it", () => {
 
   for (const id of [
     "#kbCardTitleInput",
-    "#kbCardManageTagsBtn",
     "#kbCardAttachAddBtn",
     "#kbCardDueInput",
     // The two that end an edit. They used to be a footer (#kbCardEditActions);
@@ -728,7 +727,16 @@ test("a card being read has no live control left in it", () => {
   }
   // The selects are covered as a class rather than one by one, which is what
   // lets Priority and Effort be joined by a third without touching this.
-  assert.match(block, /\.kb-card-field select/, "the top selects are still live");
+  assert.match(block, /\.kb-card-line-value select/, "the top selects are still live");
+
+  /* TAGS ARE THE DELIBERATE EXCEPTION and are not in the list above. Tagging is
+     filing rather than editing: you do it to find the card again, not to change
+     what it says, so it stays available on a card you are only reading. If that
+     is ever reversed, the tag row joins the list. */
+  assert.ok(
+    !block.includes("kb-tag-row"),
+    "the tag row is hidden while reading; tags are meant to stay editable there",
+  );
 });
 
 test("the reading face cannot be clicked into an editor", () => {

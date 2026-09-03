@@ -8447,47 +8447,62 @@
 
         <div id="kbCardTabBasic" class="modal-tab-pane">
 
-          <!-- THREE COLUMNS.
-               Where it lives, what it weighs, what it is about. Tags were a
-               full-width block further down, which put the card's own subject
-               below its attachments. -->
+          <!-- FIVE ROWS, LABEL AND VALUE.
+               Three columns read as three unrelated groups and gave the widest
+               field (tags) the narrowest column. Stacked, every field starts at
+               the same left edge and the eye runs straight down the labels, and
+               Tags gets the full width it actually needs.
+
+               Board is first because it is the outermost fact about a card:
+               which board, then which column on it, then how it is ranked, then
+               what it is about. -->
           <div class="kb-card-top">
-            <div class="kb-card-top-col">
-              <div class="setup-field kb-card-field">
-                <label for="kbCardColumnSelect">Column</label>
-                <select id="kbCardColumnSelect" class="settings-select"></select>
-                <span id="kbCardColumnDisplay" class="kb-card-readonly"></span>
-              </div>
-              <div class="setup-field kb-card-field">
-                <label for="kbCardBoardSelect">Board</label>
+
+            <div class="kb-card-line">
+              <label class="kb-card-line-label" for="kbCardBoardSelect">Board</label>
+              <div class="kb-card-line-value">
                 <select id="kbCardBoardSelect" class="settings-select"></select>
                 <span id="kbCardBoardDisplay" class="kb-card-readonly"></span>
               </div>
             </div>
 
-            <div class="kb-card-top-col">
-              <div class="setup-field kb-card-field">
-                <label for="kbCardPrioritySelect">Priority</label>
+            <div class="kb-card-line">
+              <label class="kb-card-line-label" for="kbCardColumnSelect">Column</label>
+              <div class="kb-card-line-value">
+                <select id="kbCardColumnSelect" class="settings-select"></select>
+                <span id="kbCardColumnDisplay" class="kb-card-readonly"></span>
+              </div>
+            </div>
+
+            <div class="kb-card-line">
+              <label class="kb-card-line-label" for="kbCardPrioritySelect">Priority</label>
+              <div class="kb-card-line-value">
                 <select id="kbCardPrioritySelect" class="settings-select"></select>
                 <span id="kbCardPriorityDisplay" class="kb-card-readonly"></span>
               </div>
-              <!-- EFFORT sits beside Priority because the two are read together:
-                   "urgent and small" and "urgent and huge" are different plans,
-                   and splitting them across the modal would hide that. -->
-              <div class="setup-field kb-card-field">
-                <label for="kbCardEffortSelect">Effort</label>
+            </div>
+
+            <!-- EFFORT sits under Priority because the two are read together:
+                 "urgent and small" and "urgent and huge" are different plans,
+                 and separating them would hide that. -->
+            <div class="kb-card-line">
+              <label class="kb-card-line-label" for="kbCardEffortSelect">Effort</label>
+              <div class="kb-card-line-value">
                 <select id="kbCardEffortSelect" class="settings-select"></select>
                 <span id="kbCardEffortDisplay" class="kb-card-readonly"></span>
               </div>
             </div>
 
-            <div class="kb-card-top-col kb-card-top-tags">
-              <div class="setup-field kb-card-field">
-                <label>Tags</label>
-                <div id="kbCardTagPicker" class="kb-tag-picker"></div>
-                <button id="kbCardManageTagsBtn" class="settings-action-btn">Manage Tags</button>
+            <!-- TAGS stay editable while the card is only being read, unlike
+                 every other field here. Tagging is filing rather than editing:
+                 you do it to find the card again, not to change what it says. -->
+            <div class="kb-card-line">
+              <span class="kb-card-line-label">Tags</span>
+              <div class="kb-card-line-value">
+                <div id="kbCardTagPicker" class="kb-tag-row"></div>
               </div>
             </div>
+
           </div>
 
         <!-- The reorderable blocks. -->

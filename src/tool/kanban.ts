@@ -4031,16 +4031,6 @@ function getCardModal(): Modal {
     })();
   });
 
-  document.getElementById("kbCardManageTagsBtn")!.addEventListener("click", () => {
-    const card = getCard(openCardId);
-    const board = card ? getBoard(card.boardId) : null;
-    if (!board) return;
-    // This board's own vocabulary, not the defaults: those are templates, and
-    // adding one there would not put a tag on this card.
-    _cardModal!.close({ handoff: true });
-    openBoardSetup(board, "tags");
-  });
-
   /* Everything that is an ACTION on the card rather than a field of it. The
      footer these came from is gone: with every edit applying live there was
      nothing left for it to hold except two destructive buttons sitting under
@@ -6068,9 +6058,26 @@ function renderCardSubtasks(card: Card): void {
    TAGS ON A CARD
 ----------------------------------------------------------------------------- */
 
+/* -----------------------------------------------------------------------------
+   THE TAG ROW
+   -----------------------------------------------------------------------------
+   Every tag on the board used to be drawn as a button, grouped by category,
+   whether the card wore it or not. On a board with four tags that is a picker.
+   On a board with a Versions category holding a year of releases it is a wall,
+   and the four tags the card actually has are lost in it.
+
+   So the ROW shows what the card wears and nothing else, and choosing is a menu
+   that opens on demand: one drill-down per category, a tick beside the ones
+   already on. A long category becomes a long submenu, which scrolls, instead of
+   fifty buttons pushing the description off the screen.
+
+   EDITABLE WHILE READING, unlike the fields above it. Tagging is filing rather
+   than editing: you do it to find the card again, not to change what it says.
+----------------------------------------------------------------------------- */
+
 function renderCardTags(card: Card): void {
-  const picker = document.getElementById("kbCardTagPicker")!;
-  picker.replaceChildren();
+  const row = document.getElementById("kbCardTagPicker")!;
+  row.replaceChildren();
 
   // This card's own board's vocabulary, not the defaults. A card can only wear
   // a tag that exists on the board it is on.
@@ -6078,56 +6085,107 @@ function renderCardTags(card: Card): void {
   const boardCategories = board?.tagCategories ?? [];
   const boardTags = board?.tags ?? [];
 
-  const usable = boardCategories.filter(
-    (c) =>
-      c.status === "active" ||
-      boardTags.some((t) => t.categoryId === c.id && card.tagIds.includes(t.id)),
-  );
-
-  if (usable.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "placeholder-text";
-    empty.textContent =
-      "This board has no tags yet. Board Setup > Tags can copy in the defaults or add its own.";
-    picker.appendChild(empty);
-    return;
+  // No board means no vocabulary, so no tags to draw. Guarded here rather than
+  // at the top, because the row still has to render its empty state.
+  const worn = board ? orderedCardTags(card, board) : [];
+  for (const tag of worn) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "kb-tag-chip-btn";
+    chip.textContent = tag.name;
+    chip.title = `${tag.name} — click to take it off`;
+    paintTagChip(chip, tagColor(tag, boardCategories), true);
+    chip.addEventListener("click", () => {
+      card.tagIds = card.tagIds.filter((id) => id !== tag.id);
+      stampCard(card);
+      renderCardTags(card);
+      renderAll();
+    });
+    row.appendChild(chip);
   }
 
+  if (worn.length === 0) {
+    const none = document.createElement("span");
+    none.className = "kb-tag-none";
+    none.textContent = "None";
+    row.appendChild(none);
+  }
+
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "kb-tag-add-btn";
+  add.textContent = worn.length === 0 ? "+ Add" : "+";
+  add.title = "Put a tag on this card";
+  add.addEventListener("click", (e) => {
+    openMenu(e.currentTarget as HTMLElement, cardTagMenu(card, boardCategories, boardTags));
+  });
+  row.appendChild(add);
+}
+
+/** One drill-down per category, tags inside, ticked where the card wears one.
+ *
+ *  Built fresh on every open so a tag added in the manager and come back from
+ *  is in the list without the card being reopened. */
+function cardTagMenu(card: Card, categories: TagCategory[], tags: Tag[]): MenuItem[] {
+  const items: MenuItem[] = [];
+
+  const usable = categories.filter(
+    (c) =>
+      c.status === "active" ||
+      tags.some((t) => t.categoryId === c.id && card.tagIds.includes(t.id)),
+  );
+
   for (const category of usable) {
-    // A retired tag stays visible on the cards that already carry it (dropping
-    // it would rewrite history) but is not offered to cards that do not.
-    const catTags = boardTags.filter(
+    /* A retired tag stays visible on the cards that already carry it, because
+       dropping it would rewrite history, but is not offered to cards that do
+       not have it. */
+    const catTags = tags.filter(
       (t) => t.categoryId === category.id && (t.status === "active" || card.tagIds.includes(t.id)),
     );
     if (catTags.length === 0) continue;
 
-    const group = document.createElement("div");
-    group.className = "kb-tag-group";
-
-    const label = document.createElement("span");
-    label.className = "kb-tag-group-label";
-    label.textContent = category.name;
-    group.appendChild(label);
-
-    for (const tag of catTags) {
-      const on = card.tagIds.includes(tag.id);
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "kb-tag-toggle";
-      btn.classList.toggle("active", on);
-      btn.textContent = tag.name;
-      paintTagChip(btn, tagColor(tag, boardCategories), on);
-      btn.title = tag.status === "retired" ? `${tag.name} (retired)` : tag.name;
-      btn.addEventListener("click", () => {
-        if (on) card.tagIds = card.tagIds.filter((id) => id !== tag.id);
-        else card.tagIds.push(tag.id);
-        stampCard(card);
-        renderCardTags(card);
-      });
-      group.appendChild(btn);
-    }
-    picker.appendChild(group);
+    const on = catTags.filter((t) => card.tagIds.includes(t.id)).length;
+    items.push({
+      label: on > 0 ? `${category.name} (${on})` : category.name,
+      submenu: catTags.map((tag) => ({
+        // A tick rather than a checkbox: MenuItem draws plain text, and the
+        // mark has to survive being read at a glance in a list of twenty.
+        label: `${card.tagIds.includes(tag.id) ? "\u2713 " : "\u2007 "}${tag.name}`,
+        onClick: () => {
+          if (card.tagIds.includes(tag.id)) {
+            card.tagIds = card.tagIds.filter((id) => id !== tag.id);
+          } else {
+            card.tagIds.push(tag.id);
+          }
+          stampCard(card);
+          renderCardTags(card);
+          renderAll();
+        },
+      })),
+    });
   }
+
+  if (items.length === 0) {
+    items.push({
+      label: "This board has no tags yet",
+      disabled: true,
+    });
+  }
+
+  items.push({ separator: true });
+  items.push({
+    label: "Manage Tags\u2026",
+    onClick: () => {
+      const board = getBoard(card.boardId);
+      if (!board) return;
+      // This board's own vocabulary, not the defaults: those are templates, and
+      // adding one there would not put a tag on this card.
+      _cardModal!.close({ handoff: true });
+      openBoardSetup(board, "tags");
+    },
+  });
+
+  return items;
 }
 
 /* =============================================================================
