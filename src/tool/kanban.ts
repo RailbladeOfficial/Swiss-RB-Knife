@@ -1338,6 +1338,42 @@ function queueSave(): void {
   }, SAVE_DEBOUNCE_MS);
 }
 
+/* -----------------------------------------------------------------------------
+   KEEPING THE BOARD IN STEP
+   -----------------------------------------------------------------------------
+   The board behind the card modal has to show what the card now says. This used
+   to be a renderAll() written out at each place that changed something, which
+   is a rule nobody can keep: there are 46 writes to a card in this file and six
+   of them remembered. Editing a title updated the board; ticking a subtask did
+   not, and the card behind sat wrong until the modal closed.
+
+   So it hangs off stampCard() instead, which every one of those 46 already goes
+   through, exactly as queueSave() does. Nothing has to remember, and a write
+   added later is covered the day it is written.
+
+   DEBOUNCED, and for the same reason the save is: typing a title fires one of
+   these per keystroke, and redrawing every column on every letter is work
+   nobody asked for. Short enough that leaving a field feels immediate.
+----------------------------------------------------------------------------- */
+
+const BOARD_REFRESH_DEBOUNCE_MS = 120;
+
+let boardRefreshTimer: number | null = null;
+
+function queueBoardRefresh(): void {
+  if (boardRefreshTimer !== null) clearTimeout(boardRefreshTimer);
+  boardRefreshTimer = window.setTimeout(() => {
+    boardRefreshTimer = null;
+    /* NEVER MID-DRAG. A drag moves the card's element around the DOM and
+       commits on dragend; rebuilding the board underneath it would replace the
+       very element the pointer is holding, and the drag would die halfway
+       across the board. dragend commits and redraws, so nothing is lost by
+       waiting: the refresh is dropped rather than deferred. */
+    if (dragCardId) return;
+    renderAll();
+  }, BOARD_REFRESH_DEBOUNCE_MS);
+}
+
 /** Writes a queued edit NOW rather than letting it wait. Called before anything
  *  that replaces state wholesale (a snapshot restore) or that takes the
  *  so nothing is left sitting in the debounce while the state it describes is
@@ -3921,7 +3957,6 @@ function getCardModal(): Modal {
      keystroke of a title is work nobody asked for, and the blur that ends the
      typing is the moment the value is actually settled. */
   titleInput.addEventListener("change", () => {
-    renderAll();
     const card = getCard(openCardId);
     if (card) renderCardReadonlyValues(card);
   });
@@ -3940,7 +3975,6 @@ function getCardModal(): Modal {
     card.priority = normalizePriority(prioritySelect.value);
     stampCard(card);
     renderCardReadonlyValues(card);
-    renderAll();
   });
 
   const effortSelect = document.getElementById("kbCardEffortSelect") as HTMLSelectElement;
@@ -3950,7 +3984,6 @@ function getCardModal(): Modal {
     card.effort = normalizeEffort(effortSelect.value);
     stampCard(card);
     renderCardReadonlyValues(card);
-    renderAll();
   });
 
   boardSelect.addEventListener("change", () => {
@@ -4133,6 +4166,8 @@ function stampCard(card: Card): void {
   if (!board) return;
   board.updatedAt = card.updatedAt;
   markBoard(board.id);
+  // The board behind the modal shows this card. See KEEPING THE BOARD IN STEP.
+  queueBoardRefresh();
 }
 
 /* -----------------------------------------------------------------------------
@@ -6137,7 +6172,6 @@ function renderCardTags(card: Card): void {
       card.tagIds = card.tagIds.filter((id) => id !== tag.id);
       stampCard(card);
       renderCardTags(card);
-      renderAll();
     });
     row.appendChild(chip);
   }
@@ -6201,7 +6235,6 @@ function cardTagMenu(card: Card, categories: TagCategory[], tags: Tag[]): MenuIt
           }
           stampCard(card);
           renderCardTags(card);
-          renderAll();
         },
       })),
     });

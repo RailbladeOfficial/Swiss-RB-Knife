@@ -826,6 +826,32 @@ test("cancelling an edit puts back what was there", () => {
   );
 });
 
+test("every card edit puts the board behind it in step", () => {
+  /* The board shows the card you are editing, so it has to follow along. This
+     used to be a renderAll() written out at each place that changed something,
+     which is a rule nobody can keep: there are dozens of writes to a card in
+     this file and only a handful remembered. Editing a title updated the board
+     and ticking a subtask did not.
+
+     It hangs off stampCard() now, the one call every card write already goes
+     through, exactly as queueSave() does. */
+  const src = ts();
+
+  const at = src.indexOf("function stampCard(");
+  assert.notEqual(at, -1, "stampCard is gone");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /queueBoardRefresh\(\)/, "a card write no longer refreshes the board");
+
+  /* And it must not fire mid-drag. A drag moves the card's element around the
+     DOM and commits on dragend; rebuilding underneath would replace the very
+     element the pointer is holding. */
+  const q = src.indexOf("function queueBoardRefresh(");
+  assert.notEqual(q, -1, "queueBoardRefresh is gone");
+  const qBody = src.slice(q, src.indexOf("\n}", q));
+  assert.match(qBody, /if \(dragCardId\) return;/, "a refresh can fire mid-drag and kill it");
+  assert.match(qBody, /setTimeout/, "the refresh is not debounced, so typing redraws per keystroke");
+});
+
 test("always-editing boards have no session to save or discard", () => {
   /* "Open Cards in Edit Mode" is not "start an edit session automatically".
      It is the tool's original behavior: fields are live, each writes as you
