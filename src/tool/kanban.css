@@ -1880,7 +1880,19 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 .kb-card-prop-stacked {
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  /* Tighter than the gap between two property rows: the chips belong to the
+     heading above them, and the same spacing would read as a separate row. */
+  gap: 2px;
+}
+
+/* ONE LINE BOX FOR BOTH, so "Tags" at the top of the right column lands on the
+   same line as "Board" at the top of the left one. The label and the value are
+   deliberately different sizes, and without a shared line-height their boxes
+   are different heights too, which left the two column headings a couple of
+   pixels out from each other for no reason a reader could name. */
+.kb-card-prop-label,
+.kb-card-prop-value {
+  line-height: 1.5rem;
 }
 
 .kb-card-prop-label {
@@ -1891,6 +1903,8 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   color: var(--color-text-muted);
 }
 
+/* Tags is a heading over its chips rather than a label beside them, so it drops
+   the fixed label column and keeps only the shared line box above. */
 .kb-card-prop-stacked .kb-card-prop-label {
   width: auto;
 }
