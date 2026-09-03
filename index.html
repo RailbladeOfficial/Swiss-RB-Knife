@@ -8447,59 +8447,64 @@
 
         <div id="kbCardTabBasic" class="modal-tab-pane">
 
-          <!-- FIVE ROWS, LABEL AND VALUE.
-               Three columns read as three unrelated groups and gave the widest
-               field (tags) the narrowest column. Stacked, every field starts at
-               the same left edge and the eye runs straight down the labels, and
-               Tags gets the full width it actually needs.
+          <!-- THE CARD'S PROPERTIES.
+               NOT .kb-card-top: that class belongs to the card face on the
+               board, and borrowing the name here rewrote the board's layout
+               from inside the modal's stylesheet. Everything in this block is
+               kb-card-prop-*, which nothing else uses.
 
-               Board is first because it is the outermost fact about a card:
-               which board, then which column on it, then how it is ranked, then
-               what it is about. -->
-          <div class="kb-card-top">
+               TWO COLUMNS. The four properties are short and fixed and read as
+               a list, so they stack in one column against the left edge. Tags
+               have no upper bound, so they get a column of their own where
+               growing pushes nothing sideways. -->
+          <div class="kb-card-props">
 
-            <div class="kb-card-line">
-              <label class="kb-card-line-label" for="kbCardBoardSelect">Board</label>
-              <div class="kb-card-line-value">
-                <select id="kbCardBoardSelect" class="settings-select"></select>
-                <span id="kbCardBoardDisplay" class="kb-card-readonly"></span>
+            <div class="kb-card-prop-col">
+              <div class="kb-card-prop">
+                <label class="kb-card-prop-label" for="kbCardBoardSelect">Board</label>
+                <div class="kb-card-prop-value">
+                  <select id="kbCardBoardSelect" class="settings-select"></select>
+                  <span id="kbCardBoardDisplay" class="kb-card-readonly"></span>
+                </div>
               </div>
-            </div>
 
-            <div class="kb-card-line">
-              <label class="kb-card-line-label" for="kbCardColumnSelect">Column</label>
-              <div class="kb-card-line-value">
-                <select id="kbCardColumnSelect" class="settings-select"></select>
-                <span id="kbCardColumnDisplay" class="kb-card-readonly"></span>
+              <div class="kb-card-prop">
+                <label class="kb-card-prop-label" for="kbCardColumnSelect">Column</label>
+                <div class="kb-card-prop-value">
+                  <select id="kbCardColumnSelect" class="settings-select"></select>
+                  <span id="kbCardColumnDisplay" class="kb-card-readonly"></span>
+                </div>
               </div>
-            </div>
 
-            <div class="kb-card-line">
-              <label class="kb-card-line-label" for="kbCardPrioritySelect">Priority</label>
-              <div class="kb-card-line-value">
-                <select id="kbCardPrioritySelect" class="settings-select"></select>
-                <span id="kbCardPriorityDisplay" class="kb-card-readonly"></span>
+              <div class="kb-card-prop">
+                <label class="kb-card-prop-label" for="kbCardPrioritySelect">Priority</label>
+                <div class="kb-card-prop-value">
+                  <select id="kbCardPrioritySelect" class="settings-select"></select>
+                  <span id="kbCardPriorityDisplay" class="kb-card-readonly"></span>
+                </div>
               </div>
-            </div>
 
-            <!-- EFFORT sits under Priority because the two are read together:
-                 "urgent and small" and "urgent and huge" are different plans,
-                 and separating them would hide that. -->
-            <div class="kb-card-line">
-              <label class="kb-card-line-label" for="kbCardEffortSelect">Effort</label>
-              <div class="kb-card-line-value">
-                <select id="kbCardEffortSelect" class="settings-select"></select>
-                <span id="kbCardEffortDisplay" class="kb-card-readonly"></span>
+              <!-- EFFORT sits under Priority because the two are read together:
+                   "urgent and small" and "urgent and huge" are different plans,
+                   and separating them would hide that. -->
+              <div class="kb-card-prop">
+                <label class="kb-card-prop-label" for="kbCardEffortSelect">Effort</label>
+                <div class="kb-card-prop-value">
+                  <select id="kbCardEffortSelect" class="settings-select"></select>
+                  <span id="kbCardEffortDisplay" class="kb-card-readonly"></span>
+                </div>
               </div>
             </div>
 
             <!-- TAGS stay editable while the card is only being read, unlike
                  every other field here. Tagging is filing rather than editing:
                  you do it to find the card again, not to change what it says. -->
-            <div class="kb-card-line">
-              <span class="kb-card-line-label">Tags</span>
-              <div class="kb-card-line-value">
-                <div id="kbCardTagPicker" class="kb-tag-row"></div>
+            <div class="kb-card-prop-col kb-card-prop-tags">
+              <div class="kb-card-prop kb-card-prop-stacked">
+                <span class="kb-card-prop-label">Tags</span>
+                <div class="kb-card-prop-value">
+                  <div id="kbCardTagPicker" class="kb-tag-row"></div>
+                </div>
               </div>
             </div>
 

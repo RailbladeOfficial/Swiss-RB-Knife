@@ -70,6 +70,11 @@ export interface MenuItem {
   submenu?: MenuItem[];
   /** Renders in the danger color. For destructive rows (Delete, Remove). */
   danger?: boolean;
+  /** A color chip before the label, as #rrggbb. For rows that stand for
+   *  something the user has already given a color to, so the menu and the thing
+   *  it produces are recognizably the same. Omit for rows that have no color;
+   *  an invented one would read as meaning something. */
+  swatch?: string;
   /** Grays the row out and makes it unclickable. Prefer this over omitting a
    *  row that is sometimes available: a menu whose length changes is harder
    *  to build muscle memory for than one with a grayed-out entry. */
@@ -216,6 +221,20 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
         btn.addEventListener("click", () => {
           renderLevel(item.submenu!, level);
           positionMenu(menu, anchor);
+        });
+      } else if (item.swatch) {
+        // Swatch then label, as two elements, so the color is a block rather
+        // than a character and the labels below it still line up.
+        const dot = document.createElement("span");
+        dot.className = "menu-item-swatch";
+        dot.style.background = item.swatch;
+        dot.setAttribute("aria-hidden", "true");
+        const text = document.createElement("span");
+        text.textContent = item.label ?? "";
+        btn.append(dot, text);
+        btn.addEventListener("click", () => {
+          closeMenu();
+          item.onClick?.();
         });
       } else {
         btn.textContent = item.label ?? "";

@@ -701,6 +701,42 @@ test("a renamed level is shown under its new name everywhere", () => {
   assert.deepEqual(strays, [], "these draw a shipped name instead of the renamed one");
 });
 
+test("the card modal does not borrow a class the board face owns", () => {
+  /* .kb-card-top is the card face's header strip on the BOARD. The modal
+     declared its own rule under that name lower down the same stylesheet, which
+     outranked the board's by source order and turned every card on every board
+     into a centered vertical stack. Nothing said a word: both selectors were
+     valid, they just were not about the same thing.
+
+     The modal's fields are kb-card-prop-* now. This fails if anything inside
+     the card modal's markup claims a class the board face builds. */
+  const ts0 = ts();
+  const html = read("index.html");
+
+  // What buildCardEl puts on a card face.
+  const build = ts0.slice(ts0.indexOf("function buildCardEl("));
+  const faceClasses = new Set(
+    [...build.slice(0, 4000).matchAll(/"(kb-card-[a-z-]+)"/g)].map((m) => m[1]),
+  );
+  assert.ok(faceClasses.has("kb-card-top"), "the face no longer uses kb-card-top; update this");
+
+  // What the card modal's markup uses.
+  const modal = html.slice(
+    html.indexOf('id="kbCardBackdrop"'),
+    html.indexOf('id="kbCardColorBackdrop"'),
+  );
+  const modalClasses = new Set(
+    [...modal.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)),
+  );
+
+  const shared = [...faceClasses].filter((c) => modalClasses.has(c));
+  assert.deepEqual(
+    shared,
+    [],
+    "the modal and the board face share these classes, so one will restyle the other",
+  );
+});
+
 test("a card being read has no live control left in it", () => {
   /* The whole point of the reading face is that a stray keystroke cannot edit
      real work. Every control that WRITES has to be hidden by the
@@ -727,7 +763,7 @@ test("a card being read has no live control left in it", () => {
   }
   // The selects are covered as a class rather than one by one, which is what
   // lets Priority and Effort be joined by a third without touching this.
-  assert.match(block, /\.kb-card-line-value select/, "the top selects are still live");
+  assert.match(block, /\.kb-card-prop-value select/, "the top selects are still live");
 
   /* TAGS ARE THE DELIBERATE EXCEPTION and are not in the list above. Tagging is
      filing rather than editing: you do it to find the card again, not to change

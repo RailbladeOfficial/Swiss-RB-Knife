@@ -742,6 +742,12 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   border-color: var(--kb-ink-soft);
 }
 
+/* The card face's header strip: number, agent mark, priority chip, stage chips,
+   all on one line.
+   THE NAME IS TAKEN. The card modal briefly declared its own .kb-card-top lower
+   down this file, which outranked this by source order and turned every card on
+   every board into a centered vertical stack. Those fields are kb-card-prop-*
+   now. Do not reuse this name for anything inside the modal. */
 .kb-card-top {
   display: flex;
   align-items: center;
@@ -1749,7 +1755,7 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* Reading: the values show, the controls do not. The two that END an edit go
    with them, since there is no edit to end. */
-#kbCardModal[data-kb-editing="false"] .kb-card-line-value select,
+#kbCardModal[data-kb-editing="false"] .kb-card-prop-value select,
 #kbCardModal[data-kb-editing="false"] #kbCardTitleInput,
 #kbCardModal[data-kb-editing="false"] #kbCardSaveBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardCancelBtn,
@@ -1816,53 +1822,80 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 }
 
 /* -----------------------------------------------------------------------------
-   THE TOP ROWS
+   THE CARD'S PROPERTIES
    -----------------------------------------------------------------------------
-   Label left, value right, five of them stacked. A fixed label column so the
-   values line up into a column you can read straight down, and it holds its
-   width whether the label is "Board" or "Priority".
+   These used to be called .kb-card-top, which is the class the card face on the
+   BOARD uses. Two different layouts under one name, and the modal's won: every
+   card on every board turned into a centered vertical stack. Everything here is
+   kb-card-prop-*, which nothing outside this block uses.
 
-   The label column does NOT shrink and the value column does, because the value
-   is the part that can be long: a card with nine tags should wrap them, not
-   squeeze "Priority" onto two lines.
+   TWO COLUMNS. The four properties are short, fixed and read as a list, so they
+   stack against the left edge. Tags have no upper bound, so they get their own
+   column and can grow down it without moving anything else.
 ----------------------------------------------------------------------------- */
 
-.kb-card-top {
+.kb-card-props {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 28px;
   margin-bottom: 16px;
 }
 
-.kb-card-line {
+.kb-card-prop-col {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
 }
 
-.kb-card-line-label {
+/* Tags take the slack, so a card with twenty of them wraps inside its own
+   column instead of stretching the modal. */
+.kb-card-prop-tags {
+  flex: 1 1 auto;
+}
+
+.kb-card-prop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Tags read better as a heading above its chips than as a label beside them,
+   once there is more than one row of them. */
+.kb-card-prop-stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.kb-card-prop-label {
   flex: 0 0 auto;
-  width: 74px;
-  font-size: 0.78rem;
+  width: 64px;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--color-text-muted);
 }
 
-.kb-card-line-value {
-  flex: 1 1 auto;
-  min-width: 0;
+.kb-card-prop-stacked .kb-card-prop-label {
+  width: auto;
 }
 
-/* The selects do not stretch the whole modal. A column name is short and a
-   full-width select next to a 74px label reads as a form, which is the thing
-   the reading face exists to avoid. */
-.kb-card-line-value select {
-  max-width: 320px;
+.kb-card-prop-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* A column name is short. A select stretched to the modal's width beside a
+   64px label reads as a form, which is what the reading face exists to avoid. */
+.kb-card-prop-value select {
+  max-width: 260px;
   width: 100%;
 }
 
-.kb-card-line-value .kb-card-readonly {
+.kb-card-prop-value .kb-card-readonly {
   padding: 0;
 }
 

@@ -3852,6 +3852,12 @@ function getCardModal(): Modal {
   const colorCustom = document.getElementById("kbCardColorCustom") as HTMLInputElement;
 
   _cardModal = new Modal(backdrop, {
+    /* HANDING THE TABS OVER IS WHAT MAKES A DEEP LINK WORK.
+       openCard() calls tabs.select() to choose where a card lands, which only
+       records the choice; the Modal is what re-activates it on open. Without
+       this the choice was made and never acted on, so clicking a card's comment
+       count opened the card on Basic every time. */
+    tabs: getCardTabs(),
     closeOnEsc: true,
     onClosed: () => {
       openCardId = null;
@@ -3882,10 +3888,6 @@ function getCardModal(): Modal {
     const card = getCard(openCardId);
     if (card) fn(card);
   };
-
-  // Built here with the rest of the modal's controls, so the tab buttons are
-  // listening before the first card is ever opened.
-  getCardTabs();
 
   document.getElementById("kbCardEditBtn")!.addEventListener("click", () => {
     setCardEditing(true);
@@ -6151,6 +6153,10 @@ function cardTagMenu(card: Card, categories: TagCategory[], tags: Tag[]): MenuIt
         // A tick rather than a checkbox: MenuItem draws plain text, and the
         // mark has to survive being read at a glance in a list of twenty.
         label: `${card.tagIds.includes(tag.id) ? "\u2713 " : "\u2007 "}${tag.name}`,
+        /* Its own color, so the menu and the chips it produces are recognizably
+           the same tags. A tag with no color of its own inherits its category's,
+           and one with neither gets no swatch rather than an invented color. */
+        swatch: tagColor(tag, categories) ?? undefined,
         onClick: () => {
           if (card.tagIds.includes(tag.id)) {
             card.tagIds = card.tagIds.filter((id) => id !== tag.id);
