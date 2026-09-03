@@ -292,7 +292,13 @@ test("board-overridable settings are read through the resolver, never off the de
     "defaultBoardName",
     "lockOnOpen",
     "sectionOrder",
+    // The two scales. Tool-wide on purpose: a level called "Huge" on one board
+    // and "Epic" on another would make a card's chip mean different things
+    // depending on where you were standing.
     "priorityColors",
+    "priorityLabels",
+    "effortColors",
+    "effortLabels",
   ];
 
   // Three places may touch the defaults directly, because handling the defaults
@@ -641,7 +647,7 @@ test("the priority ladder runs lowest to highest and every rung has a color", ()
   ].map((m) => m[1]);
   assert.deepEqual(ladder, ["none", "trivial", "low", "medium", "high", "critical"]);
 
-  const labels = slice("src/tool/kanban.ts", "export const PRIORITY_LABELS", "};");
+  const labels = slice("src/tool/kanban.ts", "export const DEFAULT_PRIORITY_LABELS", "};");
   const colors = slice("src/tool/kanban.ts", "export const DEFAULT_PRIORITY_COLORS", "};");
   for (const level of ladder) {
     assert.match(labels, new RegExp(`\\b${level}:`), `${level} has no label`);
@@ -654,6 +660,200 @@ test("the priority ladder runs lowest to highest and every rung has a color", ()
   const n = parseInt(trivial[1].slice(1), 16);
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   assert.ok(b > r && b > g, `trivial should read as blue, got ${trivial[1]}`);
+});
+
+test("the effort ladder is lightest to heaviest and every rung is named", () => {
+  /* Effort mirrors Priority's shape on purpose: five rungs plus "none" for
+     unset. If the two ever stop matching, a card's two chips start meaning
+     different kinds of thing and the modal that edits both breaks on one. */
+  const ladder = [
+    ...slice("src/tool/kanban.ts", "export const EFFORTS", "];").matchAll(/"([a-z]+)"/g),
+  ].map((m) => m[1]);
+  assert.deepEqual(ladder, ["none", "tiny", "small", "medium", "large", "huge"]);
+  assert.equal(ladder[0], "none", "the unset rung has to be first, the way Priority's is");
+
+  const labels = slice("src/tool/kanban.ts", "export const DEFAULT_EFFORT_LABELS", "};");
+  const colors = slice("src/tool/kanban.ts", "export const DEFAULT_EFFORT_COLORS", "};");
+  for (const level of ladder) {
+    assert.match(labels, new RegExp(`\\b${level}:`), `${level} has no label`);
+    assert.match(colors, new RegExp(`\\b${level}: "#[0-9a-f]{6}"`), `${level} has no color`);
+  }
+});
+
+test("a renamed level is shown under its new name everywhere", () => {
+  /* The rungs are settable now, so reading DEFAULT_*_LABELS to DRAW one shows
+     the shipped name and silently ignores the rename. Only the accessors and
+     the reset target may touch the defaults. */
+  const src = ts();
+  const exempt = ["function priorityLabel(", "function effortLabel(", "function scaleSpec("].map(
+    (marker) => {
+      const at = src.indexOf(marker);
+      assert.notEqual(at, -1, `could not find ${marker}`);
+      return [at, src.indexOf("\n}", at)];
+    },
+  );
+
+  const strays = [];
+  for (const m of src.matchAll(/DEFAULT_(?:PRIORITY|EFFORT)_LABELS\[/g)) {
+    if (exempt.some(([from, to]) => m.index > from && m.index < to)) continue;
+    strays.push(src.slice(m.index - 40, m.index + 40).replace(/\s+/g, " "));
+  }
+  assert.deepEqual(strays, [], "these draw a shipped name instead of the renamed one");
+});
+
+test("a card being read has no live control left in it", () => {
+  /* The whole point of the reading face is that a stray keystroke cannot edit
+     real work. Every control that WRITES has to be hidden by the
+     [data-kb-editing="false"] block, and the failure mode is silent: a field
+     added later and not listed stays live on a card claiming to be read-only. */
+  const css = read("src/tool/kanban.css");
+  const block = css.slice(
+    css.indexOf('#kbCardModal[data-kb-editing="false"]'),
+    css.indexOf('#kbCardModal[data-kb-editing="true"]'),
+  );
+  assert.ok(block.length > 0, "the reading-face rules are gone");
+
+  for (const id of [
+    "#kbCardTitleInput",
+    "#kbCardManageTagsBtn",
+    "#kbCardAttachAddBtn",
+    "#kbCardDueInput",
+    // The two that end an edit. They used to be a footer (#kbCardEditActions);
+    // they are header icons now, and either way they must not be reachable on
+    // a card that is only being read.
+    "#kbCardSaveBtn",
+    "#kbCardCancelBtn",
+  ]) {
+    assert.ok(block.includes(id), `${id} is still live while the card is being read`);
+  }
+  // The selects are covered as a class rather than one by one, which is what
+  // lets Priority and Effort be joined by a third without touching this.
+  assert.match(block, /\.kb-card-field select/, "the top selects are still live");
+});
+
+test("the reading face cannot be clicked into an editor", () => {
+  /* Hiding the toolbar in CSS is not enough: the rendered face itself opens the
+     textarea when clicked, which would turn a card being read into a card being
+     edited with no way to tell it happened. */
+  const src = ts();
+  const at = src.indexOf('preview.addEventListener("click"');
+  assert.notEqual(at, -1, "the preview no longer handles clicks");
+  const body = src.slice(at, src.indexOf("});", at));
+  assert.match(body, /opts\.readOnly\?\.\(\) === true/, "a read-only field still opens on click");
+
+  // And the card's own description has to actually pass that hook.
+  const desc = src.slice(src.indexOf("descField = createRichTextField({"));
+  assert.match(
+    desc.slice(0, 600),
+    /readOnly: \(\) => !cardEditing/,
+    "the card description does not follow the card's mode",
+  );
+});
+
+test("cancelling an edit puts back what was there", () => {
+  /* Cancel restores from a snapshot taken on the way in. A SHALLOW copy would
+     hand back the same nested arrays that were just edited, so cancelling a
+     subtask change would restore nothing. */
+  const src = ts();
+  const at = src.indexOf("function setCardEditing(");
+  assert.notEqual(at, -1, "setCardEditing is gone");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /structuredClone\(card\)/, "the snapshot is not a deep copy");
+  assert.match(
+    body,
+    /if \(on && card && !cardEditSnapshot\)/,
+    "the snapshot is retaken mid-edit, so Cancel would restore the edits",
+  );
+
+  const cancel = src.slice(src.indexOf("function cancelCardEdit("));
+  assert.match(
+    cancel.slice(0, 500),
+    /Object\.assign\(card, structuredClone\(cardEditSnapshot\)\)/,
+    "Cancel replaces the card object instead of restoring it in place",
+  );
+});
+
+test("a card opened from a count lands on the tab that count belongs to", () => {
+  const src = ts();
+
+  // The subtask count calls openCard directly.
+  const sub = src.indexOf('label.addEventListener("click"');
+  assert.notEqual(sub, -1, "the subtask count is not clickable");
+  const subBody = src.slice(sub, sub + 220);
+  assert.match(subBody, /openCard\(card\.id, "subtasks"\)/, "the subtask count opens Basic");
+  // Without this the card's own click handler also fires and wins.
+  assert.match(
+    subBody,
+    /stopPropagation/,
+    "the count's click also triggers the card's, which opens Basic",
+  );
+
+  /* The comment count goes through the shared `item` helper, which takes the
+     tab as an argument, so what matters is that the helper honors it and that
+     the comment item is the one passing "comments". */
+  const helper = src.indexOf("const item = (svg: string");
+  assert.notEqual(helper, -1, "the meta-item helper is gone");
+  const helperBody = src.slice(helper, helper + 700);
+  assert.match(helperBody, /openCard\(card\.id, tab\)/, "the helper ignores the tab it is given");
+  assert.match(helperBody, /stopPropagation/, "the meta item's click also opens Basic");
+
+  const commentCall = src.indexOf("Open this card's comments");
+  assert.notEqual(commentCall, -1, "the comment count no longer names its tab");
+  assert.match(
+    src.slice(commentCall, commentCall + 80),
+    /"comments"/,
+    "the comment count does not pass the comments tab",
+  );
+});
+
+test("every reorderable section still exists as a block to reorder", () => {
+  /* CARD_SECTIONS drives both the layout list and the drag order. A name in it
+     with no matching block is a row you can drag that moves nothing, and a
+     block with no name is one that can never be moved. */
+  const ladder = [
+    ...slice("src/tool/kanban.ts", "export const CARD_SECTIONS", "];").matchAll(/"([a-z]+)"/g),
+  ].map((m) => m[1]);
+  assert.deepEqual(ladder, ["description", "attachments", "due", "stages"]);
+
+  const html = read("index.html");
+  const blocks = [...html.matchAll(/data-kb-section="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(
+    [...blocks].sort(),
+    [...ladder].sort(),
+    "the reorderable list and the blocks in the page disagree",
+  );
+});
+
+test("a card's description reads at the same size as its comments", () => {
+  /* The description is the part of a card carrying the detail you opened it
+     for, and it was the smallest text in the modal: a hard 13px in
+     rich-text.css while comments overrode it with 0.85rem of their own. One
+     token now drives every rich text face, and a second font-size on any of
+     them is how the two drift apart again. */
+  const rt = read("src/core/rich-text.css");
+  assert.match(rt, /--rt-font-size:\s*0\.85rem/, "the shared rich text size has moved");
+
+  // Both faces of a field read the token rather than a number.
+  const body = rt.slice(rt.indexOf(".rt-body {"), rt.indexOf(".rt-body > *:first-child"));
+  assert.match(body, /font-size:\s*var\(--rt-font-size\)/, "the rendered face has its own size");
+  const area = rt.slice(rt.indexOf(".rt-editor textarea {"));
+  assert.match(
+    area.slice(0, 160),
+    /font-size:\s*var\(--rt-font-size\)/,
+    "the textarea has its own size, so writing and reading differ again",
+  );
+
+  // And nothing in the tool sets a size on a rich text block to override it.
+  const css = read("src/tool/kanban.css");
+  for (const cls of [".kb-comment-body", ".kb-card-desc"]) {
+    const at = css.indexOf(`${cls} {`);
+    if (at === -1) continue;
+    const rule = css.slice(at, css.indexOf("}", at));
+    assert.ok(
+      !/font-size/.test(rule),
+      `${cls} sets its own font-size, which is what made the description the odd one out`,
+    );
+  }
 });
 
 test("no placeholder names this app or a version of it", () => {

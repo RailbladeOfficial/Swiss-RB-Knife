@@ -7680,6 +7680,20 @@
             </div>
 
             <div class="settings-row">
+              <span class="kb-label-with-info">Open Cards in Edit Mode
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Off, a card opens as something to read and the pencil in its header switches to the fields. On, it opens ready to type in and there is no reading face. Subtasks and comments work either way. Boards can override this.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbOpenInEditLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbOpenInEditToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
               <span class="kb-label-with-info">Stamp Complete on Drop into a Done Column
                 <button type="button" class="info-trigger-btn kb-info-btn"
                   data-tooltip="Dropping a card into the column marked 'means done' stamps its Complete date. Editable afterwards, and dragging back out never clears it.">&#8505;</button>
@@ -7802,20 +7816,37 @@
             </div>
 
             <div class="settings-row">
-              <span class="kb-label-with-info">Priority Colors
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="One color per level, shared by every board. None has no color.">&#8505;</button>
-              </span>
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Priority
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="What each level is called and the color it wears, shared by every board. None has no color, because it is the absence of a priority.">&#8505;</button>
+                </span>
+                <span id="kbPrioritySummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbPriorityEditBtn" class="settings-action-btn">Customize</button>
             </div>
-            <div id="kbPriorityColorsRow" class="kb-priority-colors"></div>
 
             <div class="settings-row">
-              <span class="kb-label-with-info">Card Layout
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="The order blocks appear in an open card. Drag to rearrange; title and board/column stay first. Boards can override this in Board Setup &gt; Preferences.">&#8505;</button>
-              </span>
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Effort
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="How heavy a card is, separately from how urgent. Rename the levels to whatever your team already says.">&#8505;</button>
+                </span>
+                <span id="kbEffortSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbEffortEditBtn" class="settings-action-btn">Customize</button>
             </div>
-            <div id="kbSectionOrderList" class="kb-section-order"></div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Card Layout
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="The order the blocks appear in on an open card's Basic tab. Boards can override this in Board Setup &gt; Preferences.">&#8505;</button>
+                </span>
+                <span id="kbCardLayoutSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbCardLayoutEditBtn" class="settings-action-btn">Customize</button>
+            </div>
 
             <div class="settings-section-divider"></div>
 
@@ -7852,6 +7883,19 @@
               <button id="kbBackupRefreshBtn" class="settings-action-btn">Refresh</button>
             </div>
             <div id="kbBackupList" class="tool-backup-list"></div>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">AI Agent Access
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="One switch over every board at once. Turning it off refuses every agent request immediately and leaves each board's own settings alone, so turning it back on restores exactly what was allowed before.">&#8505;</button>
+                </span>
+                <span id="kbAgentGlobalSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbAgentGlobalOffBtn" class="danger-btn">Turn Off Everywhere</button>
+            </div>
 
           </div>
         </div>
@@ -7936,6 +7980,7 @@
           <button class="modal-tab active" data-kb-board-tab="board">Board</button>
           <button class="modal-tab" data-kb-board-tab="tags">Tags</button>
           <button class="modal-tab" data-kb-board-tab="preferences">Preferences</button>
+          <button class="modal-tab" data-kb-board-tab="agents">Agents</button>
         </div>
 
         <!-- BOARD -->
@@ -8019,6 +8064,115 @@
           <div id="kbBoardPrefsList" class="setup-preferences-list"></div>
         </div>
 
+        <!-- AGENTS
+             Letting a local AI agent work on THIS board. The explanation is
+             first and is not a tooltip: this is the one tab in the app that
+             hands something else write access to the user's data, and it has to
+             be readable before anything is switched on. -->
+        <div id="kbBoardTabAgents" class="modal-tab-pane" style="display:none;">
+
+          <div class="kb-agent-intro">
+            <p>An AI coding agent on this computer can read this board and change it, within
+              the limits you set below. Nothing is sent over the internet: the agent talks to
+              Swiss RB Knife directly on this machine.</p>
+            <p>Swiss RB Knife checks every request against these switches and refuses what is
+              not allowed. The agent is never trusted to check for itself. Swiss RB Knife has
+              to be open for any of it to work.</p>
+          </div>
+
+          <div id="kbAgentMasterOff" class="kb-agent-banner" style="display:none;">
+            <span>Agent access is switched off for the whole app.</span>
+            <button id="kbAgentMasterOnBtn" class="settings-action-btn">Turn It On</button>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span class="kb-label-with-info">Agent Access for This Board
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Off means every request for this board is refused, whatever the switches below say. Turning it off does not delete them.">&#8505;</button>
+              </span>
+              <span id="kbAgentStatusBadge" class="settings-status-badge"></span>
+              <span id="kbAgentLiveBadge" class="settings-status-badge kb-agent-live" style="display:none;"></span>
+            </div>
+            <div class="toggle-with-label">
+              <span id="kbAgentEnabledLabel">Off</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="kbAgentEnabledToggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div id="kbAgentBody" style="display:none;">
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">What It May Do
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Reading the board is always allowed once access is on. Everything that changes something starts off. Customize opens the full list, grouped.">&#8505;</button>
+                </span>
+                <span id="kbAgentPermSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbAgentPermEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Connections
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Each connection is one key for one agent. Copy it into that agent's config once. Removing it here stops that agent immediately.">&#8505;</button>
+              </span>
+              <button id="kbAgentNewConnectionBtn" class="settings-action-btn">+ New Connection</button>
+            </div>
+
+            <!-- WHICH AGENT, because the config file is not the same for all of
+                 them. Picking one here changes what the copy buttons below
+                 produce and tells you which file to put it in. -->
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Copy For
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="They all speak the same protocol. What differs is where each one keeps its server list and what that file looks like, so the buttons below give you the right shape for the one you use.">&#8505;</button>
+                </span>
+                <span id="kbAgentClientWhere" class="settings-status-badge"></span>
+              </div>
+              <select id="kbAgentClientSelect" class="settings-select"></select>
+            </div>
+
+            <div id="kbAgentConnectionList" class="kb-agent-connections"></div>
+
+            <p class="kb-agent-note"><strong>Where the agent actually runs.</strong> srbk-agent.exe
+              is started by your AI tool, not by Swiss RB Knife, so it lives in that tool's
+              process and is stopped and restarted there. Nothing here needs managing: to cut
+              a connection off, revoke it or switch this board off above, and it stops at once.
+              You never need Task Manager.</p>
+
+            <p class="kb-agent-note">srbk-agent.exe is not code-signed, so Windows or your
+              antivirus may warn the first time an agent starts it. Choose More info, then Run
+              anyway, or allow it by name in your antivirus. It is installed with Swiss RB Knife
+              at the path shown on each connection.</p>
+
+            <div class="settings-section-divider"></div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Recent Activity
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Every request an agent has made, allowed or refused, newest first. Kept for the last 500 across all boards.">&#8505;</button>
+              </span>
+              <div class="kb-agent-activity-actions">
+                <button id="kbAgentLogRefreshBtn" class="settings-action-btn">Refresh</button>
+                <button id="kbAgentLogClearBtn" class="modal-cancel-btn">Clear</button>
+              </div>
+            </div>
+            <div id="kbAgentLogList" class="kb-agent-log"></div>
+
+          </div>
+
+        </div>
+
       </div>
     </div>
   </div>
@@ -8030,6 +8184,107 @@
        built on: the limit is the thing that makes the board tell you
        something instead of just holding cards.
   ====================================================================== -->
+  <!-- CARD LAYOUT
+       Reached by Customize on Setup > Preferences. A drag list needs room to be
+       dragged in, and it was competing for height with nine other rows on a tab
+       that scrolls. -->
+  <div id="kbCardLayoutBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbCardLayoutModal" class="modal">
+      <div class="modal-header">
+        <button id="kbCardLayoutBack" class="modal-back-btn" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span>Card Layout</span>
+        <button id="kbCardLayoutClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <p class="kb-agent-note">The order these blocks appear in on an open card's Basic tab.
+          Drag to rearrange. The title, the three columns at the top and the Subtasks and
+          Comments tabs have fixed places and are not listed.</p>
+        <div id="kbSectionOrderList" class="kb-section-order"></div>
+        <div class="settings-row">
+          <span class="kb-section-note">Boards can override this in Board Setup &gt; Preferences.</span>
+          <button id="kbCardLayoutResetBtn" class="modal-cancel-btn">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRIORITY / EFFORT SCALE EDITOR
+       ONE modal for both scales, filled at open time. They are the same shape,
+       a fixed set of rungs each with a name and a color, and two hand-written
+       copies would drift apart the moment one of them gained a column. Which
+       scale is being edited is held in kanban.ts, not in the markup. -->
+  <div id="kbScaleBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbScaleModal" class="modal">
+      <div class="modal-header">
+        <button id="kbScaleBack" class="modal-back-btn" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbScaleTitle">Priority</span>
+        <button id="kbScaleClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <p id="kbScaleBlurb" class="kb-agent-note"></p>
+        <div id="kbScaleRows" class="kb-scale-rows"></div>
+        <div class="settings-row">
+          <span id="kbScaleNote" class="kb-section-note"></span>
+          <button id="kbScaleResetBtn" class="modal-cancel-btn">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGENT PERMISSIONS
+       Reached by Customize on the board's Agents tab. Grouped rather than one
+       long list, because the question "may it delete things" was previously
+       answered by scrolling past nine switches that had nothing to do with it. -->
+  <div id="kbAgentPermBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbAgentPermModal" class="modal">
+      <div class="modal-header">
+        <button id="kbAgentPermBack" class="modal-back-btn" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbAgentPermTitle">What It May Do</span>
+        <button id="kbAgentPermClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+
+        <p class="kb-agent-note">Reading this board is always allowed once agent access is on.
+          Everything below changes something, and every one of them starts off.</p>
+
+        <div class="settings-row">
+          <span id="kbAgentPermSummaryInModal" class="settings-status-badge"></span>
+          <button id="kbAgentAllOffBtn" class="settings-action-btn">Turn All Off</button>
+        </div>
+
+        <div id="kbAgentPermissionList" class="kb-agent-perm-grid"></div>
+
+      </div>
+    </div>
+  </div>
+
   <div id="kbColumnEditBackdrop" class="modal-backdrop" style="display: none;">
     <div id="kbColumnEditModal" class="modal">
       <div class="modal-header">
@@ -8126,32 +8381,114 @@
           </svg>
         </button>
         <span id="kbCardHeaderLabel">Card</span>
-        <button id="kbCardClose" class="modal-close-btn modal-header-right" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div class="modal-header-right kb-card-header-actions">
+          <!-- THE SAME CORNER DOES BOTH JOBS.
+               Reading shows the pencil. Editing swaps it for save and discard,
+               so the controls that end an edit are where the control that
+               started it was, rather than at the foot of a card you have to
+               scroll to reach past a long description. -->
+          <button id="kbCardEditBtn" class="modal-close-btn" title="Edit this card">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
+          <button id="kbCardSaveBtn" class="modal-close-btn kb-card-save-btn" title="Save changes">
+            <!-- A floppy: the outline, the shutter at the top, the label at the
+                 bottom. Still the one icon everybody reads as save. -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+              <path d="M17 21v-8H7v8" />
+              <path d="M7 3v5h8" />
+            </svg>
+          </button>
+          <button id="kbCardCancelBtn" class="modal-close-btn kb-card-discard-btn" title="Discard changes">
+            <!-- An arrow curving back on itself: put it back the way it was. -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7v6h6" />
+              <path d="M3.5 13a9 9 0 1 0 2.1-9.4L3 7" />
+            </svg>
+          </button>
+          <button id="kbCardClose" class="modal-close-btn" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="modal-body setup-body kb-card-body">
 
+        <!-- THE TITLE, twice.
+             Reading a card and editing it are different jobs, and a text box is
+             a poor way to READ a heading: it draws a border around something
+             that is not a field yet and invites a stray keystroke. So the input
+             is the editing face and the heading is the reading one, and exactly
+             one of them is in the layout at a time. -->
         <input type="text" id="kbCardTitleInput" class="kb-card-title-input" spellcheck="true" autocomplete="off"
           placeholder="Card title" />
+        <h2 id="kbCardTitleDisplay" class="kb-card-title-display"></h2>
 
-        <div class="kb-card-row">
-          <div class="setup-field kb-card-field">
-            <label for="kbCardColumnSelect">Column</label>
-            <select id="kbCardColumnSelect" class="settings-select"></select>
-          </div>
-          <div class="setup-field kb-card-field">
-            <label for="kbCardBoardSelect">Board</label>
-            <select id="kbCardBoardSelect" class="settings-select"></select>
-          </div>
-          <div class="setup-field kb-card-field">
-            <label for="kbCardPrioritySelect">Priority</label>
-            <select id="kbCardPrioritySelect" class="settings-select"></select>
-          </div>
+        <!-- TABS
+             Subtasks and comments each grow without limit and neither is used
+             on most cards, so both were charging every card the cost of the few
+             that need them. Behind a tab they cost nothing until asked for, and
+             the Basic tab stays the size of the card rather than the size of
+             its longest conversation. -->
+        <div class="modal-tabs kb-card-tabs">
+          <button class="modal-tab active" data-kb-card-tab="basic">Basic</button>
+          <button class="modal-tab" data-kb-card-tab="subtasks">
+            Subtasks<span id="kbCardSubtaskTabCount" class="kb-tab-count"></span>
+          </button>
+          <button class="modal-tab" data-kb-card-tab="comments">
+            Comments<span id="kbCardCommentTabCount" class="kb-tab-count"></span>
+          </button>
         </div>
+
+        <div id="kbCardTabBasic" class="modal-tab-pane">
+
+          <!-- THREE COLUMNS.
+               Where it lives, what it weighs, what it is about. Tags were a
+               full-width block further down, which put the card's own subject
+               below its attachments. -->
+          <div class="kb-card-top">
+            <div class="kb-card-top-col">
+              <div class="setup-field kb-card-field">
+                <label for="kbCardColumnSelect">Column</label>
+                <select id="kbCardColumnSelect" class="settings-select"></select>
+                <span id="kbCardColumnDisplay" class="kb-card-readonly"></span>
+              </div>
+              <div class="setup-field kb-card-field">
+                <label for="kbCardBoardSelect">Board</label>
+                <select id="kbCardBoardSelect" class="settings-select"></select>
+                <span id="kbCardBoardDisplay" class="kb-card-readonly"></span>
+              </div>
+            </div>
+
+            <div class="kb-card-top-col">
+              <div class="setup-field kb-card-field">
+                <label for="kbCardPrioritySelect">Priority</label>
+                <select id="kbCardPrioritySelect" class="settings-select"></select>
+                <span id="kbCardPriorityDisplay" class="kb-card-readonly"></span>
+              </div>
+              <!-- EFFORT sits beside Priority because the two are read together:
+                   "urgent and small" and "urgent and huge" are different plans,
+                   and splitting them across the modal would hide that. -->
+              <div class="setup-field kb-card-field">
+                <label for="kbCardEffortSelect">Effort</label>
+                <select id="kbCardEffortSelect" class="settings-select"></select>
+                <span id="kbCardEffortDisplay" class="kb-card-readonly"></span>
+              </div>
+            </div>
+
+            <div class="kb-card-top-col kb-card-top-tags">
+              <div class="setup-field kb-card-field">
+                <label>Tags</label>
+                <div id="kbCardTagPicker" class="kb-tag-picker"></div>
+                <button id="kbCardManageTagsBtn" class="settings-action-btn">Manage Tags</button>
+              </div>
+            </div>
+          </div>
 
         <!-- The reorderable blocks. -->
         <div id="kbCardSections" class="kb-card-sections">
@@ -8202,33 +8539,9 @@
             <p class="kb-section-hint">
               Files are copied into the app's own folder, so moving or deleting the original
               leaves this card intact. Deleting the card, the comment or the board takes its
-              files with it. On an encrypted board the copies are encrypted too. Ctrl+V pastes
-              an image straight from the clipboard. 64 MB per file.
+              files with it. Ctrl+V pastes an image straight from the clipboard.
+              64 MB per file.
             </p>
-          </div>
-
-          <div class="kb-section" data-kb-section="tags">
-            <div class="kb-section-head">
-              <span class="kb-section-title">Tags</span>
-              <button id="kbCardManageTagsBtn" class="settings-action-btn">Manage Tags</button>
-            </div>
-            <div id="kbCardTagPicker" class="kb-tag-picker"></div>
-          </div>
-
-          <div class="kb-section" data-kb-section="subtasks">
-            <div class="kb-section-head">
-              <span class="kb-section-title">Subtasks</span>
-              <span id="kbCardSubtaskSummary" class="kb-section-note"></span>
-            </div>
-            <div class="progress-bar-track kb-subtask-track">
-              <div id="kbCardSubtaskBar" class="progress-bar-fill" style="width: 0%;"></div>
-            </div>
-            <div id="kbCardSubtaskList" class="kb-subtask-list"></div>
-            <div class="kb-inline-row">
-              <input type="text" id="kbCardSubtaskInput" class="kb-wide-input" spellcheck="true" autocomplete="off"
-                placeholder="Add a subtask, then Enter" />
-              <button id="kbCardSubtaskAddBtn">Add</button>
-            </div>
           </div>
 
           <div class="kb-section" data-kb-section="stages" id="kbCardStagesSection">
@@ -8243,11 +8556,40 @@
             </div>
           </div>
 
-          <!-- COMMENTS
-               Oldest first, read as a sequence. The composer is at the foot
-               because that is where the sequence continues. Ctrl+Enter posts;
-               plain Enter is a new line, since a comment is prose. -->
-          <div class="kb-section" data-kb-section="comments">
+        </div>
+
+        </div><!-- /kbCardTabBasic -->
+
+        <!-- SUBTASKS
+             Interactive whether or not the card is being edited: ticking one off
+             is recording what happened, not editing the card's definition. -->
+        <div id="kbCardTabSubtasks" class="modal-tab-pane" style="display:none;">
+          <div class="kb-section">
+            <div class="kb-section-head">
+              <span class="kb-section-title">Subtasks</span>
+              <span id="kbCardSubtaskSummary" class="kb-section-note"></span>
+            </div>
+            <div class="progress-bar-track kb-subtask-track">
+              <div id="kbCardSubtaskBar" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div id="kbCardSubtaskList" class="kb-subtask-list"></div>
+            <div class="kb-inline-row">
+              <input type="text" id="kbCardSubtaskInput" class="kb-wide-input" spellcheck="true" autocomplete="off"
+                placeholder="Add a subtask, then Enter" />
+              <button id="kbCardSubtaskAddBtn">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMMENTS
+             Oldest first, read as a sequence. The composer is at the foot
+             because that is where the sequence continues. Ctrl+Enter posts;
+             plain Enter is a new line, since a comment is prose.
+
+             Also interactive outside edit mode, for the same reason as subtasks:
+             a comment is a thing you add to a card, not a change to it. -->
+        <div id="kbCardTabComments" class="modal-tab-pane" style="display:none;">
+          <div class="kb-section">
             <div class="kb-section-head">
               <span class="kb-section-title">Comments</span>
               <span id="kbCardCommentSummary" class="kb-section-note"></span>
@@ -8256,7 +8598,6 @@
             <div id="kbCardCommentPending" class="rt-attach-list"></div>
             <div id="kbCardCommentHost"></div>
           </div>
-
         </div>
 
       </div>

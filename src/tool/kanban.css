@@ -1779,10 +1779,12 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
    rather than live. Failing closed is the right way round here.
 ============================================================================= */
 
-/* Reading: the values show, the controls do not. */
+/* Reading: the values show, the controls do not. The two that END an edit go
+   with them, since there is no edit to end. */
 #kbCardModal[data-kb-editing="false"] .kb-card-field select,
 #kbCardModal[data-kb-editing="false"] #kbCardTitleInput,
-#kbCardModal[data-kb-editing="false"] #kbCardEditActions,
+#kbCardModal[data-kb-editing="false"] #kbCardSaveBtn,
+#kbCardModal[data-kb-editing="false"] #kbCardCancelBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardManageTagsBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardAttachAddBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardDueClearBtn,
@@ -1835,13 +1837,15 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   gap: 2px;
 }
 
-.kb-card-edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
+/* Save is the affirmative one, so it carries the accent. Discard stays the
+   header's own muted color until you are on it: an icon that looks dangerous
+   at rest makes the corner feel like somewhere not to point the mouse. */
+.kb-card-save-btn {
+  color: var(--color-success);
+}
+
+.kb-card-discard-btn:hover {
+  color: var(--color-danger);
 }
 
 /* -----------------------------------------------------------------------------
