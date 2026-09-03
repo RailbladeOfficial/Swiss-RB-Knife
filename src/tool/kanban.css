@@ -1675,6 +1675,23 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   flex-shrink: 0;
 }
 
+/* Effort, beside Priority. The same pill, outlined instead of filled: two solid
+   chips side by side compete for a glance, and priority is the one that should
+   win it. The border color is set inline from the level, so a renamed or
+   recolored rung reaches this without a second copy of the palette here. */
+.kb-card-effort {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: transparent;
+}
+
 .kb-priority-colors {
   display: flex;
   flex-wrap: wrap;

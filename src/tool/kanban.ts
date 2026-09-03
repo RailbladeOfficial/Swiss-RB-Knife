@@ -1545,6 +1545,11 @@ export function normalizeOverrides(raw: unknown): Partial<BoardScopedSettings> {
   if (!raw || typeof raw !== "object") return {};
   const src = raw as Partial<BoardScopedSettings>;
   const out: Partial<BoardScopedSettings> = {};
+  /* EVERY BOOLEAN IN BoardScopedSettings, and adding one there means adding it
+     here. A key missing from this list is read back as absent, so the board
+     silently falls back to the tool default and the setting looks like it never
+     saved. openCardsInEditMode was missing exactly that way. A test now pins
+     this list to the interface so the next one cannot go quiet. */
   const bools = [
     "confirmDelete",
     "autoCompleteOnDone",
@@ -1555,6 +1560,7 @@ export function normalizeOverrides(raw: unknown): Partial<BoardScopedSettings> {
     "showCardDelete",
     "showStages",
     "showDue",
+    "openCardsInEditMode",
   ] as const;
   for (const key of bools) {
     if (typeof src[key] === "boolean") out[key] = src[key];
@@ -2940,6 +2946,26 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
     const color = kbSettings.priorityColors[card.priority];
     chip.style.background = color;
     chip.style.color = readableTextOn(color);
+    top.appendChild(chip);
+  }
+
+  /* EFFORT SITS BESIDE PRIORITY, in the same strip and the same shape, because
+     the two are read together: "urgent and small" and "urgent and huge" are
+     different plans and a face showing one without the other hides that.
+
+     OUTLINED RATHER THAN FILLED. Two solid chips side by side compete, and
+     priority is the one that should win a glance across a full column. Effort
+     carries its color as a border and its text, so it is legible without
+     shouting. Hidden at "none", like priority: an unset estimate is not an
+     estimate of nothing. */
+  if (card.effort !== "none") {
+    const chip = document.createElement("span");
+    chip.className = "kb-card-effort";
+    chip.textContent = effortLabel(card.effort);
+    chip.title = `Effort: ${effortLabel(card.effort)}`;
+    // Only the text color is set: the border reads currentColor, so one value
+    // paints both and they cannot drift apart.
+    chip.style.color = kbSettings.effortColors[card.effort];
     top.appendChild(chip);
   }
 

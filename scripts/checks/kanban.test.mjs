@@ -324,6 +324,36 @@ test("board-overridable settings are read through the resolver, never off the de
   assert.deepEqual(strays, [], "these read a board-overridable setting without asking the board");
 });
 
+test("every board-overridable setting survives being written and read back", () => {
+  /* normalizeOverrides keeps a hand-written list of the keys it will read. A
+     boolean added to BoardScopedSettings and not to that list is written to
+     disk, dropped on the way back in, and the board falls back to the tool
+     default: the setting takes, looks right, and is gone next launch. That is
+     what happened to openCardsInEditMode.
+
+     The interface is the contract; this list has to match it. */
+  const src = ts();
+
+  const iface = src.slice(
+    src.indexOf("export interface BoardScopedSettings {"),
+    src.indexOf("\n}", src.indexOf("export interface BoardScopedSettings {")),
+  );
+  assert.ok(iface.length > 0, "BoardScopedSettings is gone");
+  const declared = [...iface.matchAll(/^\s{2}([A-Za-z]+): boolean;$/gm)].map((m) => m[1]);
+  assert.ok(declared.length > 5, `only found ${declared.length} boolean settings`);
+
+  const at = src.indexOf("export function normalizeOverrides");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  const listed = [...body.matchAll(/"([A-Za-z]+)",/g)].map((m) => m[1]);
+
+  const missing = declared.filter((key) => !listed.includes(key));
+  assert.deepEqual(
+    missing,
+    [],
+    "these board settings are dropped when a board's overrides are read back",
+  );
+});
+
 test("a board override stores only what the board disagrees about", () => {
   // Writing the current default into every key would freeze it: changing the
   // default later would stop reaching boards that never disagreed with it,
