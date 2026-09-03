@@ -55,6 +55,15 @@
        the card intact, and a card cannot name a file outside its own board
        because it carries no path at all.
 
+     • AN AI AGENT IS A CLIENT WITH NO AUTHORITY. A board can be opened to a
+       local agent (Board Setup > Agents), and everything it asks for is a
+       REQUEST this app grants or refuses. The permission check is in
+       src-tauri/src/agent_gate.rs, before the request reaches this file; the
+       checks that need the record itself (who created this card) are in the
+       AGENT OPERATIONS section below. An agent's card is created by the same
+       createCard() a button calls, so there is one set of rules rather than
+       two.
+
      • DELETING SOMETHING TAKES ITS FILES, and a deleted file is set aside
        rather than unlinked, so restoring an older snapshot brings them back for
        as long as that snapshot survives. Two things keep that honest: every
@@ -72,11 +81,16 @@
      revive_kanban_attachments, kanban_attachments_exist,
      open_kanban_attachment
 
+   Agent access (see the AGENT OPERATIONS section):
+     kanban_agent_reply, kanban_agent_status,
+     read_kanban_agent_log, clear_kanban_agent_log
+
    Preferences go through lib.rs's shared tool-file store, like every other
-   tool's.
+   tool's, and so does the agent configuration.
 ============================================================================= */
 
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   devError,
@@ -90,6 +104,30 @@ import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, closeMenu, openMenu, type MenuItem } from "../menu/menu";
 import { formatBackupName, formatBackupBytes as formatBytes } from "../core/tool-backups";
 import { registerTransferable } from "../core/data-transfer";
+import {
+  AGENT_PERMISSIONS,
+  AGENT_PERMISSION_GROUPS,
+  agentStatus,
+  groupPermissions,
+  permissionSummary,
+  testAgentConnection,
+  boardConfig,
+  clearAgentLog,
+  AGENT_CLIENTS,
+  agentClient,
+  connectionCommand,
+  connectionConfig,
+  loadAgentConfig,
+  newConnection,
+  opLabel,
+  permissionLabel,
+  readAgentLog,
+  saveAgentConfig,
+  type AgentLogEntry,
+  starterPermissions,
+  type AgentConfig,
+  type AgentToken,
+} from "./kanban-agents";
 import {
   applyRichTextCommand,
   bindRichTextLinks,
@@ -157,7 +195,9 @@ export const PRIORITIES: readonly Priority[] = [
   "critical",
 ];
 
-export const PRIORITY_LABELS: Record<Priority, string> = {
+/** The names shipped with the app. What a board actually shows comes from
+ *  settings, which start as a copy of this and can be renamed. */
+export const DEFAULT_PRIORITY_LABELS: Record<Priority, string> = {
   none: "None",
   trivial: "Trivial",
   low: "Low",
@@ -165,6 +205,21 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
   high: "High",
   critical: "Critical",
 };
+
+/** What a priority is CALLED on this install. Reads the setting, which starts
+ *  as a copy of the shipped names and can be renamed per level.
+ *
+ *  Every place that shows a rung to a person goes through here. Reading
+ *  DEFAULT_PRIORITY_LABELS directly would show the shipped name and quietly
+ *  ignore the rename, which is the bug this function exists to prevent. */
+export function priorityLabel(level: Priority): string {
+  return kbSettings.priorityLabels[level] || DEFAULT_PRIORITY_LABELS[level];
+}
+
+/** The same, for Effort. */
+export function effortLabel(level: Effort): string {
+  return kbSettings.effortLabels[level] || DEFAULT_EFFORT_LABELS[level];
+}
 
 /** Green through red, skipping "none", which is the absence of a priority and
  *  so has no color: a card with no priority set must not be painted gray as if
@@ -180,6 +235,48 @@ export const DEFAULT_PRIORITY_COLORS: Record<Priority, string> = {
   medium: "#e0a11b",
   high: "#e5651f",
   critical: "#e5484d",
+};
+
+/* -----------------------------------------------------------------------------
+   EFFORT
+   -----------------------------------------------------------------------------
+   How HEAVY a card is, which is a different question from how urgent it is.
+   Kept as its own scale rather than folded into Priority because the two
+   disagree constantly: the most urgent thing on a board is often the smallest,
+   and the biggest is often the one nobody has scheduled. A board that can only
+   say "critical" cannot tell those apart.
+
+   FIVE RUNGS PLUS "none", mirroring Priority exactly, so a card with no
+   estimate reads as unset rather than as the middle. Both the LABELS and the
+   COLORS are settable, unlike Priority's rungs, which were fixed because the
+   ramp is the meaning. Effort's names are genuinely a house style: a team that
+   says "points" and a team that says "t-shirts" mean the same five things.
+----------------------------------------------------------------------------- */
+
+export type Effort = "none" | "tiny" | "small" | "medium" | "large" | "huge";
+
+/** Lightest to heaviest, and the order the picker offers them in. */
+export const EFFORTS: readonly Effort[] = ["none", "tiny", "small", "medium", "large", "huge"];
+
+export const DEFAULT_EFFORT_LABELS: Record<Effort, string> = {
+  none: "None",
+  tiny: "Tiny",
+  small: "Small",
+  medium: "Medium",
+  large: "Large",
+  huge: "Huge",
+};
+
+/** A single hue getting darker rather than Priority's green-to-red ramp. Effort
+ *  is not a warning, and painting a big card red would read as an alarm next to
+ *  a board whose reds already mean "urgent". */
+export const DEFAULT_EFFORT_COLORS: Record<Effort, string> = {
+  none: "#6b7280",
+  tiny: "#9db8d8",
+  small: "#6f97c9",
+  medium: "#4a76b8",
+  large: "#33569a",
+  huge: "#233a72",
 };
 
 /**
@@ -203,6 +300,62 @@ export interface Subtask {
   id: string;
   text: string;
   done: boolean;
+}
+
+/**
+ * Who made this, when it was not the person at the keyboard.
+ *
+ * ABSENT MEANS THE USER, which is every card and every comment that existed
+ * before agent access did, so nothing has to be migrated and nothing has to be
+ * versioned. The same rule Board.overrides and Attachment.file already follow.
+ *
+ * `by` is the CONNECTION id, not the token: revoking and reissuing a token
+ * leaves an agent still recognized as the author of its own cards, which is
+ * what makes "edit cards it created" survive a rotated secret.
+ */
+export interface AgentAuthor {
+  kind: "agent";
+  by: string;
+  label: string;
+}
+
+/* -----------------------------------------------------------------------------
+   WHOSE CARD IS IT
+   -----------------------------------------------------------------------------
+   Three answers, because "who made this" and "whose request is it" are the same
+   question on a board one person shares with their agents:
+
+     user      the person using the app
+     agent     an AI agent, named, and matched by id so an agent still owns the
+               cards it made after its connection secret is regenerated
+     external  somebody else asked for this. Their name is free text, because
+               they are not a user of this app and never will be.
+
+   ABSENT MEANS USER. Every card written before this existed was made by the
+   person at the keyboard, so undefined reads as "user" rather than "unknown".
+   Storing nothing for the common case also keeps the board files from growing
+   a line per card to say the obvious.
+----------------------------------------------------------------------------- */
+
+export interface UserAuthor {
+  kind: "user";
+}
+
+export interface ExternalAuthor {
+  kind: "external";
+  /** Who asked. Free text: they are not a user of this app. */
+  label: string;
+}
+
+export type CardAuthor = AgentAuthor | UserAuthor | ExternalAuthor;
+
+export const AUTHOR_KINDS = ["user", "agent", "external"] as const;
+
+/** How an owner reads in the stats table and the menu. */
+export function authorLabel(author: CardAuthor | undefined): string {
+  if (!author || author.kind === "user") return "You";
+  if (author.kind === "agent") return author.label;
+  return author.label ? `${author.label} (external)` : "External";
 }
 
 /**
@@ -259,6 +412,8 @@ export interface CardComment {
   /** Equal to createdAt until the comment is edited; the card shows "edited"
    *  off the difference rather than off a separate flag. */
   updatedAt: number;
+  /** Set only when an AI agent wrote this comment. See AgentAuthor. */
+  createdBy?: AgentAuthor;
 }
 
 /** The four shapes an attachment is drawn in, decided by its extension.
@@ -329,6 +484,8 @@ export interface Card {
   colorMode: CardColorMode | null;
   textColor: CardTextColor;
   priority: Priority;
+  /** How heavy the card is, independent of how urgent. "none" is unset. */
+  effort: Effort;
   tagIds: string[];
   subtasks: Subtask[];
   /** Files hung off the card itself, as opposed to off one of its comments. */
@@ -342,6 +499,9 @@ export interface Card {
   updatedAt: number;
   /** Position within its column. Re-sequenced 0..n-1 on every commit. */
   order: number;
+  /** Whose card this is. Absent means the person using the app, which is what
+   *  every card written before owners existed was. See CardAuthor. */
+  createdBy?: CardAuthor;
 }
 
 export interface Column {
@@ -449,33 +609,26 @@ export type NewCardPosition = "top" | "bottom";
 /** The blocks of the card modal, in the order they are shown. Reorderable, as
  *  a default and then per board, because which of these you look at first is a
  *  property of how you work rather than of the tool. */
-export type CardSection =
-  | "description"
-  | "attachments"
-  | "tags"
-  | "subtasks"
-  | "due"
-  | "stages"
-  | "comments";
+/* WHAT IS AND IS NOT REORDERABLE.
+   Only the blocks that share the Basic tab. Subtasks and Comments have tabs of
+   their own now and Tags is a fixed column at the top, so none of the three has
+   an "order" to be in any more. An old stored order still naming them is not an
+   error: normalizeSectionOrder keeps only ids this build knows, so those names
+   are dropped on read and the rest keep their positions. */
+export type CardSection = "description" | "attachments" | "due" | "stages";
 
 export const CARD_SECTIONS: readonly CardSection[] = [
   "description",
   "attachments",
-  "tags",
-  "subtasks",
   "due",
   "stages",
-  "comments",
 ];
 
 export const CARD_SECTION_LABELS: Record<CardSection, string> = {
   description: "Description",
   attachments: "Attachments",
-  tags: "Tags",
-  subtasks: "Subtasks",
   due: "Due Date",
   stages: "Stage Dates",
-  comments: "Comments",
 };
 
 /**
@@ -508,6 +661,12 @@ export interface BoardScopedSettings {
   cardColorMode: CardColorMode;
   cardSize: CardSize;
   sectionOrder: CardSection[];
+  /** Skip the reading face and open every card ready to type in.
+   *
+   *  Per board because it tracks how a board is USED: a board you are actively
+   *  building wants the fields, and one you mostly consult wants the reading
+   *  face and the protection from a stray keystroke that comes with it. */
+  openCardsInEditMode: boolean;
 }
 
 /** Everything in BoardScopedSettings is a DEFAULT that a board may override.
@@ -521,6 +680,10 @@ export interface KbSettings extends BoardScopedSettings {
   /** One color per priority level. Global rather than per board: a level has
    *  to look the same everywhere or it stops being a shared scale. */
   priorityColors: Record<Priority, string>;
+  /** Renamed rungs. Starts as a copy of the shipped names. */
+  priorityLabels: Record<Priority, string>;
+  effortColors: Record<Effort, string>;
+  effortLabels: Record<Effort, string>;
 }
 
 /**
@@ -635,14 +798,19 @@ const DEFAULT_SETTINGS: KbSettings = {
   showDue: true,
   cardColorMode: "manual",
   cardSize: "comfortable",
-  // What the card IS and what came with it, then what it needs, then when it is
-  // wanted, then what has happened to it, then what was said about it since.
-  // Anything can be dragged anywhere; this is only the start.
-  sectionOrder: ["description", "attachments", "tags", "subtasks", "due", "stages", "comments"],
+  // What the card IS and what came with it, then when it is wanted, then what
+  // has happened to it. Anything can be dragged anywhere; this is only the
+  // start.
+  sectionOrder: ["description", "attachments", "due", "stages"],
+  // Off, so a card opens as something to read. Editing is a thing you ask for.
+  openCardsInEditMode: false,
   overdueWarn: true,
   defaultColumns: SYSTEM_DEFAULT_COLUMNS,
   defaultBoardName: "",
   priorityColors: { ...DEFAULT_PRIORITY_COLORS },
+  priorityLabels: { ...DEFAULT_PRIORITY_LABELS },
+  effortColors: { ...DEFAULT_EFFORT_COLORS },
+  effortLabels: { ...DEFAULT_EFFORT_LABELS },
 };
 
 /* =============================================================================
@@ -650,8 +818,13 @@ const DEFAULT_SETTINGS: KbSettings = {
 ============================================================================= */
 
 let boards: Board[] = [];
-/** Cards for every board whose contents are in memory. A locked board
- *  contributes nothing here, which is exactly why it renders as locked. */
+/** Every card of every board, flat. One array, because every question worth
+ *  asking spans columns and boards; see the note at the top of the file.
+ *
+ *  This used to carry an exception for locked boards, whose contents were not
+ *  in memory. Board encryption is gone (see LOADING), so there is no longer a
+ *  board whose cards are absent, and code that still assumed one would be
+ *  guarding against a state that cannot happen. */
 let cards: Card[] = [];
 /** The DEFAULT tag vocabulary, from the index. Templates to copy onto a board,
  *  never what a card points at: see the note on KanbanIndex. */
@@ -1067,11 +1240,13 @@ function buildContents(board: Board): BoardContents {
 
 /** Writes whichever of the three kinds of file is dirty, and nothing else.
  *
- *  A locked board is skipped rather than written: its contents are not in
- *  memory, so "saving" it would write an empty board over a full one. That
- *  cannot normally happen (you cannot edit what you cannot see) but it is the
- *  single most destructive thing this file could do, so it is refused here
- *  rather than assumed impossible.
+ *  This used to promise that a locked board was skipped rather than written,
+ *  because its contents were not in memory and saving it would have put an
+ *  empty board over a full one. Board encryption is gone and the loop below has
+ *  no such check, so the promise described a guard that was not there, which is
+ *  worse than no comment: the next person to touch this would have trusted it.
+ *  Every board in `boards` now has its contents loaded, so writing any of them
+ *  writes what is actually on it.
  */
 /** The save currently running, or a settled promise when nothing is.
  *
@@ -1240,6 +1415,7 @@ function normalizeScoped(raw: Partial<BoardScopedSettings>, base: BoardScopedSet
     cardColorMode: normalizeColorMode(raw.cardColorMode) ?? base.cardColorMode,
     cardSize: raw.cardSize === "compact" ? "compact" : raw.cardSize === "comfortable" ? "comfortable" : base.cardSize,
     sectionOrder: normalizeSectionOrder(raw.sectionOrder ?? base.sectionOrder),
+    openCardsInEditMode: bool(raw.openCardsInEditMode, base.openCardsInEditMode),
   };
 }
 
@@ -1258,11 +1434,42 @@ function normalizePriority(raw: unknown): Priority {
 /** One color per priority level, filling in from the defaults rather than
  *  rejecting a partial map: a settings file written before a level existed is
  *  simply missing it. */
+function normalizeEffort(raw: unknown): Effort {
+  return EFFORTS.includes(raw as Effort) ? (raw as Effort) : "none";
+}
+
 function normalizePriorityColors(raw: unknown): Record<Priority, string> {
   const src = (raw ?? {}) as Partial<Record<Priority, string>>;
   const out = {} as Record<Priority, string>;
   for (const level of PRIORITIES) {
     out[level] = normalizeColor(src[level], DEFAULT_PRIORITY_COLORS[level]);
+  }
+  return out;
+}
+
+/** A renamed rung, or the shipped name when the rename is missing, blank or not
+ *  a string. Trimmed and capped, because these are drawn in a chip on a card
+ *  and a 400-character "priority" would push the rest of the card off screen. */
+function normalizeLevelLabels<K extends string>(
+  raw: unknown,
+  keys: readonly K[],
+  fallback: Record<K, string>,
+): Record<K, string> {
+  const src = (raw ?? {}) as Partial<Record<K, string>>;
+  const out = {} as Record<K, string>;
+  for (const key of keys) {
+    const value = src[key];
+    const trimmed = typeof value === "string" ? value.trim().slice(0, 24) : "";
+    out[key] = trimmed || fallback[key];
+  }
+  return out;
+}
+
+function normalizeEffortColors(raw: unknown): Record<Effort, string> {
+  const src = (raw ?? {}) as Partial<Record<Effort, string>>;
+  const out = {} as Record<Effort, string>;
+  for (const level of EFFORTS) {
+    out[level] = normalizeColor(src[level], DEFAULT_EFFORT_COLORS[level]);
   }
   return out;
 }
@@ -1280,6 +1487,9 @@ export function normalizeSettings(raw: Partial<KbSettings>): KbSettings {
     defaultBoardName:
       typeof raw.defaultBoardName === "string" ? raw.defaultBoardName.slice(0, 120) : "",
     priorityColors: normalizePriorityColors(raw.priorityColors),
+    priorityLabels: normalizeLevelLabels(raw.priorityLabels, PRIORITIES, DEFAULT_PRIORITY_LABELS),
+    effortColors: normalizeEffortColors(raw.effortColors),
+    effortLabels: normalizeLevelLabels(raw.effortLabels, EFFORTS, DEFAULT_EFFORT_LABELS),
   };
 }
 
@@ -1508,6 +1718,7 @@ function normalizeComment(raw: unknown): CardComment | null {
     // than an artefact of a hand-edited file.
     updatedAt:
       typeof c.updatedAt === "number" && c.updatedAt >= created ? c.updatedAt : created,
+    createdBy: normalizeAuthor(c.createdBy),
   };
 }
 
@@ -1517,6 +1728,32 @@ function normalizeComment(raw: unknown): CardComment | null {
  *  looks real and is not. */
 function normalizeDay(raw: unknown): string | null {
   return typeof raw === "string" && parseDay(raw) !== null ? raw : null;
+}
+
+/** An author survives a round trip only if it is complete. A half-written one
+ *  becomes absent, which reads as "the user made this": the safe direction,
+ *  since the fallback grants an agent LESS than it might have had. */
+/** An agent author and nothing else. What a COMMENT may carry: a comment
+ *  arrives either from the person typing it or from an agent over the pipe,
+ *  and there is no third way in. */
+function normalizeAuthor(raw: unknown): AgentAuthor | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const a = raw as Partial<AgentAuthor>;
+  if (a.kind !== "agent") return undefined;
+  if (typeof a.by !== "string" || !a.by) return undefined;
+  return { kind: "agent", by: a.by, label: trimTo(a.label, 80) || "Agent" };
+}
+
+/** A CARD's owner, which may also be set by hand to "external". Undefined is
+ *  returned for the user, so the common case stores nothing. */
+function normalizeCardAuthor(raw: unknown): CardAuthor | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const a = raw as { kind?: unknown; label?: unknown };
+  if (a.kind === "external") {
+    return { kind: "external", label: trimTo(a.label, 80) };
+  }
+  if (a.kind === "user") return { kind: "user" };
+  return normalizeAuthor(raw);
 }
 
 function normalizeCard(raw: unknown): Card | null {
@@ -1538,6 +1775,8 @@ function normalizeCard(raw: unknown): Card | null {
     colorMode: normalizeColorMode(c.colorMode),
     textColor: normalizeTextColor(c.textColor),
     priority: normalizePriority(c.priority),
+    // Cards written before Effort existed have no field, and read as unset.
+    effort: normalizeEffort(c.effort),
     tagIds: Array.isArray(c.tagIds) ? c.tagIds.filter((t) => typeof t === "string") : [],
     subtasks: Array.isArray(c.subtasks)
       ? c.subtasks
@@ -1569,6 +1808,7 @@ function normalizeCard(raw: unknown): Card | null {
     createdAt: typeof c.createdAt === "number" ? c.createdAt : now,
     updatedAt: typeof c.updatedAt === "number" ? c.updatedAt : now,
     order: typeof c.order === "number" && Number.isFinite(c.order) ? c.order : 0,
+    createdBy: normalizeCardAuthor(c.createdBy),
   };
 }
 
@@ -1792,6 +2032,7 @@ function effective(board: Board | null): BoardScopedSettings {
     cardColorMode: kbSettings.cardColorMode,
     cardSize: kbSettings.cardSize,
     sectionOrder: kbSettings.sectionOrder,
+    openCardsInEditMode: kbSettings.openCardsInEditMode,
   };
   if (!board) return base;
   return { ...base, ...board.overrides };
@@ -2635,11 +2876,22 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
     top.appendChild(num);
   }
 
+  /* Quiet, and on the card face rather than only in the log. A card an agent
+     put there looks exactly like one you wrote otherwise, and "where did this
+     come from" is a question worth answering at a glance. */
+  if (card.createdBy?.kind === "agent") {
+    const mark = document.createElement("span");
+    mark.className = "kb-card-agent";
+    mark.textContent = "AI";
+    mark.title = `Created by ${card.createdBy.label}`;
+    top.appendChild(mark);
+  }
+
   if (card.priority !== "none") {
     const chip = document.createElement("span");
     chip.className = "kb-card-priority";
-    chip.textContent = PRIORITY_LABELS[card.priority];
-    chip.title = `Priority: ${PRIORITY_LABELS[card.priority]}`;
+    chip.textContent = priorityLabel(card.priority);
+    chip.title = `Priority: ${priorityLabel(card.priority)}`;
     // Painted its own level color even when the card is not colored by
     // priority: the chip is the readout, and it has to mean the same thing
     // whatever the card around it is doing.
@@ -2729,9 +2981,18 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
     track.appendChild(fill);
     wrap.appendChild(track);
 
+    /* CLICKING THE COUNT OPENS WHAT IT COUNTS.
+       The number already says there are subtasks; the click says show me them.
+       stopPropagation because the whole card is also a click target, and
+       without it this would open the card on Basic and then be overruled. */
     const label = document.createElement("span");
-    label.className = "kb-card-sub-count";
+    label.className = "kb-card-sub-count kb-card-count-link";
     label.textContent = `${done}/${card.subtasks.length}`;
+    label.title = "Open this card's subtasks";
+    label.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openCard(card.id, "subtasks");
+    });
     wrap.appendChild(label);
 
     el.appendChild(wrap);
@@ -2746,14 +3007,23 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
   if (attachmentCount > 0 || card.comments.length > 0) {
     const meta = document.createElement("div");
     meta.className = "kb-card-meta";
-    const item = (svg: string, count: number, title: string): void => {
+    /* `tab` is what makes an item clickable. Attachments do not pass one,
+       because they have no tab of their own: they are a block on Basic, which
+       is where the card opens anyway. */
+    const item = (svg: string, count: number, title: string, tab?: KbCardTab): void => {
       const span = document.createElement("span");
-      span.className = "kb-card-meta-item";
+      span.className = tab ? "kb-card-meta-item kb-card-count-link" : "kb-card-meta-item";
       span.title = title;
       span.innerHTML = svg;
       const label = document.createElement("span");
       label.textContent = String(count);
       span.appendChild(label);
+      if (tab) {
+        span.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openCard(card.id, tab);
+        });
+      }
       meta.appendChild(span);
     };
     if (attachmentCount > 0) {
@@ -2773,7 +3043,8 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
           '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />' +
           "</svg>",
         card.comments.length,
-        `${card.comments.length} comment(s)`,
+        "Open this card's comments",
+        "comments",
       );
     }
     el.appendChild(meta);
@@ -2783,6 +3054,103 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
   attachMenu(el, () => boardCardMenu(card));
   attachCardDragHandlers(board, el, card);
   return el;
+}
+
+/**
+ * Whose card this is, as a submenu.
+ *
+ * The AGENT choices are the connections this board actually has, read off the
+ * agent config rather than typed in, so an owner is a real agent by id and not
+ * a name that happens to match one. An agent's cards therefore stay its own
+ * when its connection secret is regenerated, which is the whole reason the id
+ * and the secret are separate things.
+ *
+ * The config is read fresh each time the menu opens, because a connection added
+ * or revoked while the card was open should be reflected the next time you
+ * look, and this menu is opened rarely enough that the read costs nothing.
+ */
+function cardOwnerMenu(card: Card): MenuItem[] {
+  const items: MenuItem[] = [
+    {
+      label: "You",
+      onClick: () => setCardOwner(card, undefined),
+    },
+  ];
+
+  for (const token of agentConnectionsForBoard(card.boardId)) {
+    items.push({
+      label: token.label,
+      onClick: () => setCardOwner(card, { kind: "agent", by: token.id, label: token.label }),
+    });
+  }
+
+  items.push({
+    label: "External\u2026",
+    onClick: () => {
+      /* Free text, because the person it names is not a user of this app and
+         there is no list to pick them from. Prompt rather than a modal of its
+         own: it is one short string, and a modal would be a screen to say a
+         name on. */
+      const who = window.prompt("Who asked for this card?", currentExternalLabel(card));
+      if (who === null) return;
+      setCardOwner(card, { kind: "external", label: trimTo(who, 80) });
+    },
+  });
+
+  return items;
+}
+
+/**
+ * The agents this board has known, for the owner menu.
+ *
+ * TWO SOURCES, because neither alone is right:
+ *
+ *   the cards    every agent that has actually written here, which is the real
+ *                answer to "historically connected" and is always in memory
+ *   the config   the connections that exist RIGHT NOW, including one just added
+ *                that has not written anything yet
+ *
+ * The config is only in memory once the Agents tab has been looked at, so it is
+ * the addition rather than the base. Reading it first and finding null would
+ * offer nothing on a board full of agent-written cards, which is the case this
+ * menu most obviously has to handle.
+ *
+ * Deduplicated by id, and the label is whichever the config gives when it has
+ * one, since a renamed connection should read under its new name.
+ */
+function agentConnectionsForBoard(boardId: string): AgentToken[] {
+  const byId = new Map<string, AgentToken>();
+
+  for (const card of cards) {
+    if (card.boardId !== boardId) continue;
+    const author = card.createdBy;
+    if (author?.kind !== "agent") continue;
+    if (!byId.has(author.by)) {
+      byId.set(author.by, { id: author.by, label: author.label, token: "", createdAt: 0 });
+    }
+  }
+
+  if (agentConfig) {
+    for (const token of boardConfig(agentConfig, boardId).tokens) {
+      byId.set(token.id, token);
+    }
+  }
+
+  return [...byId.values()];
+}
+
+function currentExternalLabel(card: Card): string {
+  return card.createdBy?.kind === "external" ? card.createdBy.label : "";
+}
+
+function setCardOwner(card: Card, owner: CardAuthor | undefined): void {
+  // Undefined rather than { kind: "user" }: absent IS the user, and writing the
+  // object would put a line in every board file to say the default.
+  card.createdBy = owner;
+  stampCard(card);
+  flash(`Owner set to ${authorLabel(owner)}.`);
+  renderCardModal();
+  renderAll();
 }
 
 /** The card's right-click menu, as opened from its face on the board.
@@ -2797,7 +3165,7 @@ function boardCardMenu(card: Card): MenuItem[] {
   const board = getBoard(card.boardId);
 
   const priorityItems: MenuItem[] = PRIORITIES.map((p) => ({
-    label: PRIORITY_LABELS[p],
+    label: priorityLabel(p),
     disabled: card.priority === p,
     onClick: () => {
       card.priority = p;
@@ -3294,6 +3662,7 @@ function createCard(
     colorMode: null,
     textColor: "auto",
     priority: "none",
+    effort: "none",
     tagIds: [],
     subtasks: [],
     attachments: [],
@@ -3379,6 +3748,7 @@ function duplicateCard(card: Card): Card | null {
 let _setupModal: Modal | null = null;
 let _newBoardModal: Modal | null = null;
 let _boardSetupModal: Modal | null = null;
+let _agentPermModal: Modal | null = null;
 let _cardColorModal: Modal | null = null;
 let _columnEditModal: Modal | null = null;
 let _cardModal: Modal | null = null;
@@ -3497,6 +3867,7 @@ function getCardModal(): Modal {
         // whichever face its text calls for, rather than the one it happened to
         // be on when it was closed.
         descFieldCardId = null;
+        descFieldMode = null;
       }
       // The players in the card go quiet and give their buffers back here
       // rather than whenever the collector next runs.
@@ -3512,12 +3883,39 @@ function getCardModal(): Modal {
     if (card) fn(card);
   };
 
+  // Built here with the rest of the modal's controls, so the tab buttons are
+  // listening before the first card is ever opened.
+  getCardTabs();
+
+  document.getElementById("kbCardEditBtn")!.addEventListener("click", () => {
+    setCardEditing(true);
+  });
+  document.getElementById("kbCardSaveBtn")!.addEventListener("click", () => saveCardEdit());
+  document.getElementById("kbCardCancelBtn")!.addEventListener("click", () => cancelCardEdit());
+
   titleInput.addEventListener("input", () => {
     const card = getCard(openCardId);
     if (!card) return;
     card.title = titleInput.value.slice(0, MAX_TITLE_LEN);
     stampCard(card);
     renderCardHeader(card);
+  });
+
+  /* THE BOARD KEEPS UP.
+     -------------------------------------------------------------------------
+     The card behind the modal used to sit unchanged until the modal closed, so
+     renaming a card or changing its priority looked like it had done nothing
+     until you dismissed the thing you did it in. Committing a field now redraws
+     the board, which is visible around the modal for every card that is not
+     directly behind it.
+
+     On CHANGE rather than on input: redrawing the whole board on every
+     keystroke of a title is work nobody asked for, and the blur that ends the
+     typing is the moment the value is actually settled. */
+  titleInput.addEventListener("change", () => {
+    renderAll();
+    const card = getCard(openCardId);
+    if (card) renderCardReadonlyValues(card);
   });
 
   columnSelect.addEventListener("change", () => {
@@ -3533,6 +3931,18 @@ function getCardModal(): Modal {
     if (!card) return;
     card.priority = normalizePriority(prioritySelect.value);
     stampCard(card);
+    renderCardReadonlyValues(card);
+    renderAll();
+  });
+
+  const effortSelect = document.getElementById("kbCardEffortSelect") as HTMLSelectElement;
+  effortSelect.addEventListener("change", () => {
+    const card = getCard(openCardId);
+    if (!card) return;
+    card.effort = normalizeEffort(effortSelect.value);
+    stampCard(card);
+    renderCardReadonlyValues(card);
+    renderAll();
   });
 
   boardSelect.addEventListener("change", () => {
@@ -3640,6 +4050,7 @@ function getCardModal(): Modal {
     if (!card) return;
     openMenu(e.currentTarget as HTMLElement, [
       { label: "Card Color", onClick: () => openCardColor(card) },
+      { label: "Owner", submenu: cardOwnerMenu(card) },
       { label: "Card Stats", onClick: () => openCardStats(card) },
       {
         label: "Duplicate Card",
@@ -3726,7 +4137,97 @@ function stampCard(card: Card): void {
   markBoard(board.id);
 }
 
-function openCard(cardId: string): void {
+/* -----------------------------------------------------------------------------
+   READING A CARD VERSUS EDITING ONE
+   -----------------------------------------------------------------------------
+   A card opens as something to READ. The fields are there, but drawn as values
+   rather than as controls, and the pencil in the header switches them over.
+
+   WHY. Most opens are a look, not a change, and a modal made entirely of live
+   inputs has no safe state: a stray keystroke in a select is a silent edit to
+   real work, and there is no undo for "I did not mean to touch that". A board
+   that IS being built can say so once, with the per-board preference, instead
+   of every card paying for it.
+
+   WHAT STAYS LIVE EITHER WAY: the three-dot menu, subtasks, and comments.
+   Ticking a subtask off and writing a comment are records of what happened
+   rather than edits to what the card is, and gating them behind a pencil would
+   make the common case the awkward one.
+----------------------------------------------------------------------------- */
+
+type KbCardTab = "basic" | "subtasks" | "comments";
+
+let cardEditing = false;
+
+/** The card as it was when editing began, for Cancel to put back. A structured
+ *  clone rather than a shallow copy: subtasks, tags and dates are all nested,
+ *  and a shallow copy would have Cancel restoring the same arrays it just
+ *  edited. */
+let cardEditSnapshot: Card | null = null;
+
+let _cardTabs: ModalTabs<KbCardTab> | null = null;
+
+function getCardTabs(): ModalTabs<KbCardTab> {
+  if (!_cardTabs) {
+    _cardTabs = new ModalTabs<KbCardTab>({
+      scope: "#kbCardModal",
+      key: "kbCardTab",
+      panes: {
+        basic: "kbCardTabBasic",
+        subtasks: "kbCardTabSubtasks",
+        comments: "kbCardTabComments",
+      },
+    });
+  }
+  return _cardTabs;
+}
+
+/**
+ * Puts the modal into reading or editing shape.
+ *
+ * One attribute on the modal drives it, and CSS decides what that means for
+ * each control, rather than a list here toggling twenty elements by hand. The
+ * list would be the thing that fell out of date the next time a field was
+ * added, and the field it forgot would be the one still editable while the card
+ * claimed to be read-only.
+ */
+function setCardEditing(on: boolean): void {
+  cardEditing = on;
+  const modal = document.getElementById("kbCardModal")!;
+  modal.dataset.kbEditing = on ? "true" : "false";
+
+  const card = getCard(openCardId);
+  // Snapshotted on the way IN only, so re-rendering mid-edit cannot overwrite
+  // the thing Cancel is supposed to go back to.
+  if (on && card && !cardEditSnapshot) cardEditSnapshot = structuredClone(card);
+  if (!on) cardEditSnapshot = null;
+
+  if (card) renderCardModal();
+}
+
+/** Leaves edit mode, keeping the changes. Everything was already written as it
+ *  was typed, so this only has to put the board in step and change face. */
+function saveCardEdit(): void {
+  setCardEditing(false);
+  void flushSave();
+  renderAll();
+}
+
+/** Leaves edit mode, putting back what was there when it started. */
+function cancelCardEdit(): void {
+  const card = getCard(openCardId);
+  if (card && cardEditSnapshot) {
+    // Restored IN PLACE. Everything else in the tool holds this same object,
+    // so replacing it in the array would leave the board drawing the old one.
+    Object.assign(card, structuredClone(cardEditSnapshot));
+    stampCard(card);
+  }
+  setCardEditing(false);
+  void flushSave();
+  renderAll();
+}
+
+function openCard(cardId: string, tab?: KbCardTab): void {
   const card = getCard(cardId);
   if (!card) return;
   // An inline comment editor belongs to the card it was opened on. Clearing it
@@ -3739,7 +4240,19 @@ function openCard(cardId: string): void {
   // The composer is built on demand, so the first card opened is not paying for
   // a control it may never use.
   getCommentField();
-  renderCardModal();
+
+  /* A card opened by clicking its comment count belongs on Comments, and one
+     opened by clicking its subtask progress belongs on Subtasks. Anything else
+     starts on Basic rather than wherever the last card was left, because the
+     tab you wanted last time says nothing about this card. */
+  getCardTabs().select(tab ?? "basic");
+
+  // Straight into the fields when the board asks for it, and the snapshot is
+  // taken here so Cancel works on a card that opened already editing.
+  // setCardEditing renders, so there is no second render here.
+  cardEditSnapshot = null;
+  setCardEditing(effectiveForCard(card).openCardsInEditMode);
+
   getCardModal().open();
   // Asked once per open, in the background: a file can vanish between sessions
   // and the card should say so rather than showing a broken picture.
@@ -3753,6 +4266,9 @@ function renderCardModal(): void {
 
   renderCardHeader(card);
   (document.getElementById("kbCardTitleInput") as HTMLInputElement).value = card.title;
+  document.getElementById("kbCardTitleDisplay")!.textContent = card.title || "Untitled card";
+  renderCardReadonlyValues(card);
+  renderCardTabCounts(card);
   renderCardDescription(card);
   renderCardAttachments(card);
   renderCardComments(card);
@@ -3773,6 +4289,55 @@ function renderCardModal(): void {
   dueSection.style.display = settings.showDue ? "" : "none";
 
   applyCardSectionOrder(settings.sectionOrder);
+}
+
+/**
+ * The reading face of the four top fields.
+ *
+ * Drawn every render rather than only outside edit mode: the values are cheap,
+ * and a face rendered only when shown is a face that is stale the instant the
+ * pencil is pressed.
+ *
+ * The two SCALE fields carry their level's color, because that color is the
+ * whole reason the level is settable. The two PLACEMENT fields do not: a column
+ * is not a rung and painting it would invent a meaning.
+ */
+function renderCardReadonlyValues(card: Card): void {
+  const board = getBoard(card.boardId);
+  const column = board ? getColumn(board, card.columnId) : null;
+
+  const set = (id: string, text: string, color?: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = color ?? "";
+  };
+
+  set("kbCardColumnDisplay", column?.title ?? "Unknown column");
+  set("kbCardBoardDisplay", board?.name ?? "Unknown board");
+  set(
+    "kbCardPriorityDisplay",
+    priorityLabel(card.priority),
+    card.priority === "none" ? undefined : kbSettings.priorityColors[card.priority],
+  );
+  set(
+    "kbCardEffortDisplay",
+    effortLabel(card.effort),
+    card.effort === "none" ? undefined : kbSettings.effortColors[card.effort],
+  );
+}
+
+/** The counts on the Subtasks and Comments tabs, so a tab says whether it is
+ *  worth opening without being opened. Empty rather than "0": a zero badge is
+ *  noise on the majority of cards that have neither. */
+function renderCardTabCounts(card: Card): void {
+  const subtasks = document.getElementById("kbCardSubtaskTabCount");
+  if (subtasks) {
+    const done = card.subtasks.filter((t) => t.done).length;
+    subtasks.textContent = card.subtasks.length ? `${done}/${card.subtasks.length}` : "";
+  }
+  const comments = document.getElementById("kbCardCommentTabCount");
+  if (comments) comments.textContent = card.comments.length ? String(card.comments.length) : "";
 }
 
 /** Rearranges the card's blocks to the order in force for its board. Moving the
@@ -3827,10 +4392,20 @@ function renderCardPlacement(card: Card): void {
   for (const level of PRIORITIES) {
     const option = document.createElement("option");
     option.value = level;
-    option.textContent = PRIORITY_LABELS[level];
+    option.textContent = priorityLabel(level);
     prioritySelect.appendChild(option);
   }
   prioritySelect.value = card.priority;
+
+  const effortSelect = document.getElementById("kbCardEffortSelect") as HTMLSelectElement;
+  effortSelect.replaceChildren();
+  for (const level of EFFORTS) {
+    const option = document.createElement("option");
+    option.value = level;
+    option.textContent = effortLabel(level);
+    effortSelect.appendChild(option);
+  }
+  effortSelect.value = card.effort;
 }
 
 function moveCardToColumn(card: Card, columnId: string): void {
@@ -4779,6 +5354,11 @@ interface RichTextField {
 }
 
 interface RichTextFieldOptions {
+  /** Asked before a click on the rendered face opens the editor. A field whose
+   *  owner is currently read-only (a card being READ rather than edited) must
+   *  not turn into a textarea because somebody clicked the words. Absent means
+   *  always editable, which is what the comment composer and its editors are. */
+  readOnly?: () => boolean;
   placeholder: string;
   emptyText: string;
   rows: number;
@@ -4935,6 +5515,10 @@ function createRichTextField(opts: RichTextFieldOptions): RichTextField {
       // A click on a link inside the text follows the link; a click on the text
       // around it starts editing.
       if ((e.target as HTMLElement).closest("[data-rt-href]")) return;
+      // ...unless nothing here is editable right now, in which case the words
+      // are just words. Checked at click time rather than at build time: the
+      // same field is read-only and editable at different moments.
+      if (opts.readOnly?.() === true) return;
       setMode("edit");
       area.focus();
     });
@@ -4980,6 +5564,10 @@ let descFieldCardId: string | null = null;
 function getDescField(): RichTextField {
   if (descField) return descField;
   descField = createRichTextField({
+    // The card's own description follows the card's mode. The comment composer
+    // and the inline comment editors deliberately do not: writing a comment is
+    // allowed on a card you are only reading.
+    readOnly: () => !cardEditing,
     rows: 6,
     maxLength: MAX_DESC_LEN,
     placeholder:
@@ -5015,16 +5603,37 @@ function getDescField(): RichTextField {
   return descField;
 }
 
+/** Which mode the description was last drawn for, so a change of mode is told
+ *  apart from an ordinary redraw of the same card. Without it, pressing Edit on
+ *  a card already showing its rendered face left the field on that face: the
+ *  same-card guard below returned before anything switched, and the toolbar
+ *  appeared above a preview. */
+let descFieldMode: "read" | "edit" | null = null;
+
 function renderCardDescription(card: Card): void {
   const field = getDescField();
-  if (descFieldCardId === card.id) {
-    // Same card, redrawn for some other reason. The text in the box is already
-    // this card's, and it may be mid-edit.
-    return;
-  }
+  const mode = cardEditing ? "edit" : "read";
+  const sameCard = descFieldCardId === card.id;
+  const sameMode = descFieldMode === mode;
+
   descFieldCardId = card.id;
-  field.setValue(card.description);
-  field.showDefaultFace();
+  descFieldMode = mode;
+
+  // A redraw of the same card in the same mode leaves the field alone, because
+  // the text in it is already this card's and may be half-typed.
+  if (sameCard && sameMode) return;
+
+  if (!sameCard) field.setValue(card.description);
+
+  /* OUTSIDE EDIT MODE THE DESCRIPTION IS READING MATTER, so it is forced to the
+     rendered face rather than being left on the textarea. The toolbar and the
+     view switch go with it in CSS, and clicking the words does not open the
+     editor: see the readOnly hook this field is built with.
+
+     Inside edit mode it opens on whichever face its text calls for, which is
+     the textarea when there is nothing written yet. */
+  if (mode === "read") field.setMode("preview");
+  else field.showDefaultFace();
 }
 
 /* -----------------------------------------------------------------------------
@@ -5114,7 +5723,8 @@ function getCommentField(): RichTextField {
     editOnly: true,
     placeholder: "What happened, what you tried, what it needs next.",
     emptyText: "",
-    extras: [attachBtn, postBtn],
+    // Post is NOT in here. See below.
+    extras: [attachBtn],
     onInput: () => {},
     onPasteImage: (blob) => {
       void (async () => {
@@ -5144,7 +5754,19 @@ function getCommentField(): RichTextField {
       postComment();
     }
   });
-  document.getElementById("kbCardCommentHost")!.appendChild(commentField.root);
+  const host = document.getElementById("kbCardCommentHost")!;
+  host.appendChild(commentField.root);
+
+  /* POST SITS UNDER THE BOX, not in the strip above it.
+     The strip is formatting: things you do TO the text while writing it. Post
+     is what you do when you have finished, and putting it up there had you
+     reaching back over what you had just written to send it. Below is where
+     the writing ends, so that is where the button that ends it goes. */
+  const footer = document.createElement("div");
+  footer.className = "kb-comment-post-row";
+  footer.appendChild(postBtn);
+  host.appendChild(footer);
+
   return commentField;
 }
 
@@ -5238,6 +5860,15 @@ function renderCardComments(card: Card): void {
     stamp.className = "kb-comment-stamp";
     stamp.textContent = commentStamp(comment);
     head.appendChild(stamp);
+
+    /* Who said it, when it was not the person reading it. A comment thread six
+       months old is exactly where this stops being obvious. */
+    if (comment.createdBy?.kind === "agent") {
+      const who = document.createElement("span");
+      who.className = "kb-comment-author";
+      who.textContent = comment.createdBy.label;
+      head.appendChild(who);
+    }
 
     const editBtn = document.createElement("button");
     editBtn.type = "button";
@@ -5531,6 +6162,18 @@ export function computeCardStats(card: Card, todayStr: string): StatRow[] {
       : { label, value: describeDays(diff), note: diff < 0 ? "the dates are out of order" : undefined, alert: diff < 0 };
   };
 
+  /* WHOSE CARD, first, because on a board an agent also writes to it this is
+     the row that changes how you read every row under it. */
+  rows.push({
+    label: "Owner",
+    value: authorLabel(card.createdBy),
+    note:
+      card.createdBy?.kind === "agent"
+        ? "created by an AI agent"
+        : card.createdBy?.kind === "external"
+          ? "someone else's request"
+          : undefined,
+  });
   rows.push({ label: "Created", value: formatDate(created) });
   rows.push({
     label: completed ? "Age at completion" : "Age",
@@ -6095,7 +6738,7 @@ function openNewBoard(): void {
    that moment because nothing points at it any more.
 ============================================================================= */
 
-type KbBoardSetupTab = "board" | "tags" | "preferences";
+type KbBoardSetupTab = "board" | "tags" | "preferences" | "agents";
 
 let boardEditId: string | null = null;
 let _boardSetupTabs: ModalTabs<KbBoardSetupTab> | null = null;
@@ -6109,6 +6752,7 @@ function getBoardSetupTabs(): ModalTabs<KbBoardSetupTab> {
         board: "kbBoardTabBoard",
         tags: "kbBoardTabTags",
         preferences: "kbBoardTabPreferences",
+        agents: "kbBoardTabAgents",
       },
       onActivate: (tab) => {
         if (tab === "board") renderBoardSetupBoardTab();
@@ -6118,6 +6762,10 @@ function getBoardSetupTabs(): ModalTabs<KbBoardSetupTab> {
           renderBoardTagList();
         }
         if (tab === "preferences") renderBoardPrefs();
+        // Reads the config and the log off disk, so it is fetched when the tab
+        // is looked at rather than on every open of the modal. Same rule the
+        // snapshot list follows.
+        if (tab === "agents") void renderAgentsTab();
       },
     });
   }
@@ -6381,6 +7029,11 @@ const BOARD_OVERRIDE_ROWS: OverrideRow[] = [
     key: "autoCompleteOnDone",
     label: "Stamp Complete on Drop into a Done Column",
     info: "Only does anything when this board has a column marked as meaning done.",
+  },
+  {
+    key: "openCardsInEditMode",
+    label: "Open Cards in Edit Mode",
+    info: "Skip the reading face and open every card with its fields ready to type in. Subtasks and comments work either way.",
   },
 ];
 
@@ -6763,35 +7416,200 @@ function renderDefaultColumns(): void {
   });
 }
 
-/** One color input per priority level. */
-function renderPriorityColors(): void {
-  const host = document.getElementById("kbPriorityColorsRow");
-  if (!host) return;
+/* -----------------------------------------------------------------------------
+   THE SCALE EDITOR
+   -----------------------------------------------------------------------------
+   Priority and Effort are the same shape: a fixed set of rungs, each with a
+   name and a color. One editor serves both, told which one it is looking at,
+   the way the tag editors are told which vocabulary they are on.
+
+   THE RUNGS THEMSELVES ARE NOT EDITABLE, only their names and colors. Adding or
+   removing a rung would change what every existing card means, and a card set
+   to a level that stopped existing has no honest answer. Renaming one is safe
+   because the id underneath never moves.
+----------------------------------------------------------------------------- */
+
+type ScaleKind = "priority" | "effort";
+
+/** Which scale the shared modal is currently editing. */
+let scaleEditKind: ScaleKind = "priority";
+
+interface ScaleSpec {
+  title: string;
+  blurb: string;
+  levels: readonly string[];
+  labels: Record<string, string>;
+  colors: Record<string, string>;
+  defaultLabels: Record<string, string>;
+  defaultColors: Record<string, string>;
+}
+
+/** The live settings objects, not copies: an edit writes straight through to
+ *  the setting it is editing, the way every other preference in this tool
+ *  does. */
+function scaleSpec(kind: ScaleKind): ScaleSpec {
+  return kind === "priority"
+    ? {
+        title: "Priority",
+        blurb:
+          "How urgent a card is. The ORDER of the levels is fixed, because that order is what " +
+          "the color ramp and the sorting mean. Their names and colors are yours.",
+        levels: PRIORITIES,
+        labels: kbSettings.priorityLabels,
+        colors: kbSettings.priorityColors,
+        defaultLabels: DEFAULT_PRIORITY_LABELS,
+        defaultColors: DEFAULT_PRIORITY_COLORS,
+      }
+    : {
+        title: "Effort",
+        blurb:
+          "How heavy a card is, separately from how urgent. Rename these to whatever your team " +
+          "already says: points, t-shirt sizes, or hours.",
+        levels: EFFORTS,
+        labels: kbSettings.effortLabels,
+        colors: kbSettings.effortColors,
+        defaultLabels: DEFAULT_EFFORT_LABELS,
+        defaultColors: DEFAULT_EFFORT_COLORS,
+      };
+}
+
+/** The badge on each Customize row: whether anything differs from what shipped,
+ *  so the row says whether it is worth opening. */
+function scaleSummary(kind: ScaleKind): string {
+  const spec = scaleSpec(kind);
+  const renamed = spec.levels.filter((l) => spec.labels[l] !== spec.defaultLabels[l]).length;
+  const recolored = spec.levels.filter(
+    (l) => l !== "none" && spec.colors[l] !== spec.defaultColors[l],
+  ).length;
+  if (renamed === 0 && recolored === 0) return "Default";
+  const parts: string[] = [];
+  if (renamed > 0) parts.push(renamed + " renamed");
+  if (recolored > 0) parts.push(recolored + " recolored");
+  return parts.join(", ");
+}
+
+function renderScaleSummaries(): void {
+  const priority = document.getElementById("kbPrioritySummary");
+  if (priority) priority.textContent = scaleSummary("priority");
+  const effort = document.getElementById("kbEffortSummary");
+  if (effort) effort.textContent = scaleSummary("effort");
+}
+
+/** One row per rung: its color, and its name as an editable field. */
+function renderScaleEditor(): void {
+  const spec = scaleSpec(scaleEditKind);
+  document.getElementById("kbScaleTitle")!.textContent = spec.title;
+  document.getElementById("kbScaleBlurb")!.textContent = spec.blurb;
+
+  const host = document.getElementById("kbScaleRows")!;
   host.replaceChildren();
 
-  for (const level of PRIORITIES) {
-    // "None" is the absence of a priority, so it has nothing to color.
-    if (level === "none") continue;
+  const restamp = () => {
+    document.getElementById("kbScaleNote")!.textContent = scaleSummary(scaleEditKind);
+    renderScaleSummaries();
+  };
 
-    const wrap = document.createElement("label");
-    wrap.className = "kb-priority-color";
+  for (const level of spec.levels) {
+    const row = document.createElement("div");
+    row.className = "kb-scale-row";
 
-    const input = document.createElement("input");
-    input.type = "color";
-    input.value = kbSettings.priorityColors[level];
-    input.addEventListener("input", () => {
-      kbSettings.priorityColors[level] = input.value.toLowerCase();
+    /* "None" keeps its name field and loses its color, because it is the
+       ABSENCE of a level rather than a level: painting it would make every
+       unset card look deliberately gray. A spacer holds the column so the
+       names below it still line up. */
+    if (level === "none") {
+      const spacer = document.createElement("span");
+      spacer.className = "kb-scale-swatch-spacer";
+      spacer.title = "None has no color: it is the absence of a level.";
+      row.appendChild(spacer);
+    } else {
+      const color = document.createElement("input");
+      color.type = "color";
+      color.className = "kb-scale-swatch";
+      color.value = spec.colors[level];
+      color.addEventListener("input", () => {
+        spec.colors[level] = color.value.toLowerCase();
+        markSettings();
+        renderAll();
+        restamp();
+      });
+      row.appendChild(color);
+    }
+
+    const name = document.createElement("input");
+    name.type = "text";
+    name.className = "kb-scale-name";
+    name.maxLength = 24;
+    name.spellcheck = false;
+    name.value = spec.labels[level];
+    name.placeholder = spec.defaultLabels[level];
+    const commit = () => {
+      // Blank falls back to the shipped name rather than leaving a rung nameless,
+      // which would draw an empty chip nothing could identify.
+      const next = name.value.trim().slice(0, 24) || spec.defaultLabels[level];
+      name.value = next;
+      spec.labels[level] = next;
       markSettings();
       renderAll();
-    });
-    wrap.appendChild(input);
+      restamp();
+    };
+    name.addEventListener("change", commit);
+    name.addEventListener("blur", commit);
+    row.appendChild(name);
 
-    const name = document.createElement("span");
-    name.textContent = PRIORITY_LABELS[level];
-    wrap.appendChild(name);
-
-    host.appendChild(wrap);
+    host.appendChild(row);
   }
+
+  restamp();
+}
+
+function openScaleEditor(kind: ScaleKind): void {
+  scaleEditKind = kind;
+  getSetupModal().close({ handoff: true });
+  getScaleModal().open();
+}
+
+let _scaleModal: Modal | null = null;
+
+function getScaleModal(): Modal {
+  if (_scaleModal) return _scaleModal;
+  _scaleModal = new Modal(document.getElementById("kbScaleBackdrop")!, {
+    closeOnEsc: true,
+    onOpen: () => renderScaleEditor(),
+  });
+
+  document.getElementById("kbScaleBack")!.addEventListener("click", () => {
+    _scaleModal!.close();
+    openSetupOnTab("preferences");
+  });
+  document.getElementById("kbScaleClose")!.addEventListener("click", () => _scaleModal!.close());
+
+  document.getElementById("kbScaleResetBtn")!.addEventListener("click", () => {
+    const spec = scaleSpec(scaleEditKind);
+    kbConfirm(
+      {
+        title: "Reset " + spec.title + " to default?",
+        message:
+          "Every name and color on this scale goes back to what shipped with the app. No card " +
+          "changes level: only what the levels are called and how they look.",
+        confirmLabel: "Reset",
+        // kbConfirm REPLACES what it was opened from, so dismissing it without
+        // this would drop you on the board instead of back on the scale.
+        reopen: () => getScaleModal().open(),
+      },
+      () => {
+        for (const level of spec.levels) {
+          spec.labels[level] = spec.defaultLabels[level];
+          spec.colors[level] = spec.defaultColors[level];
+        }
+        markSettings();
+        renderAll();
+        renderScaleEditor();
+      },
+    );
+  });
+
+  return _scaleModal;
 }
 
 function deleteBoard(board: Board): void {
@@ -6809,6 +7627,7 @@ function deleteBoard(board: Board): void {
   }
   cards = cards.filter((c) => c.boardId !== board.id);
   boards = boards.filter((b) => b.id !== board.id);
+  forgetAgentAccess(board.id);
   if (board.background) {
     void invoke("delete_kanban_image", { path: board.background.path }).catch(() => {});
   }
@@ -7048,7 +7867,10 @@ function getSetupTabs(): ModalTabs<KbSetupTab> {
         }
         // The snapshot list is a disk read, so it is fetched when its tab is
         // actually looked at rather than on every open of the modal.
-        if (tab === "data") void refreshDataTab();
+        if (tab === "data") {
+          void refreshDataTab();
+          void renderAgentGlobalRow();
+        }
       },
     });
   }
@@ -7072,6 +7894,18 @@ function getSetupModal(): Modal {
   });
 
   document.getElementById("kbSetupClose")!.addEventListener("click", () => _setupModal!.close());
+
+  document
+    .getElementById("kbPriorityEditBtn")!
+    .addEventListener("click", () => openScaleEditor("priority"));
+  document
+    .getElementById("kbEffortEditBtn")!
+    .addEventListener("click", () => openScaleEditor("effort"));
+
+  document.getElementById("kbCardLayoutEditBtn")!.addEventListener("click", () => {
+    getSetupModal().close({ handoff: true });
+    getCardLayoutModal().open();
+  });
   document.getElementById("kbNewTagCategoryBtn")!.addEventListener("click", () => {
     openTagCategoryEditor(null, "global", null);
   });
@@ -7799,6 +8633,10 @@ function bindPreferenceControls(): void {
   bindToggle("kbConfirmDeleteToggle", "kbConfirmDeleteLabel", (v) => {
     kbSettings.confirmDelete = v;
   });
+
+  bindToggle("kbOpenInEditToggle", "kbOpenInEditLabel", (v) => {
+    kbSettings.openCardsInEditMode = v;
+  });
   bindToggle("kbAutoCompleteToggle", "kbAutoCompleteLabel", (v) => {
     kbSettings.autoCompleteOnDone = v;
   });
@@ -7856,7 +8694,60 @@ function renderDefaultSectionOrder(): void {
   renderSectionOrderInto(host, kbSettings.sectionOrder, () => {
     markSettings();
     renderDefaultSectionOrder();
+    renderCardLayoutSummary();
   });
+  renderCardLayoutSummary();
+}
+
+/** The row's badge: the order in short, so the common case of never having
+ *  changed it does not need the modal opened to confirm that. */
+function renderCardLayoutSummary(): void {
+  const badge = document.getElementById("kbCardLayoutSummary");
+  if (!badge) return;
+  const isDefault =
+    kbSettings.sectionOrder.length === DEFAULT_SETTINGS.sectionOrder.length &&
+    kbSettings.sectionOrder.every((s, i) => s === DEFAULT_SETTINGS.sectionOrder[i]);
+  badge.textContent = isDefault
+    ? "Default"
+    : kbSettings.sectionOrder.map((s) => CARD_SECTION_LABELS[s]).join(" · ");
+}
+
+let _cardLayoutModal: Modal | null = null;
+
+function getCardLayoutModal(): Modal {
+  if (_cardLayoutModal) return _cardLayoutModal;
+  _cardLayoutModal = new Modal(document.getElementById("kbCardLayoutBackdrop")!, {
+    closeOnEsc: true,
+    onOpen: () => renderDefaultSectionOrder(),
+  });
+
+  document.getElementById("kbCardLayoutBack")!.addEventListener("click", () => {
+    _cardLayoutModal!.close();
+    openSetupOnTab("preferences");
+  });
+  document
+    .getElementById("kbCardLayoutClose")!
+    .addEventListener("click", () => _cardLayoutModal!.close());
+
+  document.getElementById("kbCardLayoutResetBtn")!.addEventListener("click", () => {
+    kbConfirm(
+      {
+        title: "Reset the card layout?",
+        message:
+          "The blocks go back to the order they ship in. Boards with their own layout keep it.",
+        confirmLabel: "Reset",
+        reopen: () => getCardLayoutModal().open(),
+      },
+      () => {
+        kbSettings.sectionOrder = [...DEFAULT_SETTINGS.sectionOrder];
+        markSettings();
+        renderDefaultSectionOrder();
+        renderAll();
+      },
+    );
+  });
+
+  return _cardLayoutModal;
 }
 
 /** Pushes the stored preferences onto the controls. Called after a load, on
@@ -7872,6 +8763,7 @@ function applySettingsToForm(): void {
   };
 
   setToggle("kbConfirmDeleteToggle", "kbConfirmDeleteLabel", kbSettings.confirmDelete);
+  setToggle("kbOpenInEditToggle", "kbOpenInEditLabel", kbSettings.openCardsInEditMode);
   setToggle("kbAutoCompleteToggle", "kbAutoCompleteLabel", kbSettings.autoCompleteOnDone);
   setToggle("kbShowTagsToggle", "kbShowTagsLabel", kbSettings.showTags);
   setToggle("kbShowSubtasksToggle", "kbShowSubtasksLabel", kbSettings.showSubtasks);
@@ -7893,8 +8785,8 @@ function applySettingsToForm(): void {
   ) as HTMLInputElement | null;
   if (boardName) boardName.value = kbSettings.defaultBoardName;
 
-  renderPriorityColors();
-  renderDefaultSectionOrder();
+  renderScaleSummaries();
+  renderCardLayoutSummary();
 }
 
 /* =============================================================================
@@ -8343,6 +9235,1609 @@ registerTransferable({
   },
 });
 
+/* =============================================================================
+   THE AGENTS TAB
+   -----------------------------------------------------------------------------
+   Switching agent access on for one board, deciding what it may do, and getting
+   the connection into the agent's own config without anybody going near the
+   data folder.
+
+   THE CONFIG IS READ FROM DISK EVERY TIME THIS TAB OPENS rather than held in
+   memory with the rest of the tool's state. It is written by this screen and
+   read by the back end on every single agent request, so the copy that matters
+   is the one on disk; keeping a second copy in memory is how the switch you see
+   stops being the switch that is enforced.
+
+   WRITES HERE ARE NOT DEBOUNCED, unlike everything else in this file. See
+   saveAgentConfig: the gap between turning a permission off and the file saying
+   so is a gap in which an agent can still use it.
+============================================================================= */
+
+/** The config as this screen last read it. Null until the tab is opened. */
+let agentConfig: AgentConfig | null = null;
+
+/* WHICH AGENT THE COPY BUTTONS ARE AIMED AT.
+   Session state rather than a saved setting: it changes what is put on the
+   clipboard and nothing else, and somebody who connects Claude Code once is
+   not served by the app remembering that forever. Defaults to the first
+   client, which is the one this was built against. */
+let agentClientId: string = AGENT_CLIENTS[0].id;
+
+async function loadAgentConfigForTab(): Promise<AgentConfig> {
+  agentConfig = await loadAgentConfig();
+  return agentConfig;
+}
+
+/** Applies a change and writes it, then redraws. Every switch on this tab goes
+ *  through here so that none of them can forget the write. */
+async function commitAgentConfig(change: (config: AgentConfig) => void): Promise<void> {
+  const config = agentConfig ?? (await loadAgentConfigForTab());
+  change(config);
+  try {
+    await saveAgentConfig(config);
+  } catch (err) {
+    devError("[kanban] agent config save failed", err);
+    flash("Couldn't save the agent settings.", "error", 6000);
+    return;
+  }
+  await renderAgentsTab();
+}
+
+function agentBoardConfig(config: AgentConfig, boardId: string) {
+  if (!config.boards[boardId]) {
+    config.boards[boardId] = { enabled: false, permissions: starterPermissions(), tokens: [] };
+  }
+  return config.boards[boardId];
+}
+
+async function renderAgentsTab(): Promise<void> {
+  const board = getBoard(boardEditId);
+  if (!board) return;
+  const config = await loadAgentConfigForTab();
+  const mine = boardConfig(config, board.id);
+  const status = await agentStatus();
+
+  const masterOff = document.getElementById("kbAgentMasterOff")!;
+  masterOff.style.display = !config.enabled && mine.enabled ? "" : "none";
+
+  const toggle = document.getElementById("kbAgentEnabledToggle") as HTMLInputElement;
+  const toggleLabel = document.getElementById("kbAgentEnabledLabel")!;
+  toggle.checked = mine.enabled;
+  toggleLabel.textContent = mine.enabled ? "On" : "Off";
+
+  /* The badge is the honest answer to "is this actually working". A board
+     switched on while the pipe failed to open looks identical otherwise, and
+     the agent's error would be the first anybody heard of it. */
+  const badge = document.getElementById("kbAgentStatusBadge")!;
+  if (!mine.enabled) {
+    badge.textContent = "";
+  } else if (!config.enabled) {
+    badge.textContent = "Blocked by the app-wide switch";
+  } else if (!status.listening) {
+    badge.textContent = status.error || "Not accepting connections";
+  } else if (!status.sidecarFound) {
+    badge.textContent = "srbk-agent.exe is missing";
+  } else {
+    badge.textContent = "Ready";
+  }
+
+  document.getElementById("kbAgentBody")!.style.display = mine.enabled ? "" : "none";
+  if (!mine.enabled) {
+    renderAgentLive(null);
+    return;
+  }
+
+  document.getElementById("kbAgentPermSummary")!.textContent = permissionSummary(mine.permissions);
+  document.getElementById("kbAgentPermSummaryInModal")!.textContent = permissionSummary(
+    mine.permissions,
+  );
+
+  renderAgentPermissions(board, mine.permissions);
+  renderAgentClientPicker();
+  renderAgentConnections(board, mine.tokens, status);
+  // One read of the log, used twice: the list below and the live badge above
+  // are the same facts at two lengths.
+  const entries = (await readAgentLog(200)).filter((entry) => entry.boardId === board.id);
+  renderAgentLive(entries[0] ?? null);
+  renderAgentLog(entries);
+}
+
+/** How recently counts as "right now". Long enough to still say so between two
+ *  requests an agent makes while it thinks, short enough that a badge reading
+ *  "Agent active" is not describing this morning. */
+const AGENT_LIVE_WINDOW_MS = 2 * 60 * 1000;
+
+/**
+ * The badge that answers "is my agent actually talking to this board".
+ *
+ * The status badge beside it can only say this app is LISTENING, which is true
+ * of a board no agent has ever connected to. This says whether one has, and
+ * how long ago, which is the difference between a setup that works and a setup
+ * that merely looks right.
+ */
+function renderAgentLive(latest: AgentLogEntry | null): void {
+  const badge = document.getElementById("kbAgentLiveBadge")!;
+  if (!latest) {
+    badge.style.display = "none";
+    return;
+  }
+
+  const at = new Date(latest.at).getTime();
+  if (Number.isNaN(at)) {
+    badge.style.display = "none";
+    return;
+  }
+
+  const ago = Date.now() - at;
+  badge.style.display = "";
+  if (ago <= AGENT_LIVE_WINDOW_MS) {
+    badge.classList.add("kb-agent-live");
+    badge.textContent = `${latest.agent} active now`;
+  } else {
+    // Still worth showing: "last seen three days ago" is how somebody notices a
+    // connection quietly stopped working.
+    badge.classList.remove("kb-agent-live");
+    badge.textContent = `${latest.agent} last seen ${describeAgo(ago)}`;
+  }
+}
+
+/** Rough and readable, not precise. Nobody needs the seconds. */
+function describeAgo(ms: number): string {
+  const minutes = Math.round(ms / 60000);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours === 1 ? "an hour ago" : `${hours} hours ago`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "yesterday" : `${days} days ago`;
+}
+
+/**
+ * The switches, grouped, into the Customize modal's grid.
+ *
+ * Renders whether or not the modal is open, because the tab re-renders after
+ * every change and the modal is a child of the page rather than of the tab: a
+ * grid built only on open would show yesterday's state for the moment between
+ * a toggle and its save landing.
+ */
+function renderAgentPermissions(board: Board, permissions: Record<string, boolean>): void {
+  const grid = document.getElementById("kbAgentPermissionList")!;
+  grid.replaceChildren();
+
+  for (const group of AGENT_PERMISSION_GROUPS) {
+    const members = groupPermissions(group);
+    if (members.length === 0) continue;
+
+    const box = document.createElement("div");
+    box.className = "kb-agent-perm-group";
+
+    const title = document.createElement("div");
+    title.className = "kb-agent-perm-group-title";
+    title.textContent = group.title;
+
+    const blurb = document.createElement("p");
+    blurb.className = "kb-agent-perm-group-blurb";
+    blurb.textContent = group.blurb;
+
+    box.append(title, blurb);
+
+    for (const permission of members) {
+      box.appendChild(permissionRow(board, permission, permissions));
+    }
+    grid.appendChild(box);
+  }
+}
+
+/** One switch and its label. Unchanged in behavior from the flat list this
+ *  replaced; only where it is drawn moved. */
+function permissionRow(
+  board: Board,
+  permission: (typeof AGENT_PERMISSIONS)[number],
+  permissions: Record<string, boolean>,
+): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "settings-row";
+
+  const label = document.createElement("span");
+  label.className = "kb-label-with-info";
+  label.textContent = permission.label;
+  const info = document.createElement("button");
+  info.type = "button";
+  info.className = "info-trigger-btn kb-info-btn";
+  info.textContent = "ℹ";
+  info.title = permission.help;
+  info.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleInfoTooltip(info, permission.help);
+  });
+  label.appendChild(info);
+  row.appendChild(label);
+
+  const wrap = document.createElement("div");
+  wrap.className = "toggle-with-label";
+  const state = document.createElement("span");
+  state.textContent = permissions[permission.id] ? "On" : "Off";
+  const switchLabel = document.createElement("label");
+  switchLabel.className = "toggle-switch";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = permissions[permission.id] === true;
+  input.addEventListener("change", () => {
+    void commitAgentConfig((config) => {
+      agentBoardConfig(config, board.id).permissions[permission.id] = input.checked;
+    });
+  });
+  const slider = document.createElement("span");
+  slider.className = "toggle-slider";
+  switchLabel.append(input, slider);
+  wrap.append(state, switchLabel);
+  row.appendChild(wrap);
+  return row;
+}
+
+/** The agent picker, and the line under it saying where that agent's file is.
+ *
+ *  Grouped so the terminal agents read as one kind of thing and the editors as
+ *  another. Both work identically; the split is only so the list scans. */
+function renderAgentClientPicker(): void {
+  const select = document.getElementById("kbAgentClientSelect") as HTMLSelectElement;
+  if (!select) return;
+
+  if (select.options.length === 0) {
+    for (const [label, cli] of [
+      ["Coding agents", true],
+      ["Editors", false],
+    ] as const) {
+      const group = document.createElement("optgroup");
+      group.label = label;
+      for (const client of AGENT_CLIENTS.filter((c) => c.cli === cli)) {
+        const option = document.createElement("option");
+        option.value = client.id;
+        option.textContent = client.label;
+        group.appendChild(option);
+      }
+      select.appendChild(group);
+    }
+    select.addEventListener("change", () => {
+      agentClientId = select.value;
+      void renderAgentsTab();
+    });
+  }
+
+  select.value = agentClientId;
+  document.getElementById("kbAgentClientWhere")!.textContent = agentClient(agentClientId).where;
+}
+
+function renderAgentConnections(
+  board: Board,
+  tokens: AgentToken[],
+  status: { pipeName: string; sidecarPath: string; sidecarFound: boolean },
+): void {
+  const list = document.getElementById("kbAgentConnectionList")!;
+  list.replaceChildren();
+
+  if (tokens.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "kb-agent-empty";
+    empty.textContent = "No connections yet. Make one, then paste it into your AI agent.";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const token of tokens) {
+    const row = document.createElement("div");
+    row.className = "kb-agent-connection";
+
+    const head = document.createElement("div");
+    head.className = "kb-agent-connection-head";
+    const name = document.createElement("span");
+    name.className = "kb-agent-connection-name";
+    name.textContent = token.label;
+    const made = document.createElement("span");
+    made.className = "kb-agent-connection-date";
+    made.textContent = `Added ${formatDate(new Date(token.createdAt).toLocaleDateString("en-CA"))}`;
+    head.append(name, made);
+    row.appendChild(head);
+
+    const path = document.createElement("div");
+    path.className = "kb-agent-connection-path";
+    path.textContent = status.sidecarFound
+      ? status.sidecarPath
+      : `${status.sidecarPath} (not found)`;
+    row.appendChild(path);
+
+    const info = {
+      boardName: board.name,
+      token: token.token,
+      sidecarPath: status.sidecarPath,
+      pipeName: status.pipeName,
+    };
+
+    const actions = document.createElement("div");
+    actions.className = "kb-agent-connection-actions";
+
+    const client = agentClient(agentClientId);
+
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "settings-action-btn";
+    copyBtn.textContent = `Copy for ${client.label}`;
+    copyBtn.addEventListener("click", () => {
+      void copyAgentText(connectionConfig(info, client), `${client.label} connection`);
+    });
+
+    /* Only the agents that HAVE a command get the button for it. An editor is
+       configured by editing its file, and a button that copied a command it
+       has no way to run would be an instruction to do something impossible. */
+    const command = connectionCommand(info, client);
+    const copyCmd = document.createElement("button");
+    copyCmd.className = "settings-action-btn";
+    copyCmd.textContent = "Copy as Command";
+    copyCmd.addEventListener("click", () => {
+      if (command) void copyAgentText(command, "Command");
+    });
+
+    /* The one button that answers the question the others only imply. It runs
+       srbk-agent.exe for real, so a pass means this connection works end to
+       end and a failure names the part that does not: the exe missing, an
+       antivirus blocking it, or a token this board no longer knows. */
+    const testBtn = document.createElement("button");
+    testBtn.className = "settings-action-btn";
+    testBtn.textContent = "Test Connection";
+    const testResult = document.createElement("span");
+    testResult.className = "kb-agent-test-result";
+    testBtn.addEventListener("click", () => {
+      testBtn.disabled = true;
+      testResult.className = "kb-agent-test-result";
+      testResult.textContent = "Testing…";
+      testResult.title = "";
+      void testAgentConnection(token.token)
+        .then((result) => {
+          testResult.className = result.ok
+            ? "kb-agent-test-result kb-agent-test-ok"
+            : "kb-agent-test-result kb-agent-test-bad";
+          testResult.textContent = result.summary;
+          // The full output is the tooltip rather than the line, because it is
+          // several lines of JSON when it passes and a stack of detail when it
+          // does not.
+          testResult.title = result.detail;
+        })
+        .finally(() => {
+          testBtn.disabled = false;
+        });
+    });
+
+    const remove = document.createElement("button");
+    remove.className = "modal-cancel-btn";
+    remove.textContent = "Revoke";
+    remove.addEventListener("click", () => {
+      kbConfirm(
+        {
+          title: "Revoke this connection?",
+          message:
+            `"${token.label}" stops working immediately, and any agent using it needs a new ` +
+            "connection. Cards it already created keep its name.",
+          confirmLabel: "Revoke",
+          reopen: () => openBoardSetup(board, "agents"),
+        },
+        () => {
+          // Reopened AFTER the write, not beside it: the tab renders from the
+          // config on disk, so reopening first would draw the revoked
+          // connection back one more time before correcting itself.
+          void commitAgentConfig((config) => {
+            const mine = agentBoardConfig(config, board.id);
+            mine.tokens = mine.tokens.filter((t) => t.id !== token.id);
+          }).then(() => openBoardSetup(board, "agents"));
+        },
+      );
+    });
+
+    actions.append(copyBtn);
+    if (command) actions.append(copyCmd);
+    actions.append(testBtn, remove);
+    row.appendChild(actions);
+    row.appendChild(testResult);
+    list.appendChild(row);
+  }
+}
+
+/** Takes the entries rather than fetching them: the live badge needs the same
+ *  read, and two reads of the same file would be two answers. */
+function renderAgentLog(entries: AgentLogEntry[]): void {
+  const list = document.getElementById("kbAgentLogList")!;
+  list.replaceChildren();
+
+  if (entries.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "kb-agent-empty";
+    empty.textContent = "Nothing yet. Anything an agent does to this board is listed here.";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const entry of entries.slice(0, 100)) {
+    const row = document.createElement("div");
+    row.className = entry.ok ? "kb-agent-log-row" : "kb-agent-log-row kb-agent-log-refused";
+
+    const when = document.createElement("span");
+    when.className = "kb-agent-log-when";
+    const at = new Date(entry.at);
+    when.textContent = Number.isNaN(at.getTime()) ? entry.at : at.toLocaleString();
+
+    const what = document.createElement("span");
+    what.className = "kb-agent-log-what";
+    what.textContent = `${entry.agent}: ${opLabel(entry.op)}`;
+
+    const outcome = document.createElement("span");
+    outcome.className = "kb-agent-log-outcome";
+    outcome.textContent = entry.ok ? "" : "Refused";
+    if (entry.error) outcome.title = entry.error;
+
+    row.append(when, what, outcome);
+    list.appendChild(row);
+  }
+}
+
+/** The same success/failure toast the rest of the app uses for a clipboard
+ *  write. */
+async function copyAgentText(text: string, what: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    flash(`${what} copied. Paste it into your AI agent's config.`, "success", 5000);
+  } catch {
+    flash("Couldn't reach the clipboard", "error");
+  }
+}
+
+/** The summary and kill switch on the tool's own Setup > Data tab. */
+async function renderAgentGlobalRow(): Promise<void> {
+  const summary = document.getElementById("kbAgentGlobalSummary")!;
+  const button = document.getElementById("kbAgentGlobalOffBtn") as HTMLButtonElement;
+  const config = await loadAgentConfig();
+  const on = Object.entries(config.boards).filter(([, board]) => board.enabled);
+
+  if (!config.enabled) {
+    summary.textContent =
+      on.length > 0 ? `Off everywhere (${on.length} board(s) set up)` : "Off everywhere";
+    button.textContent = "Turn Back On";
+    button.className = "settings-action-btn";
+  } else if (on.length === 0) {
+    summary.textContent = "No boards are open to an agent";
+    button.textContent = "Turn Off Everywhere";
+    button.className = "danger-btn";
+  } else {
+    summary.textContent = `${on.length} board${on.length === 1 ? "" : "s"} open to an agent`;
+    button.textContent = "Turn Off Everywhere";
+    button.className = "danger-btn";
+  }
+  button.disabled = config.enabled && on.length === 0;
+}
+
+function wireAgentGlobalRow(): void {
+  document.getElementById("kbAgentGlobalOffBtn")!.addEventListener("click", () => {
+    void (async () => {
+      const config = await loadAgentConfig();
+      if (config.enabled) {
+        kbConfirm(
+          {
+            title: "Turn off agent access?",
+            message:
+              "Every agent request is refused, on every board, from now. Each board keeps its " +
+              "own settings, so turning this back on restores exactly what was allowed before.",
+            confirmLabel: "Turn Off",
+            reopen: () => openSetupOnTab("data"),
+          },
+          () => {
+            void (async () => {
+              config.enabled = false;
+              await saveAgentConfig(config);
+              flash("Agent access is off for every board.", "success");
+              openSetupOnTab("data");
+            })();
+          },
+        );
+        return;
+      }
+      config.enabled = true;
+      await saveAgentConfig(config);
+      flash("Agent access is on again.", "success");
+      await renderAgentGlobalRow();
+    })();
+  });
+}
+
+/** Wires the Agents tab. Called once, from initKanban. */
+/** The Customize modal. Built once, on first use, like the rest of this tool's
+ *  modals, so a board that never opens it never pays for it. */
+function agentPermModal(): Modal {
+  if (_agentPermModal) return _agentPermModal;
+
+  _agentPermModal = new Modal(document.getElementById("kbAgentPermBackdrop")!, {
+    closeOnEsc: true,
+  });
+
+  const back = () => {
+    _agentPermModal!.close();
+    const board = getBoard(boardEditId);
+    if (board) openBoardSetup(board, "agents");
+  };
+  document.getElementById("kbAgentPermBack")!.addEventListener("click", back);
+  document
+    .getElementById("kbAgentPermClose")!
+    .addEventListener("click", () => _agentPermModal!.close());
+
+  return _agentPermModal;
+}
+
+function wireAgentsTab(): void {
+  const toggle = document.getElementById("kbAgentEnabledToggle") as HTMLInputElement;
+  toggle.addEventListener("change", () => {
+    const board = getBoard(boardEditId);
+    if (!board) return;
+    void commitAgentConfig((config) => {
+      const mine = agentBoardConfig(config, board.id);
+      mine.enabled = toggle.checked;
+      /* Switching a board on switches the app-wide gate on with it. The
+         alternative is a user who ticks the board, copies the connection, and
+         is refused by a second switch they were never shown. The app-wide one
+         exists to turn everything off at once, which is a thing you go looking
+         for; it is not a thing to have to find first. */
+      if (toggle.checked) config.enabled = true;
+      // A board switched on for the first time gets a connection straight away,
+      // because a board with permissions and no connection cannot be used and
+      // the next step would always have been this button.
+      if (toggle.checked && mine.tokens.length === 0) {
+        mine.tokens.push(newConnection("Claude Code"));
+      }
+    });
+  });
+
+  document.getElementById("kbAgentMasterOnBtn")!.addEventListener("click", () => {
+    void commitAgentConfig((config) => {
+      config.enabled = true;
+    });
+  });
+
+  /* Customize hands off the way every other one in the app does: the setup
+     modal steps aside rather than stacking, and Back brings it and its scroll
+     position back on the Agents tab. */
+  document.getElementById("kbAgentPermEditBtn")!.addEventListener("click", () => {
+    const board = getBoard(boardEditId);
+    if (!board) return;
+    getBoardSetupModal().close({ handoff: true });
+    agentPermModal().open();
+  });
+
+  document.getElementById("kbAgentAllOffBtn")!.addEventListener("click", () => {
+    const board = getBoard(boardEditId);
+    if (!board) return;
+    void commitAgentConfig((config) => {
+      const mine = agentBoardConfig(config, board.id);
+      for (const permission of AGENT_PERMISSIONS) mine.permissions[permission.id] = false;
+    });
+  });
+
+  document.getElementById("kbAgentNewConnectionBtn")!.addEventListener("click", () => {
+    const board = getBoard(boardEditId);
+    if (!board) return;
+    void commitAgentConfig((config) => {
+      const mine = agentBoardConfig(config, board.id);
+      mine.tokens.push(newConnection(`Agent ${mine.tokens.length + 1}`));
+    });
+  });
+
+  document.getElementById("kbAgentLogRefreshBtn")!.addEventListener("click", () => {
+    void renderAgentsTab();
+  });
+
+  document.getElementById("kbAgentLogClearBtn")!.addEventListener("click", () => {
+    const board = getBoard(boardEditId);
+    if (!board) return;
+    kbConfirm(
+      {
+        title: "Clear the activity list?",
+        message:
+          "The record of what agents have done is deleted, for every board. Nothing on the " +
+          "board itself changes.",
+        confirmLabel: "Clear",
+        reopen: () => openBoardSetup(board, "agents"),
+      },
+      () => {
+        void (async () => {
+          await clearAgentLog();
+          openBoardSetup(board, "agents");
+        })();
+      },
+    );
+  });
+
+  wireAgentGlobalRow();
+}
+
+/** Forgets a deleted board's agent settings.
+ *
+ *  Not tidiness: the board id is gone, but its TOKENS are still valid keys in a
+ *  file the back end reads on every request. Leaving them behind means a live
+ *  connection pointing at nothing, which fails with "that board no longer
+ *  exists" rather than being refused outright. */
+function forgetAgentAccess(boardId: string): void {
+  void (async () => {
+    try {
+      const config = await loadAgentConfig();
+      if (!config.boards[boardId]) return;
+      delete config.boards[boardId];
+      await saveAgentConfig(config);
+    } catch (err) {
+      devError("[kanban] could not clear agent access for a deleted board", err);
+    }
+  })();
+}
+
+/* =============================================================================
+   AGENT OPERATIONS
+   -----------------------------------------------------------------------------
+   What happens when a local AI agent asks this board to do something.
+
+   HOW A REQUEST GETS HERE. The agent talks to srbk-agent.exe, which talks to
+   src-tauri/src/agent_gate.rs over a local named pipe. The gate authenticates
+   the token, works out which board it names, checks that board's permissions
+   and then emits "kanban-agent-request" for this file to carry out. A request
+   the gate refused never arrives here at all.
+
+   WHAT IS DECIDED HERE RATHER THAN THERE. Everything that needs the record in
+   front of it:
+
+     • WHO CREATED THIS CARD. "Edit cards it created" against "edit cards
+       created by anyone else" is a question about the card, not the request,
+       and the gate has never read a board file in its life.
+     • WHETHER THE CARD IS OPEN ON SCREEN. The card modal saves as you type, so
+       an agent writing to the card the user is editing is a lost update. That
+       one card is refused while it is open.
+     • EVERY LIMIT THE TOOL ALREADY HAS. Card ceilings, title lengths, comment
+       counts. An agent is held to the same numbers a person is.
+
+   WHY THE WHOLE THING GOES THROUGH THE ORDINARY HELPERS. createCard,
+   moveCardToColumn, deleteCard and the rest are what the buttons call. An agent
+   creating a card takes the same path a person does, which is why the card gets
+   a real number, lands in a resequenced column and appears on screen at once.
+   Any operation written to touch `cards` directly would be a second, quietly
+   diverging copy of the rules.
+
+   THE REPLY IS SENT AFTER THE WRITE LANDS. flushSave() is awaited before the
+   answer goes back, so "created card #12" means #12 is on disk, not that it is
+   in memory and will be written in 400ms if nothing goes wrong.
+============================================================================= */
+
+/** One request, as the gate hands it over. */
+interface AgentRequest {
+  id: number;
+  boardId: string;
+  connectionId: string;
+  connectionLabel: string;
+  op: string;
+  params: Record<string, unknown>;
+  permissions: Record<string, boolean>;
+  ownershipChecked: boolean;
+}
+
+/** A refusal, or a failure the agent can do something about. Its message is
+ *  what the agent is shown, so every one of them says what was wrong AND what
+ *  would fix it. */
+class AgentError extends Error {}
+
+/* -----------------------------------------------------------------------------
+   RUNAWAY GUARD
+
+   An agent in a loop is the failure this tool cannot otherwise notice: every
+   individual request is permitted, and four hundred of them are still four
+   hundred permitted requests. A person doing this by hand is rate-limited by
+   being a person.
+
+   Deliberately generous, and deliberately not a setting. It is not there to
+   ration ordinary work (filing a sprint's worth of cards is thirty writes in a
+   burst, which passes); it is there so a runaway stops while the board is still
+   recognizable.
+----------------------------------------------------------------------------- */
+const AGENT_WRITE_WINDOW_MS = 60_000;
+const AGENT_WRITES_PER_WINDOW = 120;
+let agentWriteTimes: number[] = [];
+
+function checkAgentWriteRate(): void {
+  const now = Date.now();
+  agentWriteTimes = agentWriteTimes.filter((t) => now - t < AGENT_WRITE_WINDOW_MS);
+  if (agentWriteTimes.length >= AGENT_WRITES_PER_WINDOW) {
+    throw new AgentError(
+      `Too many changes at once: ${AGENT_WRITES_PER_WINDOW} in a minute is the limit. ` +
+        "Wait a moment and continue, or ask the user to check what is being changed.",
+    );
+  }
+  agentWriteTimes.push(now);
+}
+
+/* -----------------------------------------------------------------------------
+   READING THE REQUEST
+----------------------------------------------------------------------------- */
+
+function agentString(params: Record<string, unknown>, key: string): string | undefined {
+  const value = params[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function agentRequiredString(params: Record<string, unknown>, key: string): string {
+  const value = agentString(params, key);
+  if (value === undefined || !value.trim()) {
+    throw new AgentError(`"${key}" is required and must be a non-empty string.`);
+  }
+  return value;
+}
+
+function agentBool(params: Record<string, unknown>, key: string): boolean | undefined {
+  const value = params[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+/** A date argument: a real YYYY-MM-DD, or null to clear it. Absent leaves the
+ *  field alone, which is why "not given" and "given as null" have to stay
+ *  distinguishable all the way down. */
+function agentDay(params: Record<string, unknown>, key: string): string | null | undefined {
+  if (!(key in params)) return undefined;
+  const value = params[key];
+  if (value === null) return null;
+  if (typeof value === "string" && parseDay(value) !== null) return value;
+  throw new AgentError(`"${key}" must be a date as YYYY-MM-DD, or null to clear it.`);
+}
+
+function agentStringList(params: Record<string, unknown>, key: string): string[] | undefined {
+  const value = params[key];
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) {
+    throw new AgentError(`"${key}" must be a list of strings.`);
+  }
+  return value as string[];
+}
+
+/** Reads and checks an "effort", the same way priority is read and checked.
+ *  Undefined means the request did not mention it, which is different from
+ *  "none" and must leave whatever the card already had alone. */
+function agentEffort(params: Record<string, unknown>): Effort | undefined {
+  const effort = agentString(params, "effort");
+  if (effort === undefined) return undefined;
+  if (!EFFORTS.includes(effort as Effort)) {
+    throw new AgentError(`"effort" must be one of: ${EFFORTS.join(", ")}.`);
+  }
+  return effort as Effort;
+}
+
+function agentPosition(params: Record<string, unknown>): NewCardPosition {
+  return agentString(params, "position") === "top" ? "top" : "bottom";
+}
+
+/** The card an agent named: by its number on the board, or by its id. Numbers
+ *  are what a person reads off a card, so an agent that was told "card 12"
+ *  should be able to say 12. */
+function agentCard(board: Board, params: Record<string, unknown>): Card {
+  const raw = params.card;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return agentCardByNumber(board, Math.floor(raw));
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    const text = raw.trim();
+    const asNumber = text.startsWith("#") ? text.slice(1) : text;
+    if (/^\d+$/.test(asNumber)) return agentCardByNumber(board, Number(asNumber));
+    const card = cards.find((c) => c.id === text && c.boardId === board.id);
+    if (card) return card;
+    throw new AgentError(`No card with the id "${text}" on this board.`);
+  }
+  throw new AgentError('"card" is required: the card\'s number on the board, or its id.');
+}
+
+function agentCardByNumber(board: Board, number: number): Card {
+  const card = cards.find((c) => c.boardId === board.id && c.number === number);
+  if (!card) throw new AgentError(`No card numbered ${number} on this board.`);
+  return card;
+}
+
+/** A column by title or by id, case-insensitively on the title. An agent works
+ *  from what the board reads as, and "Work In Progress" is what it reads as. */
+function agentColumn(board: Board, name: string): Column {
+  const needle = name.trim().toLowerCase();
+  const column =
+    board.columns.find((c) => c.id === name.trim()) ??
+    board.columns.find((c) => c.title.toLowerCase() === needle);
+  if (!column) {
+    const available = board.columns.map((c) => c.title).join(", ") || "none";
+    throw new AgentError(`No column called "${name}" on this board. Columns are: ${available}.`);
+  }
+  return column;
+}
+
+/** A tag by name or id. Names are matched case-insensitively and across every
+ *  category, since an agent has no reason to know the category structure. */
+function agentTag(board: Board, name: string): Tag {
+  const needle = name.trim().toLowerCase();
+  const tag =
+    board.tags.find((t) => t.id === name.trim()) ??
+    board.tags.find((t) => t.name.toLowerCase() === needle);
+  if (!tag) {
+    const available = board.tags.map((t) => t.name).join(", ") || "none";
+    throw new AgentError(`No tag called "${name}" on this board. Tags are: ${available}.`);
+  }
+  return tag;
+}
+
+/* -----------------------------------------------------------------------------
+   THE CHECKS THAT NEED THE RECORD
+----------------------------------------------------------------------------- */
+
+function agentOwns(record: { createdBy?: CardAuthor }, req: AgentRequest): boolean {
+  return record.createdBy?.kind === "agent" && record.createdBy.by === req.connectionId;
+}
+
+/**
+ * The ownership rule, in one place.
+ *
+ * "Edit cards created by anyone else" is treated as covering everything,
+ * including the agent's own work: a user who has said an agent may change the
+ * cards THEY wrote has plainly not meant to stop it changing its own.
+ */
+function assertMayTouchCard(card: Card, req: AgentRequest): void {
+  if (req.permissions.editOthersCards) return;
+  if (agentOwns(card, req)) return;
+  const whose =
+    card.createdBy && card.createdBy.kind !== "user"
+      ? `by ${authorLabel(card.createdBy)}`
+      : "in Swiss RB Knife";
+  throw new AgentError(
+    `Permission denied. Card #${card.number} was created ${whose}, not by this agent. ` +
+      "To allow this: Swiss RB Knife > Kanban > this board > Setup > Agents > " +
+      '"Edit cards created by anyone else".',
+  );
+}
+
+/** Editing a card's own contents also needs one of the two edit switches. The
+ *  gate accepted either; which one applies depends on whose card it is. */
+function assertMayEditCard(card: Card, req: AgentRequest): void {
+  assertMayTouchCard(card, req);
+  if (req.permissions.editOthersCards) return;
+  if (!req.permissions.editCard) {
+    throw new AgentError(
+      'Permission denied. "Edit cards it created" is not allowed on this board. ' +
+        "To allow it: Swiss RB Knife > Kanban > this board > Setup > Agents.",
+    );
+  }
+}
+
+/** A permission the OPERATION did not need but this particular request does:
+ *  creating a card with tags on it needs the tag switch as well as the card
+ *  switch. Checked before anything is built, so a refusal leaves nothing
+ *  half-made. */
+function assertExtra(req: AgentRequest, permission: string, what: string): void {
+  if (req.permissions[permission]) return;
+  const label = permissionLabel(permission);
+  throw new AgentError(
+    `Permission denied. ${what} needs "${label}", which is not allowed on this board. ` +
+      `To allow it: Swiss RB Knife > Kanban > this board > Setup > Agents > "${label}".`,
+  );
+}
+
+/** Refuses to write to the card the user has open.
+ *
+ *  The card modal saves as you type from its own fields, so a change written
+ *  underneath it is overwritten by the next keystroke, and a change written
+ *  while the user is mid-sentence loses their sentence. One card is blocked,
+ *  not the board. */
+function assertCardNotOpen(card: Card): void {
+  if (openCardId === card.id) {
+    throw new AgentError(
+      `Card #${card.number} is open in Swiss RB Knife right now. ` +
+        "Ask the user to close it, then try again.",
+    );
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   WHAT THE AGENT IS SHOWN
+
+   Shapes built for reading, not the stored records. A card's stored form
+   carries ids for its tags, an order field, a board id it already knows and
+   attachment bookkeeping it can do nothing with. What goes back is what the
+   card SAYS.
+----------------------------------------------------------------------------- */
+
+function agentAuthorLabel(record: { createdBy?: CardAuthor }): string {
+  const author = record.createdBy;
+  if (author?.kind === "agent") return author.label;
+  // "external" matters to an agent: it is the difference between a card the
+  // user wrote and one they are relaying on somebody else's behalf.
+  if (author?.kind === "external") return author.label ? `external: ${author.label}` : "external";
+  return "user";
+}
+
+function agentCardSummary(card: Card, board: Board, todayStr: string): Record<string, unknown> {
+  const column = getColumn(board, card.columnId);
+  const done = card.subtasks.filter((s) => s.done).length;
+  return {
+    number: card.number,
+    id: card.id,
+    title: card.title,
+    column: column?.title ?? "",
+    priority: card.priority,
+    effort: card.effort,
+    tags: orderedCardTags(card, board).map((t) => t.name),
+    due: card.dates.due,
+    overdue: isOverdue(card, todayStr),
+    archived: card.archived,
+    subtasks: card.subtasks.length ? `${done}/${card.subtasks.length}` : null,
+    comments: card.comments.length,
+    createdBy: agentAuthorLabel(card),
+  };
+}
+
+function agentCardDetail(card: Card, board: Board, todayStr: string): Record<string, unknown> {
+  return {
+    ...agentCardSummary(card, board, todayStr),
+    description: card.description,
+    dates: {
+      due: card.dates.due,
+      started: card.dates.started,
+      testing: card.dates.testing,
+      completed: card.dates.completed,
+    },
+    subtaskList: card.subtasks.map((s) => ({ id: s.id, text: s.text, done: s.done })),
+    commentList: card.comments.map((c) => ({
+      id: c.id,
+      body: c.body,
+      at: new Date(c.createdAt).toISOString(),
+      by: agentAuthorLabel(c),
+    })),
+    attachments: allAttachments(card).map((a) => a.name),
+    createdAt: new Date(card.createdAt).toISOString(),
+    updatedAt: new Date(card.updatedAt).toISOString(),
+  };
+}
+
+/* -----------------------------------------------------------------------------
+   THE OPERATIONS
+----------------------------------------------------------------------------- */
+
+/** A board's own tag category, by id.
+ *
+ *  Not getTagCategory(), which answers for whichever scope the TAG EDITOR is
+ *  currently pointed at. That is a screen this code never opens, and an agent
+ *  request that happened to arrive while the user had the editor on the global
+ *  vocabulary would otherwise read the wrong list. */
+function agentTagCategory(board: Board, id: string): TagCategory | null {
+  return board.tagCategories.find((c) => c.id === id) ?? null;
+}
+
+function agentGetBoard(board: Board): Record<string, unknown> {
+  const todayStr = today();
+  const live = liveCardsOnBoard(board.id);
+  return {
+    board: { id: board.id, name: board.name, description: board.description },
+    columns: board.columns.map((column) => ({
+      id: column.id,
+      title: column.title,
+      wipLimit: column.wipLimit,
+      isDone: column.isDone,
+      cards: cardsInColumn(board.id, column.id).filter((c) => !c.archived).length,
+    })),
+    tags: board.tags
+      .filter((t) => t.status === "active")
+      .map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        category: agentTagCategory(board, tag.categoryId)?.name ?? "",
+      })),
+    priorities: PRIORITIES,
+    cardCount: live.length,
+    archivedCount: archivedCardsOnBoard(board.id).length,
+    overdueCount: live.filter((c) => isOverdue(c, todayStr)).length,
+  };
+}
+
+function agentListCards(board: Board, params: Record<string, unknown>): Record<string, unknown> {
+  const todayStr = today();
+  const wantArchived = agentBool(params, "archived") === true;
+  const columnName = agentString(params, "column");
+  const column = columnName ? agentColumn(board, columnName) : null;
+  const tagName = agentString(params, "tag");
+  const tag = tagName ? agentTag(board, tagName) : null;
+  const priority = agentString(params, "priority");
+  if (priority !== undefined && !PRIORITIES.includes(priority as Priority)) {
+    throw new AgentError(`"priority" must be one of: ${PRIORITIES.join(", ")}.`);
+  }
+  const effort = agentEffort(params);
+  const query = agentString(params, "query");
+  const overdueOnly = agentBool(params, "overdue") === true;
+  const rawLimit = params.limit;
+  const limit = typeof rawLimit === "number" ? clampInt(rawLimit, 1, 500, 100) : 100;
+
+  const matched = cards
+    .filter((card) => card.boardId === board.id)
+    .filter((card) => card.archived === wantArchived)
+    .filter((card) => !column || card.columnId === column.id)
+    .filter((card) => !tag || card.tagIds.includes(tag.id))
+    .filter((card) => !priority || card.priority === priority)
+    .filter((card) => !effort || card.effort === effort)
+    .filter((card) => !overdueOnly || isOverdue(card, todayStr))
+    .filter((card) => !query || cardMatchesText(card, query))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+
+  return {
+    cards: matched.slice(0, limit).map((card) => agentCardSummary(card, board, todayStr)),
+    matched: matched.length,
+    returned: Math.min(matched.length, limit),
+  };
+}
+
+function agentCreateCard(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const title = agentRequiredString(params, "title");
+  const columnName = agentString(params, "column");
+  const column = columnName ? agentColumn(board, columnName) : board.columns[0];
+  if (!column) {
+    throw new AgentError(
+      "This board has no columns, so there is nowhere to put a card. Ask the user to add one.",
+    );
+  }
+
+  // Everything extra the request carries is checked and resolved BEFORE the
+  // card is made, so a refusal leaves no half-built card behind.
+  const tagNames = agentStringList(params, "tags");
+  const due = agentDay(params, "due");
+  const subtaskTexts = agentStringList(params, "subtasks");
+  if (tagNames?.length) assertExtra(req, "assignTags", "Putting tags on a card");
+  if (due !== undefined) assertExtra(req, "setDates", "Setting a due date");
+  if (subtaskTexts?.length) assertExtra(req, "manageSubtasks", "Adding subtasks");
+  const tags = tagNames?.map((name) => agentTag(board, name)) ?? [];
+
+  const priority = agentString(params, "priority");
+  if (priority !== undefined && !PRIORITIES.includes(priority as Priority)) {
+    throw new AgentError(`"priority" must be one of: ${PRIORITIES.join(", ")}.`);
+  }
+  const effort = agentEffort(params);
+
+  const card = createCard(board, column.id, title, agentPosition(params));
+  if (!card) {
+    throw new AgentError(
+      `This board is at its limit of ${MAX_CARDS_PER_BOARD.toLocaleString()} cards. ` +
+        "Ask the user to archive finished work first.",
+    );
+  }
+
+  card.createdBy = { kind: "agent", by: req.connectionId, label: req.connectionLabel };
+  const description = agentString(params, "description");
+  if (description !== undefined) card.description = trimTo(description, MAX_DESC_LEN);
+  if (priority !== undefined) card.priority = priority as Priority;
+  if (effort !== undefined) card.effort = effort;
+  card.tagIds = [...new Set(tags.map((t) => t.id))];
+  if (due !== undefined) card.dates.due = due;
+  if (subtaskTexts?.length) {
+    card.subtasks = subtaskTexts
+      .slice(0, MAX_SUBTASKS_PER_CARD)
+      .map((text) => ({ id: newId(), text: trimTo(text, MAX_TITLE_LEN), done: false }));
+  }
+  stampCard(card);
+  return { created: agentCardDetail(card, board, today()) };
+}
+
+function agentUpdateCard(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayEditCard(card, req);
+  assertCardNotOpen(card);
+
+  const title = agentString(params, "title");
+  if (title !== undefined) {
+    if (!title.trim()) throw new AgentError("A card's title cannot be empty.");
+    card.title = trimTo(title, MAX_TITLE_LEN);
+  }
+  const description = agentString(params, "description");
+  if (description !== undefined) card.description = trimTo(description, MAX_DESC_LEN);
+  const priority = agentString(params, "priority");
+  if (priority !== undefined) {
+    if (!PRIORITIES.includes(priority as Priority)) {
+      throw new AgentError(`"priority" must be one of: ${PRIORITIES.join(", ")}.`);
+    }
+    card.priority = priority as Priority;
+  }
+  const effort = agentEffort(params);
+  if (effort !== undefined) card.effort = effort;
+  stampCard(card);
+  return { updated: agentCardDetail(card, board, today()) };
+}
+
+function agentMoveCard(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayTouchCard(card, req);
+  assertCardNotOpen(card);
+  const column = agentColumn(board, agentRequiredString(params, "column"));
+
+  if (column.id !== card.columnId) {
+    // The ordinary path, which is also what stamps the Complete date when the
+    // board is set to do that and the card lands in a done column.
+    moveCardToColumn(card, column.id);
+  }
+  card.order = agentPosition(params) === "top" ? -1 : cardsInColumn(board.id, column.id).length;
+  resequence(board.id);
+  stampCard(card);
+  return { moved: agentCardSummary(card, board, today()) };
+}
+
+function agentSetCardDates(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayTouchCard(card, req);
+  assertCardNotOpen(card);
+
+  let touched = false;
+  for (const field of ["due", "started", "testing", "completed"] as const) {
+    const value = agentDay(params, field);
+    if (value === undefined) continue;
+    card.dates[field] = value;
+    touched = true;
+  }
+  if (!touched) {
+    throw new AgentError(
+      'Nothing to set. Give at least one of "due", "started", "testing" or "completed".',
+    );
+  }
+  stampCard(card);
+  return { dates: card.dates, warning: stageOrderWarning(card) };
+}
+
+function agentArchiveCard(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayTouchCard(card, req);
+  assertCardNotOpen(card);
+  card.archived = agentBool(params, "archived") ?? true;
+  resequence(board.id);
+  stampCard(card);
+  return { number: card.number, archived: card.archived };
+}
+
+function agentDeleteCard(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayTouchCard(card, req);
+  assertCardNotOpen(card);
+  const gone = { number: card.number, title: card.title };
+  deleteCard(card);
+  return { deleted: gone };
+}
+
+function agentAddComment(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  /* Deliberately NOT ownership-checked. Commenting on the user's card is the
+     ordinary case ("here is what I found on this one"), and a comment ADDS
+     rather than changes: the card still says exactly what the user wrote. The
+     comment carries the agent's name, so the board never loses track of who
+     said it. */
+  const body = agentRequiredString(params, "body");
+  if (card.comments.length >= MAX_COMMENTS_PER_CARD) {
+    throw new AgentError(
+      `Card #${card.number} already has the maximum of ${MAX_COMMENTS_PER_CARD} comments.`,
+    );
+  }
+  const now = Date.now();
+  const comment: CardComment = {
+    id: newId(),
+    body: trimTo(body, MAX_COMMENT_LEN),
+    attachments: [],
+    createdAt: now,
+    updatedAt: now,
+    createdBy: { kind: "agent", by: req.connectionId, label: req.connectionLabel },
+  };
+  card.comments.push(comment);
+  stampCard(card);
+  return { commented: { card: card.number, id: comment.id } };
+}
+
+function agentDeleteComment(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  const commentId = agentRequiredString(params, "comment");
+  const comment = card.comments.find((c) => c.id === commentId);
+  if (!comment) throw new AgentError(`No comment with the id "${commentId}" on that card.`);
+  /* The COMMENT's author decides here, not the card's. An agent removing its
+     own note from the user's card is a different act from editing the user's
+     card, and holding it to the card's author would make an agent unable to
+     tidy up after itself. */
+  if (!req.permissions.editOthersCards && !agentOwns(comment, req)) {
+    throw new AgentError(
+      "Permission denied. That comment was not written by this agent. To allow this: " +
+        "Swiss RB Knife > Kanban > this board > Setup > Agents > " +
+        '"Edit cards created by anyone else".',
+    );
+  }
+  assertCardNotOpen(card);
+  card.comments = card.comments.filter((c) => c.id !== commentId);
+  stampCard(card);
+  return { deleted: { card: card.number, comment: commentId } };
+}
+
+function agentAddSubtask(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayTouchCard(card, req);
+  assertCardNotOpen(card);
+  if (card.subtasks.length >= MAX_SUBTASKS_PER_CARD) {
+    throw new AgentError(
+      `Card #${card.number} already has the maximum of ${MAX_SUBTASKS_PER_CARD} subtasks.`,
+    );
+  }
+  const subtask: Subtask = {
+    id: newId(),
+    text: trimTo(agentRequiredString(params, "text"), MAX_TITLE_LEN),
+    done: false,
+  };
+  card.subtasks.push(subtask);
+  stampCard(card);
+  return { added: subtask };
+}
+
+function agentSetSubtask(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayTouchCard(card, req);
+  assertCardNotOpen(card);
+  const subtaskId = agentRequiredString(params, "subtask");
+  const subtask = card.subtasks.find((s) => s.id === subtaskId);
+  if (!subtask) throw new AgentError(`No subtask with the id "${subtaskId}" on that card.`);
+  const done = agentBool(params, "done");
+  const text = agentString(params, "text");
+  if (done === undefined && text === undefined) {
+    throw new AgentError('Nothing to change. Give "done", "text", or both.');
+  }
+  if (done !== undefined) subtask.done = done;
+  if (text !== undefined) subtask.text = trimTo(text, MAX_TITLE_LEN);
+  stampCard(card);
+  return { subtask };
+}
+
+function agentRemoveSubtask(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayTouchCard(card, req);
+  assertCardNotOpen(card);
+  const subtaskId = agentRequiredString(params, "subtask");
+  if (!card.subtasks.some((s) => s.id === subtaskId)) {
+    throw new AgentError(`No subtask with the id "${subtaskId}" on that card.`);
+  }
+  card.subtasks = card.subtasks.filter((s) => s.id !== subtaskId);
+  stampCard(card);
+  return { removed: subtaskId };
+}
+
+function agentSetCardTags(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const card = agentCard(board, params);
+  assertMayTouchCard(card, req);
+  assertCardNotOpen(card);
+  const names = agentStringList(params, "tags");
+  if (names === undefined) throw new AgentError('"tags" is required: a list of tag names or ids.');
+  // Resolved in full before anything is assigned, so one unknown name does not
+  // leave the card holding half a list.
+  const tags = names.map((name) => agentTag(board, name));
+  card.tagIds = [...new Set(tags.map((t) => t.id))];
+  stampCard(card);
+  return { tags: orderedCardTags(card, board).map((t) => t.name) };
+}
+
+/** A ceiling on the tag vocabulary, and the ONE limit an agent meets that a
+ *  person does not. It exists because a person adds tags one dialog at a time
+ *  and an agent can add two hundred in a loop, at which point every tag filter
+ *  in the tool is unusable. */
+const MAX_AGENT_TAGS_PER_BOARD = 200;
+
+function agentCreateTag(board: Board, params: Record<string, unknown>): Record<string, unknown> {
+  const name = agentRequiredString(params, "name").trim().slice(0, 60);
+  if (board.tags.length >= MAX_AGENT_TAGS_PER_BOARD) {
+    throw new AgentError(
+      `This board already has ${MAX_AGENT_TAGS_PER_BOARD} tags, which is as many as an agent may add.`,
+    );
+  }
+  const categoryName = agentString(params, "category")?.trim() || "General";
+  let category =
+    board.tagCategories.find((c) => c.id === categoryName) ??
+    board.tagCategories.find((c) => c.name.toLowerCase() === categoryName.toLowerCase());
+  if (!category) {
+    category = {
+      id: newId(),
+      name: categoryName.slice(0, 60),
+      color: DEFAULT_TAG_COLOR,
+      status: "active",
+    };
+    board.tagCategories.push(category);
+  }
+  const clash = board.tags.find(
+    (t) => t.categoryId === category!.id && t.name.toLowerCase() === name.toLowerCase(),
+  );
+  if (clash) throw new AgentError(`"${category.name}" already has a tag called "${clash.name}".`);
+
+  const color = agentString(params, "color");
+  const tag: Tag = {
+    id: newId(),
+    categoryId: category.id,
+    name,
+    color: color !== undefined && isHexColor(color) ? color : null,
+    status: "active",
+  };
+  board.tags.push(tag);
+  touchBoard(board);
+  return { created: { id: tag.id, name: tag.name, category: category.name } };
+}
+
+function agentWipLimit(params: Record<string, unknown>): number | null {
+  const raw = params.wipLimit;
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    throw new AgentError('"wipLimit" must be a number, or null for no limit.');
+  }
+  return clampInt(raw, 1, 999, 1);
+}
+
+function agentCreateColumn(board: Board, params: Record<string, unknown>): Record<string, unknown> {
+  if (board.columns.length >= MAX_COLUMNS_PER_BOARD) {
+    throw new AgentError(`This board already has the maximum of ${MAX_COLUMNS_PER_BOARD} columns.`);
+  }
+  const title = agentRequiredString(params, "title").trim().slice(0, 60);
+  if (board.columns.some((c) => c.title.toLowerCase() === title.toLowerCase())) {
+    throw new AgentError(`This board already has a column called "${title}".`);
+  }
+  const column: Column = {
+    id: newId(),
+    title,
+    wipLimit: agentWipLimit(params),
+    isDone: agentBool(params, "isDone") ?? false,
+    collapsed: false,
+  };
+  const rawPosition = params.position;
+  const at =
+    typeof rawPosition === "number"
+      ? clampInt(rawPosition, 0, board.columns.length, board.columns.length)
+      : board.columns.length;
+  board.columns.splice(at, 0, column);
+  touchBoard(board);
+  return { created: { id: column.id, title: column.title, position: at } };
+}
+
+/**
+ * Reorders a column.
+ *
+ * SEPARATE FROM update_column because that one changes what a column IS and
+ * this changes where it sits, and an agent asking for the second should not
+ * have to resend the first's fields to avoid clearing them. It costs the same
+ * permission: both are the board's shape.
+ */
+function agentMoveColumn(board: Board, params: Record<string, unknown>): Record<string, unknown> {
+  const column = agentColumn(board, agentRequiredString(params, "column"));
+  const from = board.columns.findIndex((c) => c.id === column.id);
+
+  const raw = params.position;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    throw new AgentError("A position is needed, counting from 0 at the left.");
+  }
+  // Clamped rather than refused: "put it last" is reasonably written as a
+  // number past the end, and refusing that helps nobody.
+  const to = clampInt(raw, 0, board.columns.length - 1, from);
+
+  if (to !== from) {
+    board.columns.splice(from, 1);
+    board.columns.splice(to, 0, column);
+    touchBoard(board);
+  }
+  return {
+    moved: { id: column.id, title: column.title, from, to },
+    order: board.columns.map((c) => c.title),
+  };
+}
+
+function agentUpdateColumn(board: Board, params: Record<string, unknown>): Record<string, unknown> {
+  const column = agentColumn(board, agentRequiredString(params, "column"));
+  const title = agentString(params, "title");
+  if (title !== undefined) {
+    const trimmed = title.trim().slice(0, 60);
+    if (!trimmed) throw new AgentError("A column's title cannot be empty.");
+    const clash = board.columns.some(
+      (c) => c.id !== column.id && c.title.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (clash) throw new AgentError(`This board already has a column called "${trimmed}".`);
+    column.title = trimmed;
+  }
+  if ("wipLimit" in params) column.wipLimit = agentWipLimit(params);
+  const isDone = agentBool(params, "isDone");
+  if (isDone !== undefined) column.isDone = isDone;
+  touchBoard(board);
+  return {
+    column: { id: column.id, title: column.title, wipLimit: column.wipLimit, isDone: column.isDone },
+  };
+}
+
+/* -----------------------------------------------------------------------------
+   THE DISPATCHER
+----------------------------------------------------------------------------- */
+
+/** Operations that change something: what the runaway guard counts, and what
+ *  decides whether the board is redrawn and the save flushed. */
+const AGENT_WRITE_OPS = new Set([
+  "create_card",
+  "update_card",
+  "move_card",
+  "set_card_dates",
+  "archive_card",
+  "delete_card",
+  "add_comment",
+  "delete_comment",
+  "add_subtask",
+  "set_subtask",
+  "remove_subtask",
+  "set_card_tags",
+  "create_tag",
+  "create_column",
+  "update_column",
+  "move_column",
+]);
+
+async function runAgentRequest(req: AgentRequest): Promise<Record<string, unknown>> {
+  if (!storeLoaded) {
+    throw new AgentError("Swiss RB Knife is still loading its boards. Try again in a moment.");
+  }
+  const board = getBoard(req.boardId);
+  if (!board) {
+    throw new AgentError(
+      "That board no longer exists in Swiss RB Knife. Ask the user for a new connection.",
+    );
+  }
+  const writing = AGENT_WRITE_OPS.has(req.op);
+  if (writing) checkAgentWriteRate();
+
+  const params = req.params ?? {};
+  let result: Record<string, unknown>;
+  switch (req.op) {
+    case "get_board":
+      result = agentGetBoard(board);
+      break;
+    case "list_cards":
+      result = agentListCards(board, params);
+      break;
+    case "get_card":
+      result = { card: agentCardDetail(agentCard(board, params), board, today()) };
+      break;
+    case "create_card":
+      result = agentCreateCard(board, req, params);
+      break;
+    case "update_card":
+      result = agentUpdateCard(board, req, params);
+      break;
+    case "move_card":
+      result = agentMoveCard(board, req, params);
+      break;
+    case "set_card_dates":
+      result = agentSetCardDates(board, req, params);
+      break;
+    case "archive_card":
+      result = agentArchiveCard(board, req, params);
+      break;
+    case "delete_card":
+      result = agentDeleteCard(board, req, params);
+      break;
+    case "add_comment":
+      result = agentAddComment(board, req, params);
+      break;
+    case "delete_comment":
+      result = agentDeleteComment(board, req, params);
+      break;
+    case "add_subtask":
+      result = agentAddSubtask(board, req, params);
+      break;
+    case "set_subtask":
+      result = agentSetSubtask(board, req, params);
+      break;
+    case "remove_subtask":
+      result = agentRemoveSubtask(board, req, params);
+      break;
+    case "set_card_tags":
+      result = agentSetCardTags(board, req, params);
+      break;
+    case "create_tag":
+      result = agentCreateTag(board, params);
+      break;
+    case "create_column":
+      result = agentCreateColumn(board, params);
+      break;
+    case "update_column":
+      result = agentUpdateColumn(board, params);
+      break;
+    case "move_column":
+      result = agentMoveColumn(board, params);
+      break;
+    default:
+      // The gate refuses anything missing from its own table, so reaching this
+      // means the two tables have drifted apart.
+      throw new AgentError(`"${req.op}" is not an operation this board understands.`);
+  }
+
+  if (writing) {
+    // Redrawn and written BEFORE the answer goes back: the user watching the
+    // board sees the change at the moment the agent is told about it, and
+    // "created card #12" means #12 is on disk.
+    renderAll();
+
+    /* AND THE CARD YOU HAVE OPEN, if the agent just changed that one. The board
+       behind redrawing while the modal in front of it showed the old values was
+       the worst version of this: both on screen, disagreeing.
+
+       NOT while you are editing it. Re-rendering mid-edit would overwrite the
+       title you are halfway through typing, and an agent's change is never
+       worth taking a person's keystrokes for. The edit wins; the agent's change
+       is already saved and shows when the edit ends. */
+    if (openCardId && !cardEditing && getCard(openCardId)) renderCardModal();
+    await flushSave();
+  }
+  return result;
+}
+
+/** Registered once, for the life of the app. Kanban is initialized at startup
+ *  rather than on first entry, so this answers whether or not the tool is the
+ *  one currently on screen. */
+function listenForAgentRequests(): void {
+  void listen<AgentRequest>("kanban-agent-request", (event) => {
+    const req = event.payload;
+    void (async () => {
+      try {
+        const result = await runAgentRequest(req);
+        await invoke("kanban_agent_reply", { id: req.id, ok: true, result, error: null });
+      } catch (err) {
+        const message =
+          err instanceof AgentError
+            ? err.message
+            : `Swiss RB Knife could not complete that: ${String(err)}`;
+        if (!(err instanceof AgentError)) devError("[kanban] agent request failed", err);
+        await invoke("kanban_agent_reply", { id: req.id, ok: false, result: null, error: message });
+      }
+    })();
+  });
+}
+
 export function initKanban(): void {
   viewBoards = document.getElementById("kbViewBoards")!;
   viewBoard = document.getElementById("kbViewBoard")!;
@@ -8410,6 +10905,11 @@ export function initKanban(): void {
   // tool is on screen before answering, so holding it permanently is safe and
   // several tools can hold one at the same time.
   setSubNavHandler({ back: kbSubNavBack, forward: kbSubNavForward });
+
+  // The same "once, for the life of the app" rule, and for the same reason: an
+  // agent's request has nothing to do with which tool the user is looking at.
+  listenForAgentRequests();
+  wireAgentsTab();
 
   // Last, and before the load: everything above has to be in place before any
   // shell hook is allowed to run, and loadAll() calls back into rendering.

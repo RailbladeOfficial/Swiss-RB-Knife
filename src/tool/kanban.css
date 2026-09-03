@@ -1082,12 +1082,16 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* ── Description ── */
 
+/* The textarea a description is typed into. LAYOUT ONLY: its size and leading
+   come from .rt-editor textarea, which reads the shared --rt-font-size, so this
+   field matches its own rendered face and the comments below it. It used to
+   carry 0.88rem and a line-height of its own, outranked by the rule above and
+   therefore doing nothing except offering a third number for the next person to
+   believe. */
 .kb-card-desc {
   width: 100%;
   box-sizing: border-box;
   resize: vertical;
-  font-size: 0.88rem;
-  line-height: 1.5;
 }
 
 /* ── Subtasks ── */
@@ -1719,6 +1723,210 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   cursor: pointer;
 }
 
+/* -----------------------------------------------------------------------------
+   THE SCALE EDITOR
+   One row per rung: its color, then its name. The swatch column is a fixed
+   width so the names line up into a column you can read down, including past
+   the one rung that has no swatch.
+----------------------------------------------------------------------------- */
+
+.kb-scale-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.kb-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kb-scale-swatch {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 30px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+/* Holds the swatch column open for "None", which has no color to show. */
+.kb-scale-swatch-spacer {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 30px;
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.kb-scale-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* =============================================================================
+   THE CARD MODAL: READING VERSUS EDITING
+   -----------------------------------------------------------------------------
+   ONE attribute decides everything: [data-kb-editing] on #kbCardModal. Each
+   control says which face it belongs to and CSS hides the other, rather than
+   twenty lines of JavaScript toggling elements by hand. The hand-written list
+   is the thing that goes stale when a field is added, and the field it forgets
+   is the one still editable on a card claiming to be read-only.
+
+   Default is READING, so a control that forgot to declare itself is hidden
+   rather than live. Failing closed is the right way round here.
+============================================================================= */
+
+/* Reading: the values show, the controls do not. */
+#kbCardModal[data-kb-editing="false"] .kb-card-field select,
+#kbCardModal[data-kb-editing="false"] #kbCardTitleInput,
+#kbCardModal[data-kb-editing="false"] #kbCardEditActions,
+#kbCardModal[data-kb-editing="false"] #kbCardManageTagsBtn,
+#kbCardModal[data-kb-editing="false"] #kbCardAttachAddBtn,
+#kbCardModal[data-kb-editing="false"] #kbCardDueClearBtn,
+#kbCardModal[data-kb-editing="false"] #kbCardDueInput,
+#kbCardModal[data-kb-editing="false"] .kb-section-hint,
+/* The description's own chrome. Nothing to format and nothing to switch to
+   while the card is being read, and the rendered face is already forced in
+   renderCardDescription. */
+#kbCardModal[data-kb-editing="false"] #kbCardDescHost .rt-toolbar {
+  display: none;
+}
+
+/* A preview that is not a way into the editor should not offer a text cursor
+   or light up on hover as though it were. */
+#kbCardModal[data-kb-editing="false"] #kbCardDescHost .rt-preview {
+  cursor: default;
+}
+
+#kbCardModal[data-kb-editing="false"] #kbCardDescHost .rt-preview:hover {
+  border-color: var(--color-border);
+}
+
+/* Editing: the controls show, the values do not, and the pencil has nothing
+   left to offer. */
+#kbCardModal[data-kb-editing="true"] .kb-card-readonly,
+#kbCardModal[data-kb-editing="true"] #kbCardTitleDisplay,
+#kbCardModal[data-kb-editing="true"] #kbCardEditBtn {
+  display: none;
+}
+
+.kb-card-readonly {
+  display: block;
+  padding: 6px 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.kb-card-title-display {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.kb-card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kb-card-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* -----------------------------------------------------------------------------
+   THE THREE COLUMNS
+   Where it lives, what it weighs, what it is about. Collapses to two and then
+   to one, because three columns of selects in a narrow window is three columns
+   of nothing legible.
+----------------------------------------------------------------------------- */
+
+.kb-card-top {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+@media (min-width: 620px) {
+  .kb-card-top {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .kb-card-top {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  /* The tag column is the one that grows, so it gets the slack. */
+  .kb-card-top-tags {
+    grid-column: 3;
+  }
+}
+
+.kb-card-top-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* The picker scrolls inside its column rather than stretching it: a card with
+   thirty tags must not make the other two columns tall and empty. */
+.kb-card-top-tags .kb-tag-picker {
+  max-height: 132px;
+  overflow-y: auto;
+}
+
+/* -----------------------------------------------------------------------------
+   THE TABS
+----------------------------------------------------------------------------- */
+
+.kb-card-tabs {
+  margin-bottom: 14px;
+}
+
+/* Empty on a card with none, so the badge is never a zero. :empty needs the
+   span to have no text at all, which is what renderCardTabCounts writes. */
+.kb-tab-count {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-tab-count:empty {
+  display: none;
+}
+
+/* -----------------------------------------------------------------------------
+   COUNTS ON THE BOARD ITSELF
+   Clickable, and they say so. Each opens the card on the tab it counts.
+----------------------------------------------------------------------------- */
+
+.kb-card-count-link {
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.kb-card-count-link:hover {
+  color: var(--color-accent-input);
+  text-decoration: underline;
+}
+
 /* =============================================================================
    TAGS WITHOUT A COLOR
    -----------------------------------------------------------------------------
@@ -1894,6 +2102,14 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* ── Comments ── */
 
+/* The composer's own footer. Right-aligned, because the button ends an action
+   that runs left to right and the eye finishes where the text does. */
+.kb-comment-post-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
 .kb-comment-list {
   display: flex;
   flex-direction: column;
@@ -1949,9 +2165,11 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   background: var(--color-danger-subtle);
 }
 
-.kb-comment-body {
-  font-size: 0.85rem;
-}
+/* No font-size of its own any more. It carried 0.85rem, which is where that
+   number came from, and it is now the shared --rt-font-size that every rich
+   text face uses. Setting it again here would be a second copy free to drift
+   from the first, and the drift is exactly what left the description smaller
+   than the comments underneath it. */
 
 /* ── The counters on a card face ── */
 
@@ -2008,4 +2226,275 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   justify-content: flex-end;
   gap: 8px;
   padding: 8px 12px 12px;
+}
+
+/* ── Agent access ──────────────────────────────────────────────────────────
+   The Agents tab of Board Setup, plus the two marks an agent leaves on the
+   board itself. Everything here is drawn from the theme's own variables, so a
+   custom theme colors it without knowing it exists.
+   ------------------------------------------------------------------------ */
+
+.kb-agent-intro {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.kb-agent-intro p {
+  margin: 0 0 8px;
+}
+
+.kb-agent-intro p:last-child {
+  margin-bottom: 0;
+}
+
+/* The app-wide switch being off while this board is on. Warning-colored
+   because the board looks enabled and is not. */
+.kb-agent-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-danger);
+  border-radius: 6px;
+  background: var(--color-danger-subtle);
+  font-size: 0.78rem;
+  color: var(--color-text);
+}
+
+.kb-agent-connections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-agent-connection {
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-input-bg);
+}
+
+.kb-agent-connection-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kb-agent-connection-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.kb-agent-connection-date {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* The path is long and is the one thing here worth reading character by
+   character, so it wraps rather than being cut off. */
+.kb-agent-connection-path {
+  margin: 4px 0 8px;
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.kb-agent-connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kb-agent-activity-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.kb-agent-note {
+  margin: 10px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.kb-agent-empty {
+  margin: 6px 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.kb-agent-log {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.kb-agent-log:empty {
+  display: none;
+}
+
+.kb-agent-log-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kb-agent-log-row:last-child {
+  border-bottom: none;
+}
+
+.kb-agent-log-when {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-agent-log-what {
+  flex: 1 1 auto;
+  color: var(--color-text);
+}
+
+/* A refusal is the row worth finding in a long list, so it is the one that is
+   colored. The label carries the reason as its tooltip. */
+.kb-agent-log-outcome {
+  flex-shrink: 0;
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* -----------------------------------------------------------------------------
+   THE PERMISSION GRID
+   Reached by Customize. Three columns at most, because a fourth makes each one
+   too narrow for a switch and its label to sit on one line, and the groups are
+   short enough that a fourth column would mostly be empty anyway. It steps down
+   to two and then to one so the modal still reads on a narrow window.
+----------------------------------------------------------------------------- */
+
+.kb-agent-perm-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+@media (min-width: 620px) {
+  .kb-agent-perm-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 940px) {
+  .kb-agent-perm-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.kb-agent-perm-group {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-input-bg);
+}
+
+.kb-agent-perm-group-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.kb-agent-perm-group-blurb {
+  margin: 2px 0 8px;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+/* The rows inside a group are tighter than a settings-row on a tab, because
+   here they are read as a column rather than scanned down a page. */
+.kb-agent-perm-group .settings-row {
+  padding: 5px 0;
+}
+
+/* Green rather than the muted grey the other badges use: this one says an agent
+   is talking to the board RIGHT NOW, which is the one status worth spotting
+   without reading it. */
+.kb-agent-live {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+/* The test's answer sits under the buttons rather than beside them, because it
+   is a sentence and the buttons are a row. Empty until a test has run. */
+.kb-agent-test-result {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.kb-agent-test-result:empty {
+  display: none;
+}
+
+.kb-agent-test-ok {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.kb-agent-test-bad {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.kb-agent-log-refused .kb-agent-log-what {
+  color: var(--color-text-muted);
+}
+
+/* ── What an agent leaves behind ── */
+
+/* Small and unobtrusive: it answers "where did this card come from" for
+   somebody already looking at the card, and does not compete with the title
+   for somebody scanning the column. */
+.kb-card-agent {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+/* Inside a solid-colored card the theme's muted ink disappears, so both of
+   these follow the card's own ink like every other chip on it. */
+.kb-solid .kb-card-agent {
+  color: var(--kb-ink-soft);
+  border-color: var(--kb-ink-border);
+}
+
+.kb-comment-author {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--color-hover);
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
 }
