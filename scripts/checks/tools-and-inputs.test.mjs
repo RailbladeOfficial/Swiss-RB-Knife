@@ -554,6 +554,95 @@ test("the import warning only offers an undo where there is one", () => {
   );
 });
 
+/* KINDS AN EXPORT IS NOT EXPECTED TO CARRY, and why each one is not an
+   oversight:
+
+     draft      the half-typed state of a form. It belongs to the session rather
+                than to the records, and restoring somebody's abandoned
+                keystrokes on another machine is worse than dropping them.
+     settings   the tool's own preferences. An export moves what you MADE, not
+                how you like the tool arranged, and an import that quietly
+                rearranged the destination would be a surprise nobody asked for.
+     agents     connection tokens. Each one is a working key to a board, so
+                putting them in a file somebody might mail around is the one
+                thing this export must never do.
+
+   Anything else a tool writes has to be in its export. Auto-Backup's presets
+   were not, and an export therefore moved the folders you were backing up while
+   silently dropping the named sets you had saved. */
+const NOT_EXPORTED = ["draft", "settings", "agents"];
+
+test("an export carries every file its tool writes", () => {
+  /* Auto-Backup writes two files, the config and the saved presets, and its
+     export gathered only the first. Exporting on one machine and importing on
+     another therefore brought the folders you are backing up right now and
+     silently dropped the named sets you had saved, which is the half worth
+     moving. The import succeeded, so nothing said a word.
+
+     A tool's own load_tool_file/save_tool_file calls name the kinds it uses.
+     Every one of those has to appear inside its registerTransferable block, or
+     the export has a hole in it exactly like that one. */
+  const holes = [];
+
+  for (const file of filesUnder("src/tool", ".ts")) {
+    const text = read(file);
+    const at = text.indexOf("registerTransferable({");
+    if (at === -1) continue;
+
+    const id = /id:\s*"([a-z-]+)"/.exec(text.slice(at, at + 400))?.[1];
+    assert.ok(id, `${file} registers a transferable with no id`);
+
+    // The whole block, from the call to the line that closes it at column 0.
+    const end = text.indexOf("\n});", at);
+    assert.notEqual(end, -1, `${file}'s transferable block is not closed`);
+    const block = text.slice(at, end);
+
+    /* Every kind this tool WRITES. Matched as the toolId/kind pair that
+       save_tool_file takes, not on "kind:" alone: several tools have unrelated
+       fields by that name (a card's author kind, a budget row's kind) and
+       counting those would demand an export carry files that do not exist.
+       Reads are not enough either, or a legacy file a tool only migrates FROM
+       would look like something it still owns. */
+    const kindPair = /toolId:\s*"[a-z-]+"\s*,\s*kind:\s*"([a-z-]+)"/g;
+    const savePair =
+      /save_tool_file"[\s\S]{0,80}?toolId:\s*"[a-z-]+"\s*,\s*kind:\s*"([a-z-]+)"/g;
+
+    const kinds = new Set([...text.matchAll(savePair)].map((m) => m[1]));
+    for (const kind of NOT_EXPORTED) kinds.delete(kind);
+
+    /* A transferable may name its files, or gather from the tool's live state,
+       which is what the record-holding tools do. So a kind counts as covered
+       if the block names it OR the block reads no files at all, in which case
+       the records come from memory and only the exclusions above are at stake. */
+    const namesFiles = /load_tool_file|save_tool_file/.test(block);
+    if (!namesFiles) continue;
+
+    const covered = new Set([...block.matchAll(kindPair)].map((m) => m[1]));
+    for (const kind of kinds) {
+      if (!covered.has(kind)) holes.push(`${id} writes "${kind}" but never exports it`);
+    }
+  }
+
+  assert.deepEqual(holes, [], "these exports would lose data they were asked to carry");
+});
+
+test("a tool with nothing worth carrying stays out of the Data tab", () => {
+  /* RNGesus was in it and should not have been: its settings are six fields you
+     would retype in seconds, and the rest of what it held was a batch of random
+     numbers, which mean nothing outside the session that drew them. An export
+     that cannot say why you would restore it is a button that only invites
+     mistakes. If it comes back, this says so. */
+  const rng = read("src/tool/rng.ts");
+  assert.ok(
+    !rng.includes("registerTransferable"),
+    "RNGesus registers an export again; if that is deliberate, this test should go with it",
+  );
+  assert.ok(
+    !rng.includes("core/data-transfer"),
+    "RNGesus still imports the transfer module it no longer uses",
+  );
+});
+
 test("every file the app owns lives in a folder, not loose in the data root", () => {
   /* The data directory has a shape: app/ for the shell's own files, one folder
      per tool, and backups/ shared. A path with no slash in it would land loose

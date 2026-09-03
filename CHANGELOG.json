@@ -1,16 +1,113 @@
 [
   {
     "version": "0.7.0",
-    "date": "2026-09-01",
+    "date": "2026-09-04",
     "changes": {
       "features": {
-        
+        "App Overall": [
+          "Added right-click functionality app-wide and in every tool. Right click a thing, you can do things to that thing. I dunno why I didn't add this sooner.",
+          "Added View Modes in App Settings, allowing you to cycle through Standard, Spacious (hides the sidebar and top bar), and Fullscreen (like Spacious but also hides the Tool Header bar) for those who need more screen to work in.",
+          "You can also cycle View Modes by pressing F11 on your keyboard while in the app, as well as via right-click menus.",
+          "Added a Data tab to the App Settings modal where you can now export all your data as well as import all of it via JSON. No more going to %APPDATA%.",
+          "This tab also links directly to tools with additional unique import/export capabilities, like the CSV import in Time Tracker or Excel import in Game Stats.",
+          "New Theme Added - Liminal.",
+          "Added ability to set a sound to play on opening of modals, with volume control.",
+          "Added ability to set a sound to play on clicking of buttons, with volume control.",
+          "New Sound Pack Added - Ancient Forest.",
+          "New Sound Pack Added - Chipped.",
+          "New Sound Pack Added - Intergalactic.",
+          "New Sound Pack Added - Minimal.",
+          "New Sound Pack Added - Sleek."
+        ],
+        "Budget Tracker": [
+          "Added ability to Clone Entries.",
+          "Added ability to Split and Merge Entries.",
+          "Added ability to select multiple entries and perform Bulk Split, Merge, and Delete actions.",
+          "Added ability to Refund Entires, y'know, so you don't have to manually enter a negative Expense when you return your Amazons.",
+          "Added a Data Tab to the tool Setup modal where you can restore the tool from a backup."
+        ],
+        "Time Tracker": [
+          "Added ability to Clone Entries.",
+          "Added ability to create Break-in tasks, which allow you to more easily pivot in the middle of a task, or break apart an earlier task where you got diverted for half an hour by Becky from Accounting wanting to talk about which housewives are the REAL housewives.",
+          "Added ability to Merge Entries.",
+          "Added ability to select multiple entries and perform Bulk Split, Merge, and Delete actions.",
+          "Added last-update-of-the-hour style backups like the Budget Tracker has.",
+          "Added a Data Tab to the tool Setup modal where you can restore the tool from a backup."
+        ],
+        "Kanban": [
+          "Added new tool that gives you Kanban boards for tracking work, with cards you drag between columns.",
+          "Make as many boards as you want, each with its own columns, and give a board a background image with adjustable blur and brightness so you can tell them apart at a glance.",
+          "Columns can be renamed, reordered, collapsed, and given a work-in-progress limit that flags the column when you go over it rather than stopping you.",
+          "Mark a column as meaning done, and cards dropped into it get their Completed date stamped automatically.",
+          "Card descriptions and comments are proper Markdown with a formatting toolbar, and switch between writing and a rendered view.",
+          "Attach files to a card or to any individual comment. Images, video and audio play in the card; anything else opens in whatever program owns it. Ctrl+V pastes an image straight from the clipboard.",
+          "Open a card and it shows as something to read, with an edit button in the corner to switch to the fields. If you would rather skip that, there is an Open Cards in Edit Mode preference at both the tool and board level.",
+          "Cards open on a Basic tab, with Subtasks and Comments each getting their own tab so a long conversation does not bury the card itself.",
+          "Priority and Effort are both five levels plus unset, and you can rename every level and set its color in the tool's Setup, with a reset back to the defaults.",
+          "Tags live in categories, so you can have a Types category holding Bug and Feature, and a Versions category holding your releases, and filter on each independently.",
+          "A card's color can come from the card itself, from its tags, or from its priority, set per board and overridable on any single card.",
+          "Filter a board by text, by tags, and by due state. The text filter searches card numbers, titles, descriptions, comments and attachment filenames.",
+          "Stage dates track when a card started, went to testing, and finished. An Advance button stamps the next one with today, and every date stays directly editable, because the honest case is that work started Tuesday and you are filling the card in on Thursday.",
+          "Card Stats and Board Stats read off those dates, giving you lead and cycle times, how much is in flight, what is overdue, and what has been completed in the last week, month and all time.",
+          "Rearrange the blocks inside a card with the Card Layout editor, as a default and again per board if one board wants a different shape.",
+          "Nearly every board preference can be set once for the tool and then overridden on individual boards.",
+          "Boards, cards and their attachments are included in the app's snapshots and in the Data tab's export and import.",
+          "You can connect a local AI coding agent to a single board so it can read and change cards while you work in it, using Claude Code, OpenAI's Codex, or anything else that speaks MCP.",
+          "The agent talks to the app over a local pipe. Nothing is sent over the internet, and the app itself decides every request rather than trusting the agent to check.",
+          "Board Setup > Agents is where you switch it on, and every permission starts off. Grant only creating cards, or add editing, moving, tagging, dates, subtasks, comments, archiving, deleting and column changes as you need them.",
+          "Copy the connection straight into your agent's config with one button, and use Test Connection to confirm the whole thing works before you rely on it.",
+          "Every request an agent makes, allowed or refused, is listed in an activity log, and a refusal names the exact switch that would have allowed it.",
+          "Cards record who made them, and you can set a card's owner to yourself, to an agent, or to External for something somebody else asked you for.",
+          "One switch in the tool's Setup turns off every agent on every board at once."
+        ],
+        "Countdown Timer": [
+          "Added a customizable Display View that can run while the timer counts down."
+        ],
+        "Game Stats": [
+          "Added last-update-of-the-hour style backups like the Budget Tracker has.",
+          "Added a Data Tab to the tool Setup modal where you can restore the tool from a backup."
+        ],
+        "RNGesus": [
+          "Added a new tool that allows you to generate a batch of random numbers.",
+          "Customize criteria, hit Generate, and get a batch of up to 1,000 numbers at a time.",
+          "Shows as a grid, or in rows which can be deleted as you work through them"
+        ]
       },
       "improvements": {
-        
+        "App Overall": [
+          "Renamed the General Settings modal to App Settings",
+          "Added About modal link to Github. Should've had that there sooner, huh?",
+          "Generalized the Holiday Overrides feature and brought it out of the theme cycling feature, so you can still have automatic holiday overrides even if you just use one theme all the time.",
+          "Moved Notification Volume back into the Choose Sound Pack modal, and renamed it the Choose Notification Sound Pack modal.",
+          "Added option in Edit Home/Sidebar modal to enabling grouping of tools on Home and Sidebar by their new categories (that's right, tool categories are back baby).",
+          "Did some housecleaning / file reorganization in the src folder to keep things running more smoothly."
+        ],
+        "Time Tracker": [
+          "Added stats for Projects.",
+          "Made the Summary Panel tabbed like the Budget Tracker, being able to cycle between Totals and Stats for a more succinct view."
+        ],
+        "Countdown Timer": [
+          "Added a sound specific to the timer.",
+          "Added ability to use any sound the app has access to to fire when the timer ends.",
+          "Added options to change font style on the timer in both normal and Display Views."
+        ],
+        "Game Stats": [
+          "Migrated storage to an SQLite database to help the app run faster with large data sets, and support future advanced stats."
+        ]
       },
       "bugfixes": {
-        
+        "App Overall": [
+          "Theme Editor wasn't loading its basing theme properly."
+        ],
+        "Budget Tracker": [
+          "Reminder Day Number fields no longer show browser autofill dropdown."
+        ],
+        "Auto-Backup": [
+          "Reminder Day Number fields no longer show browser autofill dropdown."
+        ],
+        "Game Stats": [
+          "Fixed an issue where the tool like to resurrect deleted history."
+        ]
       }
     }
   },
@@ -179,7 +276,6 @@
         "Auto-Backup": [
           "Added ability to create a preset from the currently selected paths listed in the tool.",
           "Added validation to the Preset Name field."
-
         ]
       },
       "bugfixes": {
@@ -203,7 +299,7 @@
           "This happens once on app launch, and also once when you enable this setting (so you don't have to relaunch to check).",
           "If the version you're on is older than the latest released version, the top bar of the Home Page will indicate an update is available and link to the About modal.",
           "The button to launch the About modal will also pulsate to indicate that a newer version is available.",
-          "You can quickly get to the GitHub Releases Page from this notification in the About modal.", 
+          "You can quickly get to the GitHub Releases Page from this notification in the About modal.",
           "From the About Modal, you can also select to Ignore This Version if you want to skip updating this version, but still get future update available notifications.",
           "This feature is opt-in, off by default, and can be disabled at any time after enabling. No data ever leaves your device; this is a read-only check on GitHub for the sole purpose of checking the latest available Release.",
           "When a Random Theme is chosen, added button next to Reroll Theme to be able to save the randomly generated palette as a Custom Theme.",
@@ -277,12 +373,8 @@
     "version": "0.3.2",
     "date": "2026-07-10",
     "changes": {
-      "features": {
-        
-      },
-      "improvements": {
-        
-      },
+      "features": {},
+      "improvements": {},
       "bugfixes": {
         "App Overall": [
           "Various minor security fixes and improvements."
@@ -297,9 +389,7 @@
     "version": "0.3.1",
     "date": "2026-07-09",
     "changes": {
-      "features": {
-
-      },
+      "features": {},
       "improvements": {
         "Budget Tracker": [
           "Added automatic backups in the user's data folder that happen hourly in buckets."

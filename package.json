@@ -7,11 +7,12 @@
   "description": "A Multi-Tool Application.",
   "authors": "Railblade",
   "scripts": {
-    "predev": "node scripts/copy-public-docs.mjs && node scripts/generate-licenses.mjs && node scripts/generate-sound-manifest.mjs",
+    "predev": "node scripts/copy-public-docs.mjs && node scripts/generate-licenses.mjs && node scripts/generate-sound-manifest.mjs && node scripts/build-agent.mjs",
     "dev": "vite",
     "prebuild": "node scripts/copy-public-docs.mjs && node scripts/generate-licenses.mjs && node scripts/generate-sound-manifest.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "build:agent": "node scripts/build-agent.mjs --release",
     "tauri": "tauri",
     "test": "node --test \"scripts/checks/*.test.mjs\"",
     "test:rust": "cd src-tauri && cargo test --lib",

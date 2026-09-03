@@ -16,7 +16,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use chrono::{TimeZone, Utc};
+use chrono::{Local, TimeZone};
 // Manager is only referenced inside the #[cfg(not(debug_assertions))] branch of
 // get_data_path(): the compiler sees it as unused in debug builds and warns.
 // The allow suppresses that spurious warning without removing the import.
@@ -27,6 +27,7 @@ use argon2::{
     Argon2,
 };
 
+mod agent_gate;
 mod db;
 mod session_watch;
 mod tools;
@@ -554,9 +555,23 @@ pub(crate) const BACKUP_KEEP_COUNT: usize = 30;
 
 /// Folder-name format for backup snapshots: sorts correctly as plain strings
 /// (matches chronological order) and is readable in a file browser without
-/// translating a Unix timestamp. Always UTC, a snapshot taken at 2pm local
-/// won't necessarily show "14" here unless you're on UTC.
+/// translating a Unix timestamp. Rendered on the LOCAL clock, so a snapshot
+/// taken at 2pm shows "14" here.
 pub(crate) const BACKUP_FOLDER_FORMAT: &str = "%Y-%m-%d_%H-%M-%S";
+
+/// The house timestamp for anything named after the moment it was made, in
+/// LOCAL time: snapshot buckets, generated folders, log filenames.
+///
+/// Local rather than UTC because a name is read by the person who made it,
+/// next to the thing it names, so the only clock that means anything to them
+/// is the one on their wall. chrono::Local follows the system timezone,
+/// daylight saving included.
+///
+/// This is for NAMES. A moment recorded inside a data file stays a UTC
+/// instant, because that has to compare correctly against another one.
+pub(crate) fn file_timestamp() -> String {
+    Local::now().format(BACKUP_FOLDER_FORMAT).to_string()
+}
 
 /// Deletes all but the newest `keep` buckets in one tool's backups folder and
 /// returns what survived, oldest first.
@@ -657,8 +672,13 @@ fn snapshot_group(app: &tauri::AppHandle, tool_dir: &str, group_paths: &[PathBuf
         return;
     }
 
-    let bucket_start_secs = (Utc::now().timestamp() / BACKUP_MIN_INTERVAL_SECS) * BACKUP_MIN_INTERVAL_SECS;
-    let bucket_name = match Utc.timestamp_opt(bucket_start_secs, 0).single() {
+    // Bucketed on the LOCAL clock, so a bucket boundary lands on the hour the
+    // user sees. Rounding the epoch instead would drift off the local hour in a
+    // timezone whose offset is not a whole number of hours.
+    let now_local = Local::now();
+    let bucket_start_secs =
+        (now_local.timestamp() / BACKUP_MIN_INTERVAL_SECS) * BACKUP_MIN_INTERVAL_SECS;
+    let bucket_name = match Local.timestamp_opt(bucket_start_secs, 0).single() {
         Some(dt) => dt.format(BACKUP_FOLDER_FORMAT).to_string(),
         None => return,
     };
@@ -690,9 +710,13 @@ fn snapshot_group(app: &tauri::AppHandle, tool_dir: &str, group_paths: &[PathBuf
        answer changes, so it is the only place worth asking it. */
     if tool_dir == "kanban" {
         if let Some(oldest) = existing_buckets.first() {
+            // Bucket names are local wall-clock time, so they are read back as
+            // local. Reading them as UTC would move the cutoff by the whole
+            // timezone offset and drop attachments early.
             let cutoff = chrono::NaiveDateTime::parse_from_str(oldest, BACKUP_FOLDER_FORMAT)
                 .ok()
-                .map(|naive| naive.and_utc().timestamp().max(0) as u64)
+                .and_then(|naive| naive.and_local_timezone(Local).single())
+                .map(|dt| dt.timestamp().max(0) as u64)
                 .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs));
             if let Some(cutoff) = cutoff {
                 crate::tools::kanban::prune_kanban_attachment_store(&data_root(app), cutoff);
@@ -931,6 +955,10 @@ const TT_GROUP: &[&str] =
 
 const NO_SNAPSHOT: &[&str] = &[];
 
+/// Agent access stands alone: it names boards but holds none of their contents,
+/// so restoring it beside a board file would be restoring two unrelated things.
+const KANBAN_AGENTS_GROUP: &[&str] = &["kanban/kanban-agents.json"];
+
 fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
     let (name, empty, group) = match (tool_id, kind) {
         ("time-tracker", "settings") => {
@@ -944,6 +972,15 @@ fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
         ),
         ("budget", "settings") => ("budget/budget-settings.json", "{}", NO_SNAPSHOT),
         ("kanban", "settings") => ("kanban/kanban-settings.json", "{}", NO_SNAPSHOT),
+        /* AGENT ACCESS. Snapshotted, unlike the other preference files, because
+           losing it is not "set those switches again": the tokens in it are
+           pasted into agent configs elsewhere on the machine, and a lost file
+           silently breaks every one of them with no way to tell which. */
+        ("kanban", "agents") => (
+            "kanban/kanban-agents.json",
+            r#"{"enabled":false,"boards":{}}"#,
+            KANBAN_AGENTS_GROUP,
+        ),
         ("countdown", "data") => {
             ("countdown/countdown.json", r#"{"session":null,"log":[]}"#, NO_SNAPSHOT)
         }
@@ -1039,7 +1076,7 @@ pub(crate) struct ToolBackupFile {
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ToolBackup {
-    /// The snapshot folder's name: its UTC timestamp in BACKUP_FOLDER_FORMAT.
+    /// The snapshot folder's name: its local timestamp in BACKUP_FOLDER_FORMAT.
     pub(crate) name: String,
     pub(crate) files: Vec<ToolBackupFile>,
 }
@@ -1129,7 +1166,7 @@ fn read_tool_backup(
     fs::read_to_string(&path).map_err(|e| format!("Could not read that snapshot: {e}"))
 }
 
-/// Snapshot folder names are the UTC timestamp snapshot_group writes, so digits,
+/// Snapshot folder names are the local timestamp snapshot_group writes, so digits,
 /// dashes and one underscore. Same rule Kanban applies to the same names.
 pub(crate) fn valid_bucket_name(name: &str) -> bool {
     !name.is_empty()
@@ -1414,6 +1451,29 @@ pub fn run() {
             allow_asset_path(app.handle(), &data_root(app.handle()), true);
 
             session_watch::init(app.handle());
+
+            /* The door an AI agent knocks on, if the user has opened one for a
+               board. Started unconditionally: the gate itself checks, on every
+               single request, whether any board is open to an agent, so a
+               listening pipe with nothing enabled behind it grants nothing. */
+            agent_gate::init(app.handle());
+
+            /* A DEV BUILD SAYS SO IN ITS TITLE BAR.
+               ---------------------------------------------------------------
+               A dev build and an installed one are pixel-identical on screen,
+               and they are meant to be run side by side: they keep separate
+               data folders and listen on separate agent pipes precisely so
+               they can be. The cost of that is that a screenshot, a window
+               list or a taskbar entry cannot tell you which one you are
+               looking at, and a change checked in the wrong window reads as a
+               change that did not work.
+
+               Debug-only, so the installed app is untouched. */
+            #[cfg(debug_assertions)]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title("Swiss RB Knife (dev)");
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1513,6 +1573,12 @@ pub fn run() {
             tools::kanban::open_kanban_attachment,
             tools::kanban::kanban_attachments_exist,
             tools::kanban::revive_kanban_attachments,
+            // Kanban agent access
+            agent_gate::kanban_agent_reply,
+            agent_gate::kanban_agent_status,
+            agent_gate::kanban_agent_test_connection,
+            agent_gate::read_kanban_agent_log,
+            agent_gate::clear_kanban_agent_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

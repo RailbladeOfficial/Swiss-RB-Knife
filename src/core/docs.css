@@ -114,6 +114,15 @@
   flex: 1;
 }
 
+/* The release total, immediately left of the toggle. The date above it carries
+   flex:1, so this and the chevron are pushed to the right together and the
+   number reads as belonging to the control rather than to the date. */
+.changelog-version-count {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
 .changelog-toggle-btn {
   background: transparent;
   border: none;
@@ -177,6 +186,16 @@
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+/* Inherits the category's own color, at the weight of the text around it
+   rather than the heading's bold, so it reads as a quantity and not as part of
+   the word. */
+.changelog-category-count {
+  margin-left: 6px;
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
 }
 
 .changelog-category-header.features {

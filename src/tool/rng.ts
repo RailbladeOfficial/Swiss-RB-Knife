@@ -29,7 +29,6 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { registerTransferable } from "../core/data-transfer";
 import { flash, escapeHtml } from "../core/shell";
 import { attachMenuDelegated } from "../menu/menu";
 
@@ -674,30 +673,13 @@ export function initRNG(): void {
 }
 
 /* -----------------------------------------------------------------------------
-   EXPORT AND IMPORT
+   NO EXPORT AND IMPORT
    -----------------------------------------------------------------------------
-   Registered with the Data tab in App Settings, which owns the buttons. This
-   tool's records are still a JSON file, so its export IS that file's contents
-   and its import writes them straight back.
------------------------------------------------------------------------------ */
+   Deliberately absent from the Data tab, unlike every other tool.
 
-registerTransferable({
-  id: "rng",
-  label: "RNGesus",
-  gather: async () => JSON.parse(
-    await invoke<string>("load_tool_file", { toolId: "rng", kind: "data" }),
-  ),
-  apply: async (parsed) => {
-    if (parsed === null || typeof parsed !== "object") {
-      throw new Error("that file does not hold this tool's data");
-    }
-    await invoke("save_tool_file", {
-      toolId: "rng",
-      kind: "data",
-      data: JSON.stringify(parsed),
-    });
-    // Read back through the ordinary load, so every validator and default this
-    // tool applies on the way in is applied to an imported file too.
-    await loadStore();
-  },
-});
+   There is nothing here worth carrying between machines. The settings are six
+   fields you would retype in ten seconds, and the other half of what an export
+   would hold is `results`: a batch of random numbers, which are only meaningful
+   in the session that drew them. A tool that offers to back up its output has
+   to be able to say why you would restore it, and this one cannot.
+----------------------------------------------------------------------------- */

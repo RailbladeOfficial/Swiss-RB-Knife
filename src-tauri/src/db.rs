@@ -348,9 +348,10 @@ fn backups_root(app: &AppHandle) -> Option<std::path::PathBuf> {
 /// windows lib.rs uses for the JSON snapshots, so both kinds sit side by side
 /// in one folder and read as one history.
 fn current_bucket() -> String {
-    use chrono::{TimeZone, Utc};
-    let secs = (Utc::now().timestamp() / 3600) * 3600;
-    Utc.timestamp_opt(secs, 0)
+    use chrono::{Local, TimeZone};
+    let secs = (Local::now().timestamp() / 3600) * 3600;
+    Local
+        .timestamp_opt(secs, 0)
         .single()
         .map(|dt| dt.format(crate::BACKUP_FOLDER_FORMAT).to_string())
         .unwrap_or_else(|| "0000-00-00_00-00-00".to_string())
@@ -391,7 +392,7 @@ pub fn snapshot_if_due(app: &AppHandle) {
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DbBackup {
-    /// The bucket folder's name: a UTC timestamp in lib.rs's format.
+    /// The bucket folder's name: a local timestamp in lib.rs's format.
     name: String,
     bytes: u64,
 }

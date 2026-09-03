@@ -72,9 +72,29 @@ ureq = "2"
 # WTS session-notification API and a window subclass, neither of which Tauri's
 # window API exposes. Windows-only; this whole app already targets Windows
 # exclusively (elevated manifest, System32 paths throughout lib.rs).
+# The agent gate (see src/agent_gate.rs) adds the Security, Pipes and
+# Threading groups. It builds the named pipe's security descriptor by hand
+# because the DEFAULT one is unusable here: this app runs elevated, a kernel
+# object made by an elevated process carries that integrity level, and Windows
+# will not let a medium-integrity AI agent write to it. Setting the descriptor
+# is also what narrows the pipe to this one user account, where the default
+# would have admitted Administrators and SYSTEM as well.
 windows = { version = "0.61", features = [
     "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
     "Win32_System_RemoteDesktop",
+    "Win32_System_Threading",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Shell",
 ] }
+
+# The MCP sidecar. Its own crate rather than a second [[bin]] here, and that is
+# not tidiness: build.rs stamps this package's binaries with a
+# requireAdministrator manifest, so a sidecar built here would raise a UAC
+# prompt every single time an agent spawned it.
+[workspace]
+members = ["agent"]

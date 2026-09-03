@@ -32,6 +32,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { devError, devWarn, isDev } from "./dev-log";
+import { fileTimestamp } from "./timestamp";
 import { initDataTransfer, refreshDataTab } from "./data-transfer";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
@@ -2421,10 +2422,8 @@ saveRandomBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Human-readable timestamp: rng-YYYYMMDDHHMMSS (local, 24h, zero-padded).
-  const now = new Date();
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  const name = `rng-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  // The house name format: rng-YYYY-MM-DD_HH-MM-SS, local time.
+  const name = `rng-${fileTimestamp()}`;
   const newTheme: CustomTheme = {
     id: genThemeId(),
     name,

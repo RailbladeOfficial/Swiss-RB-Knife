@@ -896,27 +896,11 @@ fn run_backup_thread(
     // builds the real list from each destination thread's own result.
     let log_paths: Vec<String> = Vec::new();
 
-    // Get a local-time timestamp for the log filenames by asking PowerShell,
-    // which naturally uses the system timezone (including DST).
-    // This is called once at backup start so the overhead is negligible.
-    let timestamp = std::process::Command::new(crate::powershell_exe())
-        .args(["-NoProfile", "-NonInteractive", "-Command",
-               "Get-Date -Format 'yyyyMMddHHmmss'"])
-        .creation_flags(CREATE_NO_WINDOW)
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| s.len() == 14 && s.chars().all(|c| c.is_ascii_digit()))
-        .unwrap_or_else(|| {
-            // Fallback: UTC unix seconds if PowerShell is unavailable.
-            use std::time::{SystemTime, UNIX_EPOCH};
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs()
-                .to_string()
-        });
+    // The log filenames' timestamp, in the house format and the user's local
+    // time, taken once at backup start. This used to shell out to PowerShell's
+    // Get-Date for a local clock; chrono::Local reads the same system timezone,
+    // daylight saving included, without spawning a process.
+    let timestamp = crate::file_timestamp();
 
     /* ── PHASE 1: PREFLIGHT ────────────────────────────────────────────────
        List-only pass over every folder pair to compute the run's exact

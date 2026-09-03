@@ -590,6 +590,25 @@ async function loadChangelog(): Promise<void> {
     body.innerHTML = "";
 
     type ToolMap = Record<string, string | string[]>;
+
+    /* HOW MANY CHANGES, which is not how many keys.
+       ---------------------------------------------------------------------
+       A release is a map of category to tool to lines, and only the LINES are
+       changes: the tools are headings and the categories are headings above
+       those. Counting anything else would tell you a release with one line
+       spread over four tools was bigger than one with ten lines under a single
+       tool, which is backwards.
+
+       A tool's entry is allowed to be a bare string instead of an array, the
+       same shape the renderer below handles, so a single-line tool counts as
+       the one change it is rather than as its character length. */
+    const countEntries = (toolMap: ToolMap | undefined): number => {
+      if (!toolMap) return 0;
+      return Object.values(toolMap).reduce<number>(
+        (total, entries) => total + (Array.isArray(entries) ? entries.length : 1),
+        0,
+      );
+    };
     versions.forEach(
       (
         v: {
@@ -617,6 +636,18 @@ async function loadChangelog(): Promise<void> {
         vDate.className = "changelog-version-date";
         vDate.textContent = v.date;
 
+        /* Next to the toggle, so a collapsed release still says how much is
+           behind it and you can tell a point release from a big one without
+           opening every block in the list. */
+        const vCount = document.createElement("span");
+        vCount.className = "changelog-version-count";
+        const releaseTotal =
+          countEntries(v.changes.features) +
+          countEntries(v.changes.improvements) +
+          countEntries(v.changes.bugfixes);
+        vCount.textContent = `(${releaseTotal})`;
+        vCount.title = releaseTotal === 1 ? "1 change in this release" : `${releaseTotal} changes in this release`;
+
         const toggleBtn = document.createElement("button");
         toggleBtn.className = "changelog-toggle-btn";
         toggleBtn.setAttribute("aria-label", "Toggle version details");
@@ -627,6 +658,7 @@ async function loadChangelog(): Promise<void> {
 
         versionHeader.appendChild(vNum);
         versionHeader.appendChild(vDate);
+        versionHeader.appendChild(vCount);
         versionHeader.appendChild(toggleBtn);
         block.appendChild(versionHeader);
 
@@ -690,6 +722,13 @@ async function loadChangelog(): Promise<void> {
           const catHeader = document.createElement("div");
           catHeader.className = `changelog-category-header ${key}`;
           catHeader.textContent = label;
+
+          // Same rule as the release total: lines, not tools.
+          const catCount = document.createElement("span");
+          catCount.className = "changelog-category-count";
+          catCount.textContent = `(${countEntries(toolMap)})`;
+          catHeader.appendChild(catCount);
+
           cat.appendChild(catHeader);
 
           Object.entries(toolMap).forEach(([toolName, entries]) => {

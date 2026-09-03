@@ -15,12 +15,42 @@
    affect the modal around it.
 ============================================================================= */
 
+/* ONE SIZE FOR EVERY FACE OF EVERY FIELD, and it scales.
+   -----------------------------------------------------------------------------
+   The rendered face and the textarea you type in are the same text a moment
+   apart, so reading at one size and typing at another is the field
+   contradicting itself. So is a card whose comments are legible and whose
+   DESCRIPTION is not, when the description is the part carrying the detail you
+   opened the card for.
+
+   Both were true. The rendered face was a hard 13px, the textarea fell through
+   to the blanket `input, select, textarea { font-size: 1rem }` in shell.css,
+   and comments overrode the lot with 0.85rem of their own. The description was
+   the only one nobody had raised, so it stayed the smallest text in the card
+   while holding the most important words in it.
+
+   0.85rem is what the comments already used and what everything now uses. In
+   REM rather than px so App Settings > Font Size moves it: :root carries
+   `font-size: calc(20px + var(--font-scale) * 1px)`, making this 17px at the
+   default scale. Everything nested below is in em, so it stays in proportion
+   instead of needing its own copy of the sum. */
+:root {
+  --rt-font-size: 0.85rem;
+}
+
 .rt-body {
   color: var(--color-text);
-  font-size: 13px;
+  font-size: var(--rt-font-size);
   line-height: 1.5;
   /* A pasted URL or a wide code line must not stretch the modal. */
   overflow-wrap: anywhere;
+}
+
+/* The other face. Scoped to the editor so it cannot reach a textarea that
+   belongs to some other field. */
+.rt-editor textarea {
+  font-size: var(--rt-font-size);
+  line-height: 1.5;
 }
 
 .rt-body > *:first-child {
@@ -45,15 +75,15 @@
 }
 
 .rt-h1 {
-  font-size: 15px;
+  font-size: 1.154em;
 }
 
 .rt-h2 {
-  font-size: 14px;
+  font-size: 1.077em;
 }
 
 .rt-h3 {
-  font-size: 13px;
+  font-size: 1em;
   color: var(--color-text-muted);
 }
 

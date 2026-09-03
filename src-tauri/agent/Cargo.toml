@@ -1,0 +1,18 @@
+[package]
+name = "srbk-agent"
+version = "0.6.1"
+license = "AGPL-3.0-or-later"
+description = "Local agent bridge for Swiss RB Knife Kanban boards."
+authors = ["Railblade"]
+edition = "2021"
+
+[[bin]]
+name = "srbk-agent"
+path = "src/main.rs"
+
+# Deliberately tiny. This binary is spawned by an AI agent, holds no rules and
+# no data, and talks to the app over a local pipe using ordinary file I/O, so it
+# needs neither the windows crate nor any unsafe code.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

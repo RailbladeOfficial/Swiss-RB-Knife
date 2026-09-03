@@ -38,6 +38,7 @@ import { devError, flash, setSubNavHandler, shortPath, navigateToTool } from "..
 import { Modal, ModalTabs } from "../modal/modal";
 import { renderDbBackups } from "../core/db-backups";
 import { registerTransferable } from "../core/data-transfer";
+import { fileTimestamp } from "../core/timestamp";
 import { diffRows } from "../core/row-diff";
 import { attachMenu } from "../menu/menu";
 import {
@@ -1137,15 +1138,7 @@ async function downloadGameTemplate(count: number): Promise<void> {
       sheets.push({ name: `Game ${i}`, rows: templateGameRows(["Player 1", "Player 2", "Player 3"]) });
     }
     const bytes = buildWorkbook(sheets);
-    const now = new Date();
-    const timestamp = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0"),
-      String(now.getHours()).padStart(2, "0"),
-      String(now.getMinutes()).padStart(2, "0"),
-      String(now.getSeconds()).padStart(2, "0"),
-    ].join("-");
+    const timestamp = fileTimestamp();
     const path = await invoke<string>("write_game_stats_download", {
       filename: `five-crowns-game-log-template-${timestamp}.xlsx`,
       dataBase64: toBase64(bytes),

@@ -15,7 +15,6 @@
 
 use std::fs;
 use std::path::PathBuf;
-use chrono::Local;
 use serde::{Deserialize, Serialize};
 
 /* =============================================================================
@@ -255,7 +254,7 @@ pub fn dfg_generate_files(
         return Err(format!("Output directory does not exist: {}", base.display()));
     }
 
-    let timestamp   = Local::now().format("%Y-%m-%d-%H-%M-%S");
+    let timestamp   = crate::file_timestamp();
     let folder_name = format!("files-generated-{timestamp}");
     let root_path   = base.join(&folder_name);
     fs::create_dir_all(&root_path)

@@ -29,6 +29,7 @@ import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
 import { renderToolBackups, readToolBackup } from "../core/tool-backups";
 import { registerTransferable } from "../core/data-transfer";
+import { fileTimestamp } from "../core/timestamp";
 
 /* =============================================================================
    TYPES
@@ -1315,17 +1316,10 @@ function csvField(value: string): string {
 }
 
 async function exportCSV(): Promise<void> {
+  // One instant for both the filename and the header inside the file, so the
+  // two can never disagree by a second.
   const now = new Date();
-  const timestamp = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-    String(now.getHours()).padStart(2, "0"),
-    String(now.getMinutes()).padStart(2, "0"),
-    String(now.getSeconds()).padStart(2, "0"),
-  ].join("-");
-
-  const filename = `time-tracker-report-${timestamp}.csv`;
+  const filename = `time-tracker-report-${fileTimestamp(now)}.csv`;
 
   const visibleEntries = entries.filter((e) => {
     if (!viewStart && !viewEnd) return true;
@@ -1663,15 +1657,7 @@ function parseCsvImport(raw: string): CsvImportResult {
 
 async function downloadCsvTemplate(): Promise<void> {
   try {
-    const now = new Date();
-    const timestamp = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0"),
-      String(now.getHours()).padStart(2, "0"),
-      String(now.getMinutes()).padStart(2, "0"),
-      String(now.getSeconds()).padStart(2, "0"),
-    ].join("-");
+    const timestamp = fileTimestamp();
     const savedTo = await invoke<string>("export_csv", {
       filename: `time-tracker-import-template-${timestamp}.csv`,
       data: "Start Date,Start Time,End Date,End Time,Project,Activity,Notes",

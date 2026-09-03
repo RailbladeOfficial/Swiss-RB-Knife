@@ -38,6 +38,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { devError } from "./dev-log";
+import { fileTimestamp } from "./timestamp";
 
 /** What one tool needs in order to be exported and imported. */
 export interface Transferable {
@@ -157,8 +158,7 @@ function wire(): void {
 /** A filename that says what it is and when, so a folder of them is readable
  *  without opening any. */
 function suggestedName(tool: Transferable): string {
-  const day = new Date().toLocaleDateString("en-CA");
-  return `${tool.id}-${day}.json`;
+  return `${tool.id}-${fileTimestamp()}.json`;
 }
 
 /* THE FILE DIALOGS BELONG TO THE BACKEND, not to this module, and that is why

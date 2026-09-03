@@ -2968,23 +2968,62 @@ export async function initAutoBackup(): Promise<void> {
    and its import writes them straight back.
 ----------------------------------------------------------------------------- */
 
+/* THIS TOOL WRITES TWO FILES, and an export that carried one of them was an
+   export that silently lost the other. The config is the folders you are
+   backing up right now; the PRESETS are the named sets you saved, which is the
+   half worth carrying to another machine and the half that used to be dropped.
+
+   The presets ride along under a "presets" key beside the config's own fields
+   rather than in a new wrapper, so a file exported before this still imports:
+   it simply has no such key, and the tool keeps whatever presets it already
+   had. BackupConfig has no field of that name, so nothing collides.
+
+   The key is stripped before the config is written. Left in, it would put an
+   array into the config file that nothing there reads and nothing removes. */
+const PRESETS_EXPORT_KEY = "presets";
+
 registerTransferable({
   id: "auto-backup",
   label: "Auto-Backup",
-  gather: async () => JSON.parse(
-    await invoke<string>("load_tool_file", { toolId: "auto-backup", kind: "data" }),
-  ),
+  gather: async () => {
+    const config = JSON.parse(
+      await invoke<string>("load_tool_file", { toolId: "auto-backup", kind: "data" }),
+    );
+    const saved = JSON.parse(
+      await invoke<string>("load_tool_file", { toolId: "auto-backup", kind: "presets" }),
+    );
+    return { ...config, [PRESETS_EXPORT_KEY]: Array.isArray(saved) ? saved : [] };
+  },
   apply: async (parsed) => {
     if (parsed === null || typeof parsed !== "object") {
       throw new Error("that file does not hold this tool's data");
     }
+
+    const { [PRESETS_EXPORT_KEY]: exportedPresets, ...config } = parsed as Record<string, unknown>;
+
     await invoke("save_tool_file", {
       toolId: "auto-backup",
       kind: "data",
-      data: JSON.stringify(parsed),
+      data: JSON.stringify(config),
     });
-    // Read back through the ordinary load, so every validator and default this
-    // tool applies on the way in is applied to an imported file too.
+
+    // Only when the file actually carried them. An older export has no key, and
+    // wiping the presets already on this machine because the file predates them
+    // would be the same bug in the other direction.
+    if (Array.isArray(exportedPresets)) {
+      await invoke("save_tool_file", {
+        toolId: "auto-backup",
+        kind: "presets",
+        data: JSON.stringify(exportedPresets),
+      });
+    }
+
+    // Read back through the ordinary loads, so every validator and default this
+    // tool applies on the way in is applied to an imported file too. loadPresets
+    // is what sanitizes them, so a malformed preset in the file is dropped here
+    // rather than reaching the screen.
     await loadConfig();
+    await loadPresets();
+    renderPresetList();
   },
 });

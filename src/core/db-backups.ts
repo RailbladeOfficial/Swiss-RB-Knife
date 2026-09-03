@@ -25,25 +25,18 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
+import { formatFileTimestamp } from "./timestamp";
 
 export interface DbBackup {
-  /** The snapshot folder's name, a UTC timestamp. */
+  /** The snapshot folder's name, a local-time timestamp in the house format. */
   name: string;
   bytes: number;
 }
 
-/** A snapshot folder name ("2026-09-01_14-00-00") as local date and time. The
- *  name is UTC, so it is parsed as UTC and shown in local time; doing it by
- *  string surgery would show someone three time zones over the wrong hour with
- *  no way to tell. */
-export function formatSnapshotName(name: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/.exec(name);
-  if (!m) return name;
-  const date = new Date(
-    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6])),
-  );
-  return Number.isNaN(date.getTime()) ? name : date.toLocaleString();
-}
+/** A snapshot folder name ("2026-09-01_14-00-00") as a readable date and time.
+ *  One implementation, shared with the tool snapshot list, which had grown an
+ *  identical copy of it. */
+export const formatSnapshotName = formatFileTimestamp;
 
 export function formatSnapshotBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

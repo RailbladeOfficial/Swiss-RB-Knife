@@ -81,3 +81,11 @@ src-tauri/gen/schemas
 # Windows junk
 Thumbs.db
 Desktop.ini
+# Local working notes (see dev/ for the checklist and standards docs)
+/dev
+# Temporary storage for supporting files that help guide development goals
+/demo
+
+# Built by scripts/build-agent.mjs for Tauri's externalBin. A build artifact of
+# the src-tauri/agent crate, not a checked-in binary.
+/src-tauri/binaries

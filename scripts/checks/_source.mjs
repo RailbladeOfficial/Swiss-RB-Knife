@@ -18,7 +18,23 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-export const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
+/**
+ * One source file, as text, with LINE ENDINGS NORMALIZED TO \n.
+ *
+ * The normalization is not tidiness. .gitattributes sets `text=auto`, so git
+ * stores LF and checks out CRLF on Windows, which is what every one of these
+ * checks is actually reading. A check that looks for a literal "\n}\n" to find
+ * the end of a function then matches nothing, silently slices to the end of the
+ * file, and asserts against every other function in it.
+ *
+ * That is not hypothetical: it is what made two of the migration checks fail on
+ * a clean Windows checkout while the code they were reading was correct, and it
+ * would have gone on producing failures nobody could reproduce on macOS or
+ * Linux. Doing it here rather than in each caller means a check can be written
+ * the obvious way and still be right on both platforms.
+ */
+export const read = (rel) =>
+  fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 export const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
 
 /** The chunk of a source file between `startMarker` and the next `endMarker`.

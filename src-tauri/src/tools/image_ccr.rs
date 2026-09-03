@@ -51,11 +51,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x08000000;
-
 // =============================================================================
 //  SHARED STRUCTS
 // =============================================================================
@@ -979,25 +974,10 @@ fn resize_images_thread(
             .or_else(|| image_paths.first().and_then(|p| p.parent().map(|d| d.to_path_buf())))
             .unwrap_or_else(|| PathBuf::from("."));
 
-        // Use PowerShell to get a local-time timestamp matching the format used
-        // elsewhere in the app (auto-backup log filenames, etc.): YYYYMMDDHHMMSS.
-        let timestamp = std::process::Command::new(crate::powershell_exe())
-            .args(["-NoProfile", "-NonInteractive", "-Command",
-                   "Get-Date -Format 'yyyyMMddHHmmss'"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .ok()
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .map(|s| s.trim().to_string())
-            .filter(|s| s.len() == 14 && s.chars().all(|c| c.is_ascii_digit()))
-            .unwrap_or_else(|| {
-                // Fallback: UTC unix seconds if PowerShell is unavailable
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0)
-                    .to_string()
-            });
+        // The house name format, local time, same helper every other generated
+        // name in the app uses. This used to shell out to PowerShell's Get-Date
+        // for a local clock; chrono::Local reads the same system timezone.
+        let timestamp = crate::file_timestamp();
         base_dir.join(format!("resized-{timestamp}"))
     };
 
