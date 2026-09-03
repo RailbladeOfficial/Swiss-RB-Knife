@@ -1834,11 +1834,25 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
    column and can grow down it without moving anything else.
 ----------------------------------------------------------------------------- */
 
+/* TWO EVEN HALVES, not content-sized. Flex sized the properties column to its
+   widest value, so where Tags began moved with whatever board or column name
+   the card happened to carry: the same modal looked different card to card.
+   A 1fr 1fr grid fixes the split, and the gap puts Tags a little past the
+   midline rather than exactly on it. */
 .kb-card-props {
-  display: flex;
-  align-items: flex-start;
-  gap: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: 24px;
   margin-bottom: 16px;
+}
+
+/* One column under a narrow window, where two halves of a modal are two halves
+   of nothing. Tags go below rather than beside. */
+@media (max-width: 640px) {
+  .kb-card-props {
+    grid-template-columns: 1fr;
+  }
 }
 
 .kb-card-prop-col {
@@ -1848,10 +1862,10 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   min-width: 0;
 }
 
-/* Tags take the slack, so a card with twenty of them wraps inside its own
-   column instead of stretching the modal. */
+/* Nothing to say about width any more: the grid gives it exactly half. Kept as
+   a hook so the tag column can be found without counting children. */
 .kb-card-prop-tags {
-  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .kb-card-prop {
