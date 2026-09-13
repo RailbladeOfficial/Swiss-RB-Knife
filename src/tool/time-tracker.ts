@@ -28,7 +28,6 @@ import { flash, devError, shortPath, navigateToTool } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
 import { renderToolBackups, readToolBackup } from "../core/tool-backups";
-import { registerTransferable } from "../core/data-transfer";
 import { newId } from "../core/ids";
 import {
   loadToolJson,
@@ -3214,61 +3213,6 @@ interface TimeTrackerExport {
   projects: Project[];
   settings: Partial<TTSettings>;
 }
-
-registerTransferable({
-  id: "time-tracker",
-  snapshots: true,
-  label: "Time Tracker",
-  summary: () => `${entries.length} entries · ${activities.length} activities`,
-  otherFormats: {
-    // Navigates to the tool first. Its Setup modal belongs to a screen, and
-    // opening it from App Settings would leave it floating over whatever tool
-    // happened to be showing.
-    label: "CSV import and export",
-    open: () => {
-      navigateToTool("tracking", "time-tracker");
-      openTTSetupOnTab("preferences");
-    },
-  },
-  gather: async () => ({
-    entries: entries.map(entryToRow),
-    activities,
-    projects,
-    settings: {
-      quickDelete: settings.quickDelete,
-      roundNowToMinute: settings.roundNowToMinute,
-      payPeriod: settings.payPeriod,
-      breakInUseMinutes: settings.breakInUseMinutes,
-    },
-  }),
-  apply: async (parsed) => {
-    const payload = parsed as Partial<TimeTrackerExport> | null;
-    if (!payload || !Array.isArray(payload.entries)) {
-      throw new Error("that file does not hold a list of entries");
-    }
-    // Checked on the way in, as a load is: a hand-edited export is outside
-    // input, and this is the one path where it reaches the app.
-    const rows = payload.entries.filter(isStoredEntry).map(entryToRow);
-    await invoke("save_tool_file", {
-      toolId: "time-tracker",
-      kind: "data",
-      data: JSON.stringify(rows),
-    });
-
-    if (Array.isArray(payload.activities)) activities = payload.activities.filter(isValidActivity);
-    if (Array.isArray(payload.projects)) projects = payload.projects.filter(isValidProject);
-    if (payload.settings && typeof payload.settings === "object") {
-      settings = { ...settings, ...payload.settings };
-    }
-    saveSettings();
-
-    // Re-read rather than trusting what was just sent: the round trip is the
-    // same one a launch makes.
-    await loadFromDisk();
-    renderCurrentView();
-  },
-});
-
 function openTTSetupOnTab(tab?: TTSetupTab): void {
   if (tab) ttSetupTabs.select(tab);
   getTTSetupModal().open();

@@ -91,6 +91,16 @@ windows = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Shell",
 ] }
+# Whole-data-folder export and import (see src/data_archive.rs). Default
+# features drag in bzip2, zstd, lzma, AES encryption and a time crate; a backup
+# of this app's own folder needs exactly one compression method, and `deflate`
+# is the one every unzip tool on earth already reads, so the archive stays
+# openable by hand. That matters more than a few percent of size here: the
+# whole point of shipping a plain .zip rather than a bespoke format is that the
+# user can verify what is in it without this app.
+#
+# Pure Rust either way, so no C toolchain is added to the build.
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # The MCP sidecar. Its own crate rather than a second [[bin]] here, and that is
 # not tidiness: build.rs stamps this package's binaries with a

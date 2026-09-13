@@ -37,7 +37,6 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { devError, flash, setSubNavHandler, shortPath, navigateToTool } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { renderDbBackups } from "../core/db-backups";
-import { registerTransferable } from "../core/data-transfer";
 import { loadToolJson, saveToolJson, saveToolText, unblockAfterReplacement } from "../core/tool-store";
 import { newId } from "../core/ids";
 import { fileTimestamp } from "../core/timestamp";
@@ -744,51 +743,6 @@ async function refreshGsBackups(): Promise<void> {
    mean anything together: a game names its players by id, so a set of games
    without the profiles they point at is a history of matches between nobody.
 ----------------------------------------------------------------------------- */
-
-registerTransferable({
-  id: "game-stats",
-  label: "Game Stats",
-  snapshots: true,
-  summary: () => `${games.length} games · ${profiles.length} profiles`,
-  otherFormats: {
-    // Navigates to the tool first; see the note on Time Tracker's.
-    label: "Spreadsheet import and export",
-    open: () => {
-      navigateToTool("tracking", "game-stats");
-      openGsSetupOnTab("preferences");
-    },
-  },
-  gather: async () => ({ games, profiles, tables, settings }),
-  apply: async (parsed) => {
-    const payload = parsed as Partial<GameStatsData> | null;
-    if (!payload || !Array.isArray(payload.games)) {
-      throw new Error("that file does not hold a list of games");
-    }
-    const rows = payload.games
-      .filter((g): g is GameInstance => !!g && typeof g === "object" && typeof g.id === "string")
-      .map(gameToRow);
-
-    await invoke("gs_replace_all", {
-      games: rows,
-      profiles: Array.isArray(payload.profiles) ? payload.profiles : [],
-      tables: Array.isArray(payload.tables) ? payload.tables : [],
-    });
-    await invoke("save_tool_file", {
-      toolId: "game-stats",
-      kind: "settings",
-      data: JSON.stringify({ ...DEFAULT_SETTINGS, ...payload.settings }),
-    });
-
-    // Re-read rather than trusting what was just sent: the round trip is the
-    // same one a launch makes, so anything it would repair is repaired here.
-    await loadFromDisk();
-    renderProfilesList();
-    renderTablesList();
-    refreshProfileDatalist();
-    renderHomeDashboard();
-  },
-});
-
 function openGsSetupOnTab(tab?: GsSetupTab): void {
   if (tab) gsSetupTabs.select(tab);
   // Read on the way in rather than on tab switch, so the Data tab is never the

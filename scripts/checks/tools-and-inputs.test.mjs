@@ -370,28 +370,323 @@ test("there is one base64 codec, not one per tool", () => {
   );
 });
 
-test("every tool that keeps user data writes it without leaving a half-file", () => {
-  // atomic_write and backed_up_write_group both write through a temp file and
-  // rename. A bare fs::write to a data-directory path does not, and an install
-  // that force-terminates the app mid-write (which is how Windows upgrades one)
-  // leaves a truncated file where the data was.
+/* -----------------------------------------------------------------------------
+   Which writes have to be atomic, and how this check decides.
+
+   Must be atomic: anything under the app's data root that the app reads back.
+   Need not be: exports into Downloads or a folder the user picked, files staged
+   under a temp name, append-only log sinks, and snapshot .bak copies.
+
+   The check used to recognize a safe write by the NAME of the variable being
+   written to, with "path" and "p" on the skip list. Those are the two most
+   generic names in the codebase, so two correct writes passed for the wrong
+   reason and a data-file write spelled fs::write(&path, ...) would have passed
+   with them. It also only looked at fs::write, which is one of the four ways
+   this codebase writes a file.
+
+   So it resolves the DESTINATION instead: follow the let-bindings back through
+   the enclosing function and see where the path came from.
+----------------------------------------------------------------------------- */
+
+/** Where a path can come from and still be exempt: the user asked for the file
+ *  and a torn one is remade by pressing the button again. */
+const USER_CHOSEN = /\b(download_dir|desktop_dir|document_dir|home_dir|current_dir|temp_dir|output_dir|target_dir)\b/;
+/** Where a path coming from means the app reads that file back, so a torn one
+ *  is lost data rather than an inconvenience. */
+const APP_DATA = /\b(get_data_path|data_root|tool_file|attach_root|board_attach_dir|store_dir|backups_dir|snapshot_dir)\b/;
+/** A staging name nothing points at. The file is renamed or deleted before
+ *  anything reads it, which is the whole reason it carries this suffix. */
+const STAGING_NAME = /\.(tmp|part)\b|\.tmp-/;
+
+/** Sites that are deliberately not atomic, each with the reason written down.
+ *  Keyed by the function they live in, so a NEW write in the same file is still
+ *  checked rather than inheriting an exemption it was not granted. */
+const DELIBERATE = new Map([
+  ["src-tauri/src/lib.rs:atomic_write", "this IS the mechanism"],
+  ["src-tauri/src/lib.rs:atomic_copy", "this IS the mechanism"],
+  ["src-tauri/src/lib.rs:snapshot_group", "a torn .bak costs one bucket and is not a torn data file; routing it through the atomic helper would mean snapshotting a snapshot"],
+  ["src-tauri/src/tools/kanban.rs:retire_attachment", "documented: if the copy fails it deletes anyway, on the reasoning that an undeletable card is worse than an unrecoverable file"],
+  ["src-tauri/src/data_archive.rs:restart_for_import", "a five-byte sentinel in the STAGING folder, not the data folder. It is only ever tested for existence, and a torn one fails the safe way: no marker means no swap, which is the same answer as not having asked for one"],
+  ["src-tauri/src/data_archive.rs:write_archive", "writes to the temp name its caller staged (export_app_data builds a .tmp-<pid> beside the destination and renames it into place), and the destination itself came from a save dialog rather than the data folder"],
+  ["src-tauri/src/data_archive.rs:unpack", "writes into the staging folder, not the data folder. Nothing reads a staged import until the swap on the next launch, and a failed unpack deletes the whole folder rather than leaving part of one, so a torn file inside it can never be read"],
+]);
+
+/** Blanks out comments, so the doc comment ON atomic_write (which names
+ *  fs::write to say not to use it) is not read as a call to it. */
+function stripComments(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, (b) => b.replace(/[^\n]/g, " "))
+    .replace(/\/\/[^\n]*/g, (b) => b.replace(/[^\n]/g, " "));
+}
+
+/** Drops #[cfg(test)] mod blocks. A test writing a fixture is not a write path
+ *  the app takes, and the fixtures deliberately live in the temp directory. */
+function stripTestMods(text) {
+  let out = text;
+  for (;;) {
+    const at = out.search(/#\[cfg\(test\)\]\s*mod\s+\w+\s*\{/);
+    if (at < 0) return out;
+    let i = out.indexOf("{", at);
+    let depth = 0;
+    for (; i < out.length; i++) {
+      if (out[i] === "{") depth++;
+      else if (out[i] === "}" && --depth === 0) break;
+    }
+    out = out.slice(0, at) + out.slice(at, i + 1).replace(/[^\n]/g, " ") + out.slice(i + 1);
+  }
+}
+
+/** The function a byte offset sits inside: its name, and where its body starts.
+ *  Used both to look the site up in the exemption list and to bound the search
+ *  for let-bindings, so a name in one function cannot answer for another. */
+function enclosingFn(text, index) {
+  const decl = /^[ \t]*(?:pub(?:\([a-z()]+\))?\s+)?(?:async\s+)?fn\s+(\w+)/gm;
+  let found = { name: "", start: 0 };
+  for (const m of text.matchAll(decl)) {
+    if (m.index > index) break;
+    found = { name: m[1], start: m.index };
+  }
+  return found;
+}
+
+/** The arguments of a call, split on top-level commas. `text` starts just after
+ *  the opening parenthesis. */
+function callArgs(text) {
+  const args = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if ("([{".includes(c)) depth++;
+    else if (")]}".includes(c)) {
+      if (c === ")" && depth === 0) { args.push(text.slice(start, i)); return args; }
+      depth--;
+    } else if (c === "," && depth === 0) { args.push(text.slice(start, i)); start = i + 1; }
+  }
+  return args;
+}
+
+/** Everything the destination expression is built out of: the expression, plus
+ *  the right-hand side of every let-binding it reaches, four hops deep. Four is
+ *  enough for the longest chain in the app (a generated file's folder, which
+ *  goes target_dir to root_path to base to download_dir) and stops a cycle. */
+function provenance(fnBody, expr) {
+  let seen = expr;
+  const done = new Set();
+  for (let hop = 0; hop < 4; hop++) {
+    let grew = false;
+    for (const name of new Set([...seen.matchAll(/\b([a-z_][a-z0-9_]*)\b/g)].map((m) => m[1]))) {
+      if (done.has(name)) continue;
+      done.add(name);
+      const let_ = new RegExp(
+        String.raw`\blet\s+(?:mut\s+)?` + name + String.raw`\b[^=;]*=([\s\S]*?);\s*\n`,
+      );
+      const m = let_.exec(fnBody);
+      if (m) { seen += "\n" + m[1]; grew = true; }
+    }
+    if (!grew) break;
+  }
+  return seen;
+}
+
+test("every write into the app's data folder goes through the atomic helpers", () => {
   const offenders = [];
   for (const file of filesUnder("src-tauri/src", ".rs")) {
-    const text = read(file);
-    for (const m of text.matchAll(/fs::write\(&?(\w+)/g)) {
-      const target = m[1];
-      // Temporaries, staging files and export destinations are not the app's
-      // own data files; each is named for what it is.
-      if (/^(temp|tmp|out|dest|path|file_path|src|sealed|sealed2|p)$/.test(target)) continue;
-      // The snapshot copy itself. A torn .bak costs one bucket and is not a
-      // torn data file, which is the thing the atomic helper exists to stop;
-      // routing it through that helper would also mean snapshotting a snapshot.
-      if (target === "snapshot_dir") continue;
-      const line = text.slice(0, m.index).split("\n").length;
-      offenders.push(`${file}:${line} fs::write(${target})`);
+    const text = stripTestMods(stripComments(read(file)));
+
+    const sites = [];
+    // fs::write(dest, bytes)
+    for (const m of text.matchAll(/fs::write\(/g)) {
+      sites.push({ index: m.index, kind: "fs::write", dest: callArgs(text.slice(m.index + m[0].length))[0] ?? "" });
+    }
+    // fs::copy(source, dest): the SECOND argument is where the file lands.
+    for (const m of text.matchAll(/fs::copy\(/g)) {
+      sites.push({ index: m.index, kind: "fs::copy", dest: callArgs(text.slice(m.index + m[0].length))[1] ?? "" });
+    }
+    // File::create(dest), the way a write that never touches fs::write starts.
+    for (const m of text.matchAll(/File::create\(/g)) {
+      sites.push({ index: m.index, kind: "File::create", dest: callArgs(text.slice(m.index + m[0].length))[0] ?? "" });
+    }
+    // OpenOptions::new()...open(dest). An append-only sink is a log, not a
+    // save: it adds lines to a file nothing rewrites, and the atomic helper
+    // (which replaces a whole file) is the wrong tool for one.
+    for (const m of text.matchAll(/OpenOptions::new\(\)([\s\S]{0,400}?)\.open\(/g)) {
+      if (/\.append\(true\)/.test(m[1])) continue;
+      if (/\.read\(true\)/.test(m[1])) continue; // opening something to read it
+      sites.push({ index: m.index, kind: "OpenOptions", dest: callArgs(text.slice(m.index + m[0].length))[0] ?? "" });
+    }
+
+    for (const site of sites) {
+      const fn = enclosingFn(text, site.index);
+      if (DELIBERATE.has(`${file}:${fn.name}`)) continue;
+      const line = text.slice(0, site.index).split("\n").length;
+      const where = provenance(text.slice(fn.start, site.index), site.dest);
+      if (STAGING_NAME.test(where)) continue;
+      if (USER_CHOSEN.test(where)) continue;
+      if (APP_DATA.test(where)) {
+        offenders.push(`${file}:${line} ${site.kind} lands in the data folder without atomic_write/atomic_copy`);
+      } else {
+        // Fail closed. A destination that cannot be traced to either side is
+        // the case this check exists for: it is how the next unsafe write
+        // arrives, and saying nothing about it is how the old check let one in.
+        offenders.push(`${file}:${line} ${site.kind}(${site.dest.trim()}) writes somewhere this check cannot place`);
+      }
     }
   }
-  assert.deepEqual(offenders, [], "these write a data file without the atomic helper");
+  assert.deepEqual(offenders, [], "these write a file without the atomic helper, or somewhere unprovable");
+});
+
+test("a tool reads its own files through the store, not by hand", () => {
+  /* The store is what tells "there is no file" apart from "the file is there
+     and I could not read it", and what stops the second case being saved over.
+     A tool that calls the commands itself gets neither, and the failure is
+     silent: the tool opens empty and the first edit writes that emptiness to
+     disk. There is no screen on which that looks like anything but a tool that
+     forgot everything.
+
+     core/tool-store.ts is the one place allowed to name the commands, because
+     it is the thing being described. */
+  const strays = [];
+  for (const file of [...filesUnder("src/tool", ".ts"), ...filesUnder("src/core", ".ts")]) {
+    if (file === "src/core/tool-store.ts") continue;
+    const text = read(file);
+    for (const m of text.matchAll(/invoke[^\n]*"(load_tool_file|save_tool_file)"/g)) {
+      const line = text.slice(0, m.index).split("\n").length;
+      strays.push(`${file}:${line} calls ${m[1]} directly`);
+    }
+  }
+  assert.deepEqual(strays, [], "these bypass core/tool-store.ts");
+});
+
+test("a failed load blocks the save rather than only warning about it", () => {
+  /* A banner on a tool that otherwise behaves normally does not save anything:
+     the first edit still writes. The refusal is the mechanism, so these are the
+     parts of it that have to still be there. */
+  const store = read("src/core/tool-store.ts");
+
+  // A parse failure is a block, not a shrug. Both load paths route into it.
+  assert.match(store, /export async function loadToolJson/, "there is no shared JSON load");
+  const loadJson = slice("src/core/tool-store.ts", "export async function loadToolJson", "\n}");
+  assert.match(loadJson, /throw await block\(/, "a parse failure does not block the file");
+
+  // And the save actually refuses.
+  const save = slice("src/core/tool-store.ts", "export async function saveToolText", "\n}");
+  assert.match(save, /blocked\.get\(/, "the save does not check the block");
+  assert.match(save, /throw new Error\(/, "the save does not refuse, it only reports");
+
+  /* Kanban keeps its own load/save commands for boards, so the store's block
+     does not reach them and it carries the same rule itself, per file. */
+  const kb = read("src/tool/kanban.ts");
+  assert.match(kb, /const unreadableFiles = new Set<string>\(\)/, "Kanban tracks no unreadable files");
+  const writeDirty = slice("src/tool/kanban.ts", "async function writeDirty", "\n}");
+  for (const [what, why] of [
+    ['skipWrite("index"', "the board list"],
+    ["skipWrite(id,", "a board's own file"],
+  ]) {
+    assert.ok(writeDirty.includes(what), `Kanban writes ${why} without checking whether it read it`);
+  }
+});
+
+test("a data folder from a newer build is refused, not written to", () => {
+  /* One stamp for the folder, not a version key in each file: three of the data
+     files are a bare list or a bare null at the top level, and a list cannot
+     carry a key. The point of the stamp is not migrating (migrations key on what
+     they find) but being able to say NO: every file in a newer folder still
+     parses, the fields this build does not know are dropped on the way in, and
+     the first save writes the folder back without them. */
+  const lib = read("src-tauri/src/lib.rs");
+  assert.match(lib, /const DATA_SCHEMA_VERSION: u32/, "the folder has no version to compare");
+
+  /* Decided in setup() before anything reads OR MOVES a file. Ahead of the
+     layout migration, because rearranging a folder written by a newer build is
+     the thing being prevented; and ahead of the front end, which would put a
+     round trip between the app starting and the answer, with every tool loading
+     in the gap. */
+  const setup = slice("src-tauri/src/lib.rs", ".setup(|app|", "app.manage(DataFolderVerdict");
+  const judgeAt = setup.indexOf("judge_data_folder(");
+  const freezeAt = setup.indexOf("set_data_frozen(");
+  const migrateAt = setup.indexOf("migrate_data_layout(");
+  const stampAt = setup.indexOf("stamp_data_folder(");
+  assert.ok(judgeAt !== -1, "nothing judges the data folder at startup");
+  assert.ok(freezeAt > judgeAt, "the freeze is set before the folder is judged");
+  assert.ok(migrateAt > freezeAt, "the folder is migrated before it is judged");
+  assert.ok(stampAt > migrateAt, "the folder is stamped before it is migrated");
+
+  /* Judging must not write: it would destroy the evidence it runs on. */
+  const judge = slice("src-tauri/src/lib.rs", "fn judge_data_folder", "\n}\n");
+  assert.ok(!/atomic_write|fs::write/.test(judge), "the compatibility check writes to the folder");
+
+  /* THE FREEZE IS ENFORCED IN RUST, at the places every write has to pass
+     through, not at the front-end call sites that remembered to ask. The front
+     end refuses too, and that is what produces a message worth reading, but on
+     its own it would miss the database, the shell's own files, every delete and
+     every snapshot restore. */
+  for (const [what, where] of [
+    ["atomic_write", slice("src-tauri/src/lib.rs", "pub(crate) fn atomic_write", "\n}")],
+    ["atomic_copy", slice("src-tauri/src/lib.rs", "pub(crate) fn atomic_copy", "\n}")],
+  ]) {
+    assert.match(where, /deny_if_frozen\(\)\?/, `${what} writes even when the folder is frozen`);
+  }
+  // The database never goes near atomic_write, so it is refused at the engine.
+  const withDb = slice("src-tauri/src/db.rs", "pub fn with_db<T>", "\n}");
+  assert.match(withDb, /query_only/, "a frozen folder's database is still writable");
+  assert.match(withDb, /data_is_frozen\(\)/, "the database does not ask about the freeze");
+
+  /* A command that DELETES passes through none of those, so each is guarded by
+     hand. A new one belongs on this list. */
+  const deleters = [
+    ["src-tauri/src/tools/kanban.rs", "delete_kanban_board"],
+    ["src-tauri/src/tools/kanban.rs", "delete_kanban_board_attachments"],
+    ["src-tauri/src/tools/kanban.rs", "delete_kanban_image"],
+    ["src-tauri/src/tools/kanban.rs", "delete_kanban_attachment"],
+    ["src-tauri/src/tools/kanban.rs", "sweep_kanban_attachments"],
+    ["src-tauri/src/agent_gate.rs", "clear_kanban_agent_log"],
+    ["src-tauri/src/lib.rs", "clear_lock_hash"],
+    ["src-tauri/src/tools/budget.rs", "budget_enable_encryption"],
+    ["src-tauri/src/tools/budget.rs", "budget_disable_encryption"],
+    ["src-tauri/src/tools/budget.rs", "restore_budget_backup"],
+    ["src-tauri/src/db.rs", "restore_db_backup"],
+  ];
+  const unguarded = [];
+  for (const [file, fn] of deleters) {
+    const body = slice(file, `fn ${fn}(`, "\n}");
+    if (!/deny_if_frozen\(\)\?/.test(body)) unguarded.push(`${file}: ${fn}`);
+  }
+  assert.deepEqual(unguarded, [], "these change the data folder without asking whether it is frozen");
+
+  // Refusing to write, not warning about it.
+  const front = read("src/core/data-version.ts");
+  assert.match(front, /freezeAllWrites\(/, "a newer folder is not frozen, only reported");
+  const store = slice("src/core/tool-store.ts", "export async function saveToolText", "\n}");
+  assert.match(store, /if \(frozenReason\) throw/, "the shared store writes anyway when frozen");
+
+  /* The two tools whose records never reach the shared store have to ask
+     themselves. Kanban writes boards through its own commands, and Budget's
+     records go through its encrypted pair. */
+  for (const [file, fn] of [
+    ["src/tool/kanban.ts", "async function writeDirty"],
+    ["src/tool/budget.ts", "async function saveToDisk"],
+  ]) {
+    const body = slice(file, fn, "\n}");
+    assert.match(body, /writesFrozen\(\)/, `${file}'s own save path ignores the freeze`);
+  }
+});
+
+test("the back end never answers a failed read with an empty file", () => {
+  /* The other half of the same rule, and the half that came first. A read that
+     failed used to return the tool's empty shape, so a file held open by
+     antivirus for the moment the app started presented as a tool with nothing
+     in it. Only NotFound is an empty tool. */
+  const lib = read("src-tauri/src/lib.rs");
+  for (const fn of ["fn load_tool_file", "fn load_settings", "fn merge_settings"]) {
+    const at = lib.indexOf(fn);
+    assert.notEqual(at, -1, `${fn} is gone`);
+    const body = lib.slice(at, lib.indexOf("\n}\n", at));
+    assert.match(
+      body,
+      /ErrorKind::NotFound/,
+      `${fn} does not tell a missing file apart from one it could not read`,
+    );
+  }
 });
 
 test("a tool's own files go through the shared store, not a pair of its own", () => {
@@ -445,7 +740,7 @@ test("every tool that keeps records you would miss also snapshots them", () => {
   );
 
   for (const [file, fns] of [
-    ["src-tauri/src/tools/game_stats_db.rs", ["gs_save", "gs_replace_all"]],
+    ["src-tauri/src/tools/game_stats_db.rs", ["gs_save"]],
   ]) {
     const text = read(file);
     for (const fn of fns) {
@@ -543,15 +838,23 @@ test("a migration runs once and records that it did", () => {
     assert.ok(!/remove_file/.test(body), `${fn} deletes the file it migrated from`);
   }
 
-  /* Every path that deliberately sets what this tool holds records the same
-     thing, or an import of an empty export lets the old file back in. */
-  const dbSrc = read("src-tauri/src/tools/game_stats_db.rs");
-  const replaceAt = dbSrc.indexOf("pub fn gs_replace_all(");
-  assert.notEqual(replaceAt, -1, "gs_replace_all is missing");
-  assert.match(
-    dbSrc.slice(replaceAt, dbSrc.indexOf("\n}\n", replaceAt)),
-    /mark_json_migrated\(/,
-    "importing or restoring an empty history would let the old JSON file back in",
+  /* THERE IS NO LONGER A COMMAND THAT REPLACES THE WHOLE HISTORY, and that is
+     what closed the hole this used to guard.
+
+     gs_replace_all existed for the per-tool JSON import, and it had to call
+     mark_json_migrated by hand: importing an export that held no games left
+     the tables empty, which the old "are there any rows" test read as "never
+     migrated", and the previous game-stats.json was read straight back in over
+     the top of a deliberate empty.
+
+     Replacing the data folder wholesale cannot reach that state. The database
+     file is swapped as a file, so gs_meta travels with the games it belongs to
+     and the recorded answer always matches the rows beside it. The check that
+     remains is that the answer is still RECORDED rather than inferred, which
+     is the half that was load-bearing. */
+  assert.ok(
+    !read("src-tauri/src/tools/game_stats_db.rs").includes("gs_replace_all"),
+    "gs_replace_all is back; it needs to mark the JSON migration itself again",
   );
 
   // And the front end asks the recorded answer, not the row count.
@@ -559,41 +862,6 @@ test("a migration runs once and records that it did", () => {
     read("src/tool/game-stats.ts"),
     /!snapshot\.jsonMigrated[\s\S]{0,700}migrateGamesFromJson\(/,
     "Game Stats decides whether to migrate from how many games it can see",
-  );
-});
-
-test("the import warning only offers an undo where there is one", () => {
-  /* The Data tab's import replaces everything a tool holds. Its confirmation
-     used to promise that a snapshot made this undoable, for all eight tools,
-     and for half of them that was simply false: four keep preferences and
-     short lists, snapshot nothing, and have no screen to put anything back.
-
-     `snapshots: true` is each tool's own claim, and a claim needs checking.
-     A tool makes it if and only if it actually draws a snapshot list. */
-  const declares = new Set();
-  const draws = new Set();
-  for (const file of filesUnder("src/tool", ".ts")) {
-    const text = read(file);
-    const at = text.indexOf("registerTransferable({");
-    if (at === -1) continue;
-    const id = /id:\s*"([a-z-]+)"/.exec(text.slice(at, at + 400))?.[1];
-    assert.ok(id, `${file} registers a transferable with no id`);
-
-    if (/snapshots:\s*true/.test(text.slice(at, at + 400))) declares.add(id);
-    // Either shared renderer, or Kanban's own per-board one.
-    if (/renderToolBackups\(|renderDbBackups\(|list_kanban_backups/.test(text)) draws.add(id);
-  }
-  assert.ok(declares.size > 0, "parsed no snapshot claims");
-
-  assert.deepEqual(
-    [...declares].filter((id) => !draws.has(id)),
-    [],
-    "these tools promise an import can be undone but show no snapshots to undo it with",
-  );
-  assert.deepEqual(
-    [...draws].filter((id) => !declares.has(id)),
-    [],
-    "these tools have snapshots but their import warning does not say so",
   );
 });
 
@@ -666,23 +934,6 @@ test("an export carries every file its tool writes", () => {
   }
 
   assert.deepEqual(holes, [], "these exports would lose data they were asked to carry");
-});
-
-test("a tool with nothing worth carrying stays out of the Data tab", () => {
-  /* RNGesus was in it and should not have been: its settings are six fields you
-     would retype in seconds, and the rest of what it held was a batch of random
-     numbers, which mean nothing outside the session that drew them. An export
-     that cannot say why you would restore it is a button that only invites
-     mistakes. If it comes back, this says so. */
-  const rng = read("src/tool/rng.ts");
-  assert.ok(
-    !rng.includes("registerTransferable"),
-    "RNGesus registers an export again; if that is deliberate, this test should go with it",
-  );
-  assert.ok(
-    !rng.includes("core/data-transfer"),
-    "RNGesus still imports the transfer module it no longer uses",
-  );
 });
 
 test("every file the app owns lives in a folder, not loose in the data root", () => {

@@ -81,6 +81,13 @@ src-tauri/gen/schemas
 # Windows junk
 Thumbs.db
 Desktop.ini
+# Whole-folder import staging, and the folders an import sets aside. Both are
+# named after the data folder and sit beside it (see
+# src-tauri/src/data_archive.rs), so in a dev build they land at the repo root
+# next to /data.
+/data.srbk-incoming
+/data.srbk-replaced-*
+
 # Local working notes (see dev/ for the checklist and standards docs)
 /dev
 # Temporary storage for supporting files that help guide development goals

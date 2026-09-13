@@ -102,7 +102,6 @@ import {
 } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, closeMenu, openMenu, type MenuItem } from "../menu/menu";
-import { registerTransferable } from "../core/data-transfer";
 import { formatBackupName } from "../core/tool-backups";
 import { formatBytes } from "../core/format";
 import { newId } from "../core/ids";
@@ -9340,97 +9339,6 @@ interface KanbanExport {
   tagCategories: TagCategory[];
   tags: Tag[];
 }
-
-registerTransferable({
-  id: "kanban",
-  snapshots: true,
-  label: "Kanban",
-  summary: () =>
-    `${boards.length} boards · ${cards.filter((c) => !c.archived).length} cards`,
-  note:
-    "Board backgrounds and attached files are named in the export but not included, " +
-    "so an import brings the cards back and reports their files as missing.",
-  gather: async () => ({
-    boards,
-    cards,
-    tagCategories: globalTagCategories,
-    tags: globalTags,
-  }),
-  apply: async (parsed) => {
-    const payload = parsed as Partial<KanbanExport> | null;
-    if (!payload || !Array.isArray(payload.boards) || !Array.isArray(payload.cards)) {
-      throw new Error("that file does not hold a board list");
-    }
-    // Normalized on the way in, exactly as a load is. A hand-edited export is
-    // outside input like any other, and this is the one path where it reaches
-    // the app.
-    const nextBoards = payload.boards
-      .map((raw) => {
-        const board = normalizeBoardMeta(raw);
-        if (!board) return null;
-        /* An exported board carries its CONTENTS as well, and normalizeBoardMeta
-           drops them on purpose: its job is reading an index entry, where a
-           board's columns and vocabulary are not. So they are layered back on
-           from the same record. Without this, importing an export returns every
-           board with no columns and no tags. */
-        const contents = normalizeContents((raw ?? {}) as Partial<BoardContents>);
-        board.columns = contents.columns;
-        board.nextCardNumber = contents.nextCardNumber;
-        board.tagCategories = contents.tagCategories;
-        board.tags = contents.tags;
-        board.overrides = contents.overrides;
-        return board;
-      })
-      .filter((b): b is Board => b !== null);
-    // The cards travel as their own list, not inside their boards, so
-    // contents.cards above is always empty and is deliberately not used.
-    const nextCards = payload.cards
-      .map(normalizeCard)
-      .filter((c): c is Card => c !== null);
-
-    /* Written straight to the files, one board at a time, rather than by
-       loading them into memory and letting the ordinary save path do it. An
-       import replaces everything, and every one of those writes snapshots what
-       it replaced, so the state you had before the import is still in the last
-       bucket if the file turns out to be the wrong one.
-
-       Boards that existed before and are not in the import are deleted, or the
-       tool would end up showing the union of the two, which is not what
-       "replace" means anywhere else in the app. */
-    const incoming = new Set(nextBoards.map((b) => b.id));
-    for (const board of boards) {
-      if (!incoming.has(board.id)) {
-        await invoke("delete_kanban_board", { boardId: board.id }).catch(() => {});
-      }
-    }
-
-    boards = nextBoards;
-    cards = nextCards;
-    globalTagCategories = Array.isArray(payload.tagCategories)
-      ? payload.tagCategories.map(normalizeTagCategory).filter((c): c is TagCategory => c !== null)
-      : [];
-    globalTags = Array.isArray(payload.tags)
-      ? payload.tags.map(normalizeTag).filter((t): t is Tag => t !== null)
-      : [];
-
-    // Drops cards pointing at a board the file did not carry, and tag ids no
-    // vocabulary in it defines. The same pass a launch makes.
-    reconcile();
-
-    await invoke("save_kanban_index", { data: JSON.stringify(buildIndex()) });
-    for (const board of boards) {
-      await invoke("save_kanban_board", {
-        boardId: board.id,
-        data: JSON.stringify(buildContents(board)),
-      });
-    }
-    for (const board of boards) sweepBoardAttachments(board.id);
-
-    if (currentBoardId && !getBoard(currentBoardId)) showKbView("boards");
-    renderAll();
-  },
-});
-
 /* =============================================================================
    THE AGENTS TAB
    -----------------------------------------------------------------------------

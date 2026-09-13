@@ -28,6 +28,7 @@ use argon2::{
 };
 
 mod agent_gate;
+mod data_archive;
 mod db;
 mod session_watch;
 mod tools;
@@ -772,91 +773,6 @@ fn snapshot_group(app: &tauri::AppHandle, tool_dir: &str, group_paths: &[PathBuf
     }
 }
 
-/* =============================================================================
-   EXPORT AND IMPORT
-   -----------------------------------------------------------------------------
-   Every tool's data, out to a JSON file the user names and back in from one.
-
-   FOR GAME STATS THIS REPLACES BEING ABLE TO OPEN THE FILE. Its records live
-   in the database, so there is no JSON to open in Notepad and repair by hand
-   the way there is for every other tool. An export therefore has to be able to
-   reconstruct it completely, and an import has to be able to put it back.
-
-   For the tools still on files, an export is a copy you can take somewhere
-   else, which a snapshot sitting beside the data is not.
-
-   These two commands are file I/O and nothing else. What an export CONTAINS and
-   what an import MEANS is each tool's own business, because only the tool knows
-   its own shape; the front end assembles one and applies the other.
-============================================================================= */
-
-/* THE DIALOG IS OPENED HERE, NOT IN THE FRONT END, and that is the whole point
-   of these two.
-
-   They used to take a path as an argument. Every other write in this app is
-   pinned to a name from one of the allowlists above, for the reason get_data_path
-   states: nothing joins a path that arrived from the front end unchecked. These
-   two broke that rule, and this app runs elevated, so `export_tool_json` was a
-   write-anywhere-as-Administrator command with nothing but a convention in
-   front of it. The dialog was that convention: real, but enforced on the wrong
-   side of the boundary.
-
-   Now the destination is whatever the person at the keyboard picked in an OS
-   dialog this process opened. There is no argument to lie about. The front end
-   suggests a FILENAME, which is checked like every other filename before it is
-   put in front of anyone.
-
-   `#[tauri::command(async)]` on a sync function is what puts these on a worker
-   thread. The blocking dialog calls must not run on the main thread, which is
-   where a plain #[tauri::command] would put them, and where they would freeze
-   the event loop the dialog needs in order to answer. */
-
-/// Asks where to put an export and writes it there, returning where it landed.
-/// `Ok(None)` means the dialog was cancelled, which is not an error.
-#[tauri::command(async)]
-fn export_tool_json(
-    app: tauri::AppHandle,
-    suggested_name: String,
-    data: String,
-) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-
-    let name = sanitize_filename(&suggested_name)?;
-    let picked = app
-        .dialog()
-        .file()
-        .set_title("Export")
-        .set_file_name(name)
-        .add_filter("JSON", &["json"])
-        .blocking_save_file();
-    let Some(dest) = picked.and_then(|p| p.as_path().map(|p| p.to_path_buf())) else {
-        return Ok(None);
-    };
-    // Through the atomic helper like every other write: an export interrupted
-    // half way must not leave a file that looks complete and is not.
-    atomic_write(&dest, data.as_bytes())?;
-    Ok(Some(dest.to_string_lossy().to_string()))
-}
-
-/// Asks for a file and returns its text. `Ok(None)` means the dialog was
-/// cancelled. Deciding what the text MEANS is the tool's job.
-#[tauri::command(async)]
-fn import_tool_json(app: tauri::AppHandle) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-
-    let picked = app
-        .dialog()
-        .file()
-        .set_title("Import")
-        .add_filter("JSON", &["json"])
-        .blocking_pick_file();
-    let Some(src) = picked.and_then(|p| p.as_path().map(|p| p.to_path_buf())) else {
-        return Ok(None);
-    };
-    fs::read_to_string(&src)
-        .map(Some)
-        .map_err(|e| format!("Could not read that file: {e}"))
-}
 
 /* =============================================================================
    WINDOW SIZE COMMANDS  (shell-level)
@@ -1715,6 +1631,22 @@ pub fn run() {
         // frontend uses it (all file I/O goes through custom commands), so
         // shipping it would only widen the attack surface for no benefit.
         .setup(|app| {
+            /* BEFORE EVEN THE VERDICT: a data folder staged by an import on a
+               previous run is swapped in here.
+
+               It has to be first. The whole point of staging an import and
+               restarting is that the swap happens while nothing has opened a
+               file in either folder, and the judgement below reads the very
+               stamp the incoming folder brings with it. Judging the outgoing
+               folder and then replacing it would answer a question about a
+               folder that is no longer there.
+
+               Returns where the replaced folder was put, which is the way back
+               from an import that turned out to be the wrong one. */
+            if let Some(replaced) = data_archive::take_pending_import(app.handle()) {
+                eprintln!("[data] imported a data folder; the previous one is at {replaced}");
+            }
+
             /* Then, before anything reads a file and before anything moves
                one: is this folder one this build may touch at all?
 
@@ -1792,8 +1724,6 @@ pub fn run() {
             tool_file_name,
             data_folder_status,
             list_tool_backups,
-            export_tool_json,
-            import_tool_json,
             read_tool_backup,
             db::list_db_backups,
             db::restore_db_backup,
@@ -1845,6 +1775,13 @@ pub fn run() {
             tools::budget::budget_enable_encryption,
             tools::budget::budget_disable_encryption,
             tools::budget::budget_set_session_unlock,
+            // Whole-folder export and import (see data_archive.rs).
+            data_archive::app_data_summary,
+            data_archive::export_app_data,
+            data_archive::import_app_data,
+            data_archive::cancel_staged_import,
+            data_archive::staged_import_waiting,
+            data_archive::restart_for_import,
             tools::budget::list_budget_backups,
             tools::budget::restore_budget_backup,
             // Game Stats
@@ -1859,7 +1796,6 @@ pub fn run() {
             // Game Stats records (the database)
             tools::game_stats_db::gs_load,
             tools::game_stats_db::gs_save,
-            tools::game_stats_db::gs_replace_all,
             tools::game_stats_db::gs_migrate_from_json,
             // Kanban Boards
             tools::kanban::save_kanban_index,
@@ -1932,6 +1868,132 @@ mod lock_hash_tests {
             );
         }
     }
+}
+
+#[cfg(test)]
+mod data_stamp_tests {
+    use super::{judge_stamp, DATA_SCHEMA_VERSION};
+
+    fn stamp(schema: u32) -> String {
+        format!(r#"{{"schema":{schema},"app":"0.7.0","written_at":"2026-09-05T12:00:00-04:00"}}"#)
+    }
+
+    #[test]
+    fn a_folder_with_no_stamp_is_a_folder_this_build_may_write() {
+        // A first run, or an install from before stamping existed. Refusing
+        // either would lock every existing user out of their own data on the
+        // release that introduced the check.
+        assert_eq!(judge_stamp(None, 1).state, "fresh");
+    }
+
+    #[test]
+    fn its_own_shape_and_every_older_one_are_accepted() {
+        assert_eq!(judge_stamp(Some(&stamp(1)), 1).state, "ok");
+        assert_eq!(judge_stamp(Some(&stamp(1)), 5).state, "ok");
+        assert_eq!(judge_stamp(Some(&stamp(4)), 5).state, "ok");
+    }
+
+    #[test]
+    fn a_newer_shape_is_refused_and_says_which() {
+        let out = judge_stamp(Some(&stamp(9)), 2);
+        assert_eq!(out.state, "newer");
+        // Both numbers, because "this is newer" without saying newer than what
+        // is not something anyone can act on.
+        assert_eq!(out.found, Some(9));
+        assert_eq!(out.supported, 2);
+    }
+
+    #[test]
+    fn a_stamp_that_will_not_parse_is_refused_rather_than_assumed_good() {
+        for junk in ["", "{", "null", "[]", r#"{"schema":"one"}"#] {
+            assert_eq!(
+                judge_stamp(Some(junk), 1).state,
+                "unreadable",
+                "{junk:?} was taken as a readable stamp",
+            );
+        }
+    }
+
+    #[test]
+    fn the_version_this_build_writes_is_the_one_it_accepts() {
+        // Guards the pair drifting: a bumped constant with the writer left
+        // behind would stamp folders as older than they are.
+        assert_eq!(judge_stamp(Some(&stamp(DATA_SCHEMA_VERSION)), DATA_SCHEMA_VERSION).state, "ok");
+    }
+}
+
+#[cfg(test)]
+mod atomic_copy_tests {
+    use super::atomic_copy;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// A directory of this test's own, so two of these running at once cannot
+    /// land on each other's files.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "srbk-atomic-copy-{}-{}-{name}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// Whatever this copy left lying beside the destination. A helper because
+    /// "the temp file is gone" is asserted on every path, success or not.
+    fn strays(dir: &PathBuf) -> Vec<String> {
+        fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+            .filter(|n| n.contains(".tmp-"))
+            .collect()
+    }
+
+    #[test]
+    fn the_copy_arrives_whole_and_leaves_no_temp_behind() {
+        let dir = scratch("whole");
+        let source = dir.join("source.bin");
+        let dest = dir.join("dest.bin");
+        // Bigger than one buffer, so this is a real copy rather than one write.
+        let bytes: Vec<u8> = (0..300_000u32).map(|i| (i % 251) as u8).collect();
+        fs::write(&source, &bytes).unwrap();
+
+        atomic_copy(&source, &dest).expect("the copy should succeed");
+
+        assert_eq!(fs::read(&dest).unwrap(), bytes, "the copy is not the source");
+        assert_eq!(strays(&dir), Vec::<String>::new(), "a temp file was left behind");
+    }
+
+    #[test]
+    fn an_existing_destination_is_replaced_rather_than_appended_to() {
+        let dir = scratch("replace");
+        let source = dir.join("source.bin");
+        let dest = dir.join("dest.bin");
+        fs::write(&source, b"new").unwrap();
+        fs::write(&dest, b"the older, longer contents").unwrap();
+
+        atomic_copy(&source, &dest).expect("the copy should succeed");
+
+        assert_eq!(fs::read(&dest).unwrap(), b"new", "the old contents survived the rename");
+    }
+
+    /* WHAT IS NOT TESTED HERE, AND WHY. The property this helper exists for is
+       that a copy interrupted PART WAY never appears under the real name, and
+       there is no way to interrupt one from inside a test: a missing source
+       fails before fs::copy creates anything, so a plain copy passes that case
+       too, and a disk filling up mid-write is not something a test can arrange.
+
+       So the guarantee is held in two other places instead. The tests above
+       cover what this helper does when it works, which is the part that would
+       break if the temp-then-rename were wired up wrongly. And the check
+       "every write into the app's data folder goes through the atomic helpers"
+       fails the build if a copy into the data folder stops going through here,
+       which is how the original bug arrived: a plain fs::copy straight onto the
+       live name, in one of two sites that were supposed to match. */
 }
 
 #[cfg(test)]

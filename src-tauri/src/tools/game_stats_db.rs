@@ -338,34 +338,6 @@ pub fn gs_save(
     })
 }
 
-/// Replaces every game and every list, for a snapshot restore or a JSON import.
-#[tauri::command]
-pub fn gs_replace_all(
-    app: AppHandle,
-    games: Vec<GameRow>,
-    profiles: Vec<ProfileRow>,
-    tables: Vec<TableRow>,
-) -> Result<(), String> {
-    snapshot_if_due(&app);
-    with_db(&app, |conn| {
-        let tx = conn.unchecked_transaction()?;
-        tx.execute("DELETE FROM gs_round_score", [])?;
-        tx.execute("DELETE FROM gs_round", [])?;
-        tx.execute("DELETE FROM gs_game_player", [])?;
-        tx.execute("DELETE FROM gs_game", [])?;
-        for game in &games {
-            write_game(&tx, game)?;
-        }
-        write_lists(&tx, &profiles, &tables)?;
-        /* An import or a restore is a deliberate statement about what this tool
-           holds, including when it holds nothing. Recording it as migrated
-           stops the old JSON file being read back in over the top of it. */
-        mark_json_migrated(&tx)?;
-        tx.commit()?;
-        Ok(())
-    })
-}
-
 /// Moves game-stats.json into the tables, once and once only.
 ///
 /// ONCE IS RECORDED, NOT INFERRED. The old test was "are the tables empty",

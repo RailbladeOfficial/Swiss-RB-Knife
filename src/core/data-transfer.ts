@@ -1,88 +1,57 @@
 /* =============================================================================
    DATA TRANSFER: the App Settings Data tab
    -----------------------------------------------------------------------------
-   One screen for getting a tool's data out to a JSON file and back in from one.
+   Two buttons over the whole data folder. Export writes a zip of it; Import
+   replaces it with one.
 
-   WHY THIS EXISTS AT ALL. Two reasons, and they apply to different tools.
+   WHAT THIS REPLACED, AND WHY. This screen used to be a dropdown of tools, each
+   with its own pair of hand-written functions saying what to gather and how to
+   put it back. Seven pairs is seven things that have to stay correct as seven
+   tools change, and each one was a promise that a JSON file held everything
+   that tool owned. Several of those promises were quietly partial: an export
+   carried a tool's records but not its snapshots, not its attachments, and not
+   the settings that decide how the records are read.
 
-   Game Stats keeps its records in the database, so it has no file you can open
-   in a text editor and repair by hand. That was a real safety net, and giving
-   it up needs something in its place: an export holds everything required to
-   rebuild the tool, and an import puts it back.
+   A zip of the folder promises nothing it cannot keep, because it IS the
+   folder. That matters more than tidiness here: a backup you cannot inspect is
+   one you are trusting rather than one you have checked, and this one opens in
+   Explorer.
 
-   Every other tool does still have that file, and an export is still worth
-   having: a snapshot lives beside the data it protects, so it is no use for
-   moving a tool to another machine or for keeping a copy somewhere else.
+   It also settled the encryption question. Budget's files are copied byte for
+   byte, so an encrypted budget stays encrypted inside the archive. Gathering
+   through the tool meant decrypting into memory first, which put budget records
+   in the clear in a file, from a tool the user had deliberately locked.
 
-   WHY IMPORT REPLACES RATHER THAN MERGES. A merge has to answer "what happens
-   when this already exists", and every answer is a guess at what someone meant.
-   A replace has exactly one meaning, and it asks before it runs.
+   WHY IMPORT RESTARTS THE APP. It replaces files that are open while the app
+   runs (the database connection, settings.json) and would leave every tool in
+   the front end holding state that no longer matches the disk. So an import is
+   two phases: unpack to a staging folder now, swap it in on the next launch
+   before anything has opened a file. See src-tauri/src/data_archive.rs, which
+   owns both halves and keeps the folder it replaced.
 
-   WHETHER IT CAN BE UNDONE DEPENDS ON THE TOOL, and the warning has to say so
-   rather than assume. Four of these tools capture the state a write replaces
-   and offer a screen to put it back; the other four keep preferences and short
-   lists, snapshot nothing, and an import into one of them is final. The
-   confirmation used to promise an undo for all eight, which for half of them
-   was not true. `snapshots` is what each tool says about itself.
-
-   WHY THE CSV AND SPREADSHEET IMPORTERS ARE NOT HERE. Those read somebody
-   else's file, so they need column matching, a preview and a per-row error
-   list: Game Stats' importer alone is six screens' worth of controls. Folding
-   them into a dropdown would either lose that or make this a button that opens
-   them anyway. So it is a button that opens them, honestly labeled.
-
-   ADDING A TOOL is one entry in TRANSFERABLE. Nothing else here knows the
-   difference between one tool and another.
+   THE FILE DIALOGS BELONG TO THE BACKEND. A path chosen here would be a path
+   the backend had to take on trust, and it writes as Administrator. Each
+   command opens its own dialog and returns null if it was closed.
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
 
 import { devError } from "./dev-log";
-import { fileTimestamp } from "./timestamp";
+import { formatDataSize } from "./format";
 
-/** What one tool needs in order to be exported and imported. */
-export interface Transferable {
-  /** Matches the tool ids used by the shared file store and the database. */
-  id: string;
-  label: string;
-  /** Everything this tool holds, as the object that goes in the file. */
-  gather: () => Promise<unknown>;
-  /** Puts a parsed export back, replacing what is there. Throws with a sentence
-   *  worth showing if the file is not one of this tool's. */
-  apply: (parsed: unknown) => Promise<void>;
-  /** A one-line readout for the tool row, e.g. "3 boards · 40 cards". */
-  summary?: () => string;
-  /** A tool-specific importer this screen deliberately does not replace. */
-  otherFormats?: { label: string; open: () => void };
-  /** Shown under the buttons. Anything true and worth knowing before you press
-   *  one, such as what an export does not carry. */
-  note?: string;
-  /** Whether this tool captures what a write replaces AND has a screen to put
-   *  it back. Decides whether the import warning offers an undo. Set it only
-   *  where both halves are true: a snapshot nothing can reach is not an undo. */
-  snapshots?: boolean;
+/** What the folder holds right now, for the readout above the buttons. */
+interface DataSummary {
+  fileCount: number;
+  totalBytes: number;
+  path: string;
 }
 
-const TRANSFERABLE: Transferable[] = [];
-
-/** Tools register themselves as they initialize, so this module does not have
- *  to import every tool and put itself in the middle of the load order. */
-export function registerTransferable(entry: Transferable): void {
-  const at = TRANSFERABLE.findIndex((t) => t.id === entry.id);
-  if (at === -1) TRANSFERABLE.push(entry);
-  else TRANSFERABLE[at] = entry;
-}
-
-/** The version stamped into every export. Read on import: a file from a future
- *  version is refused rather than half-understood. */
-const EXPORT_VERSION = 1;
-
-interface ExportEnvelope {
-  app: "swiss-rb-knife";
-  tool: string;
-  version: number;
+/** What an import has unpacked and is holding for the next launch. */
+interface StagedImport {
+  fileCount: number;
+  totalBytes: number;
   exportedAt: string;
-  data: unknown;
+  appVersion: string;
 }
 
 let wired = false;
@@ -101,146 +70,197 @@ export function initDataTransfer(deps: {
   confirmFn = deps.confirm;
 }
 
-function current(): Transferable | null {
-  const select = document.getElementById("dataToolSelect") as HTMLSelectElement | null;
-  if (!select) return null;
-  return TRANSFERABLE.find((t) => t.id === select.value) ?? null;
-}
+/* -----------------------------------------------------------------------------
+   DRAWING THE TAB
+----------------------------------------------------------------------------- */
 
-/** Fills the dropdown and draws the row for whichever tool is chosen. Called
- *  every time the tab is opened, because a tool's summary changes as it is
- *  used and a stale count is worse than none. */
+/** Re-reads the folder and redraws the tab. Called every time it is opened,
+ *  because the counts change as the app is used and a stale size is worse than
+ *  none. */
 export function refreshDataTab(): void {
-  const select = document.getElementById("dataToolSelect") as HTMLSelectElement | null;
-  if (!select) return;
+  if (!document.getElementById("dataExportBtn")) return;
   wire();
-
-  const chosen = select.value;
-  select.replaceChildren();
-  for (const tool of TRANSFERABLE) {
-    const option = document.createElement("option");
-    option.value = tool.id;
-    option.textContent = tool.label;
-    select.appendChild(option);
-  }
-  if (TRANSFERABLE.some((t) => t.id === chosen)) select.value = chosen;
-
-  drawRow();
+  void drawSummary();
+  void drawPending();
 }
 
-function drawRow(): void {
-  const tool = current();
-  const summary = document.getElementById("dataToolSummary");
-  const note = document.getElementById("dataToolNote");
-  const other = document.getElementById("dataOtherFormats");
-  const otherLabel = document.getElementById("dataOtherFormatsLabel");
+async function drawSummary(): Promise<void> {
+  const badge = document.getElementById("dataFolderSummary");
+  const path = document.getElementById("dataFolderPath");
+  try {
+    const summary = await invoke<DataSummary>("app_data_summary");
+    if (badge) {
+      badge.textContent =
+        `${summary.fileCount} ${summary.fileCount === 1 ? "file" : "files"} · ` +
+        formatDataSize(summary.totalBytes);
+    }
+    if (path) path.textContent = summary.path;
+  } catch (err) {
+    devError("[data] could not measure the data folder", err);
+    // Said plainly rather than left blank: an empty badge reads as a count
+    // that failed to load, which is exactly what it would be.
+    if (badge) badge.textContent = "could not be read";
+    if (path) path.textContent = "";
+  }
+}
 
-  if (summary) summary.textContent = tool?.summary?.() ?? "";
-  if (note) note.textContent = tool?.note ?? "";
-  if (other) other.style.display = tool?.otherFormats ? "" : "none";
-  if (otherLabel && tool?.otherFormats) otherLabel.textContent = tool.otherFormats.label;
+/** The "waiting to apply" row, shown only while an import is staged. An app
+ *  closed before restarting comes back still holding one, so this is read on
+ *  every open of the tab rather than only after an import. */
+async function drawPending(): Promise<void> {
+  const row = document.getElementById("dataImportPending");
+  const badge = document.getElementById("dataImportPendingBadge");
+  if (!row) return;
+  try {
+    const waiting = await invoke<boolean>("staged_import_waiting");
+    row.style.display = waiting ? "" : "none";
+    // "Not applied" rather than "restart to apply": a staged copy does nothing
+    // until Restart Now is pressed, and a badge that reads like an instruction
+    // would suggest an ordinary restart is enough to trigger it.
+    if (badge) badge.textContent = waiting ? "unpacked, not applied" : "";
+  } catch (err) {
+    devError("[data] could not check for a staged import", err);
+    row.style.display = "none";
+  }
 }
 
 function wire(): void {
   if (wired) return;
   wired = true;
 
-  (document.getElementById("dataToolSelect") as HTMLSelectElement)
-    .addEventListener("change", drawRow);
-
   document.getElementById("dataExportBtn")!.addEventListener("click", () => void doExport());
   document.getElementById("dataImportBtn")!.addEventListener("click", () => void doImport());
-  document.getElementById("dataOtherFormatsBtn")!.addEventListener("click", () => {
-    current()?.otherFormats?.open();
+
+  document.getElementById("dataFolderOpenBtn")!.addEventListener("click", () => {
+    void (async () => {
+      const path = document.getElementById("dataFolderPath")?.textContent ?? "";
+      if (!path) return;
+      try {
+        await invoke("show_in_explorer", { path });
+      } catch (err) {
+        devError("[data] could not open the data folder", err);
+        flashFn("Could not open the data folder.", "error");
+      }
+    })();
   });
-}
 
-/** A filename that says what it is and when, so a folder of them is readable
- *  without opening any. */
-function suggestedName(tool: Transferable): string {
-  return `${tool.id}-${fileTimestamp()}.json`;
-}
+  document.getElementById("dataImportRestartBtn")!.addEventListener("click", () => {
+    void (async () => {
+      try {
+        // Never returns on success: the process is replaced.
+        await invoke("restart_for_import");
+      } catch (err) {
+        devError("[data] could not restart", err);
+        flashFn(`Could not restart: ${String(err)}`, "error", 9000);
+      }
+    })();
+  });
 
-/* THE FILE DIALOGS BELONG TO THE BACKEND, not to this module, and that is why
-   neither of these opens one. A path chosen here would be a path the backend
-   had to take on trust, and it writes as Administrator. The command opens the
-   dialog itself and returns null if it was closed. See the note above
-   export_tool_json in lib.rs. */
-
-async function doExport(): Promise<void> {
-  const tool = current();
-  if (!tool) return;
-  try {
-    const envelope: ExportEnvelope = {
-      app: "swiss-rb-knife",
-      tool: tool.id,
-      version: EXPORT_VERSION,
-      exportedAt: new Date().toISOString(),
-      data: await tool.gather(),
-    };
-    // Indented: an export is meant to be readable and diffable outside this
-    // app, which one long line is useless for.
-    const written = await invoke<string | null>("export_tool_json", {
-      suggestedName: suggestedName(tool),
-      data: JSON.stringify(envelope, null, 2),
-    });
-    if (written === null) return; // dialog closed
-    flashFn(`Exported ${tool.label} to ${written}`, "success", 8000);
-  } catch (err) {
-    devError("[data] export failed", err);
-    flashFn(`Export failed: ${String(err)}`, "error", 9000);
-  }
-}
-
-async function doImport(): Promise<void> {
-  const tool = current();
-  if (!tool) return;
-  try {
-    const raw = await invoke<string | null>("import_tool_json");
-    if (raw === null) return; // dialog closed
-
-    const envelope = JSON.parse(raw) as Partial<ExportEnvelope>;
-
-    // Checked before anything is replaced. Importing Game Stats into the Kanban
-    // would otherwise empty one tool and fill it with nonsense.
-    if (envelope.app !== "swiss-rb-knife" || typeof envelope.tool !== "string") {
-      throw new Error("that file was not exported by this app");
-    }
-    if (envelope.tool !== tool.id) {
-      const other = TRANSFERABLE.find((t) => t.id === envelope.tool);
-      throw new Error(
-        `that file holds ${other ? other.label : envelope.tool} data, not ${tool.label}`,
-      );
-    }
-    if (typeof envelope.version === "number" && envelope.version > EXPORT_VERSION) {
-      throw new Error("that file came from a newer version of the app");
-    }
-
+  document.getElementById("dataImportDiscardBtn")!.addEventListener("click", () => {
     confirmFn(
       {
-        title: `Replace all ${tool.label} data?`,
+        title: "Discard the staged import?",
         message:
-          `Everything ${tool.label} currently holds is replaced by the contents of this file. ` +
-          (tool.snapshots
-            ? `A snapshot of the current state is taken first, which the Data tab in ${tool.label}'s own settings can put back.`
-            : `${tool.label} keeps no snapshots, so this cannot be undone. Export the current data first if you might want it back.`),
-        confirmLabel: "Replace",
+          "The unpacked copy is deleted. Nothing else changes: a staged import does " +
+          "nothing until Restart Now is pressed, so your data folder has not been touched.",
+        confirmLabel: "Discard",
       },
       () => {
         void (async () => {
           try {
-            await tool.apply(envelope.data);
-            flashFn(`Imported ${tool.label}.`, "success", 8000);
-            drawRow();
+            await invoke("cancel_staged_import");
+            flashFn("Staged import discarded.");
+            void drawPending();
           } catch (err) {
-            devError("[data] import failed", err);
-            flashFn(`Import failed: ${String(err)}`, "error", 9000);
+            devError("[data] could not discard the staged import", err);
+            flashFn(`Could not discard it: ${String(err)}`, "error", 9000);
           }
         })();
       },
     );
+  });
+}
+
+/* -----------------------------------------------------------------------------
+   EXPORT
+----------------------------------------------------------------------------- */
+
+async function doExport(): Promise<void> {
+  const button = document.getElementById("dataExportBtn") as HTMLButtonElement;
+  // Zipping a folder with attachments in it is not instant, and a second press
+  // would open a second dialog over the first.
+  button.disabled = true;
+  try {
+    const written = await invoke<string | null>("export_app_data");
+    if (written === null) return; // dialog closed
+    flashFn(`Exported your data to ${written}`, "success", 9000);
+  } catch (err) {
+    devError("[data] export failed", err);
+    flashFn(`Export failed: ${String(err)}`, "error", 9000);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   IMPORT
+----------------------------------------------------------------------------- */
+
+async function doImport(): Promise<void> {
+  const button = document.getElementById("dataImportBtn") as HTMLButtonElement;
+  button.disabled = true;
+  try {
+    /* Unpacks to a staging folder and touches nothing live. Every reason to
+       refuse an archive (not ours, from a newer build, an entry pointing
+       outside the folder, empty) is decided in there, BEFORE this asks the user
+       anything: a confirmation offered for a file that was never going to work
+       is a question with no right answer. */
+    const staged = await invoke<StagedImport | null>("import_app_data");
+    if (staged === null) return; // dialog closed
+
+    const when = describeExportDate(staged.exportedAt);
+    confirmFn(
+      {
+        title: "Replace all of your data?",
+        message:
+          `That archive holds ${staged.fileCount} ${staged.fileCount === 1 ? "file" : "files"} ` +
+          `(${formatDataSize(staged.totalBytes)}), exported from version ${staged.appVersion}${when}. ` +
+          `Everything this app currently holds is replaced by it: every tool, every setting, ` +
+          `every snapshot. The app restarts to apply it, and the folder it replaces is kept ` +
+          `beside the new one so you can get back to it.`,
+        confirmLabel: "Replace and Restart",
+      },
+      () => {
+        void (async () => {
+          try {
+            await invoke("restart_for_import");
+          } catch (err) {
+            devError("[data] could not restart", err);
+            flashFn(`Could not restart: ${String(err)}`, "error", 9000);
+            void drawPending();
+          }
+        })();
+      },
+    );
+    /* Drawn now as well, not only after the confirm. Declining leaves the
+       unpacked copy on disk, INERT: the swap keys off a marker that only the
+       restart writes, so saying no changes nothing and a later restart applies
+       nothing either. The row is the only thing that says the copy is there,
+       and the only place to throw it away. */
+    void drawPending();
   } catch (err) {
     devError("[data] import failed", err);
     flashFn(`Import failed: ${String(err)}`, "error", 9000);
+  } finally {
+    button.disabled = false;
   }
+}
+
+/** ", taken on <date>" for a timestamp that parses, and nothing at all for one
+ *  that does not. The date is how someone tells two backups apart, so it is
+ *  worth naming; a bad one is not worth saying "Invalid Date" over. */
+function describeExportDate(raw: string): string {
+  const at = new Date(raw);
+  if (Number.isNaN(at.getTime())) return "";
+  return `, taken on ${at.toLocaleString()}`;
 }

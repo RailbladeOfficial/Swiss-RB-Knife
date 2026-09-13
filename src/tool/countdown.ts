@@ -39,7 +39,6 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { registerTransferable } from "../core/data-transfer";
 import { loadToolJson, saveToolJson, unblockAfterReplacement } from "../core/tool-store";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
@@ -2628,32 +2627,3 @@ export function initCountdown(): void {
   render();
   void loadStore();
 }
-
-/* -----------------------------------------------------------------------------
-   EXPORT AND IMPORT
-   -----------------------------------------------------------------------------
-   Registered with the Data tab in App Settings, which owns the buttons. This
-   tool's records are still a JSON file, so its export IS that file's contents
-   and its import writes them straight back.
------------------------------------------------------------------------------ */
-
-registerTransferable({
-  id: "countdown",
-  label: "Countdown Timer",
-  gather: async () => JSON.parse(
-    await invoke<string>("load_tool_file", { toolId: "countdown", kind: "data" }),
-  ),
-  apply: async (parsed) => {
-    if (parsed === null || typeof parsed !== "object") {
-      throw new Error("that file does not hold this tool's data");
-    }
-    await invoke("save_tool_file", {
-      toolId: "countdown",
-      kind: "data",
-      data: JSON.stringify(parsed),
-    });
-    // Read back through the ordinary load, so every validator and default this
-    // tool applies on the way in is applied to an imported file too.
-    await loadStore();
-  },
-});
