@@ -805,38 +805,27 @@ fn sidecar_path(_app: &AppHandle) -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
 
-    // Dev: hand out the copy in dev/bin, NOT the one cargo just built beside
-    // this binary. An agent holds the exe it spawned open for its whole
-    // session, and Windows will not let cargo overwrite a running exe, so an
-    // agent pointed at target/debug blocks the next dev build. The copy is
-    // made by scripts/build-agent.mjs; see "The Debug Copy" there.
+    // Dev: the copy in dev/bin, and ONLY that copy, even when it is missing.
+    // An agent holds the exe it spawned open for its whole session, and Windows
+    // will not let cargo overwrite a running exe. This used to fall back to the
+    // exe in target/debug whenever the copy was not there, which is exactly the
+    // path that must never be handed out: a connection made in that moment kept
+    // pointing into target/ for good, and every dev build after it failed with
+    // "Access is denied". A missing copy now shows as "not found" on the Agents
+    // tab, and the next `npm run tauri dev` makes it. See build-agent.mjs.
     #[cfg(debug_assertions)]
     {
-        // From src-tauri/target/debug up to the repo root, then dev/bin.
-        let copy = dir.join("../../../dev/bin/srbk-agent.exe");
-        if copy.exists() {
-            return fs::canonicalize(copy).ok();
-        }
+        // src-tauri/target/debug -> src-tauri/target -> src-tauri -> repo root.
+        let root = dir.ancestors().nth(3)?;
+        return Some(root.join("dev").join("bin").join("srbk-agent.exe"));
     }
 
     // Release: the sidecar sits beside the app, put there by the installer.
-    let beside = dir.join("srbk-agent.exe");
-    if beside.exists() {
-        return Some(beside);
-    }
-
-    // Dev, with no copy made yet: cargo puts both binaries in the same target
-    // folder, so the line above usually finds it. This is the fallback for a
-    // dev run started from somewhere unusual.
-    #[cfg(debug_assertions)]
+    #[cfg(not(debug_assertions))]
     {
-        let candidate = dir.join("../../target/debug/srbk-agent.exe");
-        if candidate.exists() {
-            return fs::canonicalize(candidate).ok();
-        }
+        let beside = dir.join("srbk-agent.exe");
+        Some(beside)
     }
-
-    Some(beside)
 }
 
 /* =============================================================================
@@ -1528,10 +1517,14 @@ mod tests {
         let exe = std::env::current_exe().ok()?;
         // target/debug/deps/<test>.exe -> target/debug -> target
         let target = exe.parent()?.parent()?.parent()?;
-        for profile in ["debug", "release"] {
-            let candidate = target.join(profile).join("srbk-agent.exe");
-            if candidate.exists() {
-                return Some(candidate);
+        // build-agent.mjs builds into target/srbk-agent. The plain profile
+        // folders are for a sidecar built by hand with `cargo build`.
+        for folder in [target.join("srbk-agent"), target.to_path_buf()] {
+            for profile in ["debug", "release"] {
+                let candidate = folder.join(profile).join("srbk-agent.exe");
+                if candidate.exists() {
+                    return Some(candidate);
+                }
             }
         }
         None

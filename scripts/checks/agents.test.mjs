@@ -29,7 +29,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { read, htmlIds } from "./_source.mjs";
+import { read, htmlIds, slice } from "./_source.mjs";
 
 const gate = () => read("src-tauri/src/agent_gate.rs");
 const settings = () => read("src/tool/kanban-agents.ts");
@@ -507,34 +507,37 @@ test("the app looks for the sidecar under the name the build produces", () => {
   );
 });
 
-test("a dev build hands out the copy, not the exe cargo has to overwrite", () => {
+test("no running agent can block a dev build", () => {
   /* An agent spawns srbk-agent.exe and holds it open for its whole session,
-     and Windows will not let cargo overwrite a running exe. So a connection
-     pointed at target/debug does not fail on its own terms, it fails the NEXT
-     dev build: cargo tries to relink the file the agent is holding and the
-     build dies before the app starts, with nothing on screen connecting the
-     two. The fix is that a debug build copies the exe out of target/ and the
-     Agents tab hands out THAT path. Both halves have to stay, and the lookup
-     has to prefer the copy, or the trap comes straight back. */
+     and Windows will not let cargo overwrite a running exe. A connection
+     pointed at the exe cargo writes does not fail on its own terms, it fails
+     the NEXT dev build, with "failed to remove file ... Access is denied" and
+     nothing on screen connecting the two.
+
+     The first fix handed agents a copy in dev/bin, but the app fell back to
+     target/debug whenever the copy was missing, and one connection made in
+     that moment brought the whole trap back. So all three halves are pinned:
+     the sidecar builds into a folder nothing runs from, a dev app hands out
+     only the dev/bin copy (missing or not), and a copy an agent is running is
+     moved aside rather than left stale or allowed to fail the build. */
   const build = read("scripts/build-agent.mjs");
   assert.match(
     build,
-    /path\.join\(ROOT_DIR, "dev", "bin"\)/,
-    "the debug build no longer copies the exe out of target/",
+    /"--target-dir",\s*AGENT_TARGET_DIR/,
+    "the sidecar builds into target/debug, where a connected agent can lock it",
   );
+  assert.match(build, /path\.join\(ROOT_DIR, "dev", "bin"\)/, "the debug build no longer copies the exe out of target/");
   assert.match(
     build,
-    /EBUSY[\s\S]{0,60}EPERM/,
-    "a destination locked by a running agent must warn, not fail the build",
+    /EBUSY[\s\S]{0,60}EPERM[\s\S]{0,120}renameSync\(copy, aside\)/,
+    "a copy locked by a running agent must be moved aside, not fail the build",
   );
 
-  const preferred = gate().indexOf('dev/bin/srbk-agent.exe');
-  const beside = gate().indexOf('let beside = dir.join("srbk-agent.exe")');
-  assert.ok(preferred !== -1, "the app no longer looks for the dev copy");
-  assert.ok(
-    preferred < beside,
-    "the app finds target/debug first, so a dev connection still points at the exe cargo overwrites",
-  );
+  const lookup = slice("src-tauri/src/agent_gate.rs", "fn sidecar_path(", "\n}");
+  const dev = lookup.slice(lookup.indexOf("#[cfg(debug_assertions)]"), lookup.indexOf("#[cfg(not(debug_assertions))]"));
+  assert.match(dev, /\.join\("dev"\)\.join\("bin"\)\.join\("srbk-agent\.exe"\)/, "a dev app no longer hands out the dev/bin copy");
+  const devCode = dev.replace(/\/\/[^\n]*/g, "");
+  assert.ok(!/target|exists\(\)/.test(devCode), "a dev app can still fall back to handing out an exe inside target/");
 });
 
 test("a permission flipped mid-session reaches the agent's tool list", () => {
