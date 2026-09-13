@@ -160,6 +160,33 @@ function buildCardGroupHeading(label: string): HTMLElement {
   return head;
 }
 
+/**
+ * The shown tools, grouped the way they are DRAWN.
+ *
+ * Categories partition the order, they do not replace it. Whatever
+ * settings.sidebarItems already says (a sort mode, or a hand-dragged order)
+ * still decides the order within each heading, so switching the toggle on and
+ * back off returns the exact list you had.
+ *
+ * A tool's category IS its section: a key is "<category>/<tool>", so this reads
+ * the one grouping the tool has rather than a second one kept alongside it.
+ *
+ * SHARED WITH THE BLADE WALK, which is why it is a function rather than four
+ * lines inside applySidebarOrder. The Blades theme colors tools by their
+ * position on screen, and it read the flat stored order while the sidebar drew
+ * a grouped one, so with categories switched on every color was wrong: the
+ * sidebar showed Tracking first and the palette was still counting from
+ * whatever settings.sidebarItems happened to hold. One function, one order.
+ */
+function shownGroups(): { label: string | null; keys: string[] }[] {
+  const shownKeys = settings.sidebarItems.filter((it) => it.pinned).map((it) => it.key);
+  if (!settings.toolCategories) return [{ label: null, keys: shownKeys }];
+  return TOOL_CATEGORIES.map((cat) => ({
+    label: cat.label as string | null,
+    keys: shownKeys.filter((key) => ALL_TOOLS.find((t) => t.key === key)?.section === cat.id),
+  })).filter((group) => group.keys.length > 0);
+}
+
 /** Reorders and shows/hides the sidebar nav-items and Home dashboard
  *  tool-cards to match settings.sidebarItems, then re-syncs the On Startup
  *  select and the Settings-row status badge. Call after ANY change to
@@ -176,22 +203,7 @@ export function applySidebarOrder(): void {
 
   clearCategoryHeadings();
 
-  /* Categories partition the order, they do not replace it. Whatever
-     settings.sidebarItems already says (a sort mode, or a hand-dragged
-     order) still decides the order within each heading, so switching the
-     toggle on and back off returns the exact list you had.
-
-     A tool's category IS its section: a key is "<category>/<tool>", so this
-     reads the one grouping the tool has rather than a second one kept
-     alongside it. */
-  const groups = settings.toolCategories
-    ? TOOL_CATEGORIES.map((cat) => ({
-        label: cat.label,
-        keys: shownKeys.filter(
-          (key) => ALL_TOOLS.find((t) => t.key === key)?.section === cat.id,
-        ),
-      })).filter((group) => group.keys.length > 0)
-    : [{ label: null as string | null, keys: shownKeys }];
+  const groups = shownGroups();
 
   // Move shown items into order (appendChild on an already-attached node
   // relocates it, repeated in desired order, this leaves everything in that
@@ -246,6 +258,7 @@ export function applySidebarOrder(): void {
     if (card) card.style.display = "none";
   });
 
+  applyBladeOrder();
   refreshStartupSelectOptions();
   refreshSidebarHiddenBadge();
 
@@ -254,6 +267,84 @@ export function applySidebarOrder(): void {
   // hand-off to another tool (Countdown Timer → Time Tracker) listen for it so they
   // can disable that offer when the target has been hidden.
   window.dispatchEvent(new CustomEvent("sidebarchange"));
+}
+
+/* -----------------------------------------------------------------------------
+   BLADE ORDER  (the Blades theme's per-tool color)
+   -----------------------------------------------------------------------------
+   Blades hands every tool one of five colors, and the point of the set is that
+   walking the sidebar walks red, orange, green, blue, purple and round again.
+   That only holds if the color follows the tool's POSITION rather than its
+   name, so this stamps `data-blade` (1..5) on each of the four surfaces the
+   theme colors: the sidebar row, the Home card, the tool's own view, and
+   <body> for whichever tool is open (modals render at body level, outside the
+   tool's subtree, so they have no other way to reach it).
+
+   Done here, in TypeScript, rather than as a per-tool block in blades.css,
+   because the CSS cannot know the order: the sidebar is reorderable, sortable
+   five ways, and grows a row every time a tool ships. The stylesheet keeps the
+   five palettes and nothing else.
+
+   The count is walked over EVERY tool, shown ones first in the order they are
+   displayed and hidden ones after, so a hidden tool still resolves to a color
+   if something opens it, and re-showing it does not shuffle the colors of the
+   tools above it. It is stamped for every theme, not only Blades: an unused
+   data attribute costs nothing, and gating it on the active theme would mean
+   re-running this on every theme change.
+----------------------------------------------------------------------------- */
+
+/** How many colors the Blades palette cycles through. Matches the five blade
+ *  blocks in public/themes/blades.css; changing one without the other leaves
+ *  tools past the fifth with no palette at all. */
+const BLADE_COUNT = 5;
+
+/** The order the blades are handed out in: the sidebar exactly as it is drawn,
+ *  then whatever is hidden.
+ *
+ *  Through shownGroups() rather than off settings.sidebarItems, because with
+ *  categories switched on those two are different orders. See the note on that
+ *  function. */
+function bladeOrderedKeys(): string[] {
+  const shown = shownGroups().flatMap((group) => group.keys);
+  const hidden = settings.sidebarItems.filter((it) => !it.pinned).map((it) => it.key);
+  const ordered = [...shown, ...hidden];
+  // Anything ALL_TOOLS knows about but settings does not (a tool added between
+  // a load and this call) still needs a color rather than falling back to the
+  // stylesheet's default green.
+  for (const meta of ALL_TOOLS) if (!ordered.includes(meta.key)) ordered.push(meta.key);
+  return ordered;
+}
+
+/** The blade number for one "section/tool" key, 1-based. */
+export function bladeForToolKey(key: string): number {
+  const at = bladeOrderedKeys().indexOf(key);
+  return (at === -1 ? 0 : at % BLADE_COUNT) + 1;
+}
+
+/** Stamps data-blade on every sidebar row, Home card and tool view. Called
+ *  from applySidebarOrder, which is the one funnel every reorder, re-sort,
+ *  show/hide and settings load already passes through. */
+export function applyBladeOrder(): void {
+  bladeOrderedKeys().forEach((key, index) => {
+    const meta = ALL_TOOLS.find((t) => t.key === key);
+    if (!meta) return;
+    const blade = String((index % BLADE_COUNT) + 1);
+    const sel = `[data-section="${meta.section}"][data-tool="${meta.tool}"]`;
+    document
+      .querySelectorAll<HTMLElement>(`.nav-item${sel}, .tool-card${sel}`)
+      .forEach((el) => {
+        el.dataset.blade = blade;
+      });
+    const view = document.getElementById(`${meta.section}-tool-${meta.tool}`);
+    if (view) view.dataset.blade = blade;
+  });
+
+  // The open tool's blade, for the modals that sit outside its subtree. Read
+  // back off <body> rather than recomputed, so this and switchSection() cannot
+  // disagree about which tool is open.
+  const active = document.body.dataset.activeTool;
+  if (active) document.body.dataset.activeBlade = String(bladeForToolKey(active));
+  else delete document.body.dataset.activeBlade;
 }
 
 /** Whether a tool is currently shown in the sidebar / on Home. Exported for

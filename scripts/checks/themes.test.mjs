@@ -130,3 +130,91 @@ test("the Special tab stays alphabetical", () => {
   const sorted = [...labels].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   assert.deepEqual(labels, sorted, "Special tab themes are no longer in alphabetical order");
 });
+test("the Blades theme colors tools by position, and the app stamps the position", () => {
+  /* Blades hands every tool one of five colors and the whole look rests on the
+     sidebar reading red, orange, green, blue, purple in order. That order is
+     the USER's, so the stylesheet cannot know it: it keys on a data-blade
+     number the app stamps, and this checks the two halves still meet.
+
+     It is checked because both halves fail silently. A selector that stops
+     matching renders as "unchanged", and an attribute nobody reads costs
+     nothing and says nothing. The symptom of them drifting apart is every tool
+     showing the default green, which is what shipping two new tools under the
+     old hardcoded-per-tool blocks already produced once. */
+  const css = read("public/themes/blades.css");
+
+  // Five palettes, no more and no fewer, each claiming all four surfaces.
+  for (const n of [1, 2, 3, 4, 5]) {
+    for (const surface of [".nav-item", ".tool-card", ".tool-view"]) {
+      assert.ok(
+        css.includes(`${surface}[data-blade="${n}"]`),
+        `blades.css does not color ${surface} for blade ${n}`,
+      );
+    }
+    assert.ok(
+      css.includes(`body[data-active-blade="${n}"] .modal-backdrop`),
+      `blades.css does not reach the modals of blade ${n}`,
+    );
+  }
+  assert.ok(
+    !css.includes('[data-blade="6"]'),
+    "there is a sixth blade, which the app never stamps",
+  );
+
+  // And nothing is keyed on a tool's NAME any more, which is what made the
+  // colors fixed and every new tool green.
+  const named = [...css.matchAll(/\.(?:nav-item|tool-card)\[data-section=/g)];
+  assert.deepEqual(
+    named.map((m) => m[0]),
+    [],
+    "blades.css is picking tools out by name again, so reordering will not recolor them",
+  );
+
+  // The app's half: the stamp, the cycle length, and the <body> mirror the
+  // modals read.
+  const sidebar = read("src/core/sidebar-edit.ts");
+  assert.match(sidebar, /const BLADE_COUNT = 5;/, "the cycle length is not five");
+  assert.match(sidebar, /el\.dataset\.blade = blade;/, "nothing stamps data-blade on the rows and cards");
+  assert.match(sidebar, /view\.dataset\.blade = blade;/, "nothing stamps data-blade on the tool views");
+  assert.match(
+    sidebar,
+    /export function applyBladeOrder/,
+    "there is no function assigning the blades",
+  );
+  assert.match(
+    read("src/core/sidebar-edit.ts"),
+    /applyBladeOrder\(\);/,
+    "applyBladeOrder is never called from applySidebarOrder",
+  );
+
+  const shell = read("src/core/shell.ts");
+  assert.match(
+    shell,
+    /document\.body\.dataset\.activeBlade = String\(bladeForToolKey\(/,
+    "the open tool's blade never reaches <body>, so its modals fall back to the default",
+  );
+  assert.match(
+    shell,
+    /delete document\.body\.dataset\.activeBlade;/,
+    "the blade is left on <body> after leaving a tool",
+  );
+});
+
+test("the attention pulse wears the tool's own blade", () => {
+  /* The pulse animates --color-btn / --color-btn-text (shell.css and
+     landing.css). The blade scopes deliberately do NOT remap the shared tokens
+     on sidebar rows and Home cards, because that would recolor the silver
+     stack itself, so both pulsed in :root's green whatever tool was asking.
+     Budget and Auto-Backup are the only two that raise it, and both flashed
+     the wrong color. */
+  const css = read("public/themes/blades.css");
+  const at = css.indexOf(".nav-item.attention-pulse,");
+  assert.notEqual(at, -1, "blades.css does not recolor the pulse");
+  const rule = css.slice(at, css.indexOf("}", at));
+  assert.ok(rule.includes(".tool-card.attention-pulse"), "the Home card's pulse is not covered");
+  assert.match(rule, /--color-btn:\s*var\(--bl-rail\)/, "the pulse does not take the blade's rail");
+  assert.ok(
+    css.includes(".nav-item.attention-pulse .nav-icon"),
+    "the icon still has a color of its own, so it pulses into invisibility",
+  );
+});

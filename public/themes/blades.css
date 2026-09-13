@@ -8,22 +8,30 @@
    blade pulled forward over the others.
 
    PER-TOOL COLOR
-   Every tool owns one of the five blades off the dashboard: Marketplace red,
+   Every tool wears one of the five blades off the dashboard: Marketplace red,
    profile orange, Games green, Media blue, System purple. They are handed out
-   by walking the Classic tool order (ALL_TOOLS in shell.ts) and cycling
-   through the five, so Budget is red, Time Tracker orange, Auto-Backup green,
-   and round again.
+   by POSITION, walking the sidebar top to bottom and cycling through the five,
+   so the first tool is red, the second orange, and round again. Reorder the
+   sidebar and the colors follow the new order; add a tool and it takes the
+   color of the slot it lands in. The pattern is the point, not which tool
+   happens to be red.
+
+   The order lives in TypeScript, because it is the user's order and no
+   stylesheet can see it. applyBladeOrder() in src/core/sidebar-edit.ts stamps
+   data-blade="1".."5" on each tool's sidebar row, Home card and tool view, and
+   switchSection() puts the open tool's number on <body> as data-active-blade.
 
    Each blade is eight custom properties: --bl-1…--bl-4 are the card's radial
    stops (light to dark), --bl-deep is the header band, --bl-rail the fill and
    edge color, --bl-ink the near-black used for text, --bl-tint the near-white
-   used for entry fields. :root holds the green as the default, and each tool
-   re-declares all eight on FOUR selectors at once: its tool view, its sidebar
-   row, its Home card, and any modal open while it is the active tool.
+   used for entry fields. :root holds the green as the default, and each blade
+   re-declares all eight on FOUR selectors at once: the tool view, the sidebar
+   row, the Home card, and any modal open while that tool is active.
 
-   That last one is why shell.ts stamps `data-active-tool` on <body>. Modals
-   are rendered at body level, outside the tool's own subtree, so nothing in
-   the DOM otherwise connects the Budget's modals to the Budget.
+   That last one is why shell.ts stamps `data-active-tool` and
+   `data-active-blade` on <body>. Modals are rendered at body level, outside
+   the tool's own subtree, so nothing in the DOM otherwise connects the
+   Budget's modals to the Budget.
 
    REMAPPING THE SHARED TOKENS
    The tool stylesheets are written against the shared palette (--color-panel,
@@ -120,16 +128,30 @@
 /* =============================================================================
    BLADE ASSIGNMENT
    -----------------------------------------------------------------------------
-   Classic tool order, cycling red → orange → green → blue → purple. Each block
-   claims the tool's view, its sidebar row, its Home card and its modals
-   together, so all four resolve the same blade.
+   Five palettes, red → orange → green → blue → purple, keyed on the
+   `data-blade` number the app stamps rather than on a tool's name.
+
+   WHY IT IS NOT A BLOCK PER TOOL, WHICH IS WHAT THIS USED TO BE. The blade a
+   tool wears is its POSITION in the sidebar, not its identity: move Budget to
+   second and it should be orange, and whatever took first place should be red.
+   A stylesheet cannot know that order. The sidebar is reorderable by drag,
+   sortable five ways, and gains a row every time a tool ships, and the old
+   hardcoded blocks meant every new tool had to be hand-assigned a color (both
+   0.7.0 additions came out green) and reordering did nothing at all.
+
+   applyBladeOrder() in src/core/sidebar-edit.ts walks the sidebar as drawn and
+   stamps data-blade="1".."5" on the tool's sidebar row, its Home card and its
+   tool view; switchSection() puts the open tool's number on <body> so the
+   modals, which render outside the tool's subtree, can find it too.
+
+   Each block claims all four at once, so they always resolve the same blade.
 ============================================================================= */
 
-/* 1. Budget Tracker, Marketplace red */
-#tracking-tool-budget,
-.nav-item[data-section="tracking"][data-tool="budget"],
-.tool-card[data-section="tracking"][data-tool="budget"],
-body[data-active-tool="tracking/budget"] .modal-backdrop {
+/* 1. Marketplace red */
+.nav-item[data-blade="1"],
+.tool-card[data-blade="1"],
+.tool-view[data-blade="1"],
+body[data-active-blade="1"] .modal-backdrop {
   --bl-1:    #fbe3db;
   --bl-2:    #f2b5a6;
   --bl-3:    #e59480;
@@ -140,11 +162,11 @@ body[data-active-tool="tracking/budget"] .modal-backdrop {
   --bl-tint: #fdf1ee;
 }
 
-/* 2. Time Tracker, profile orange */
-#tracking-tool-time-tracker,
-.nav-item[data-section="tracking"][data-tool="time-tracker"],
-.tool-card[data-section="tracking"][data-tool="time-tracker"],
-body[data-active-tool="tracking/time-tracker"] .modal-backdrop {
+/* 2. Profile orange */
+.nav-item[data-blade="2"],
+.tool-card[data-blade="2"],
+.tool-view[data-blade="2"],
+body[data-active-blade="2"] .modal-backdrop {
   --bl-1:    #fdedcf;
   --bl-2:    #f7cf8c;
   --bl-3:    #edb45f;
@@ -155,11 +177,11 @@ body[data-active-tool="tracking/time-tracker"] .modal-backdrop {
   --bl-tint: #fdf6e8;
 }
 
-/* 3. Auto-Backup, Games green */
-#files-tool-auto-backup,
-.nav-item[data-section="files"][data-tool="auto-backup"],
-.tool-card[data-section="files"][data-tool="auto-backup"],
-body[data-active-tool="files/auto-backup"] .modal-backdrop {
+/* 3. Games green */
+.nav-item[data-blade="3"],
+.tool-card[data-blade="3"],
+.tool-view[data-blade="3"],
+body[data-active-blade="3"] .modal-backdrop {
   --bl-1:    #e0f8c6;
   --bl-2:    #b8e78a;
   --bl-3:    #97d661;
@@ -170,11 +192,11 @@ body[data-active-tool="files/auto-backup"] .modal-backdrop {
   --bl-tint: #f3fbe9;
 }
 
-/* 4. Countdown Timer, Media blue */
-#productivity-tool-countdown,
-.nav-item[data-section="productivity"][data-tool="countdown"],
-.tool-card[data-section="productivity"][data-tool="countdown"],
-body[data-active-tool="productivity/countdown"] .modal-backdrop {
+/* 4. Media blue */
+.nav-item[data-blade="4"],
+.tool-card[data-blade="4"],
+.tool-view[data-blade="4"],
+body[data-active-blade="4"] .modal-backdrop {
   --bl-1:    #dbf0fa;
   --bl-2:    #a6dbf1;
   --bl-3:    #7cc6e6;
@@ -185,11 +207,11 @@ body[data-active-tool="productivity/countdown"] .modal-backdrop {
   --bl-tint: #eff8fd;
 }
 
-/* 5. Game Stats, System purple */
-#tracking-tool-game-stats,
-.nav-item[data-section="tracking"][data-tool="game-stats"],
-.tool-card[data-section="tracking"][data-tool="game-stats"],
-body[data-active-tool="tracking/game-stats"] .modal-backdrop {
+/* 5. System purple */
+.nav-item[data-blade="5"],
+.tool-card[data-blade="5"],
+.tool-view[data-blade="5"],
+body[data-active-blade="5"] .modal-backdrop {
   --bl-1:    #ebe3fb;
   --bl-2:    #cfc0f2;
   --bl-3:    #b7a3e6;
@@ -198,66 +220,6 @@ body[data-active-tool="tracking/game-stats"] .modal-backdrop {
   --bl-rail: #574689;
   --bl-ink:  #2e2352;
   --bl-tint: #f5f1fd;
-}
-
-/* 6. Image CCR, back to Marketplace red */
-#files-tool-image-ccr,
-.nav-item[data-section="files"][data-tool="image-ccr"],
-.tool-card[data-section="files"][data-tool="image-ccr"],
-body[data-active-tool="files/image-ccr"] .modal-backdrop {
-  --bl-1:    #fbe3db;
-  --bl-2:    #f2b5a6;
-  --bl-3:    #e59480;
-  --bl-4:    #d97e68;
-  --bl-deep: #b04a34;
-  --bl-rail: #8f3826;
-  --bl-ink:  #5c1109;
-  --bl-tint: #fdf1ee;
-}
-
-/* 7. Days Between Dates, profile orange */
-#calculators-tool-days-between,
-.nav-item[data-section="calculators"][data-tool="days-between"],
-.tool-card[data-section="calculators"][data-tool="days-between"],
-body[data-active-tool="calculators/days-between"] .modal-backdrop {
-  --bl-1:    #fdedcf;
-  --bl-2:    #f7cf8c;
-  --bl-3:    #edb45f;
-  --bl-4:    #e3a343;
-  --bl-deep: #b06f14;
-  --bl-rail: #8f5809;
-  --bl-ink:  #4a2c00;
-  --bl-tint: #fdf6e8;
-}
-
-/* 8. TTS Repeater, Games green */
-#productivity-tool-tts-repeater,
-.nav-item[data-section="productivity"][data-tool="tts-repeater"],
-.tool-card[data-section="productivity"][data-tool="tts-repeater"],
-body[data-active-tool="productivity/tts-repeater"] .modal-backdrop {
-  --bl-1:    #e0f8c6;
-  --bl-2:    #b8e78a;
-  --bl-3:    #97d661;
-  --bl-4:    #86cc4b;
-  --bl-deep: #4f8f1c;
-  --bl-rail: #3f7714;
-  --bl-ink:  #1f3d08;
-  --bl-tint: #f3fbe9;
-}
-
-/* 9. Dummy File Generator, Media blue */
-#files-tool-dummy-file-generator,
-.nav-item[data-section="files"][data-tool="dummy-file-generator"],
-.tool-card[data-section="files"][data-tool="dummy-file-generator"],
-body[data-active-tool="files/dummy-file-generator"] .modal-backdrop {
-  --bl-1:    #dbf0fa;
-  --bl-2:    #a6dbf1;
-  --bl-3:    #7cc6e6;
-  --bl-4:    #63b8de;
-  --bl-deep: #2f7fa8;
-  --bl-rail: #1f6389;
-  --bl-ink:  #0d3d59;
-  --bl-tint: #eff8fd;
 }
 
 /* =============================================================================
@@ -280,15 +242,7 @@ body[data-active-tool="files/dummy-file-generator"] .modal-backdrop {
    these scopes instead, each one substitutes against its own blade.
 ============================================================================= */
 
-#tracking-tool-budget,
-#tracking-tool-time-tracker,
-#files-tool-auto-backup,
-#productivity-tool-countdown,
-#tracking-tool-game-stats,
-#files-tool-image-ccr,
-#calculators-tool-days-between,
-#productivity-tool-tts-repeater,
-#files-tool-dummy-file-generator,
+.tool-view[data-blade],
 body[data-active-tool] .modal-backdrop {
   /* Sub-surfaces inside a panel: Budget's ledger and setup rows, Time
      Tracker's totals block and entry rows, Game Stats' tiles and chips. */
@@ -414,6 +368,34 @@ body {
    sidebar is a legible column of colors rather than nine grey glyphs. */
 .nav-item[data-tool] .nav-icon {
   color: var(--bl-rail);
+}
+
+/* ── The attention pulse, in the tool's own blade ──
+   .nav-item.attention-pulse and .tool-card.attention-pulse animate
+   --color-btn / --color-btn-text (shell.css, landing.css). The blade scopes
+   deliberately do NOT remap the shared tokens on sidebar rows and Home cards,
+   because that would recolor the silver stack itself, so both pulsed in
+   :root's green whatever tool was asking: Budget and Auto-Backup, the only two
+   that raise it, both flashed the wrong color.
+
+   Remapped here instead, only while the pulse is up, and only on the pulsing
+   element. --bl-rail is declared on that same element by the blade block
+   above, so var() substitutes against the row's own blade rather than :root's.
+   White ink because a rail-filled control is the one place this theme uses
+   white (see the header note). */
+.nav-item.attention-pulse,
+.tool-card.attention-pulse {
+  --color-btn:      var(--bl-rail);
+  --color-btn-text: #ffffff;
+}
+
+/* The icon has a color of its own (the rail, above), so on a rail-filled row
+   it would pulse into invisibility. Inherit instead: the row's `color` is what
+   the animation is already driving, which also keeps the icon phase-locked to
+   it for free (shell.ts sets the negative animation-delay on the row, not on
+   anything inside it). */
+.nav-item.attention-pulse .nav-icon {
+  color: inherit;
 }
 
 .nav-item:hover {
@@ -808,7 +790,7 @@ textarea:focus {
 
 /* ── Budget Tracker ──
    The four accent panels keep the tool's own blade (inherited from
-   #tracking-tool-budget) and are told apart by their rails, which come from
+   the same blade) and are told apart by their rails, which come from
    --color-accent-* above. No background overrides here on purpose: setting
    one would break the tool out of its color. */
 
@@ -870,7 +852,7 @@ textarea:focus {
    The whole tool re-skins through the --gs-* hooks declared at the top of
    src/tool/game-stats.css (rails, tiles, scoreboard, round grid, comparison
    table, history cards, chart tooltip). Pointed at the blade vars, so the tool
-   paints itself from #tracking-tool-game-stats' own purple.
+   paints itself from whichever blade Game Stats is currently wearing.
 
    --gs-accent and --gs-accent-soft are NOT here: they are blade-relative, so
    they are declared in the blade scope instead. These are the hue-independent

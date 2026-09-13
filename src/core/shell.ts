@@ -148,6 +148,7 @@ export { getSoundOptions, resolveSoundUrl, playSoundUrl } from "../sound/sound";
 import {
   SIDEBAR_SORT_MENU,
   applySidebarOrder,
+  bladeForToolKey,
   applySidebarSort,
   isToolPinned,
   isToolVisible,
@@ -867,8 +868,13 @@ function switchSection(sectionKey: string, toolKey?: string): void {
   // tool is open" rather than "a tool was last open".
   if (toolKey) {
     document.body.dataset.activeTool = `${sectionKey}/${toolKey}`;
+    // Which of the five Blades colors that tool is currently wearing. It is a
+    // function of the tool's POSITION in the sidebar, so it cannot be written
+    // into the stylesheet; see applyBladeOrder() in sidebar-edit.ts.
+    document.body.dataset.activeBlade = String(bladeForToolKey(`${sectionKey}/${toolKey}`));
   } else {
     delete document.body.dataset.activeTool;
+    delete document.body.dataset.activeBlade;
   }
 
   navItems.forEach((item) => {
@@ -1987,8 +1993,40 @@ function normalizeSidebarItems(raw: unknown): SidebarItemState[] {
     deduped.push(it);
   }
 
-  const missing = ALL_TOOLS.filter((t) => !seen.has(t.key)).map((t) => ({ key: t.key, pinned: true }));
-  return [...deduped, ...missing];
+  /* A TOOL ADDED SINCE THIS WAS SAVED LANDS WHERE ALL_TOOLS SAYS IT BELONGS,
+     not at the end. Appending was the old answer and it was wrong in the one
+     case it existed for: someone who has dragged their sidebar into an order
+     they know gets the new tool dumped at the bottom, furthest from the tools
+     it is related to, and the Blades theme (which colors by position) recolors
+     everything below it. Instead the new tool is slotted in after the nearest
+     tool that PRECEDES it in ALL_TOOLS and is already in the list, so it
+     arrives beside its neighbors and everything the user ordered by hand stays
+     exactly where they put it.
+
+     Pinned and hidden are kept as two runs, because the rest of the sidebar
+     code takes "pinned items come first" as a given. A new tool is pinned, so
+     it is only ever placed among the pinned ones. */
+  const pinnedList = deduped.filter((it) => it.pinned);
+  const hiddenList = deduped.filter((it) => !it.pinned);
+
+  for (const [rank, meta] of ALL_TOOLS.entries()) {
+    if (seen.has(meta.key)) continue;
+    seen.add(meta.key);
+    // The closest earlier ALL_TOOLS entry that is actually on the list. Walking
+    // backwards rather than taking ALL_TOOLS' immediate predecessor, because
+    // that one may itself be hidden or absent.
+    let at = 0;
+    for (let i = rank - 1; i >= 0; i--) {
+      const found = pinnedList.findIndex((it) => it.key === ALL_TOOLS[i].key);
+      if (found !== -1) {
+        at = found + 1;
+        break;
+      }
+    }
+    pinnedList.splice(at, 0, { key: meta.key, pinned: true });
+  }
+
+  return [...pinnedList, ...hiddenList];
 }
 
 /** Loads settings from disk, merges over defaults (so new settings get their
