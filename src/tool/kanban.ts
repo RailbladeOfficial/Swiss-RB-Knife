@@ -930,12 +930,56 @@ let headerNotice: HTMLElement;
 /** Parses a YYYY-MM-DD string to a local Date at midday. Midday, not midnight,
  *  so a day difference computed across a daylight-saving boundary is still a
  *  whole number of days rather than 0.958 of one. */
+/**
+ * Parses either shape a stored moment can take, in LOCAL time.
+ *
+ * TWO SHAPES, on purpose. A due date is a calendar day and nothing else, so it
+ * is stored as `YYYY-MM-DD`. A stage stamp records the moment something
+ * actually happened, so it is stored as `YYYY-MM-DDTHH:MM`, which is exactly
+ * what <input type="datetime-local"> reads and writes.
+ *
+ * A BARE DATE IS PINNED TO NOON, which is not arbitrary: it is what keeps whole
+ * -day arithmetic exact across a daylight-saving boundary, where midnight to
+ * midnight can be 23 or 25 hours and would round to the wrong number of days.
+ * A stamp that carries a real time uses that time, because there the point IS
+ * the time.
+ */
 export function parseDay(value: string | null | undefined): Date | null {
   if (!value) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?$/.exec(value);
   if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+  const hasTime = m[4] !== undefined;
+  const d = new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    hasTime ? Number(m[4]) : 12,
+    hasTime ? Number(m[5]) : 0,
+    0,
+    0,
+  );
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Whether a stored value carries a time as well as a date. */
+export function hasTimeOfDay(value: string | null | undefined): boolean {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value);
+}
+
+/** A moment in the form a stage stamp is stored and a datetime-local input
+ *  reads. Built from the local clock rather than toISOString(), which is UTC
+ *  and would stamp the wrong day for anyone west of Greenwich after 5pm. */
+function localStamp(d: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+/** Now, as a stage stamp. */
+export function nowStamp(): string {
+  return localStamp(new Date());
 }
 
 /** Whole days from `from` to `to`, or null if either is missing/unparseable.
@@ -948,12 +992,28 @@ export function dayDiff(from: string | null, to: string | null): number | null {
 }
 
 /** Renders a date in the app's chosen order. The stored form is always
- *  YYYY-MM-DD; only the display flips. */
+ *  YYYY-MM-DD; only the display flips. A stamp carrying a time is handed to
+ *  formatMoment instead, so nothing prints a raw "2026-09-06T14:30". */
 function formatDate(value: string | null): string {
   if (!value) return "—";
-  if (!shellSettings.americanDates) return value;
-  const [y, m, d] = value.split("-");
-  return `${m}-${d}-${y}`;
+  if (hasTimeOfDay(value)) return formatMoment(value);
+  return formatStoredDate(value, shellSettings.americanDates);
+}
+
+/** A stage stamp: the date in the app's chosen order, then the time in the
+ *  app's chosen clock. Falls back to the date alone for a value that has no
+ *  time, so every caller can use this without asking first. */
+function formatMoment(value: string | null): string {
+  if (!value) return "—";
+  const [day, time] = value.split(/[T ]/);
+  const date = formatStoredDate(day, shellSettings.americanDates);
+  if (!time) return date;
+  const [h, m] = time.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return date;
+  if (!shellSettings.hour12) return `${date} ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  const suffix = h < 12 ? "am" : "pm";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${date} ${hour12}:${String(m).padStart(2, "0")}${suffix}`;
 }
 
 /** "same day" / "1 day" / "12 days". Used everywhere a duration is reported,
@@ -968,6 +1028,15 @@ export function describeDays(n: number): string {
  *  it can be compared against the stage dates on the same footing. */
 export function createdDay(card: Card): string {
   return new Date(card.createdAt).toLocaleDateString("en-CA");
+}
+
+/** The moment a card was created, date AND time, for showing beside the stage
+ *  stamps. Display only: every day count and the stage order check keep using
+ *  createdDay(), because a real time there would shift "12 days old" and lead
+ *  time by a day depending on the hour, and would flag a Work Started stamp
+ *  from earlier on the creation day as out of order. */
+export function createdMoment(card: Card): string {
+  return localStamp(new Date(card.createdAt));
 }
 
 function clampInt(value: unknown, lo: number, hi: number, fallback: number): number {
@@ -1864,7 +1933,19 @@ function normalizeComment(raw: unknown): CardComment | null {
  *  is subtracted from these and a half-valid date would produce a number that
  *  looks real and is not. */
 function normalizeDay(raw: unknown): string | null {
-  return typeof raw === "string" && parseDay(raw) !== null ? raw : null;
+  // A day and only a day: a time on a due date would be a promise the overdue
+  // check does not keep, since it compares whole days.
+  return typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) && parseDay(raw) !== null
+    ? raw
+    : null;
+}
+
+/** A stage stamp: either shape, kept as written. Normalized to the T form so
+ *  a value that arrived with a space (a hand-edited file, an agent) sorts and
+ *  compares the same as one this app wrote. */
+function normalizeMoment(raw: unknown): string | null {
+  if (typeof raw !== "string" || parseDay(raw) === null) return null;
+  return raw.replace(" ", "T");
 }
 
 /** An author survives a round trip only if it is complete. A half-written one
@@ -1936,10 +2017,14 @@ function normalizeCard(raw: unknown): Card | null {
           .slice(0, MAX_COMMENTS_PER_CARD)
       : [],
     dates: {
+      // A target, so a calendar day and nothing else.
       due: normalizeDay(d.due),
-      started: normalizeDay(d.started),
-      testing: normalizeDay(d.testing),
-      completed: normalizeDay(d.completed),
+      // Records of something that happened, so they carry the time it happened
+      // at. A stamp written before they did is a bare date and stays one:
+      // inventing a time for it would be inventing a fact.
+      started: normalizeMoment(d.started),
+      testing: normalizeMoment(d.testing),
+      completed: normalizeMoment(d.completed),
     },
     archived: c.archived === true,
     createdAt: typeof c.createdAt === "number" ? c.createdAt : now,
@@ -4595,7 +4680,9 @@ function moveCardToColumn(card: Card, columnId: string): void {
   card.columnId = column.id;
   card.order = -1; // to the top of its new column, then resequenced
   if (column.isDone && effective(board).autoCompleteOnDone && !card.dates.completed) {
-    card.dates.completed = today();
+    // The moment, like every other stage stamp. Dropping a card into Done is
+    // the app watching something happen, so it knows the time as well as the day.
+    card.dates.completed = nowStamp();
     flash("Stamped the card's Complete date.");
   }
   resequence(board.id);
@@ -4641,7 +4728,10 @@ function moveCardToBoard(card: Card, boardId: string): void {
 function advanceStage(card: Card): void {
   const next = furthestStage(card) + 1;
   if (next >= STAGES.length) return;
-  card.dates[STAGES[next]] = today();
+  // The moment, not the day. This button's whole job is recording when
+  // something happened, and "some time on Tuesday" is a worse answer than the
+  // one the clock was already able to give.
+  card.dates[STAGES[next]] = nowStamp();
   stampCard(card);
 }
 
@@ -4667,8 +4757,14 @@ export function stageOrderWarning(card: Card): string | null {
   ];
   const set = chain.filter((s) => s.value !== null);
   for (let i = 1; i < set.length; i++) {
-    const diff = dayDiff(set[i - 1].value, set[i].value);
-    if (diff !== null && diff < 0) {
+    /* Compared as INSTANTS, not rounded to whole days. Now that a stage stamp
+       carries a time, "completed at 09:00, work started at 14:00" is out of
+       order on the same day, and dayDiff would round that to zero and say
+       nothing. Created is still a bare day and parses to noon, so a stamp
+       earlier on the creation day does not read as an error. */
+    const a = parseDay(set[i - 1].value)?.getTime();
+    const b = parseDay(set[i].value)?.getTime();
+    if (a !== undefined && b !== undefined && b < a) {
       return `${set[i].label} is before ${set[i - 1].label}`;
     }
   }
@@ -4679,7 +4775,7 @@ function renderCardStages(card: Card): void {
   const grid = document.getElementById("kbCardStages")!;
   grid.replaceChildren();
 
-  grid.appendChild(buildStageRow("Created", createdDay(card), null));
+  grid.appendChild(buildStageRow("Created", createdMoment(card), null));
   for (const stage of STAGES) {
     grid.appendChild(
       buildStageRow(STAGE_LABELS[stage], card.dates[stage], (value) => {
@@ -4699,7 +4795,7 @@ function renderCardStages(card: Card): void {
     const next = STAGES[furthest + 1];
     advance.disabled = false;
     advance.textContent = ADVANCE_LABELS[next];
-    advance.title = `Stamps ${STAGE_LABELS[next]} with today's date.`;
+    advance.title = `Stamps ${STAGE_LABELS[next]} with the date and time right now.`;
   } else {
     advance.disabled = true;
     advance.textContent = "All Stages Stamped";
@@ -4781,9 +4877,13 @@ function buildStageRow(
   }
 
   const input = document.createElement("input");
-  input.type = "date";
+  input.type = "datetime-local";
   input.className = "kb-stage-input";
-  input.value = value ?? "";
+  /* A stamp written before stage times existed is a bare date, which a
+     datetime-local input will not display at all. Shown at midnight so the
+     control has something to hold, and left alone in storage until it is
+     actually edited: reading a card must not rewrite it. */
+  input.value = value ? (hasTimeOfDay(value) ? value : `${value}T00:00`) : "";
   input.addEventListener("change", () => onChange(input.value || null));
   row.appendChild(input);
 
@@ -10081,12 +10181,34 @@ function agentBool(params: Record<string, unknown>, key: string): boolean | unde
 /** A date argument: a real YYYY-MM-DD, or null to clear it. Absent leaves the
  *  field alone, which is why "not given" and "given as null" have to stay
  *  distinguishable all the way down. */
+/** A due date: a calendar day and nothing else.
+ *
+ *  A time is REFUSED here rather than accepted and dropped. parseDay takes
+ *  either shape, so an agent sending "2026-09-06T14:00" for a due date would
+ *  have been told yes, had it written, and then found it gone at the next load
+ *  when normalizeDay refused it. Being told no is the honest answer. */
 function agentDay(params: Record<string, unknown>, key: string): string | null | undefined {
   if (!(key in params)) return undefined;
   const value = params[key];
   if (value === null) return null;
-  if (typeof value === "string" && parseDay(value) !== null) return value;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && parseDay(value) !== null) {
+    return value;
+  }
   throw new AgentError(`"${key}" must be a date as YYYY-MM-DD, or null to clear it.`);
+}
+
+/** A stage stamp: a day, or a day and a time. Normalized the same way a stamp
+ *  from the front end is, so an agent writing "2026-09-06 14:00" produces a
+ *  value that sorts and compares like every other one. */
+function agentMoment(params: Record<string, unknown>, key: string): string | null | undefined {
+  if (!(key in params)) return undefined;
+  const value = params[key];
+  if (value === null) return null;
+  const normalized = normalizeMoment(value);
+  if (normalized !== null) return normalized;
+  throw new AgentError(
+    `"${key}" must be YYYY-MM-DD or YYYY-MM-DDTHH:MM, or null to clear it.`,
+  );
 }
 
 function agentStringList(params: Record<string, unknown>, key: string): string[] | undefined {
@@ -10487,8 +10609,15 @@ function agentSetCardDates(
   assertCardNotOpen(card);
 
   let touched = false;
-  for (const field of ["due", "started", "testing", "completed"] as const) {
-    const value = agentDay(params, field);
+  // Due is a target and is a day; the three stages are records of something
+  // that happened and carry the time it happened at.
+  const due = agentDay(params, "due");
+  if (due !== undefined) {
+    card.dates.due = due;
+    touched = true;
+  }
+  for (const field of STAGES) {
+    const value = agentMoment(params, field);
     if (value === undefined) continue;
     card.dates[field] = value;
     touched = true;

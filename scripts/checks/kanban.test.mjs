@@ -1520,3 +1520,108 @@ test("the file header lists exactly the commands the file defines", () => {
   assert.deepEqual(undocumented, [], "these commands exist but the header does not name them");
   assert.deepEqual(phantom, [], "the header names these, and they do not exist");
 });
+test("a stage stamp carries a time, and a due date does not", () => {
+  /* A due date is a TARGET, compared as whole days by the overdue check. A
+     stage stamp is a RECORD of something that happened, and the time it
+     happened at is most of the point. Storing both the same way meant either
+     lying about one or losing the other.
+
+     The failure this guards is quiet in both directions: a time on a due date
+     is accepted by parseDay, written, and then dropped by normalizeDay at the
+     next load, and a stage stamp normalized as a day loses its time the same
+     way. */
+  const src = ts();
+
+  const day = slice("src/tool/kanban.ts", "function normalizeDay(", "\n}");
+  assert.match(day, /\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$/, "a due date would accept a time and then lose it");
+
+  const moment = slice("src/tool/kanban.ts", "function normalizeMoment(", "\n}");
+  assert.match(moment, /replace\(" ", "T"\)/, "a stamp written with a space is not normalized");
+
+  // The three stages go through normalizeMoment, the due date through normalizeDay.
+  const dates = src.slice(src.indexOf("    dates: {"), src.indexOf("    dates: {") + 500);
+  assert.match(dates, /due: normalizeDay\(/, "the due date is not normalized as a day");
+  for (const stage of ["started", "testing", "completed"]) {
+    assert.match(
+      dates,
+      new RegExp(`${stage}: normalizeMoment\\(`),
+      `${stage} is not normalized as a moment, so its time is dropped on load`,
+    );
+  }
+
+  // Both stamping paths record the moment, not the day.
+  const advance = slice("src/tool/kanban.ts", "function advanceStage(", "\n}");
+  assert.match(advance, /nowStamp\(\)/, "the stage button still stamps a bare day");
+  const move = slice("src/tool/kanban.ts", "function moveCardToColumn(", "\n}");
+  assert.match(move, /card\.dates\.completed = nowStamp\(\)/, "the drop-into-Done stamp is still a bare day");
+
+  // And the input can actually hold a time.
+  assert.match(src, /input\.type = "datetime-local"/, "the stage editor is still a date-only input");
+});
+
+test("Created shows its time beside the stages, and only shows it", () => {
+  /* The three stage rows show a date and a time, and Created showed only the
+     date, which reads as the time being unknown. It is known: createdAt is an
+     exact instant. But the same card's day counts ("12 days old", lead time)
+     and the stage order check read createdDay(), and a real time there would
+     move a count by a day depending on the hour and flag a Work Started stamp
+     from earlier on the creation day as out of order. So the time is for the
+     row alone. */
+  const stages = slice("src/tool/kanban.ts", "function renderCardStages(", "\n}");
+  assert.ok(
+    stages.includes('buildStageRow("Created", createdMoment(card), null)'),
+    "the Created row is back to showing a bare date",
+  );
+
+  const moment = slice("src/tool/kanban.ts", "function createdMoment(", "\n}");
+  assert.ok(moment.includes("localStamp("), "the creation time is not built from the local clock");
+  assert.ok(!moment.includes("toISOString"), "the creation time is UTC, so it shows the wrong hour");
+
+  for (const [name, start] of [
+    ["the stage order check", "function stageOrderWarning("],
+    ["the card stats", "function computeCardStats("],
+  ]) {
+    const body = slice("src/tool/kanban.ts", start, "\n}");
+    assert.ok(body.includes("createdDay("), `${name} no longer reads the creation day`);
+    assert.ok(!body.includes("createdMoment("), `${name} does day math on the creation TIME`);
+  }
+});
+
+test("a stage stamp made before times existed still opens", () => {
+  /* Every card written before this release holds a bare YYYY-MM-DD. A
+     datetime-local input will not display one at all, so it would read as the
+     stamp having been cleared, and the first save would make that true. */
+  const row = slice("src/tool/kanban.ts", "function buildStageRow(", "\n}");
+  assert.match(
+    row,
+    /hasTimeOfDay\(value\) \? value : `\$\{value\}T00:00`/,
+    "an older date-only stamp has nothing to show in the input",
+  );
+
+  // And parseDay reads both, with the bare day still pinned to noon so
+  // whole-day arithmetic survives a daylight-saving boundary.
+  const parse = slice("src/tool/kanban.ts", "export function parseDay(", "\n}");
+  assert.match(parse, /hasTime \? Number\(m\[4\]\) : 12/, "a bare day is no longer pinned to noon");
+});
+
+test("the stage order warning compares instants, not days", () => {
+  // With a time on each stamp, "completed 09:00, work started 14:00" is out of
+  // order on one day, and rounding to whole days would say nothing at all.
+  const fn = slice("src/tool/kanban.ts", "export function stageOrderWarning(", "\n}");
+  assert.ok(!fn.includes("dayDiff("), "the ordering check still rounds to whole days");
+  assert.match(fn, /parseDay\(set\[i - 1\]\.value\)\?\.getTime\(\)/, "the check does not compare instants");
+});
+
+test("changing the shape of a stored field bumps the data-folder version", () => {
+  /* An older build hands each stage value to a YYYY-MM-DD regex, gets no match,
+     and normalizes it to null: it does not ignore the time, it drops the whole
+     stamp and then writes the card back without it. That is the case the
+     version stamp exists for, as opposed to a NEW field an older build would
+     simply skip, which must not bump it. */
+  const lib = read("src-tauri/src/lib.rs");
+  const m = /pub\(crate\) const DATA_SCHEMA_VERSION: u32 = (\d+);/.exec(lib);
+  assert.ok(m, "the data schema version is gone");
+  assert.ok(Number(m[1]) >= 2, "stage stamps changed shape without the folder version moving");
+  assert.match(lib, /2 = Kanban stage stamps carry a time/, "the new version is not written down");
+});
+

@@ -287,7 +287,7 @@ const TOOLS: &[ToolSpec] = &[
                     "priority": { "type": "string", "enum": ["none", "trivial", "low", "medium", "high", "critical"] },
                     "effort": { "type": "string", "enum": ["none", "tiny", "small", "medium", "large", "huge"] },
                     "tags": { "type": "array", "items": { "type": "string" }, "description": "Existing tags, by name or id. Needs the assign-tags permission." },
-                    "due": { "type": "string", "description": "Due date as YYYY-MM-DD. Needs the set-dates permission." },
+                    "due": { "type": "string", "description": "Due date as YYYY-MM-DD, a day only. Needs the set-dates permission." },
                     "subtasks": { "type": "array", "items": { "type": "string" } },
                     "position": { "type": "string", "enum": ["top", "bottom"], "description": "Where in the column. Default bottom." }
                 }),
@@ -335,16 +335,18 @@ const TOOLS: &[ToolSpec] = &[
         name: "kanban_set_card_dates",
         op: "set_card_dates",
         permissions: &["setDates"],
-        description: "Sets or clears a card's due date and its work-stage dates. Pass null to \
-                      clear one. Dates are YYYY-MM-DD.",
+        description: "Sets or clears a card's due date and its work-stage stamps. Pass null to \
+                      clear one. The due date is a day, YYYY-MM-DD. The three stage stamps \
+                      record when something happened and take YYYY-MM-DDTHH:MM, or a bare \
+                      day when the time is not known.",
         schema: || {
             schema(
                 json!({
                     "card": card_ref(),
-                    "due": { "type": ["string", "null"] },
-                    "started": { "type": ["string", "null"], "description": "When work started." },
-                    "testing": { "type": ["string", "null"], "description": "When testing started." },
-                    "completed": { "type": ["string", "null"], "description": "When it was finished." }
+                    "due": { "type": ["string", "null"], "description": "Target day, YYYY-MM-DD. A time is refused." },
+                    "started": { "type": ["string", "null"], "description": "When work started, YYYY-MM-DDTHH:MM or YYYY-MM-DD." },
+                    "testing": { "type": ["string", "null"], "description": "When testing started, YYYY-MM-DDTHH:MM or YYYY-MM-DD." },
+                    "completed": { "type": ["string", "null"], "description": "When it was finished, YYYY-MM-DDTHH:MM or YYYY-MM-DD." }
                 }),
                 &["card"],
             )
