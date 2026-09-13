@@ -130,6 +130,39 @@ test("the Special tab stays alphabetical", () => {
   const sorted = [...labels].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   assert.deepEqual(labels, sorted, "Special tab themes are no longer in alphabetical order");
 });
+
+test("the theme editor shows what the saved theme will render", () => {
+  /* Picking a system theme as the editor's base and going back to "This theme's
+     saved colors" left six variables applied from the theme looked at on the
+     way past. A system theme reads as all 39 of RANDOM_VARS; a custom theme
+     holds whatever existed the day it was saved, which for the ones on this
+     machine is 33. The live preview only ever SET properties, so the extra six
+     stayed: --color-accent (the active tab's text in most themes, and the one
+     you notice), --color-success, and the four changelog colors. */
+  const src = read("src/theme/theme-editor.ts");
+  const preview = slice("src/theme/theme-editor.ts", "function teLivePreview(", "\n}");
+  assert.match(
+    preview,
+    /removeProperty\(/,
+    "the live preview sets colors without clearing the ones it no longer has, so a previous base leaks through",
+  );
+  assert.match(preview, /for \(const key of RANDOM_VARS\)/, "the preview does not sweep the whole variable list");
+
+  /* And it previews through the SAME rule that applying a saved theme uses.
+     The accent derivation lived only in the apply path, so the preview fell
+     through to the base sheet's accent and the saved theme came up different. */
+  assert.match(src, /function effectiveThemeVars\(/, "there is no single definition of what a custom theme renders with");
+  for (const fn of ["function teLivePreview(", "export function applyCustomThemeById("]) {
+    const body = slice("src/theme/theme-editor.ts", fn, "\n}");
+    assert.match(body, /effectiveThemeVars\(/, `${fn} does not go through the shared rule`);
+  }
+  assert.equal(
+    (src.match(/deriveAccent\(/g) ?? []).length,
+    2,
+    "the accent derivation is called from more than the one place that defines the rule",
+  );
+});
+
 test("the Blades theme colors tools by position, and the app stamps the position", () => {
   /* Blades hands every tool one of five colors and the whole look rests on the
      sidebar reading red, orange, green, blue, purple in order. That order is

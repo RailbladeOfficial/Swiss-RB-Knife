@@ -338,22 +338,36 @@ export function clearCustomTheme(): void {
   document.getElementById("custom-theme-adv-styles")?.remove();
 }
 
+/**
+ * The colors a custom theme ACTUALLY renders with: the ones it stores, plus the
+ * derived accent when it stores none.
+ *
+ * One function, called by both the live preview and the apply-a-saved-theme
+ * path, because the editor showing something the saved theme will not reproduce
+ * is the whole failure this is here to stop. The derivation used to live only
+ * in the apply path, so the preview fell through to the base sheet's accent and
+ * the saved theme came up with a different one.
+ */
+function effectiveThemeVars(vars: Record<string, string>): Record<string, string> {
+  const out = { ...vars };
+  /* --color-accent (the bright highlight for active tabs, titles and slider
+     values) is not one of the editor's swatches. It comes off --color-btn, so
+     a custom theme gets a sensible highlight without another picker, and so
+     does one saved before the variable existed. An explicit value always wins. */
+  if (!out["--color-accent"] && out["--color-btn"]) {
+    out["--color-accent"] = deriveAccent(out["--color-btn"]);
+  }
+  return out;
+}
+
 /** Applies a custom theme by id: sets CSS vars on :root and injects advanced styles. */
 export function applyCustomThemeById(id: string): void {
   const theme = customThemes.find((t) => t.id === id);
   if (!theme) return;
   setActiveCustomId(id);
   const root = document.documentElement;
-  for (const [key, value] of Object.entries(theme.vars)) {
+  for (const [key, value] of Object.entries(effectiveThemeVars(theme.vars))) {
     root.style.setProperty(key, value);
-  }
-  // --color-accent (the bright highlight for active tabs/titles/slider values)
-  // isn't a custom-editor swatch. Derive it from --color-btn so custom themes (
-  // including ones saved before this var existed) get a sensible highlight
-  // without an extra picker. Only set if the theme didn't explicitly provide one.
-  if (!theme.vars["--color-accent"]) {
-    const btn = theme.vars["--color-btn"];
-    if (btn) root.style.setProperty("--color-accent", deriveAccent(btn));
   }
   applyCustomThemeStyles(theme);
 }
@@ -570,10 +584,42 @@ async function teReadSystemThemeVars(
   return vars;
 }
 
+/**
+ * Puts the working colors on screen.
+ *
+ * THE INLINE SET IS MADE TO MATCH THE WORKING SET EXACTLY, which means clearing
+ * as well as setting. This used to only set, and the two sets are not always
+ * the same size: a system theme is read as all 39 of RANDOM_VARS, while a
+ * custom theme holds whatever existed on the day it was saved. Three of the
+ * themes on this machine hold 33.
+ *
+ * So picking a system theme as the base and then going back to "This theme's
+ * saved colors" left the six the saved theme has never heard of still applied,
+ * from the theme you looked at on the way past: `--color-accent` (which is the
+ * active tab's text in most themes, and the one you notice), `--color-success`,
+ * and the four changelog colors. The swatches said one thing and the app was
+ * rendering another, until the editor was closed.
+ */
 function teLivePreview(): void {
   const root = document.documentElement;
-  for (const [key, value] of Object.entries(_teWorkingVars)) {
-    root.style.setProperty(key, value);
+  const effective = effectiveThemeVars(_teWorkingVars);
+
+  /* Cleared as well as set, so the inline set matches the working set exactly.
+     The two are not always the same size: a system theme reads as all 39 of
+     RANDOM_VARS, and a custom theme holds whatever existed on the day it was
+     saved, which for the three on this machine is 33. */
+  for (const key of RANDOM_VARS) {
+    const value = effective[key];
+    if (value === undefined) root.style.removeProperty(key);
+    else root.style.setProperty(key, value);
+  }
+  /* Anything the working set holds that RANDOM_VARS does not. None today, and
+     set rather than cleared because a variable this file has not heard of is
+     one it has no business dropping. */
+  for (const [key, value] of Object.entries(effective)) {
+    if (!(RANDOM_VARS as readonly string[]).includes(key)) {
+      root.style.setProperty(key, value);
+    }
   }
   // Build a synthetic theme object and apply its advanced styles
   const synthetic: CustomTheme = {
