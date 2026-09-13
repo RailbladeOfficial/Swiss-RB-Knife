@@ -491,6 +491,36 @@ test("the app looks for the sidecar under the name the build produces", () => {
   );
 });
 
+test("a dev build hands out the copy, not the exe cargo has to overwrite", () => {
+  /* An agent spawns srbk-agent.exe and holds it open for its whole session,
+     and Windows will not let cargo overwrite a running exe. So a connection
+     pointed at target/debug does not fail on its own terms, it fails the NEXT
+     dev build: cargo tries to relink the file the agent is holding and the
+     build dies before the app starts, with nothing on screen connecting the
+     two. The fix is that a debug build copies the exe out of target/ and the
+     Agents tab hands out THAT path. Both halves have to stay, and the lookup
+     has to prefer the copy, or the trap comes straight back. */
+  const build = read("scripts/build-agent.mjs");
+  assert.match(
+    build,
+    /path\.join\(ROOT_DIR, "dev", "bin"\)/,
+    "the debug build no longer copies the exe out of target/",
+  );
+  assert.match(
+    build,
+    /EBUSY[\s\S]{0,60}EPERM/,
+    "a destination locked by a running agent must warn, not fail the build",
+  );
+
+  const preferred = gate().indexOf('dev/bin/srbk-agent.exe');
+  const beside = gate().indexOf('let beside = dir.join("srbk-agent.exe")');
+  assert.ok(preferred !== -1, "the app no longer looks for the dev copy");
+  assert.ok(
+    preferred < beside,
+    "the app finds target/debug first, so a dev connection still points at the exe cargo overwrites",
+  );
+});
+
 test("a permission flipped mid-session reaches the agent's tool list", () => {
   /* The tool list is trimmed to what the board allows, and tools/list re-asks
      the app every time so its answer is always current. But an MCP client asks

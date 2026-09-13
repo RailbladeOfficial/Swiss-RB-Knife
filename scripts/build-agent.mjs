@@ -22,9 +22,10 @@ import { fileURLToPath } from "node:url";
 | Two modes:
 |
 |   node scripts/build-agent.mjs              debug, for `tauri dev`. Cargo puts
-|                                             the exe in target/debug, which is
-|                                             already beside the dev app binary,
-|                                             so nothing has to be copied.
+|                                             the exe in target/debug, beside the
+|                                             dev app binary, and this copies it
+|                                             to dev/bin for agents to run. See
+|                                             "The Debug Copy" below for why.
 |
 |   node scripts/build-agent.mjs --release    release, for `tauri build`. Copies
 |                                             the exe to src-tauri/binaries under
@@ -40,6 +41,7 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const TAURI_DIR = path.join(ROOT_DIR, "src-tauri");
 const MANIFEST = path.join(TAURI_DIR, "Cargo.toml");
 const BINARIES_DIR = path.join(TAURI_DIR, "binaries");
+const DEV_BIN_DIR = path.join(ROOT_DIR, "dev", "bin");
 
 const release = process.argv.includes("--release");
 
@@ -80,8 +82,37 @@ if (!fs.existsSync(built)) {
   throw new Error(`cargo reported success but ${built} is not there`);
 }
 
+/*
+|--------------------------------------------------------------------------
+| The Debug Copy
+|--------------------------------------------------------------------------
+|
+| An AI agent spawns srbk-agent.exe and holds it open for the whole session,
+| and Windows will not let cargo overwrite a running exe. So an agent pointed
+| at target/debug breaks the NEXT dev build: cargo tries to relink the very
+| file the agent is holding, and the build dies before the app ever starts.
+|
+| A debug build therefore leaves a copy outside target/, and that copy is the
+| one the Agents tab hands out (see sidecar_path() in src-tauri/src/agent_gate.rs).
+| Cargo keeps target/debug to itself and is never blocked by a running agent.
+|
+| A locked destination means an agent is running the copy at this moment. That
+| is a warning rather than a failure: the old copy stays, the running agent
+| keeps working, and it picks up this build whenever it is next started.
+| Failing here would reintroduce the blocked build the copy exists to avoid.
+|
+*/
+
 if (!release) {
-  console.log(`srbk-agent: ${built}`);
+  fs.mkdirSync(DEV_BIN_DIR, { recursive: true });
+  const copy = path.join(DEV_BIN_DIR, "srbk-agent.exe");
+  try {
+    fs.copyFileSync(built, copy);
+    console.log(`srbk-agent: ${copy}`);
+  } catch (error) {
+    if (error.code !== "EBUSY" && error.code !== "EPERM") throw error;
+    console.warn(`srbk-agent: kept the existing ${copy}, an agent is running it`);
+  }
   process.exit(0);
 }
 

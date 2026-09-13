@@ -758,15 +758,29 @@ fn sidecar_path(_app: &AppHandle) -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
 
+    // Dev: hand out the copy in dev/bin, NOT the one cargo just built beside
+    // this binary. An agent holds the exe it spawned open for its whole
+    // session, and Windows will not let cargo overwrite a running exe, so an
+    // agent pointed at target/debug blocks the next dev build. The copy is
+    // made by scripts/build-agent.mjs; see "The Debug Copy" there.
+    #[cfg(debug_assertions)]
+    {
+        // From src-tauri/target/debug up to the repo root, then dev/bin.
+        let copy = dir.join("../../../dev/bin/srbk-agent.exe");
+        if copy.exists() {
+            return fs::canonicalize(copy).ok();
+        }
+    }
+
     // Release: the sidecar sits beside the app, put there by the installer.
     let beside = dir.join("srbk-agent.exe");
     if beside.exists() {
         return Some(beside);
     }
 
-    // Dev: cargo puts both binaries in the same target folder anyway, so the
-    // line above usually finds it. This is the fallback for a dev run started
-    // from somewhere unusual.
+    // Dev, with no copy made yet: cargo puts both binaries in the same target
+    // folder, so the line above usually finds it. This is the fallback for a
+    // dev run started from somewhere unusual.
     #[cfg(debug_assertions)]
     {
         let candidate = dir.join("../../target/debug/srbk-agent.exe");
