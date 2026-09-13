@@ -120,6 +120,9 @@ import {
   clearAgentLog,
   AGENT_CLIENTS,
   agentClient,
+  clientHint,
+  COPY_COMMAND_LABEL,
+  copyConfigLabel,
   connectionCommand,
   connectionConfig,
   loadAgentConfig,
@@ -12242,7 +12245,7 @@ function renderAgentClientPicker(): void {
   }
 
   select.value = agentClientId;
-  document.getElementById("kbAgentClientWhere")!.textContent = agentClient(agentClientId).where;
+  document.getElementById("kbAgentClientWhere")!.textContent = clientHint(agentClient(agentClientId));
 }
 
 function renderAgentConnections(
@@ -12308,7 +12311,7 @@ function renderAgentConnections(
 
     const copyBtn = document.createElement("button");
     copyBtn.className = "settings-action-btn";
-    copyBtn.textContent = `Copy for ${client.label}`;
+    copyBtn.textContent = copyConfigLabel(client);
     copyBtn.addEventListener("click", () => {
       void copyAgentText(connectionConfig(info, client), `${client.label} connection`);
     });
@@ -12319,7 +12322,7 @@ function renderAgentConnections(
     const command = connectionCommand(info, client);
     const copyCmd = document.createElement("button");
     copyCmd.className = "settings-action-btn";
-    copyCmd.textContent = "Copy as Command";
+    copyCmd.textContent = COPY_COMMAND_LABEL;
     copyCmd.title =
       `For PowerShell. Replaces this board's earlier connection in ${client.label}, ` +
       "then checks that the new one works.";

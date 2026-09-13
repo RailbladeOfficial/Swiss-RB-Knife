@@ -426,8 +426,13 @@ export interface AgentClient {
   label: string;
   /** Which of the three shapes its config file takes. */
   format: AgentClientFormat;
-  /** Where the block goes, shown under the buttons so nobody has to guess. */
+  /** The file the copied block goes in, as a place, e.g.
+   *  `%USERPROFILE%\.codex\config.toml`. clientHint() builds the sentence
+   *  around it, so this is a location and never an instruction. */
   where: string;
+  /** Whether it has a CLI that can add a server, and so a Copy as Command
+   *  button. connectionCommand() has a branch for each client marked true. */
+  command: boolean;
   /** True for the terminal agents, false for the editors. Only groups the
    *  list; both kinds work identically. */
   cli: boolean;
@@ -451,49 +456,85 @@ export const AGENT_CLIENTS: readonly AgentClient[] = [
     id: "claude-code",
     label: "Claude Code",
     format: "mcpServers",
-    where: "Copy as Command and paste it into PowerShell. Or put the block in .mcp.json in your project.",
+    where: ".mcp.json in your project folder",
+    command: true,
     cli: true,
   },
   {
     id: "codex",
     label: "Codex",
     format: "codexToml",
-    where:
-      "Copy as Command and paste it into PowerShell. Or put the block in ~/.codex/config.toml, or .codex/config.toml in a trusted project.",
+    where: "%USERPROFILE%\\.codex\\config.toml",
+    command: true,
     cli: true,
   },
   {
     id: "gemini-cli",
     label: "Gemini CLI",
     format: "mcpServers",
-    where: "Put the block in ~/.gemini/settings.json, or .gemini/settings.json in your project.",
+    where: "%USERPROFILE%\\.gemini\\settings.json",
+    command: false,
     cli: true,
   },
   {
     id: "cursor",
     label: "Cursor",
     format: "mcpServers",
-    where: "Put the block in ~/.cursor/mcp.json, or .cursor/mcp.json in your project.",
+    where: "%USERPROFILE%\\.cursor\\mcp.json",
+    command: false,
     cli: false,
   },
   {
     id: "windsurf",
     label: "Windsurf",
     format: "mcpServers",
-    where: "Put the block in %USERPROFILE%\\.codeium\\windsurf\\mcp_config.json.",
+    where: "%USERPROFILE%\\.codeium\\windsurf\\mcp_config.json",
+    command: false,
     cli: false,
   },
   {
     id: "vscode",
     label: "VS Code",
     format: "vscode",
-    where: "Put the block in .vscode/mcp.json in your project.",
+    where: ".vscode\\mcp.json in your project folder",
+    command: false,
     cli: false,
   },
 ];
 
 export function agentClient(id: string): AgentClient {
   return AGENT_CLIENTS.find((c) => c.id === id) ?? AGENT_CLIENTS[0];
+}
+
+/** The two copy buttons' labels. Shared with the hint that names them, so the
+ *  instruction can never send someone looking for a button called something
+ *  else. */
+export const COPY_COMMAND_LABEL = "Copy as Command";
+
+export function copyConfigLabel(client: AgentClient): string {
+  return `Copy for ${client.label}`;
+}
+
+/**
+ * The line under Copy For: which button to press, and exactly what to do with
+ * what it copies.
+ *
+ * PowerShell, and it says NOT Command Prompt, because the command is
+ * PowerShell syntax (`2>$null`, `;` between steps, `&` to run the check) and
+ * Command Prompt reads all three differently. Windows Terminal opens
+ * PowerShell by default, but "paste it into a terminal" is how a paste into
+ * cmd happens.
+ */
+export function clientHint(client: AgentClient): string {
+  const parts = [
+    `Use "${copyConfigLabel(client)}" and add the block to ${client.where}.`,
+    "If that file already has other servers in it, add just this entry next to them.",
+  ];
+  if (client.command) {
+    parts.push(`Or use "${COPY_COMMAND_LABEL}" and paste it into PowerShell, not Command Prompt.`);
+  }
+  parts.push(`Then restart ${client.label}.`);
+  return parts.join(" ");
 }
 
 /** What the sidecar is launched with, which is the same for every client. */
@@ -575,6 +616,7 @@ export function connectionConfig(info: ConnectionInfo, client: AgentClient): str
  * Replacing is safe because the key is per board and per build: see serverKey.
  */
 export function connectionCommand(info: ConnectionInfo, client: AgentClient): string | null {
+  if (!client.command) return null;
   const key = serverKey(info.boardName, info.pipeName);
   const env = [`SRBK_AGENT_TOKEN=${info.token}`, `SRBK_AGENT_PIPE=${info.pipeName}`].map(
     (e) => `--env ${e}`,

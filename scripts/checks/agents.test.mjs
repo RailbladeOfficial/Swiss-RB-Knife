@@ -625,3 +625,36 @@ test("the permissions modal knows its board without asking Board Setup", () => {
   const render = src.slice(src.indexOf("async function renderAgentsTab("));
   assert.match(render.slice(0, 300), /agentBoard\(\)/, "the Agents screens do not redraw while Customize is open");
 });
+
+test("the Copy For hint names the buttons as they are labeled, and the right shell", () => {
+  /* The hint is the instruction ('Use "Copy for Claude Code" and...'), so a
+     button renamed without it sends people looking for something that is not
+     there. Both read the same label helpers. The command is PowerShell syntax
+     that Command Prompt cannot run, so the hint has to say which shell. */
+  const agents = read("src/tool/kanban-agents.ts");
+  const hintFn = agents.slice(agents.indexOf("export function clientHint"));
+  const hint = hintFn.slice(0, hintFn.indexOf("\n}"));
+  assert.match(hint, /copyConfigLabel\(client\)/, "the hint spells out the config button's label itself");
+  assert.match(hint, /COPY_COMMAND_LABEL/, "the hint spells out the command button's label itself");
+  assert.match(hint, /PowerShell, not Command Prompt/, "the hint does not say which shell runs the command");
+
+  const ui = kanban();
+  assert.match(ui, /copyBtn\.textContent = copyConfigLabel\(client\)/, "the config button has its own label");
+  assert.match(ui, /copyCmd\.textContent = COPY_COMMAND_LABEL/, "the command button has its own label");
+  assert.match(ui, /clientHint\(agentClient\(agentClientId\)\)/, "the line under Copy For is not the hint");
+
+  // The hint offers the command exactly for the clients that have one.
+  const cmdFn = agents.slice(agents.indexOf("export function connectionCommand"));
+  const cmd = cmdFn.slice(0, cmdFn.indexOf("\n}"));
+  assert.match(cmd, /if \(!client\.command\) return null/, "a client without a command can still be handed one");
+  const list = agents.slice(
+    agents.indexOf("export const AGENT_CLIENTS"),
+    agents.indexOf("export function agentClient"),
+  );
+  const flagged = [...list.matchAll(/id: "([a-z-]+)"[\s\S]*?command: (true|false)/g)]
+    .filter((m) => m[2] === "true")
+    .map((m) => m[1])
+    .sort();
+  const branched = [...cmd.matchAll(/client\.id === "([a-z-]+)"/g)].map((m) => m[1]).sort();
+  assert.deepEqual(flagged, branched, "the clients marked as having a command and the commands written differ");
+});
