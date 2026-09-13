@@ -3080,6 +3080,35 @@ if (__DEV__) {
 // include it when saving maximized state.
 let _lastNonMaxSize: { width: number; height: number } | null = null;
 
+/* THE WINDOW HAS A FLOOR, AND BOTH ENDS HAVE TO HONOR IT.
+ * ----------------------------------------------------------------------------
+ * These mirror minWidth/minHeight in tauri.conf.json. Tauri applies those to a
+ * drag-resize, but NOT to a programmatic setSize, so a size below them could be
+ * written down and then handed straight back on the next launch.
+ *
+ * That is not hypothetical: a 0.6.1 data folder was found holding 787x392.5,
+ * and a dev one holding 144x17.5, which reopens as a window roughly the size of
+ * its own title bar. innerSize() can report a degenerate size while the window
+ * is mid-transition, the debounced save writes whatever it is handed, and the
+ * only check on the way back in was `> 0`.
+ *
+ * Clamped on BOTH sides on purpose. Clamping only the restore would leave the
+ * bad number on disk; clamping only the save would not rescue a file that
+ * already has one. */
+const MIN_WINDOW_WIDTH = 800;
+const MIN_WINDOW_HEIGHT = 400;
+
+/** A saved dimension, or null if it is not a number this app would ever set. */
+function usableWindowSize(width: unknown, height: unknown): { width: number; height: number } | null {
+  if (typeof width !== "number" || typeof height !== "number") return null;
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+  if (width <= 0 || height <= 0) return null;
+  return {
+    width: Math.max(width, MIN_WINDOW_WIDTH),
+    height: Math.max(height, MIN_WINDOW_HEIGHT),
+  };
+}
+
 /** Saves the current window size to disk in logical pixels (DPI-independent).
  *  When maximized, saves the maximized flag alongside the last known restore
  *  dimensions so Windows has the correct restore size when unmaximizing. */
@@ -3108,13 +3137,15 @@ async function saveWindowSize(): Promise<void> {
     // Convert physical → logical so saved values are DPI-independent
     const size = await win.innerSize();
     const factor = await win.scaleFactor();
-    const logicalW = size.width / factor;
-    const logicalH = size.height / factor;
-    _lastNonMaxSize = { width: logicalW, height: logicalH };
+    // Nothing below the floor is worth writing down, and a resize caught
+    // mid-transition is where the degenerate numbers come from.
+    const usable = usableWindowSize(size.width / factor, size.height / factor);
+    if (!usable) return;
+    _lastNonMaxSize = usable;
     await invoke("save_window_size", {
       data: JSON.stringify({
-        width: logicalW,
-        height: logicalH,
+        width: usable.width,
+        height: usable.height,
         maximized: false,
       }),
     });
@@ -3131,14 +3162,12 @@ async function restoreWindowSize(): Promise<void> {
   try {
     const raw = await invoke<string>("load_window_size");
     const parsed = JSON.parse(raw);
-    const width =
-      typeof parsed.width === "number" && parsed.width > 0
-        ? parsed.width
-        : null;
-    const height =
-      typeof parsed.height === "number" && parsed.height > 0
-        ? parsed.height
-        : null;
+    // Anything already on disk from before the floor existed comes back up
+    // to it here, so one launch is enough to fix a file rather than needing
+    // the file deleted by hand.
+    const saved = usableWindowSize(parsed.width, parsed.height);
+    const width = saved?.width ?? null;
+    const height = saved?.height ?? null;
     const maximized =
       typeof parsed.maximized === "boolean" ? parsed.maximized : false;
     const win = getCurrentWindow();
