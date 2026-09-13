@@ -526,7 +526,82 @@ pub fn restart_for_import(app: AppHandle) -> Result<(), String> {
     }
     fs::write(staging.join(READY_MARKER), b"apply")
         .map_err(|e| format!("could not arm the import: {e}"))?;
+
+    /* A DEV BUILD CLOSES INSTEAD OF RESTARTING. `tauri dev` starts the app and
+       the dev server its window loads from, and treats the app exiting as the
+       end of the session. An app that relaunches itself comes back as a process
+       `tauri dev` is not running, looking for a server that is going away with
+       it. The import is applied on the next `npm run tauri dev`, and the Data tab
+       says so before this is pressed. */
+    #[cfg(debug_assertions)]
+    {
+        app.exit(0);
+        return Ok(());
+    }
+
+    #[cfg(not(debug_assertions))]
     app.restart();
+}
+
+/// What happened to an armed import at launch, for the front end to say once.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    /// "applied" or "failed".
+    pub state: &'static str,
+    /// Where the replaced folder was put, when there was one to keep.
+    pub replaced: Option<String>,
+    /// Why it did not apply, in words, for "failed".
+    pub message: String,
+}
+
+/// Held from setup() until the front end takes it, so it is said once a launch
+/// rather than on every reload of the page.
+pub struct PendingImportResult(pub std::sync::Mutex<Option<ImportResult>>);
+
+#[tauri::command]
+pub fn take_import_result(result: tauri::State<'_, PendingImportResult>) -> Option<ImportResult> {
+    result.0.lock().ok().and_then(|mut slot| slot.take())
+}
+
+/// How many times a folder rename is tried before the swap gives up, 200ms
+/// apart: five seconds. See `rename_patiently`.
+const RENAME_ATTEMPTS: u32 = 25;
+
+/// fs::rename, retried for a few seconds.
+///
+/// The app restarts itself to apply an import, and the new process can reach
+/// the swap while the old one is still letting go of the files it had open:
+/// the database, settings.json. Windows will not rename a folder while anything
+/// inside it is open, so a single attempt could lose a race it would have won
+/// a moment later.
+fn rename_patiently(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut attempt = 1;
+    loop {
+        match fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(_) if attempt < RENAME_ATTEMPTS => {
+                attempt += 1;
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            Err(err) => return Err(err),
+        }
+    }
+}
+
+/// The failure a person reads, for a swap Windows refused.
+fn swap_failed(err: &std::io::Error) -> ImportResult {
+    ImportResult {
+        state: "failed",
+        replaced: None,
+        message: format!(
+            "Your data was not changed. Windows would not let Swiss RB Knife move its data \
+             folder ({err}), which means something still has a file in it open: most often a \
+             File Explorer window showing that folder, or a program that watches it. The \
+             import is still unpacked. Close whatever that is, then open App Settings > Data \
+             and press Restart Now to try again, or Discard it."
+        ),
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -537,13 +612,19 @@ pub fn restart_for_import(app: AppHandle) -> Result<(), String> {
 /// setup(), before the folder is judged, before the layout migration, and
 /// before anything at all has opened a file in it.
 ///
-/// Returns the path the replaced folder was moved to, for the log.
+/// Returns what happened, or None when no import was armed.
 ///
 /// EVERY FAILURE LEAVES THE LIVE FOLDER ALONE. The order is: rename the live
 /// folder aside, then rename staging into place. If the first fails nothing
 /// has happened; if the second fails the live folder is put straight back.
 /// There is no window in which both are gone.
-pub fn take_pending_import(app: &AppHandle) -> Option<String> {
+///
+/// A FAILURE IS SAID, NOT LOGGED. This used to return None on a refused rename
+/// and print nothing a person would ever see, having already removed the
+/// marker, so the import sat there unapplied, disarmed, and unexplained. In a
+/// dev build it failed every time, because the dev server was watching the
+/// folder. The result goes to the front end now (see ImportResult).
+pub fn take_pending_import(app: &AppHandle) -> Option<ImportResult> {
     let staging = incoming_dir(app);
     if !staging.is_dir() {
         return None;
@@ -556,8 +637,11 @@ pub fn take_pending_import(app: &AppHandle) -> Option<String> {
     if !marker.is_file() {
         return None;
     }
-    // Removed BEFORE the swap, so the marker never lands inside the live data
-    // folder and cannot re-arm anything on a later launch.
+    /* Removed BEFORE the swap, so the marker never lands inside the live data
+       folder and cannot re-arm anything on a later launch. It also leaves a
+       failed import disarmed, which is deliberate: one that failed on every
+       launch would stall every launch by the retries below. The failure is said
+       instead, and Restart Now arms it again. */
     let _ = fs::remove_file(&marker);
 
     let root = data_root(app);
@@ -570,11 +654,8 @@ pub fn take_pending_import(app: &AppHandle) -> Option<String> {
        litter that looks like a backup. */
     let had_data = fs::read_dir(&root).map(|mut d| d.next().is_some()).unwrap_or(false);
     if had_data {
-        if fs::rename(&root, &replaced).is_err() {
-            // Something still holds the folder. Leaving staging in place means
-            // the next launch tries again, which is the right answer: nothing
-            // has been lost and nothing half-applied.
-            return None;
+        if let Err(err) = rename_patiently(&root, &replaced) {
+            return Some(swap_failed(&err));
         }
     } else {
         // Nothing to keep, but the empty folder is still in the way of the
@@ -582,16 +663,32 @@ pub fn take_pending_import(app: &AppHandle) -> Option<String> {
         let _ = fs::remove_dir_all(&root);
     }
 
-    if fs::rename(&staging, &root).is_err() {
+    if let Err(err) = rename_patiently(&staging, &root) {
         // Put it back exactly as it was. The staged import stays for another
         // attempt rather than being thrown away on one bad launch.
-        let _ = fs::rename(&replaced, &root);
-        return None;
+        if had_data && rename_patiently(&replaced, &root).is_err() {
+            return Some(ImportResult {
+                state: "failed",
+                replaced: Some(replaced.to_string_lossy().to_string()),
+                message: format!(
+                    "The import could not be moved into place ({err}), and your previous data \
+                     folder could not be moved back either. Nothing is lost: it is at {}. Close \
+                     Swiss RB Knife and rename that folder back to {} by hand.",
+                    replaced.display(),
+                    root.display()
+                ),
+            });
+        }
+        return Some(swap_failed(&err));
     }
 
     prune_replaced(&parent, &root);
-    // Nothing was set aside on a first run, so there is nothing to point at.
-    had_data.then(|| replaced.to_string_lossy().to_string())
+    Some(ImportResult {
+        state: "applied",
+        // Nothing was set aside on a first run, so there is nothing to point at.
+        replaced: had_data.then(|| replaced.to_string_lossy().to_string()),
+        message: String::new(),
+    })
 }
 
 /// `<data folder>.srbk-incoming`, beside the data folder.

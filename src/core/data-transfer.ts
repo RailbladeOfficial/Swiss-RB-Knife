@@ -54,10 +54,23 @@ interface StagedImport {
   appVersion: string;
 }
 
+/** What happened at launch to an import armed on the run before. */
+interface ImportResult {
+  state: "applied" | "failed";
+  replaced: string | null;
+  message: string;
+}
+
+/** A dev build closes rather than restarting to apply an import: `tauri dev`
+ *  cannot follow an app that relaunches itself. See restart_for_import. */
+const APPLY_BY_CLOSING = import.meta.env.DEV;
+
 let wired = false;
 let flashFn: (msg: string, kind?: "success" | "error", ms?: number) => void = () => {};
-let confirmFn: (opts: { title: string; message: string; confirmLabel: string },
-                onConfirm: () => void) => void = (_o, run) => run();
+let confirmFn: (
+  opts: { title: string; message: string; confirmLabel: string; reopen?: () => void },
+  onConfirm: () => void,
+) => void = (_o, run) => run();
 
 /** Hands over the two shell services this screen needs. Passed in rather than
  *  imported, because shell.ts imports this module and the reverse would put the
@@ -68,6 +81,50 @@ export function initDataTransfer(deps: {
 }): void {
   flashFn = deps.flash;
   confirmFn = deps.confirm;
+}
+
+/**
+ * Says what happened to an import armed on the last run, once, at startup.
+ *
+ * The swap runs before the window exists, so this is the only way its outcome
+ * reaches a person. A failure used to go to a log line and nowhere else, and
+ * the import simply sat there unapplied with no explanation.
+ *
+ * Resolves once a failure has been read, so the startup gates queue behind it.
+ */
+export async function showImportResult(): Promise<void> {
+  let result: ImportResult | null;
+  try {
+    result = await invoke<ImportResult | null>("take_import_result");
+  } catch (err) {
+    devError("[data] could not read the import result", err);
+    return;
+  }
+  if (!result) return;
+
+  if (result.state === "applied") {
+    flashFn(
+      result.replaced
+        ? `Your data was imported. The folder it replaced is kept at ${result.replaced}`
+        : "Your data was imported.",
+      "success",
+      12000,
+    );
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    confirmFn(
+      {
+        title: "Your import was not applied",
+        message: result.message,
+        confirmLabel: "OK",
+        // Dismissing is as good an answer as OK: there is nothing to decide.
+        reopen: resolve,
+      },
+      resolve,
+    );
+  });
 }
 
 /* -----------------------------------------------------------------------------
@@ -144,10 +201,15 @@ function wire(): void {
     })();
   });
 
-  document.getElementById("dataImportRestartBtn")!.addEventListener("click", () => {
+  const restartBtn = document.getElementById("dataImportRestartBtn")!;
+  if (APPLY_BY_CLOSING) {
+    restartBtn.textContent = "Close to Apply";
+    restartBtn.title = "Dev build: the app closes, and the import is applied the next time you run npm run tauri dev.";
+  }
+  restartBtn.addEventListener("click", () => {
     void (async () => {
       try {
-        // Never returns on success: the process is replaced.
+        // Never returns on success: the process is replaced, or closed in dev.
         await invoke("restart_for_import");
       } catch (err) {
         devError("[data] could not restart", err);
@@ -226,9 +288,13 @@ async function doImport(): Promise<void> {
           `That archive holds ${staged.fileCount} ${staged.fileCount === 1 ? "file" : "files"} ` +
           `(${formatDataSize(staged.totalBytes)}), exported from version ${staged.appVersion}${when}. ` +
           `Everything this app currently holds is replaced by it: every tool, every setting, ` +
-          `every snapshot. The app restarts to apply it, and the folder it replaces is kept ` +
-          `beside the new one so you can get back to it.`,
-        confirmLabel: "Replace and Restart",
+          `every snapshot. ` +
+          (APPLY_BY_CLOSING
+            ? `This is a dev build, so the app closes, and the import is applied the next time ` +
+              `you run npm run tauri dev. `
+            : `The app restarts to apply it. `) +
+          `The folder it replaces is kept beside the new one so you can get back to it.`,
+        confirmLabel: APPLY_BY_CLOSING ? "Replace and Close" : "Replace and Restart",
       },
       () => {
         void (async () => {

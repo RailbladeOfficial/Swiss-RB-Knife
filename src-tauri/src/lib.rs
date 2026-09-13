@@ -1643,9 +1643,14 @@ pub fn run() {
 
                Returns where the replaced folder was put, which is the way back
                from an import that turned out to be the wrong one. */
-            if let Some(replaced) = data_archive::take_pending_import(app.handle()) {
-                eprintln!("[data] imported a data folder; the previous one is at {replaced}");
+            let import_result = data_archive::take_pending_import(app.handle());
+            if let Some(result) = &import_result {
+                eprintln!("[data] staged import {}: {}", result.state, result.message);
             }
+            // Held for the front end, which says it once the window is up. The
+            // swap runs before there is a window, so a log line was the only
+            // place a failure used to go.
+            app.manage(data_archive::PendingImportResult(std::sync::Mutex::new(import_result)));
 
             /* Then, before anything reads a file and before anything moves
                one: is this folder one this build may touch at all?
@@ -1782,6 +1787,7 @@ pub fn run() {
             data_archive::cancel_staged_import,
             data_archive::staged_import_waiting,
             data_archive::restart_for_import,
+            data_archive::take_import_result,
             tools::budget::list_budget_backups,
             tools::budget::restore_budget_backup,
             // Game Stats

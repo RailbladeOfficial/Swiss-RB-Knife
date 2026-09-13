@@ -38,6 +38,7 @@ import {
 } from "./shell";
 import { showLockScreen } from "./lockscreen";
 import { showDataFolderGate } from "./data-version";
+import { showImportResult } from "./data-transfer";
 
 const LICENSE_ACCEPTED_KEY = "shell-license-accepted-version";
 const CHANGELOG_SEEN_KEY = "shell-changelog-seen-version";
@@ -1639,6 +1640,12 @@ export async function runStartupGates(appVersion: string): Promise<void> {
      been frozen, that is the single most important thing about this session,
      and someone who cannot get past the lock would otherwise never be told. */
   await showDataFolderGate({ confirm: appConfirm, quit: quitApp });
+
+  /* Then what happened to an import armed on the last run, if one was. Behind
+     the folder gate, because a frozen folder is the bigger news, and ahead of
+     the lock, because "your import did not apply" is the answer to why the
+     data looks the way it does. */
+  await showImportResult();
 
   // Gate 1: App lock, verify before anything else is visible
   if (settings.appLock) {

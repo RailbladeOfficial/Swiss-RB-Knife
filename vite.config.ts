@@ -1,4 +1,21 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
+
+const ROOT_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+// FOLDERS THE DEV SERVER MUST NOT WATCH, all at the repo root. On Windows a
+// watched folder cannot be renamed while the watcher holds it open, and the
+// app renames exactly these. A dev build keeps its data folder at <repo>/data,
+// and a whole-folder import applies by renaming the live folder aside and the
+// staged data.srbk-incoming into its place, so with the dev server watching,
+// every import in dev failed ("Access is denied") and stayed unapplied. dev/
+// holds the srbk-agent.exe copy, which is renamed aside the same way while an
+// agent runs it. Vite serves nothing from any of them.
+function isUnwatched(file: string): boolean {
+  const first = path.relative(ROOT_DIR, file).split(path.sep)[0];
+  return first === "data" || first.startsWith("data.srbk-") || first === "dev";
+}
 
 
 const host = process.env.TAURI_DEV_HOST;
@@ -84,8 +101,9 @@ export default defineConfig(async () => {
           }
         : undefined,
       watch: {
-        // 3. tell Vite to ignore watching `src-tauri`
-        ignored: ["**/src-tauri/**"],
+        // 3. tell Vite to ignore watching `src-tauri`, and the folders the app
+        //    renames at the repo root (see isUnwatched above)
+        ignored: ["**/src-tauri/**", (file: string) => isUnwatched(file)],
       },
     },
   };

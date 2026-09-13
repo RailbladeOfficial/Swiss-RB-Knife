@@ -88,7 +88,7 @@ test("an import replaces the folder by renaming it, never by deleting it", () =>
      turned out to be the wrong archive. A remove_dir_all on the live folder
      would make this the one action in the app with no undo at all. */
   const swap = slice("src-tauri/src/data_archive.rs", "pub fn take_pending_import", "\n}");
-  assert.match(swap, /fs::rename\(&root, &replaced\)/, "the live folder is not set aside");
+  assert.match(swap, /rename_patiently\(&root, &replaced\)/, "the live folder is not set aside");
 
   /* There is exactly ONE delete in here and it is the empty-folder case:
      data_root() creates the folder as it resolves it, so a first run would
@@ -111,16 +111,51 @@ test("an import replaces the folder by renaming it, never by deleting it", () =>
     /let had_data = fs::read_dir\(&root\)/,
     "nothing checks whether the folder being replaced had anything in it",
   );
-  assert.match(swap, /fs::rename\(&staging, &root\)/, "the staged folder is not moved into place");
+  assert.match(swap, /rename_patiently\(&staging, &root\)/, "the staged folder is not moved into place");
 
   /* And it can never leave BOTH gone. If setting the live folder aside fails,
      nothing has happened; if moving staging in fails, the live folder goes
-     straight back. */
+     straight back, and if even that fails the person is told where it is. */
   assert.match(
     swap,
-    /let _ = fs::rename\(&replaced, &root\);/,
+    /had_data && rename_patiently\(&replaced, &root\)\.is_err\(\)/,
     "a half-failed swap leaves no data folder at all",
   );
+});
+
+test("an import that could not be applied says so, in the app", () => {
+  /* The swap returned None on a refused rename and printed to a log nobody
+     reads, having already removed the arming marker, so the import sat there
+     unapplied and unexplained. In a dev build it failed every time, because
+     the dev server was watching the data folder. The result is handed to the
+     front end now, and shown once the window is up. */
+  const swap = slice("src-tauri/src/data_archive.rs", "pub fn take_pending_import", "\n}");
+  assert.match(swap, /-> Option<ImportResult>/, "the swap cannot report what happened");
+  assert.match(swap, /return Some\(swap_failed\(&err\)\)/, "a refused rename is not reported");
+  assert.doesNotMatch(swap, /\.is_err\(\) \{\s*return None;/, "a failed rename still returns silently");
+
+  const lib = read("src-tauri/src/lib.rs");
+  assert.match(lib, /app\.manage\(data_archive::PendingImportResult/, "the result is not kept for the front end");
+  assert.match(lib, /data_archive::take_import_result/, "the front end cannot ask for the result");
+  assert.match(read("src/core/docs.ts"), /await showImportResult\(\)/, "nothing shows the result at startup");
+
+  // Retried, because a restarted app can reach the swap before the old one lets go.
+  assert.match(read("src-tauri/src/data_archive.rs"), /fn rename_patiently\(/, "a single refused rename fails the import");
+});
+
+test("the dev server does not watch the folders an import renames", () => {
+  /* On Windows a watched folder cannot be renamed. A dev build keeps its data
+     at <repo>/data, and Vite watched the whole repo, so every import in dev was
+     refused at the swap. */
+  const config = read("vite.config.ts");
+  assert.match(config, /first === "data"/, "the dev server watches the dev data folder");
+  assert.match(config, /first\.startsWith\("data\.srbk-"\)/, "the dev server watches the import's staging and replaced folders");
+  assert.match(config, /isUnwatched\(file\)/, "the unwatched list is not passed to the watcher");
+
+  // And a dev build closes to apply, because tauri dev cannot follow a relaunch.
+  const restart = slice("src-tauri/src/data_archive.rs", "pub fn restart_for_import", "\n}");
+  assert.match(restart, /#\[cfg\(debug_assertions\)\][\s\S]*?app\.exit\(0\)/, "a dev build restarts itself out from under tauri dev");
+  assert.match(read("src/core/data-transfer.ts"), /APPLY_BY_CLOSING = import\.meta\.env\.DEV/, "the Data tab does not tell a dev build it will close");
 });
 
 test("the staging folder is a sibling of the data folder, not a child", () => {
