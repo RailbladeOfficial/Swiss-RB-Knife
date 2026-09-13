@@ -1735,7 +1735,7 @@ async function attachBackupListeners(): Promise<void> {
       } else if (payload.aborted_file) {
         // Mid-file cancel: name what was interrupted, right where the person
         // is already looking (the line that showed "Copying …" a moment ago).
-        progressCurrentLabel.textContent = "Cancelled";
+        progressCurrentLabel.textContent = "Canceled";
         progressCurrentFileEl.textContent = `Aborted on: ${payload.aborted_file}`;
         flash(payload.message, "error", 8000);
       } else {
@@ -2231,7 +2231,7 @@ export function getDueBackupReminder(): BackupReminderStatus | null {
 }
 
 /* -----------------------------------------------------------------------------
-   Persistent due signals, modelled on the new-version notifier, which pulses
+   Persistent due signals, modeled on the new-version notifier, which pulses
    the About row in the sidebar and writes a line into the Home header for as
    long as the update exists. The startup reminder is a single moment that's
    easy to click past; these stay up until a backup actually completes.

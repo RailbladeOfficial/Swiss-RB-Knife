@@ -611,7 +611,7 @@ function emitUtterance(): void {
     const announce = (): void => {
       if (announced) return;
       announced = true;
-      // A new run began before this line finished (which also cancelled it),
+      // A new run began before this line finished (which also canceled it),
       // reporting the old run as finished now would be about something the
       // user has already moved on from.
       if (runEpoch !== epoch || running) return;

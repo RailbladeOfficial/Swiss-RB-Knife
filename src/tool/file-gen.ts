@@ -413,7 +413,7 @@ async function handleBrowse(): Promise<void> {
   try {
     const selected = await open({ directory: true, multiple: false, title: "Choose output folder" });
     if (selected && typeof selected === "string") outputDirInput.value = selected;
-  } catch { /* cancelled */ }
+  } catch { /* canceled */ }
 }
 
 /* =============================================================================

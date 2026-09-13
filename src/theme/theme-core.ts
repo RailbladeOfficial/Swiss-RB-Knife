@@ -1044,7 +1044,7 @@ function startHalloweenLightning(): void {
   // stopSeasonalEffect() can drop it. Left untracked, each switch back to
   // Halloween stacked another permanent listener, and clicks made AFTER
   // leaving the theme still pushed onto lightningStrikes, an array the
-  // cancelled animation loop no longer drains.
+  // canceled animation loop no longer drains.
   seasonalClickHandler = () => spawnStrike();
   document.addEventListener("click", seasonalClickHandler);
 }

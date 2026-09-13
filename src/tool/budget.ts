@@ -1286,7 +1286,7 @@ async function saveAppSettings(): Promise<void> {
 /* =============================================================================
    BUDGET REMINDERS
    -----------------------------------------------------------------------------
-   A nudge to go put your actual numbers in, modelled on Auto-Backup's reminder
+   A nudge to go put your actual numbers in, modeled on Auto-Backup's reminder
    and the new-version notifier. Same three parts, so all three behave alike:
 
      • a persistent signal while something is owed (sidebar row pulse + a line

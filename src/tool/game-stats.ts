@@ -2902,7 +2902,7 @@ function saveGameStatsDraft(): void {
 }
 
 /** Drops the stored draft. Called wherever an entry is finished or abandoned,
- *  so a saved or cancelled game never reappears on the next launch. Cancels any
+ *  so a saved or canceled game never reappears on the next launch. Cancels any
  *  pending debounced write first, or that write would recreate what this just
  *  cleared. Stores "null" rather than deleting the file, which is exactly what
  *  load_game_stats_draft returns for "no draft" anyway. */

@@ -34,7 +34,7 @@
 
    Ordering/cancel: destinations run in list order. A cancel requested between
    destinations stops before the next one starts; a cancel DURING a
-   destination is caught in its copy loop, which returns a cancelled result
+   destination is caught in its copy loop, which returns a canceled result
    and ends the whole run. If a destination hits a fatal (exit code >= 16)
    error it fails that destination but the run still reports per-destination
    results in the backup-complete summary.
@@ -862,7 +862,7 @@ pub fn run_backup(
         // cancel), so clearing the flags here covers all of them. The cancel
         // flag MUST be cleared once it has served its purpose, preflight_pair
         // is also used by estimate_backup, and a stale true here would
-        // instantly abort every estimate scan after a cancelled backup.
+        // instantly abort every estimate scan after a canceled backup.
         CANCEL_REQUESTED.store(false, Ordering::SeqCst);
         BACKUP_RUNNING.store(false, Ordering::SeqCst);
     });
@@ -921,7 +921,7 @@ fn run_backup_thread(
             if CANCEL_REQUESTED.load(Ordering::SeqCst) {
                 let _ = app.emit("backup-complete", BackupCompleteEvent {
                     success: false,
-                    message: "Backup cancelled by user.".to_string(),
+                    message: "Backup canceled by user.".to_string(),
                     log_paths: log_paths.clone(),
                     total_files, total_dirs, total_bytes, total_extras,
                     total_secs: run_start.elapsed().as_secs_f64(),
@@ -962,7 +962,7 @@ fn run_backup_thread(
                 PreflightOutcome::Cancelled => {
                     let _ = app.emit("backup-complete", BackupCompleteEvent {
                         success: false,
-                        message: "Backup cancelled by user.".to_string(),
+                        message: "Backup canceled by user.".to_string(),
                         log_paths: log_paths.clone(),
                         total_files, total_dirs, total_bytes, total_extras,
                         total_secs: run_start.elapsed().as_secs_f64(),
@@ -1013,7 +1013,7 @@ fn run_backup_thread(
     for (dest_index, destination) in destinations.iter().enumerate() {
         // A cancel requested between destinations stops before starting the
         // next one. (A cancel DURING a destination is handled inside the
-        // copy loop, which returns a cancelled result.)
+        // copy loop, which returns a canceled result.)
         if CANCEL_REQUESTED.load(Ordering::SeqCst) {
             break;
         }
@@ -1024,7 +1024,7 @@ fn run_backup_thread(
         );
         let stop = result.cancelled;
         results.push(result);
-        // A cancelled destination ends the whole run, don't start the rest.
+        // A canceled destination ends the whole run, don't start the rest.
         if stop {
             break;
         }
@@ -1053,7 +1053,7 @@ fn run_backup_thread(
     let aborted_file = results.iter().find_map(|r| r.aborted_file.clone());
 
     let (success, message) = if any_cancelled {
-        (false, "Backup cancelled by user.".to_string())
+        (false, "Backup canceled by user.".to_string())
     } else if !failed.is_empty() {
         let detail = failed
             .iter()
@@ -1220,7 +1220,7 @@ fn run_destination(
 
     for (source_index, source) in sources.iter().enumerate() {
         if CANCEL_REQUESTED.load(Ordering::SeqCst) {
-            let message = "Backup cancelled by user.".to_string();
+            let message = "Backup canceled by user.".to_string();
             let skipped_log_path = if skipped.is_empty() { None } else { Some(skipped_log_file.clone()) };
             let _ = app.emit("backup-destination-done", BackupDestinationDoneEvent {
                 dest_index,
@@ -1610,7 +1610,7 @@ fn run_destination(
             // Everything this folder produced has already been streamed to the
             // log; just close it out with the reason it stopped and flush, so
             // the partial buffer isn't lost.
-            folder_log.raw("\n[Backup cancelled by user during this folder.]\n");
+            folder_log.raw("\n[Backup canceled by user during this folder.]\n");
             folder_log.flush();
 
             let mut cleanup_note = String::new();
@@ -1631,7 +1631,7 @@ fn run_destination(
             total_dirs  += dirs_this_folder;
             total_bytes += bytes_this_folder;
 
-            let message = format!("Backup cancelled by user.{}", cleanup_note);
+            let message = format!("Backup canceled by user.{}", cleanup_note);
             let aborted_file = if last_current_file.is_empty() {
                 None
             } else {

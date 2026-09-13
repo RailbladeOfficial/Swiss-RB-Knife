@@ -2050,7 +2050,7 @@ function normalizeComment(raw: unknown): CardComment | null {
     attachments,
     createdAt: created,
     // Never earlier than createdAt, so "edited" is a real comparison rather
-    // than an artefact of a hand-edited file.
+    // than an artifact of a hand-edited file.
     updatedAt:
       typeof c.updatedAt === "number" && c.updatedAt >= created ? c.updatedAt : created,
     createdBy: normalizeAuthor(c.createdBy),
@@ -4855,7 +4855,7 @@ function buildTagChip(
 
    The commit happens on `dragend`, never on `drop`. dragend fires whatever
    happens (dropped on a column, dropped on the padding, dropped outside the
-   window, cancelled with Escape), so it is the only hook that cannot leave the
+   window, canceled with Escape), so it is the only hook that cannot leave the
    already-reordered DOM disagreeing with the stored order. That exact bug is
    what the same note in sidebar-edit.ts is about.
 ============================================================================= */
@@ -10829,7 +10829,7 @@ function getTagEditModal(): Modal {
     onOpen: () => setTimeout(() => nameInput.focus(), 50),
     onClosed: () => {
       tagEditId = null;
-      /* Both dropped here, so a cancelled "create from a card" leaves nothing
+      /* Both dropped here, so a canceled "create from a card" leaves nothing
          armed for whatever tag is edited next. Safe despite the back and save
          paths needing tagEditReturn AFTER they close this modal: onClosed
          fires a fade later, by which time returnToTagList has already run and

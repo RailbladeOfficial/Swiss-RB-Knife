@@ -222,7 +222,7 @@ test("board background images can only be deleted from inside their own folder",
 
 test("card order is committed on dragend, not on drop", () => {
   // dragend fires however the drag ends (on a column, on the padding, outside
-  // the window, cancelled with Escape). Committing on drop instead leaves the
+  // the window, canceled with Escape). Committing on drop instead leaves the
   // already-reordered DOM disagreeing with the stored order every time the
   // release lands anywhere else. Same rule as sidebar-edit.ts.
   const src = ts();

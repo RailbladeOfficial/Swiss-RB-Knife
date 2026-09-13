@@ -194,7 +194,7 @@ fn collect_files(
 ----------------------------------------------------------------------------- */
 
 /// Zips the whole data folder to a file the user picks, returning where it
-/// landed. `Ok(None)` means the dialog was cancelled, which is not an error.
+/// landed. `Ok(None)` means the dialog was canceled, which is not an error.
 ///
 /// The dialog is opened HERE rather than taking a path from the front end, for
 /// the reason export_tool_json states and this inherits: this process runs as
@@ -332,7 +332,7 @@ pub struct StagedImport {
 
 /// Reads a chosen archive, checks it, and unpacks it into the staging folder.
 /// Nothing in the live data folder is touched. `Ok(None)` means the dialog was
-/// cancelled.
+/// canceled.
 ///
 /// DELIBERATELY NOT GUARDED BY `deny_if_frozen`. A frozen folder is one written
 /// by a NEWER build, and restoring an older export over it is exactly how

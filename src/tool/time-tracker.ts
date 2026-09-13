@@ -1643,7 +1643,7 @@ function parseCsvImport(raw: string): CsvImportResult {
   if (errors.length > 0) {
     return {
       ok: false,
-      message: `Import cancelled: ${errors.length} row${errors.length > 1 ? "s" : ""} failed validation:\n${errors.join("\n")}`,
+      message: `Import canceled: ${errors.length} row${errors.length > 1 ? "s" : ""} failed validation:\n${errors.join("\n")}`,
     };
   }
   if (parsed.length === 0) {

@@ -277,7 +277,7 @@ appLockToggle.addEventListener("change", async () => {
     settingsModal.close({ handoff: true });
     const saved = await openSetLockModal("enable");
     if (!saved) {
-      // User cancelled, leave lock off
+      // User canceled, leave lock off
       openSettingsOnTab("preferences");
       return;
     }
@@ -421,7 +421,7 @@ function _applySetLockType(
 /** Opens the set-credential modal.
  *  Includes a PIN/Password picker so the user can choose before entering.
  *  On cancel, both the credential type and the stored hash revert to unchanged.
- *  Returns a promise that resolves to true if the user saved, false if cancelled. */
+ *  Returns a promise that resolves to true if the user saved, false if canceled. */
 function openSetLockModal(mode: "enable" | "change"): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     // Snapshot state so cancel can restore it
