@@ -1284,6 +1284,42 @@ test("a half-written comment belongs to a named card, not to whatever is open", 
   );
 });
 
+test("redrawing the columns keeps where you were on the board", () => {
+  /* Closing a card modal sent every column back to the top and the board back
+     to the far left, because renderColumns() empties the strip and rebuilds it,
+     and the scroll positions live on the elements being thrown away. Any card
+     far enough down a column to need scrolling to was a card you then had to
+     scroll back to, every time you looked at one.
+
+     The read has to happen BEFORE replaceChildren(): emptying the strip
+     collapses its width, and the browser clamps scrollLeft to 0 as it does, so
+     the sideways position cannot be recovered afterwards. That ordering is the
+     part worth pinning. */
+  const body = slice("src/tool/kanban.ts", "function renderColumns(", "\n}");
+
+  const readLeft = body.indexOf("columnsEl.scrollLeft");
+  const readTops = body.indexOf(".scrollTop");
+  const wipe = body.indexOf("columnsEl.replaceChildren()");
+  assert.notEqual(wipe, -1, "renderColumns no longer rebuilds the strip");
+  assert.ok(readLeft !== -1 && readLeft < wipe, "the sideways position is not read before the rebuild");
+  assert.ok(readTops !== -1 && readTops < wipe, "the column positions are not read before the rebuild");
+
+  // And put back after it.
+  assert.ok(
+    body.lastIndexOf("scrollTop") > wipe,
+    "the column positions are never restored",
+  );
+  assert.ok(
+    body.lastIndexOf("columnsEl.scrollLeft") > wipe,
+    "the sideways position is never restored",
+  );
+
+  /* Only onto the board it came from. Column ids cannot collide across boards,
+     but the sideways position is just a number and would otherwise be carried
+     onto whatever board you opened next. */
+  assert.match(body, /renderedBoardId/, "a board switch would inherit the previous board's position");
+});
+
 test("two saves can never be in flight at once", () => {
   // flushSave() is used as a barrier by four things that then change the world
   // underneath a save: Lock Now takes the password away, Encrypt deletes the

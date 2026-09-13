@@ -2780,9 +2780,47 @@ function renderBoardCounts(board: Board): void {
   filterBtn.classList.toggle("active", anyFilterActive());
 }
 
+/** Which board the columns on screen belong to, so a scroll position is only
+ *  ever put back on the board it was taken from. */
+let renderedBoardId: string | null = null;
+
+/**
+ * Draws every column, KEEPING WHERE YOU WERE.
+ *
+ * This rebuilds the whole column strip, and the strip is where the scrolling
+ * happens: `.kb-columns` scrolls sideways and each `.kb-column-body` scrolls
+ * down. Throwing the DOM away takes both with it, so closing a card modal sent
+ * every column back to the top and the board back to the far left. Any card
+ * far enough down a column to need scrolling to was, by definition, a card you
+ * then had to scroll back to, every single time.
+ *
+ * The fix is here rather than at the modal, because the modal is not what did
+ * it. Every redraw did: ticking a subtask, a filter change, an agent editing a
+ * card. Fixing the one that was noticed would have left the rest.
+ *
+ * A board SWITCH deliberately starts fresh. Column ids belong to one board so
+ * they never match another's, and the sideways position is only restored when
+ * the board is the same one, which is what renderedBoardId is for.
+ */
 function renderColumns(board: Board): void {
   const todayStr = today();
+  const sameBoard = renderedBoardId === board.id;
+
+  /* Read BEFORE replaceChildren(). Emptying the strip collapses its width to
+     nothing, and the browser clamps scrollLeft to 0 as it does, so this cannot
+     be read back afterwards. */
+  const keptLeft = sameBoard ? columnsEl.scrollLeft : 0;
+  const keptTops = new Map<string, number>();
+  if (sameBoard) {
+    for (const el of columnsEl.querySelectorAll<HTMLElement>(".kb-column")) {
+      const id = el.dataset.columnId;
+      const body = el.querySelector<HTMLElement>(".kb-column-body");
+      if (id && body && body.scrollTop > 0) keptTops.set(id, body.scrollTop);
+    }
+  }
+
   columnsEl.replaceChildren();
+  renderedBoardId = board.id;
 
   if (board.columns.length === 0) {
     columnsEmpty.style.display = "";
@@ -2794,6 +2832,19 @@ function renderColumns(board: Board): void {
   for (const column of board.columns) {
     columnsEl.appendChild(buildColumn(board, column, todayStr));
   }
+
+  /* Put back what was there. A column holding less than it did (a card was
+     deleted, or a filter now hides it) clamps to its new bottom on its own,
+     which is the right answer: it goes as close to where you were as there is
+     room for, rather than refusing. */
+  for (const el of columnsEl.querySelectorAll<HTMLElement>(".kb-column")) {
+    const id = el.dataset.columnId;
+    const top = id ? keptTops.get(id) : undefined;
+    if (top === undefined) continue;
+    const body = el.querySelector<HTMLElement>(".kb-column-body");
+    if (body) body.scrollTop = top;
+  }
+  if (keptLeft > 0) columnsEl.scrollLeft = keptLeft;
 }
 
 function buildColumn(board: Board, column: Column, todayStr: string): HTMLElement {
