@@ -119,6 +119,41 @@ Log and track time entries with pay period summaries, running totals, and CSV ex
   </a>
 </p>
 
+### - **Kanban**
+I've bounced off every board tool on the web. They all want an account, most of them want a subscription the moment you cross some arbitrary card count, and every single one decides your data lives on their server instead of yours. All I ever wanted was columns and cards that stay on my machine. So here we are. Make as many boards as you want, each with its own columns, drag cards between them, and give a board a background image with adjustable blur and brightness so you can tell one from another at a glance. Columns get renamed, reordered, collapsed, and given a work-in-progress limit that flags you when you go over it rather than nannying you into stopping. Mark a column as meaning done and anything you drop in it gets its Completed date stamped for you. Cards hold proper Markdown descriptions and comments, subtasks, and file attachments - images, video and audio play right there in the card, and Ctrl+V pastes a screenshot straight in. Priority and Effort are five levels each and you can rename every one of them and pick its color, because your "Critical" and my "Critical" are probably different animals. Tags live in categories, so a Types category can hold Bug and Feature while a Versions category holds your releases, and you filter on each independently. Stage dates track when a card started, went to testing, and finished, and every one of them stays editable, because the honest case is that work started Tuesday and you're filling the card in on Thursday. Board Stats reads off those dates and hands you lead and cycle times, what's in flight, what's overdue, and what you've actually finished this week. Nearly every preference is set once for the tool and then overridden on any single board that wants a different shape.
+
+And if you use an AI coding agent, you can hand it one board. Claude Code, Codex, anything that speaks MCP - it reads and changes cards while you work in the same board, and nothing goes over the internet, because it's talking to the app on your own machine. Every permission starts off. Grant it card creation and nothing else, or add editing, moving, tagging, dates, subtasks, comments, archiving and deleting as you decide to trust it with them. The app checks every single request itself rather than taking the agent's word for it, every request it makes gets logged whether it was allowed or refused, and a refusal tells you exactly which switch would have let it through. One button copies the connection into your agent's config, another tests it, and one switch in Setup cuts every agent off every board at once.
+
+<p align="center">
+  <a href="./screenshots/kanban/kanban-boards.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-boards.png" width="100%" alt="Kanban: Board Gallery" />
+  </a>
+  <a href="./screenshots/kanban/kanban-board.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board.png" width="100%" alt="Kanban: Board View" />
+  </a>
+  <a href="./screenshots/kanban/kanban-board-stats.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board-stats.png" width="49%" alt="Kanban: Board Stats" />
+  </a>
+  <a href="./screenshots/kanban/kanban-card.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-card.png" width="49%" alt="Kanban: Card View" />
+  </a>
+  <a href="./screenshots/kanban/kanban-card-comments.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-card-comments.png" width="49%" alt="Kanban: Card Comments" />
+  </a>
+  <a href="./screenshots/kanban/kanban-board-setup.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board-setup.png" width="49%" alt="Kanban: Board Setup" />
+  </a>
+  <a href="./screenshots/kanban/kanban-setup-tags.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-setup-tags.png" width="49%" alt="Kanban: Setup Modal - Tag Categories" />
+  </a>
+  <a href="./screenshots/kanban/kanban-setup-preferences.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-setup-preferences.png" width="49%" alt="Kanban: Setup Modal - Preferences" />
+  </a>
+  <a href="./screenshots/kanban/kanban-agents.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-agents.png" width="100%" alt="Kanban: Board Setup - Agents" />
+  </a>
+</p>
+
 ### - **Auto-Backup**
 Configure source and destination folder pairs and run mirror backups via Windows' robocopy utility. Store your most common Source / Destination mappings as presets for the future. Click Run and then go watch TV while this handles backing up one drive to another, without having to babysit it.
 
@@ -221,6 +256,21 @@ In my QA work, sometimes you just need a random assortment of meaningless files 
   </a>
   <a href="./screenshots/dfg/dfg-3.png" target="_blank">
     <img class="md-img" src="./screenshots/dfg/dfg-3.png" width="100%" alt="Dummy File Generator Filled In" />
+  </a>
+</p>
+
+### - **RNGesus**
+Every random number generator I could find online is either buried under three ad banners and a cookie prompt, or it gives you exactly one number and makes you press the button another forty times. I wanted a batch. Set a minimum and a maximum, say how many you want, and get up to a thousand numbers in one go. Both ends are included, negatives are fine, and it doesn't care if you put the bigger number first. Flip decimals on if whole numbers won't do, up to eight places. Then view the lot as a grid you can copy in one go, or as rows you can delete one at a time as you work through them, which is the actual reason this exists - drawing numbers and crossing them off without a pen and a bit of paper.
+
+<p align="center">
+  <a href="./screenshots/rngesus/rngesus-base.png" target="_blank">
+    <img class="md-img" src="./screenshots/rngesus/rngesus-base.png" width="100%" alt="RNGesus: Main View" />
+  </a>
+  <a href="./screenshots/rngesus/rngesus-grid.png" target="_blank">
+    <img class="md-img" src="./screenshots/rngesus/rngesus-grid.png" width="49%" alt="RNGesus: Grid Output" />
+  </a>
+  <a href="./screenshots/rngesus/rngesus-rows.png" target="_blank">
+    <img class="md-img" src="./screenshots/rngesus/rngesus-rows.png" width="49%" alt="RNGesus: Rows Output" />
   </a>
 </p>
 
