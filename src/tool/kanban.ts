@@ -93,6 +93,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
+  backgroundMenu,
   devError,
   flash,
   setSubNavHandler,
@@ -517,6 +518,13 @@ export interface Column {
    *  and (with the preference on) a drop here stamps the Complete date. */
   isDone: boolean;
   collapsed: boolean;
+  /** How this column is sorted, as a VIEW over the hand-made order.
+   *
+   *  `null` (or absent) follows the board's default. An empty array is an
+   *  explicit "manual, whatever the board says", which is not the same thing:
+   *  a column you deliberately dragged into shape has to be able to stay that
+   *  way after the board's default changes under it. */
+  sort?: SortRule[] | null;
 }
 
 export interface BoardBackground {
@@ -557,6 +565,16 @@ export interface Board {
   nextCardNumber: number;
   createdAt: number;
   updatedAt: number;
+  /** Epoch ms this board was last OPENED, and how many times. Absent until it
+   *  has been. They feed the Most Recent and Most Used board sorts, and they
+   *  are deliberately separate from updatedAt: opening a board is not editing
+   *  it, and a sort called "most recent" that reshuffled when you merely read
+   *  something would be answering a different question.
+   *
+   *  Same pair, same names and same purpose as SidebarItemState's, because
+   *  this is that feature one level down. */
+  lastOpenedAt?: number;
+  openCount?: number;
   /** THIS BOARD's tag vocabulary. See the note on KanbanIndex. */
   tagCategories: TagCategory[];
   tags: Tag[];
@@ -608,7 +626,9 @@ export type CardSize = "comfortable" | "compact";
 /** Where a new card lands. Not a setting: the control you used says which end
  *  you meant. The + in the column header adds to the top, the Add card button
  *  at the foot of the column adds to the bottom. */
-export type NewCardPosition = "top" | "bottom";
+/** Where a new card lands. `{ below }` is a card id: the new one goes directly
+ *  under it, which is what "Add Card Below" on the right-click menu means. */
+export type NewCardPosition = "top" | "bottom" | { below: string };
 
 /** The blocks of the card modal, in the order they are shown. Reorderable, as
  *  a default and then per board, because which of these you look at first is a
@@ -665,6 +685,11 @@ export interface BoardScopedSettings {
   cardColorMode: CardColorMode;
   cardSize: CardSize;
   sectionOrder: CardSection[];
+  /** How a column sorts its cards when it has no rules of its own. Empty is
+   *  the hand-made order, which is what a board is for; a board whose columns
+   *  are all "by priority, then by type" can say so once here instead of on
+   *  every column. */
+  defaultSort: SortRule[];
   /** Cards open with their fields live and stay that way.
    *
    *  NOT "start an edit session automatically". There is no session: every
@@ -677,12 +702,26 @@ export interface BoardScopedSettings {
    *  building wants the fields, and one you mostly consult wants the reading
    *  face and the protection from a stray keystroke that comes with it. */
   openCardsInEditMode: boolean;
+  /** Whether cards on this board past their due date pulse the sidebar and get
+   *  counted in the tool header.
+   *
+   *  PER BOARD, because "past its due date" only means something on a board
+   *  that works to dates. A reference board or a someday list has due dates it
+   *  set once and does not act on, and a tool-wide switch made that board's
+   *  cards nag from every screen or turned the warning off for the boards that
+   *  do work to dates. A board whose due dates are off is already excluded by
+   *  isOverdue; this is the separate question of whether to shout about them. */
+  overdueWarn: boolean;
 }
 
 /** Everything in BoardScopedSettings is a DEFAULT that a board may override.
- *  The five added here are tool-wide and cannot be overridden. */
+ *  The four added here are tool-wide and cannot be overridden. */
 export interface KbSettings extends BoardScopedSettings {
-  overdueWarn: boolean;
+  /** How the board gallery is ordered. The same six the sidebar offers, and
+   *  for the same reason: this is that feature one level down. "custom" is
+   *  whatever you last dragged it into and is what a drag switches you to,
+   *  because a live sort would immediately undo the drag. */
+  boardSort: BoardSortMode;
   /** Comma-separated column titles a brand-new board starts with. */
   defaultColumns: string;
   /** Prefilled into the New Board form. Empty means no suggestion. */
@@ -695,6 +734,30 @@ export interface KbSettings extends BoardScopedSettings {
   effortColors: Record<Effort, string>;
   effortLabels: Record<Effort, string>;
 }
+
+/** How the board gallery is ordered.
+ *
+ *  Shaped after SidebarSortMode, but NOT a copy of it. The sidebar's "Classic"
+ *  is the order ALL_TOOLS is written in, an order the app itself decided and
+ *  that a user can recognize. Boards have no such order: the only thing the
+ *  app knows about when a board arrived is when it was made, so "Classic" here
+ *  meant "oldest first" while saying nothing about it. It is two honest modes
+ *  instead. */
+export type BoardSortMode = "newest" | "oldest" | "az" | "za" | "recent" | "used" | "custom";
+
+/** The modes, with the label each one wears in the picker. One list, so the
+ *  <select> and the sorter cannot come to disagree about what exists. */
+export const BOARD_SORT_MODES: { mode: BoardSortMode; label: string }[] = [
+  // Newest first is the default, and it is first in the list for the same
+  // reason: the board you just made is almost always the one you want.
+  { mode: "newest", label: "Newest First" },
+  { mode: "oldest", label: "Oldest First" },
+  { mode: "az", label: "A-Z" },
+  { mode: "za", label: "Z-A" },
+  { mode: "recent", label: "Most Recent" },
+  { mode: "used", label: "Most Used" },
+  { mode: "custom", label: "Custom (dragged)" },
+];
 
 /**
  * The shape of an EXPORT, and only of an export. Nothing on disk looks like
@@ -797,6 +860,7 @@ const DARK_INK = "#101014";
 const LIGHT_INK = "#ffffff";
 
 const DEFAULT_SETTINGS: KbSettings = {
+  boardSort: "newest",
   confirmDelete: true,
   autoCompleteOnDone: true,
   showTags: true,
@@ -812,6 +876,9 @@ const DEFAULT_SETTINGS: KbSettings = {
   // has happened to it. Anything can be dragged anywhere; this is only the
   // start.
   sectionOrder: ["description", "attachments", "due", "stages"],
+  // Manual. A board's order is a decision someone made, and a tool that
+  // rearranged it on first open would be overruling that decision unasked.
+  defaultSort: [],
   // Off, so a card opens as something to read. Editing is a thing you ask for.
   openCardsInEditMode: false,
   overdueWarn: true,
@@ -1372,6 +1439,8 @@ function buildIndex(): KanbanIndex {
       background: b.background,
       createdAt: b.createdAt,
       updatedAt: b.updatedAt,
+      lastOpenedAt: b.lastOpenedAt,
+      openCount: b.openCount,
     })),
     tagCategories: globalTagCategories,
     tags: globalTags,
@@ -1615,8 +1684,34 @@ function normalizeScoped(raw: Partial<BoardScopedSettings>, base: BoardScopedSet
     cardColorMode: normalizeColorMode(raw.cardColorMode) ?? base.cardColorMode,
     cardSize: raw.cardSize === "compact" ? "compact" : raw.cardSize === "comfortable" ? "comfortable" : base.cardSize,
     sectionOrder: normalizeSectionOrder(raw.sectionOrder ?? base.sectionOrder),
+    defaultSort: normalizeSortRules(raw.defaultSort) ?? base.defaultSort,
     openCardsInEditMode: bool(raw.openCardsInEditMode, base.openCardsInEditMode),
+    overdueWarn: bool(raw.overdueWarn, base.overdueWarn),
   };
+}
+
+/** Sort rules from a file. Returns null for "the file did not say", which is
+ *  what lets a board override fall back to the default rather than to nothing.
+ *  A rule naming a field this build does not know is dropped: the alternative
+ *  is a sort that silently does nothing and cannot be explained. */
+function normalizeSortRules(raw: unknown): SortRule[] | null {
+  if (!Array.isArray(raw)) return null;
+  const known = new Set<string>(["priority", "effort", "number", "name", "due", "created", "updated"]);
+  const out: SortRule[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const r = item as { field?: unknown; dir?: unknown };
+    const dir: "asc" | "desc" = r.dir === "asc" ? "asc" : "desc";
+    if (typeof r.field === "string" && known.has(r.field)) {
+      out.push({ field: r.field as SortField, dir });
+    } else if (
+      r.field && typeof r.field === "object" &&
+      typeof (r.field as { category?: unknown }).category === "string"
+    ) {
+      out.push({ field: { category: (r.field as { category: string }).category }, dir });
+    }
+  }
+  return out;
 }
 
 function normalizeColorMode(raw: unknown): CardColorMode | null {
@@ -1678,8 +1773,11 @@ export function normalizeSettings(raw: Partial<KbSettings>): KbSettings {
   const bool = (v: unknown, fallback: boolean): boolean =>
     typeof v === "boolean" ? v : fallback;
   return {
+    // overdueWarn is board-scoped now, so normalizeScoped reads it. A second
+    // line for it here would be the same field read twice, and the day the two
+    // disagreed the one nearer the bottom would silently win.
     ...normalizeScoped(raw, DEFAULT_SETTINGS),
-    overdueWarn: bool(raw.overdueWarn, DEFAULT_SETTINGS.overdueWarn),
+    boardSort: normalizeBoardSort(raw.boardSort),
     defaultColumns:
       typeof raw.defaultColumns === "string"
         ? raw.defaultColumns.slice(0, 400)
@@ -1691,6 +1789,20 @@ export function normalizeSettings(raw: Partial<KbSettings>): KbSettings {
     effortColors: normalizeEffortColors(raw.effortColors),
     effortLabels: normalizeLevelLabels(raw.effortLabels, EFFORTS, DEFAULT_EFFORT_LABELS),
   };
+}
+
+/** A stored board sort, checked against the modes that exist.
+ *
+ *  There is deliberately no rename map here, unlike RENAMED_SOUND_PACKS or
+ *  RENAMED_TOOL_KEYS. Board sorting has not shipped, so "classic" cannot be
+ *  sitting in anyone's settings file; a map for it would be permanent
+ *  machinery guarding a value that never existed in the wild. Anything
+ *  unrecognized, that name included, falls back to the default. */
+function normalizeBoardSort(raw: unknown): BoardSortMode {
+  if (typeof raw !== "string") return DEFAULT_SETTINGS.boardSort;
+  return BOARD_SORT_MODES.some((m) => m.mode === raw)
+    ? (raw as BoardSortMode)
+    : DEFAULT_SETTINGS.boardSort;
 }
 
 /** A board's overrides: only the keys it actually disagrees about.
@@ -1719,6 +1831,7 @@ export function normalizeOverrides(raw: unknown): Partial<BoardScopedSettings> {
     "showStages",
     "showDue",
     "openCardsInEditMode",
+    "overdueWarn",
   ] as const;
   for (const key of bools) {
     if (typeof src[key] === "boolean") out[key] = src[key];
@@ -1730,6 +1843,14 @@ export function normalizeOverrides(raw: unknown): Partial<BoardScopedSettings> {
   }
   if (Array.isArray(src.sectionOrder)) {
     out.sectionOrder = normalizeSectionOrder(src.sectionOrder);
+  }
+  /* An EMPTY list is a real answer here and has to survive: "this board sorts
+     nothing, whatever the default says" is a decision, and dropping it would
+     put the board back on a default it had explicitly stepped away from. So
+     the test is whether the file had the key at all, not whether it had
+     anything in it. */
+  if (Array.isArray(src.defaultSort)) {
+    out.defaultSort = normalizeSortRules(src.defaultSort) ?? [];
   }
   return out;
 }
@@ -1789,6 +1910,9 @@ function normalizeColumn(raw: unknown): Column | null {
     wipLimit: limit,
     isDone: c.isDone === true,
     collapsed: c.collapsed === true,
+    // null, not [], for a column that has never been sorted: absent means
+    // "follow the board", and an empty list means "manual, and I meant it".
+    sort: normalizeSortRules(c.sort),
   };
 }
 
@@ -1831,6 +1955,11 @@ function normalizeBoardMeta(raw: unknown): Board | null {
     background: normalizeBackground(b.background),
     createdAt: typeof b.createdAt === "number" ? b.createdAt : now,
     updatedAt: typeof b.updatedAt === "number" ? b.updatedAt : now,
+    // Absent means never opened, which the sorts read as "rank last". Not
+    // defaulted to `now`: that would tell Most Recent every board on a fresh
+    // install was just used.
+    lastOpenedAt: typeof b.lastOpenedAt === "number" ? b.lastOpenedAt : undefined,
+    openCount: typeof b.openCount === "number" ? b.openCount : undefined,
     columns: [],
     nextCardNumber: 1,
     tagCategories: [],
@@ -2254,7 +2383,9 @@ function effective(board: Board | null): BoardScopedSettings {
     cardColorMode: kbSettings.cardColorMode,
     cardSize: kbSettings.cardSize,
     sectionOrder: kbSettings.sectionOrder,
+    defaultSort: kbSettings.defaultSort,
     openCardsInEditMode: kbSettings.openCardsInEditMode,
+    overdueWarn: kbSettings.overdueWarn,
   };
   if (!board) return base;
   return { ...base, ...board.overrides };
@@ -2422,6 +2553,9 @@ function showKbView(view: KbView, boardId?: string): void {
       showKbView("boards");
       return;
     }
+    // A selection belongs to the board it was made on. Carrying ids across
+    // would mean a bulk action reaching cards that are not on screen.
+    if (currentBoardId !== board.id) clearCardSelection(false);
     currentBoardId = board.id;
     // Tags are per board, so "which vocabulary is in play" has to move with the
     // view. One place sets it, so it cannot drift out of step with the board on
@@ -2431,6 +2565,7 @@ function showKbView(view: KbView, boardId?: string): void {
     // Leaving a board is a real departure, so its filters go with it. Opening
     // a card from the board is not: that path never comes through here.
     if (currentView === "board") clearFilters();
+    clearCardSelection(false);
     currentBoardId = null;
     setTagScope(null);
   }
@@ -2540,9 +2675,12 @@ function renderAll(): void {
  *  needs you" reads the same wherever it comes from. */
 function refreshOverdueAttention(): void {
   const todayStr = today();
-  const overdue = kbSettings.overdueWarn
-    ? cards.filter((c) => isOverdue(c, todayStr)).length
-    : 0;
+  /* Counted board by board, because the warning is a board's own answer now. A
+     board with it off contributes nothing even while its cards are genuinely
+     overdue, which is the point: it is a board nobody wants shouted at about. */
+  const overdue = cards.filter(
+    (c) => effectiveForCard(c).overdueWarn && isOverdue(c, todayStr),
+  ).length;
 
   setToolAttention("productivity", "kanban", overdue > 0);
 
@@ -2561,6 +2699,11 @@ function refreshOverdueAttention(): void {
 ============================================================================= */
 
 function renderGallery(): void {
+  // Re-applied on every render rather than only when the mode is picked, so
+  // Most Recent and Most Used stay live. A no-op under Custom and a no-op when
+  // nothing moved, so this is not a write per repaint.
+  applyBoardSortMode();
+
   const needle = boardSearchInput.value.trim().toLowerCase();
   const visible = boards.filter(
     (b) =>
@@ -2693,6 +2836,19 @@ function buildBoardTile(board: Board): HTMLElement {
     }
   });
 
+  /* DRAGGABLE IN PLACE. A tile is a card in a grid, and everything else in
+     this tool that sits in an order is dragged where it sits; making people
+     open a modal to reorder the thing already in front of them was the odd one
+     out. The modal stays, because it is where the sort MODE lives and because
+     a long gallery is easier to rearrange as a list.
+
+     Only while the gallery is unfiltered: the search box hides tiles, and
+     dropping between two visible ones says nothing about where it lands among
+     the ones you cannot see. */
+  if (boards.length > 1 && boardSearchInput.value.trim() === "") {
+    attachBoardTileDrag(tile, board);
+  }
+
   /* No Delete Board here, deliberately.
      Every destructive confirm in this tool has to name where dismissing it
      puts you back (see kbConfirm, and the check that enforces it in
@@ -2721,6 +2877,53 @@ function buildBoardTile(board: Board): HTMLElement {
   return tile;
 }
 
+/** Which tile is mid-drag, shared by every tile's dragover handler. */
+let boardTileDragId: string | null = null;
+
+/**
+ * Drag-to-reorder for one gallery tile.
+ *
+ * A GRID, not a list, so "before or after" is decided on the horizontal
+ * midpoint like the tag chips rather than the vertical one the stacked lists
+ * use. Tiles wrap, and measuring top/bottom would put every drop on the same
+ * side of whatever tile the cursor was over.
+ *
+ * The tile is also a click target that opens the board. HTML5 drag and drop
+ * suppresses the click that would follow a real drag, so the two do not fight;
+ * what needs care is the Edit button inside it, which stops its own click but
+ * would still be dragged by. It is left alone: dragging from anywhere on the
+ * tile including the button is the same gesture.
+ */
+function attachBoardTileDrag(tile: HTMLElement, board: Board): void {
+  tile.draggable = true;
+
+  tile.addEventListener("dragstart", (e) => {
+    boardTileDragId = board.id;
+    tile.classList.add("kb-dragging");
+    e.dataTransfer?.setData("text/plain", board.name);
+  });
+
+  // Committed on dragend rather than drop, so a release anywhere still lands
+  // the order. Same rule as every other drag list in this tool.
+  tile.addEventListener("dragend", () => {
+    tile.classList.remove("kb-dragging");
+    boardTileDragId = null;
+    commitBoardOrderFromDom(boardGrid, ".kb-board-tile");
+  });
+
+  tile.addEventListener("dragover", (e) => {
+    if (!boardTileDragId || boardTileDragId === board.id) return;
+    e.preventDefault();
+    const dragged = boardGrid.querySelector<HTMLElement>(
+      `.kb-board-tile[data-board-id="${CSS.escape(boardTileDragId)}"]`,
+    );
+    if (!dragged) return;
+    const rect = tile.getBoundingClientRect();
+    const before = e.clientX < rect.left + rect.width / 2;
+    boardGrid.insertBefore(dragged, before ? tile : tile.nextSibling);
+  });
+}
+
 /* =============================================================================
    BOARD VIEW
 ============================================================================= */
@@ -2729,6 +2932,7 @@ function buildBoardTile(board: Board): HTMLElement {
 function openBoardFromGallery(boardId: string): void {
   const board = getBoard(boardId);
   if (!board) return;
+  recordBoardUsage(board);
   showKbView("board", board.id);
 }
 
@@ -2847,6 +3051,579 @@ function renderColumns(board: Board): void {
   if (keptLeft > 0) columnsEl.scrollLeft = keptLeft;
 }
 
+/* =============================================================================
+   SORTING A COLUMN
+   -----------------------------------------------------------------------------
+   A column is a hand-ordered list by default, and that is the point of a board:
+   the order means something you decided. But "show me this lot by priority, then
+   by type, then alphabetically" is a question you want answered without losing
+   the arrangement you built, and dragging forty cards to ask it is not an
+   answer.
+
+   So a sort is a VIEW, not a rewrite. `card.order` is never touched. The column
+   holds a list of rules, the cards are drawn through them, and clearing the
+   rules puts the hand-made order straight back, unchanged, however long the
+   sort was on.
+
+   LAYERED, because one key is rarely the question. The rules apply in order and
+   the next one only speaks when the previous ties, which is what makes
+   "priority, then type, then name" mean what it sounds like.
+
+   THE MENU IS THE EDITOR. Each field in the Sort submenu cycles
+   off -> descending -> ascending -> off, and a field switched on joins the end
+   of the list. The submenu shows each field's place and direction, so the whole
+   rule set is visible in the thing you use to change it, and there is no
+   separate screen to open, fill in and close.
+
+   A DROP CLEARS THE SORT. Dragging a card into a sorted column is an explicit
+   statement about where that card goes, and honoring it while a sort is on
+   would mean the card jumping somewhere else the instant it lands.
+============================================================================= */
+
+/** What a column can be sorted by. Tags sort by the tag a card carries FROM a
+ *  named category, which is what "sort by type" and "sort by tool" mean on a
+ *  board whose vocabulary is grouped that way. */
+export type SortField =
+  | "priority"
+  | "effort"
+  | "number"
+  | "name"
+  | "due"
+  | "created"
+  | "updated"
+  | { category: string };
+
+export interface SortRule {
+  field: SortField;
+  /** "desc" first for the ladders, because "most urgent at the top" is the
+   *  thing anyone actually wants from a priority sort. */
+  dir: "asc" | "desc";
+}
+
+/** The fields offered in the menu, in the order they are listed. Tag categories
+ *  are appended per board, since they are the board's own vocabulary. */
+const SORT_FIELDS: { field: SortField; label: string }[] = [
+  { field: "priority", label: "Priority" },
+  { field: "effort", label: "Effort" },
+  { field: "due", label: "Due Date" },
+  { field: "number", label: "Card Number" },
+  { field: "name", label: "Name" },
+  { field: "created", label: "Created" },
+  { field: "updated", label: "Last Edited" },
+];
+
+function sameField(a: SortField, b: SortField): boolean {
+  if (typeof a === "object" && typeof b === "object") return a.category === b.category;
+  return a === b;
+}
+
+/** A field's name. Takes the CATEGORY LIST rather than a board, because the
+ *  same editor sets the tool-wide default, where the vocabulary is the global
+ *  one and there is no board to read it off. */
+function sortFieldLabel(field: SortField, categories: TagCategory[]): string {
+  if (typeof field === "object") {
+    return categories.find((c) => c.id === field.category)?.name ?? "Tag";
+  }
+  return SORT_FIELDS.find((f) => f.field === field)?.label ?? String(field);
+}
+
+/** One card's value for one field, as something comparable. Null sorts LAST
+ *  whichever direction is asked for: "no due date" is not earlier or later than
+ *  a date, it is the absence of one, and burying those at the bottom is what
+ *  anyone means by "sort by due date". */
+function sortValue(card: Card, field: SortField, board: Board): number | string | null {
+  if (typeof field === "object") {
+    /* The card's tag from this category, by the category's own order, so a
+       Types category listed Bug, Improvement, Feature sorts in that order
+       rather than alphabetically. A card with no tag from it sorts last. */
+    const tags = board.tags.filter((t) => t.categoryId === field.category);
+    const index = tags.findIndex((t) => card.tagIds.includes(t.id));
+    return index === -1 ? null : index;
+  }
+  switch (field) {
+    case "priority":
+      return PRIORITIES.indexOf(card.priority);
+    case "effort":
+      return EFFORTS.indexOf(card.effort);
+    case "number":
+      return card.number;
+    case "name":
+      return card.title.trim().toLowerCase();
+    case "due":
+      return card.dates.due ?? null;
+    case "created":
+      return card.createdAt;
+    case "updated":
+      return card.updatedAt;
+  }
+}
+
+/** Applies the rules. Returns a NEW array; the caller's order is untouched. */
+function sortCards(list: Card[], rules: SortRule[], board: Board): Card[] {
+  if (rules.length === 0) return list;
+  const out = [...list];
+  out.sort((a, b) => {
+    for (const rule of rules) {
+      const av = sortValue(a, rule.field, board);
+      const bv = sortValue(b, rule.field, board);
+      // Absent values go to the bottom in both directions. See sortValue.
+      if (av === null && bv === null) continue;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      let cmp = 0;
+      if (typeof av === "string" && typeof bv === "string") cmp = av.localeCompare(bv);
+      else cmp = (av as number) < (bv as number) ? -1 : (av as number) > (bv as number) ? 1 : 0;
+      if (cmp !== 0) return rule.dir === "asc" ? cmp : -cmp;
+    }
+    /* Every rule tied, so the hand-made order breaks it. Falling back to this
+       rather than leaving it to the sort's stability is what makes the result
+       the same every time it is drawn. */
+    return a.order - b.order;
+  });
+  return out;
+}
+
+/** The rules in force for a column: its own, or the board's default when it has
+ *  none of its own. `null` on the column means "follow the board"; an empty
+ *  array means "manual, whatever the board says". */
+function rulesForColumn(board: Board, column: Column): SortRule[] {
+  return column.sort ?? effective(board).defaultSort ?? [];
+}
+
+/** Off -> descending -> ascending -> off, appending to the end when it turns on.
+ *  One click is the common case (most urgent first), two is the other
+ *  direction, three takes it back out. */
+function cycleColumnSort(board: Board, column: Column, field: SortField): void {
+  const rules = [...rulesForColumn(board, column)];
+  const at = rules.findIndex((r) => sameField(r.field, field));
+  if (at === -1) rules.push({ field, dir: "desc" });
+  else if (rules[at]!.dir === "desc") rules[at] = { field, dir: "asc" };
+  else rules.splice(at, 1);
+  column.sort = rules;
+  touchBoard(board);
+  renderBoardView();
+}
+
+/** What a column's badge says: where its order comes from, in as few words as
+ *  a badge can carry. "Board default" is a different answer from "Manual", and
+ *  a row that cannot tell them apart is a row you have to open to read. */
+function describeSortBadge(column: Column): string {
+  if (column.sort === null || column.sort === undefined) return "Board Default";
+  if (column.sort.length === 0) return "Manual";
+  return "Customized";
+}
+
+/** A rule set as a sentence. One wording, used by the Board Setup row, the
+ *  column editor's button and the header tooltip, so the three cannot describe
+ *  the same rules differently. */
+function describeSortRules(rules: SortRule[], categories: TagCategory[]): string {
+  if (rules.length === 0) return "Manual, the order you dragged them into";
+  return rules
+    .map((r) => `${sortFieldLabel(r.field, categories)} ${r.dir === "desc" ? "high to low" : "low to high"}`)
+    .join(", then ");
+}
+
+/* -----------------------------------------------------------------------------
+   WHAT A SETTINGS BADGE SAYS
+
+   Two words at most. A badge is read at a glance to answer one question, "has
+   anyone touched this?", and the answer to that is never a sentence. The detail
+   belongs on the screen the Customize button opens, which is where someone has
+   already decided they want the detail.
+
+   These used to spell the whole rule set out, which made the badge as wide as
+   the rules were long and pushed the row around every time they changed.
+----------------------------------------------------------------------------- */
+
+/* THE CHAIN, AND WHAT EACH LINK CAN SAY.
+
+   Tool -> board -> column. Each level either follows the one above it or has an
+   answer of its own, and NAMES the level it is following, so a badge tells you
+   where to go to change it rather than only that you are not there yet.
+
+   A list-valued setting has one more state than a plain one, and it is easy to
+   miss: an EMPTY list is an answer. "This board sorts nothing" is a decision
+   someone made, and it is not the same as "this board has not been asked". The
+   board badge used to collapse those two into "Customized", so a board
+   deliberately left manual looked identical to one carrying three sort levels.
+
+   There is no "follow the tool" at column level. A column's parent is its
+   board, and a board that is following the tool passes the tool's answer down
+   unchanged, so the tool default already reaches every column that has not been
+   overridden. A column binding past its board to the tool would be a fourth
+   state no other setting in this app has, to answer a question ("ignore this
+   board's sort but not the tool's") that copying the rules answers already. */
+
+/** For a TOOL-level setting: is this still what the app ships with? */
+function toolBadge(isDefault: boolean): string {
+  return isDefault ? "Default" : "Customized";
+}
+
+/** For a board-level setting with only two states, like Card Layout, where an
+ *  empty list is not a meaningful answer. */
+function boardBadge(hasOverride: boolean): string {
+  return hasOverride ? "Customized" : "Tool Default";
+}
+
+/** For the board's column sort, which has three: following the tool, its own
+ *  rules, or deliberately none. */
+function describeBoardSortBadge(board: Board): string {
+  const own = board.overrides.defaultSort;
+  if (own === undefined) return "Tool Default";
+  if (own.length === 0) return "Manual";
+  return "Customized";
+}
+
+/** The Sort submenu for one column. Each row says where that field sits in the
+ *  order and which way it runs, so the rule set is readable from the menu. */
+function columnSortMenu(board: Board, column: Column): MenuItem[] {
+  const rules = rulesForColumn(board, column);
+  const fields: { field: SortField; label: string }[] = [
+    ...SORT_FIELDS,
+    ...board.tagCategories.map((c) => ({ field: { category: c.id }, label: c.name })),
+  ];
+
+  const items: MenuItem[] = fields.map(({ field, label }) => {
+    const at = rules.findIndex((r) => sameField(r.field, field));
+    const rule = at === -1 ? null : rules[at]!;
+    /* An active field reads "Priority ↓", and gains its place in the order only
+       once there IS an order to have a place in. A lone "1" in front of the
+       only rule is noise. */
+    const mark = rule ? `${rules.length > 1 ? `${at + 1}. ` : ""}${label} ${rule.dir === "desc" ? "↓" : "↑"}` : label;
+    return {
+      label: mark,
+      onClick: () => cycleColumnSort(board, column, field),
+    };
+  });
+
+  return [
+    {
+      label: rules.length === 0 ? "Manual order (drag to arrange)" : "Clear sort, back to manual",
+      disabled: rules.length === 0,
+      onClick: () => {
+        column.sort = [];
+        touchBoard(board);
+        renderBoardView();
+      },
+    },
+    ...(column.sort !== null && column.sort !== undefined
+      ? [{
+          label: "Follow the board default",
+          onClick: () => {
+            column.sort = null;
+            touchBoard(board);
+            renderBoardView();
+          },
+        }]
+      : []),
+    /* The menu is the quick way to flip one level. Reordering levels, and
+       reading the whole rule set at once, is what the editor is for. */
+    {
+      label: "Customize…",
+      onClick: () =>
+        openSortEditor({ kind: "column", boardId: board.id, columnId: column.id }),
+    },
+    // The menu's own separator, not a row of dashes standing in for one.
+    { separator: true },
+    ...items,
+  ];
+}
+
+/* -----------------------------------------------------------------------------
+   THE SORT EDITOR
+
+   One screen, two things it can be pointed at: the board's DEFAULT, set in
+   Board Setup, and one COLUMN's own rules, set from that column's settings. The
+   menu on a column header stays as the quick way to add or flip a level without
+   opening anything; this is where a layered rule set is actually built and
+   rearranged, and where the board-wide answer is set at all.
+
+   Two editors would have drifted. The rule set is the same shape in both cases
+   and so is every question you can ask of it, so the difference is one target
+   object and one sentence at the top.
+----------------------------------------------------------------------------- */
+
+/** What the editor is pointed at. Held rather than passed, because the modal's
+ *  own buttons fire long after it was opened. */
+type SortTarget =
+  | { kind: "tool" }
+  | { kind: "board"; boardId: string }
+  | { kind: "column"; boardId: string; columnId: string };
+
+let sortEditTarget: SortTarget | null = null;
+/** Which level is being dragged, by its place in the list. */
+let sortDragIndex: number | null = null;
+/** Where to go back to when this closes, since it is reached from two places. */
+let sortEditReturn: (() => void) | null = null;
+let _sortModal: Modal | null = null;
+
+/** The board the editor is working on, or null if it has gone. */
+function sortEditBoard(): Board | null {
+  if (!sortEditTarget || sortEditTarget.kind === "tool") return null;
+  return getBoard(sortEditTarget.boardId);
+}
+
+/** The tag vocabulary the editor offers. A board's own for a board or a column,
+ *  the global one for the tool default, which is the vocabulary a brand-new
+ *  board starts from. */
+function sortEditCategories(): TagCategory[] {
+  return sortEditBoard()?.tagCategories ?? globalTagCategories;
+}
+
+/** The rules being edited, read fresh each time: the editor writes straight
+ *  through to the board file, so there is no working copy to get out of step. */
+function sortEditRules(): SortRule[] {
+  if (!sortEditTarget) return [];
+  if (sortEditTarget.kind === "tool") return kbSettings.defaultSort;
+  const board = sortEditBoard();
+  if (!board) return [];
+  if (sortEditTarget.kind === "board") return effective(board).defaultSort;
+  const column = getColumn(board, sortEditTarget.columnId);
+  return column ? rulesForColumn(board, column) : [];
+}
+
+/** Writes the edited rules back to whichever thing is being edited. */
+function setSortEditRules(rules: SortRule[]): void {
+  if (!sortEditTarget) return;
+  if (sortEditTarget.kind === "tool") {
+    kbSettings.defaultSort = rules;
+    markSettings();
+    renderSortEditor();
+    renderColumnSortSummary();
+    renderBoardView();
+    return;
+  }
+  const board = sortEditBoard();
+  if (!board) return;
+  if (sortEditTarget.kind === "board") {
+    /* Straight onto the board's overrides. A board editing its default IS
+       setting an override; there is no third level above it to follow. */
+    board.overrides.defaultSort = rules;
+  } else {
+    const column = getColumn(board, sortEditTarget.columnId);
+    if (!column) return;
+    column.sort = rules;
+  }
+  markBoard(board.id);
+  renderSortEditor();
+  renderBoardView();
+}
+
+function getSortModal(): Modal {
+  if (_sortModal) return _sortModal;
+  _sortModal = new Modal(document.getElementById("kbSortBackdrop")!, {
+    closeOnEsc: true,
+    onClosed: () => {
+      const back = sortEditReturn;
+      sortEditTarget = null;
+      sortEditReturn = null;
+      back?.();
+    },
+  });
+
+  const goBack = (): void => _sortModal!.close();
+  document.getElementById("kbSortBack")!.addEventListener("click", goBack);
+  document.getElementById("kbSortClose")!.addEventListener("click", goBack);
+  document.getElementById("kbSortClearBtn")!.addEventListener("click", () => setSortEditRules([]));
+
+  /* Whether this BOARD has an answer of its own. Only shown for the board's
+     default, because a column always has one: its own rules, or the board's. */
+  document.getElementById("kbSortFollowBtn")!.addEventListener("click", () => {
+    const board = sortEditBoard();
+    if (!board) return;
+    if (board.overrides.defaultSort === undefined) {
+      // Starts from what it was already following, so turning the override on
+      // changes nothing until a level is actually added or removed.
+      board.overrides.defaultSort = [...effective(null).defaultSort];
+    } else {
+      delete board.overrides.defaultSort;
+    }
+    markBoard(board.id);
+    renderSortEditor();
+    renderBoardView();
+  });
+
+  document.getElementById("kbSortAdd")!.addEventListener("change", (e) => {
+    const select = e.target as HTMLSelectElement;
+    const value = select.value;
+    select.value = "";
+    if (!value) return;
+    const field: SortField = value.startsWith("cat:")
+      ? { category: value.slice(4) }
+      : (value as SortField);
+    // Appended, because a level added is a tie-break for the ones above it.
+    setSortEditRules([...sortEditRules(), { field, dir: "desc" }]);
+  });
+
+  return _sortModal;
+}
+
+/**
+ * Opens the editor on the board's default or on one column.
+ *
+ * `back` is how to return, because this is reached from two different screens
+ * and neither of them is the board: without it, closing would drop you on the
+ * board rather than where you started.
+ */
+function openSortEditor(target: SortTarget, back?: () => void): void {
+  sortEditTarget = target;
+  sortEditReturn = back ?? null;
+  renderSortEditor();
+  // Replaces whatever launched it rather than stacking on top. See kbConfirm.
+  topOpenKanbanModal()?.close({ handoff: true });
+  getSortModal().open();
+}
+
+function renderSortEditor(): void {
+  const board = sortEditBoard();
+  const host = document.getElementById("kbSortRules")!;
+  const intro = document.getElementById("kbSortIntro")!;
+  const title = document.getElementById("kbSortTitle")!;
+  const add = document.getElementById("kbSortAdd") as HTMLSelectElement;
+  host.replaceChildren();
+  if (!board || !sortEditTarget) return;
+
+  const column =
+    sortEditTarget.kind === "column" ? getColumn(board, sortEditTarget.columnId) : null;
+  title.textContent = column ? `Sort: ${column.title}` : "Default Column Sort";
+  intro.textContent = column
+    ? `How ${column.title} orders its cards, whatever the board's default says. ` +
+      "Levels apply in order, and each one only decides the order when the ones above it tie."
+    : "How every column on this board orders its cards unless that column says otherwise. " +
+      "Levels apply in order, and each one only decides the order when the ones above it tie.";
+
+  /* The override row, for the board default only. A column is never "following
+     nothing": it has its own rules or it has the board's, and the Follow-the-
+     board entry on its menu is where that is decided. */
+  const followRow = document.getElementById("kbSortFollowRow") as HTMLElement;
+  followRow.style.display = column ? "none" : "";
+  if (!column) {
+    const custom = board.overrides.defaultSort !== undefined;
+    document.getElementById("kbSortFollowBadge")!.textContent = describeBoardSortBadge(board);
+    document.getElementById("kbSortFollowBtn")!.textContent = custom
+      ? "Follow the tool default"
+      : "Set for this board";
+  }
+
+  const rules = sortEditRules();
+
+  if (rules.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "kb-section-note";
+    empty.textContent = column
+      ? "No levels, so this column keeps the order you dragged it into."
+      : "No levels, so columns keep the order you dragged them into.";
+    host.appendChild(empty);
+  }
+
+  rules.forEach((rule, index) => {
+    const row = document.createElement("div");
+    row.className = "kb-sort-rule";
+    row.draggable = true;
+    row.dataset.ruleIndex = String(index);
+
+    /* Dragged to reorder, the same way the card layout list is, rather than a
+       pair of arrows per row. Levels are an order and dragging is how an order
+       is expressed; the arrows also cost two controls in a row that is already
+       carrying a name and a direction. */
+    const grip = document.createElement("span");
+    grip.className = "kb-column-grip";
+    grip.textContent = "⠳";
+    grip.title = "Drag to change which level applies first";
+    row.appendChild(grip);
+
+    const rank = document.createElement("span");
+    rank.className = "kb-sort-rank";
+    rank.textContent = String(index + 1);
+    row.appendChild(rank);
+
+    const label = document.createElement("span");
+    label.className = "kb-sort-field";
+    label.textContent = sortFieldLabel(rule.field, sortEditCategories());
+    row.appendChild(label);
+
+    /* The direction reads as words rather than an arrow. "High to low" is
+       unambiguous for a ladder and for a date; an arrow is not, and this is
+       the screen where the rule is being decided rather than glanced at. */
+    const dir = document.createElement("button");
+    dir.type = "button";
+    dir.className = "settings-action-btn";
+    dir.textContent = rule.dir === "desc" ? "High to low" : "Low to high";
+    dir.addEventListener("click", () => {
+      const next = [...sortEditRules()];
+      next[index] = { field: rule.field, dir: rule.dir === "desc" ? "asc" : "desc" };
+      setSortEditRules(next);
+    });
+    row.appendChild(dir);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "kb-icon-btn kb-sort-remove";
+    remove.textContent = "×";
+    remove.title = "Remove this level";
+    remove.addEventListener("click", () =>
+      setSortEditRules(sortEditRules().filter((_, i) => i !== index)),
+    );
+    row.appendChild(remove);
+
+    row.addEventListener("dragstart", () => {
+      sortDragIndex = index;
+      row.classList.add("kb-dragging");
+    });
+    /* Committed on dragend rather than drop, so a release anywhere (on the
+       list, on the padding, outside the window) still lands the new order.
+       Same reason as the card layout list. */
+    row.addEventListener("dragend", () => {
+      row.classList.remove("kb-dragging");
+      sortDragIndex = null;
+      const before = sortEditRules();
+      const next = Array.from(host.querySelectorAll<HTMLElement>(".kb-sort-rule"))
+        .map((el) => before[Number(el.dataset.ruleIndex)])
+        .filter((r): r is SortRule => r !== undefined);
+      if (next.length !== before.length) return;
+      setSortEditRules(next);
+    });
+    row.addEventListener("dragover", (e) => {
+      if (sortDragIndex === null || sortDragIndex === index) return;
+      e.preventDefault();
+      const dragged = host.querySelector<HTMLElement>(
+        `.kb-sort-rule[data-rule-index="${sortDragIndex}"]`,
+      );
+      if (!dragged) return;
+      const rect = row.getBoundingClientRect();
+      const above = e.clientY < rect.top + rect.height / 2;
+      host.insertBefore(dragged, above ? row : row.nextSibling);
+    });
+
+    host.appendChild(row);
+  });
+
+  /* The picker only offers what is not already in the list: a field cannot
+     sort twice, and a second copy of it would be a level that never speaks. */
+  add.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Choose a field…";
+  add.appendChild(placeholder);
+  const options: { value: string; label: string; field: SortField }[] = [
+    ...SORT_FIELDS.map((f) => ({ value: String(f.field), label: f.label, field: f.field })),
+    ...board.tagCategories.map((c) => ({
+      value: `cat:${c.id}`,
+      label: c.name,
+      field: { category: c.id } as SortField,
+    })),
+  ];
+  for (const opt of options) {
+    if (rules.some((r) => sameField(r.field, opt.field))) continue;
+    const el = document.createElement("option");
+    el.value = opt.value;
+    el.textContent = opt.label;
+    add.appendChild(el);
+  }
+  add.value = "";
+  add.disabled = add.children.length <= 1;
+}
+
 function buildColumn(board: Board, column: Column, todayStr: string): HTMLElement {
   const el = document.createElement("section");
   el.className = "kb-column";
@@ -2855,7 +3632,10 @@ function buildColumn(board: Board, column: Column, todayStr: string): HTMLElemen
   if (column.isDone) el.classList.add("kb-column-done");
 
   const all = cardsInColumn(board.id, column.id);
-  const visible = all.filter((c) => cardMatchesFilters(c, todayStr));
+  // Filtered first, then sorted: sorting cards that are not on screen would
+  // only cost time, and the order of what IS shown is the same either way.
+  const rules = rulesForColumn(board, column);
+  const visible = sortCards(all.filter((c) => cardMatchesFilters(c, todayStr)), rules, board);
   // The WIP number counts every card in the column, not the filtered subset:
   // a limit that moved when you typed in a search box would be worthless.
   const over = column.wipLimit !== null && all.length > column.wipLimit;
@@ -2905,6 +3685,21 @@ function buildColumn(board: Board, column: Column, todayStr: string): HTMLElemen
     if (addBtn.style.display !== "none") openQuickAdd(board, column, footer, addBtn, "top");
   });
   head.appendChild(quickAdd);
+
+  /* A sorted column has to look different from one that is hand-arranged, or
+     the cards being somewhere unexpected has no explanation on screen. The
+     tooltip spells the layers out in order. */
+  if (rules.length > 0) {
+    const chip = document.createElement("span");
+    chip.className = "kb-column-sorted";
+    chip.textContent = "⇅";
+    chip.title =
+      "Sorted by " +
+      rules
+        .map((r) => `${sortFieldLabel(r.field, board.tagCategories)} ${r.dir === "desc" ? "high to low" : "low to high"}`)
+        .join(", then ");
+    head.appendChild(chip);
+  }
 
   const count = document.createElement("span");
   count.className = "kb-column-count";
@@ -2966,6 +3761,7 @@ function buildColumn(board: Board, column: Column, todayStr: string): HTMLElemen
           renderBoardView();
         },
       },
+      { label: "Sort Cards", submenu: columnSortMenu(board, column) },
       { label: "Column Settings…", onClick: () => openColumnEditor(board, column) },
       {
         label: "Archive All Cards Here",
@@ -3032,14 +3828,22 @@ function buildColumn(board: Board, column: Column, todayStr: string): HTMLElemen
 
 /** The inline capture form. `position` comes from WHICH control opened it: the
  *  + in the header means the top, the button at the foot means the bottom. */
+/**
+ * The inline "type a title, press Enter" form.
+ *
+ * `host` is where the form goes and `addBtn` is the button it replaces, which
+ * for the column footer is the Add card button and for "Add Card Below" is
+ * nothing: the form is inserted straight under the card instead, and there is
+ * no button to hide or bring back.
+ */
 function openQuickAdd(
   board: Board,
   column: Column,
-  footer: HTMLElement,
-  addBtn: HTMLButtonElement,
+  host: HTMLElement,
+  addBtn: HTMLButtonElement | null,
   position: NewCardPosition,
 ): void {
-  addBtn.style.display = "none";
+  if (addBtn) addBtn.style.display = "none";
 
   const form = document.createElement("div");
   form.className = "kb-quick-add";
@@ -3066,7 +3870,7 @@ function openQuickAdd(
   row.appendChild(cancel);
 
   form.appendChild(row);
-  footer.appendChild(form);
+  host.appendChild(form);
   input.focus();
 
   function commit(): void {
@@ -3074,19 +3878,19 @@ function openQuickAdd(
     if (!title) return;
     const created = createCard(board, column.id, title, position);
     if (!created) return;
-    // Re-render so the new card appears, then reopen the form in the same
-    // column so a run of captures is uninterrupted.
+    /* Re-render so the new card appears, then reopen the form so a run of
+       captures is uninterrupted. Adding BELOW walks down the column as you go:
+       the next one lands under the one just made, which is what typing a list
+       in order feels like. Adding at an end stays at that end. */
+    const next: NewCardPosition =
+      typeof position === "object" ? { below: created.id } : position;
     renderBoardView();
-    const nextColumn = columnsEl.querySelector<HTMLElement>(
-      `.kb-column[data-column-id="${CSS.escape(column.id)}"] .kb-column-footer`,
-    );
-    const nextBtn = nextColumn?.querySelector<HTMLButtonElement>(".kb-column-add");
-    if (nextColumn && nextBtn) openQuickAdd(board, column, nextColumn, nextBtn, position);
+    reopenQuickAdd(board, column, next);
   }
 
   function close(): void {
     form.remove();
-    addBtn.style.display = "";
+    if (addBtn) addBtn.style.display = "";
   }
 
   save.addEventListener("click", commit);
@@ -3100,6 +3904,139 @@ function openQuickAdd(
       close();
     }
   });
+}
+
+/** Puts the quick-add form back after a re-render, wherever it belongs for this
+ *  position. Split out because the form's own commit needs it and so does the
+ *  menu item that opens one under a card. */
+function reopenQuickAdd(board: Board, column: Column, position: NewCardPosition): void {
+  const columnEl = columnsEl.querySelector<HTMLElement>(
+    `.kb-column[data-column-id="${CSS.escape(column.id)}"]`,
+  );
+  if (!columnEl) return;
+
+  if (typeof position === "object") {
+    const cardEl = columnEl.querySelector<HTMLElement>(
+      `.kb-card[data-card-id="${CSS.escape(position.below)}"]`,
+    );
+    if (!cardEl?.parentElement) return;
+    // Its own wrapper, inserted after the card, so the form sits where the new
+    // card will and nothing has to be undone when it closes.
+    const slot = document.createElement("div");
+    slot.className = "kb-quick-add-slot";
+    cardEl.parentElement.insertBefore(slot, cardEl.nextSibling);
+    openQuickAdd(board, column, slot, null, position);
+    return;
+  }
+
+  const footer = columnEl.querySelector<HTMLElement>(".kb-column-footer");
+  const addBtn = footer?.querySelector<HTMLButtonElement>(".kb-column-add");
+  if (footer && addBtn) openQuickAdd(board, column, footer, addBtn, position);
+}
+
+/* =============================================================================
+   SELECTING MORE THAN ONE CARD
+   -----------------------------------------------------------------------------
+   Ctrl+click and Shift+click, the way a spreadsheet does it, so a batch of
+   cards can be moved, re-prioritized or archived in one go instead of one
+   right-click at a time.
+
+   Ctrl+click toggles one card and becomes the new anchor. Shift+click selects
+   from the anchor to the card clicked, REPLACING whatever the last range put
+   there rather than adding to it, which is what makes a range you got slightly
+   wrong fixable by clicking again instead of starting over.
+
+   A RANGE IS WITHIN ONE COLUMN. "The ones in between" only means anything down
+   a single list; across columns there is no order to be between. Shift-clicking
+   into a different column starts a fresh range there rather than selecting a
+   rectangle nobody asked for.
+
+   The selection is BY ID and lives only as long as the board is on screen. It
+   is not saved, it is dropped when the board changes, and every action taken on
+   it re-reads the cards, so a card deleted by an agent mid-selection is simply
+   not there when the action runs rather than a stale object being written back.
+----------------------------------------------------------------------------- */
+
+let selectedCardIds = new Set<string>();
+/** Where the next Shift+click measures from. */
+let selectionAnchorId: string | null = null;
+
+/** The selected cards that still exist, in board order. */
+function selectedCards(): Card[] {
+  return cards.filter((c) => selectedCardIds.has(c.id) && !c.archived);
+}
+
+function clearCardSelection(redraw = true): void {
+  if (selectedCardIds.size === 0) return;
+  selectedCardIds.clear();
+  selectionAnchorId = null;
+  if (redraw) renderBoardView();
+}
+
+/** Ctrl+click: this card joins or leaves the selection, and becomes the anchor
+ *  either way. Leaving the anchor behind on a card you just deselected is what
+ *  makes the next Shift+click measure from somewhere you are not looking. */
+function toggleCardSelection(card: Card): void {
+  if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
+  else selectedCardIds.add(card.id);
+  selectionAnchorId = card.id;
+  renderBoardView();
+}
+
+/** Shift+click: everything between the anchor and this card, in this column. */
+function extendCardSelection(card: Card): void {
+  const anchor = selectionAnchorId ? getCard(selectionAnchorId) : null;
+  // No anchor, or one in another column, so there is nothing to be between.
+  if (!anchor || anchor.columnId !== card.columnId || anchor.archived) {
+    toggleCardSelection(card);
+    return;
+  }
+  const column = visibleCardsInColumn(card.boardId, card.columnId);
+  const from = column.findIndex((c) => c.id === anchor.id);
+  const to = column.findIndex((c) => c.id === card.id);
+  if (from === -1 || to === -1) {
+    toggleCardSelection(card);
+    return;
+  }
+  /* Replaces the range rather than adding to it, so overshooting is fixed by
+     clicking the right card instead of clearing and starting again. Cards
+     picked out individually with Ctrl elsewhere are kept: only this column's
+     run is rewritten. */
+  for (const c of column) selectedCardIds.delete(c.id);
+  for (let i = Math.min(from, to); i <= Math.max(from, to); i++) {
+    const c = column[i];
+    if (c) selectedCardIds.add(c.id);
+  }
+  renderBoardView();
+}
+
+/** The cards a column is SHOWING, filters included, which is the order a range
+ *  is measured in. Selecting through a card you cannot see would be a selection
+ *  you cannot check. */
+function visibleCardsInColumn(boardId: string, columnId: string): Card[] {
+  const todayStr = today();
+  return cardsInColumn(boardId, columnId).filter((c) => cardMatchesFilters(c, todayStr));
+}
+
+/**
+ * What a click on a card face means.
+ *
+ * Returns true when the click was a selection gesture and the card should NOT
+ * open. Ctrl and Shift are the two that select; a plain click opens the card
+ * and drops the selection, because leaving a selection standing behind an open
+ * card is how a later bulk action surprises someone.
+ */
+function handleCardClick(card: Card, e: MouseEvent): boolean {
+  if (e.ctrlKey || e.metaKey) {
+    toggleCardSelection(card);
+    return true;
+  }
+  if (e.shiftKey) {
+    extendCardSelection(card);
+    return true;
+  }
+  clearCardSelection(false);
+  return false;
 }
 
 /* =============================================================================
@@ -3343,8 +4280,23 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
     el.appendChild(meta);
   }
 
-  el.addEventListener("click", () => openCard(card.id));
-  attachMenu(el, () => boardCardMenu(card));
+  if (selectedCardIds.has(card.id)) el.classList.add("kb-card-selected");
+
+  el.addEventListener("click", (e) => {
+    // A selection gesture never opens the card: the point of Ctrl+clicking six
+    // of them is to act on six, not to end up looking at the last one.
+    if (handleCardClick(card, e)) return;
+    openCard(card.id);
+  });
+  /* Right-clicking INSIDE a selection acts on the selection; right-clicking
+     anywhere else drops it and behaves as it always did. Silently acting on a
+     selection you had forgotten about is the failure worth avoiding here, and
+     the menu says how many it is about to touch. */
+  attachMenu(el, () =>
+    selectedCardIds.size > 1 && selectedCardIds.has(card.id)
+      ? bulkCardMenu(selectedCards())
+      : (clearCardSelection(), boardCardMenu(card)),
+  );
   attachCardDragHandlers(board, el, card);
   return el;
 }
@@ -3454,6 +4406,248 @@ function setCardOwner(card: Card, owner: CardAuthor | undefined): void {
  *  it is the shortcut past opening the card at all, which is why priority,
  *  column and board, the three fields most often changed on their own, are
  *  here as submenus but are plain form controls in the modal. */
+/**
+ * The right-click menu for a selection, rather than for one card.
+ *
+ * Every entry is the plural of one that is already on the single-card menu, and
+ * nothing new: a menu that grows options only reachable by selecting several
+ * cards would be a second way to do things, discovered by accident.
+ *
+ * What is deliberately NOT here: Open Card, Add Card Below, Card Color and Card
+ * Stats. Each of those opens a screen about one card, and the honest plural of
+ * "open this" is not "open eleven of them".
+ *
+ * Every action re-reads the selection through `selectedCards()` at the moment
+ * it runs, so a card deleted between opening the menu and clicking an entry is
+ * simply not in the list rather than a stale object written back to the board.
+ */
+/* Escape drops the selection, which is the one gesture every list in every
+   program agrees on. Bound once, on the document, and only doing anything when
+   there IS a selection, so it never competes with a modal's own Escape. */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || selectedCardIds.size === 0) return;
+  if (currentView !== "board") return;
+  e.preventDefault();
+  clearCardSelection();
+});
+
+function bulkCardMenu(selection: Card[]): MenuItem[] {
+  const count = selection.length;
+  const boardId = selection[0]?.boardId ?? currentBoardId;
+  const board = getBoard(boardId);
+
+  /** Runs `apply` over everything still selected, then redraws once. Once,
+   *  because redrawing per card on a selection of forty is forty full rebuilds
+   *  of every column. */
+  const overSelection = (apply: (card: Card) => void, done: (n: number) => void): void => {
+    const live = selectedCards();
+    for (const card of live) apply(card);
+    clearCardSelection(false);
+    renderAll();
+    done(live.length);
+  };
+
+  const priorityItems: MenuItem[] = PRIORITIES.map((p) => ({
+    label: priorityLabel(p),
+    onClick: () =>
+      overSelection(
+        (card) => {
+          card.priority = p;
+          stampCard(card);
+        },
+        (n) => flash(`${n} cards set to ${priorityLabel(p)}.`),
+      ),
+  }));
+
+  const effortItems: MenuItem[] = EFFORTS.map((eff) => ({
+    label: effortLabel(eff),
+    onClick: () =>
+      overSelection(
+        (card) => {
+          card.effort = eff;
+          stampCard(card);
+        },
+        (n) => flash(`${n} cards set to ${effortLabel(eff)}.`),
+      ),
+  }));
+
+  /* Only the columns on the board the selection is on. A selection can only
+     ever be on one board, because it is cleared when the board changes. */
+  const columnItems: MenuItem[] = (board?.columns ?? []).map((col) => ({
+    label: col.title,
+    onClick: () =>
+      overSelection(
+        (card) => moveCardToColumn(card, col.id),
+        (n) => flash(`${n} cards moved to ${col.title}.`),
+      ),
+  }));
+
+  const boardItems: MenuItem[] = boards
+    .filter((b) => b.id !== boardId && b.columns.length > 0)
+    .map((b) => ({
+      label: b.name,
+      onClick: () =>
+        overSelection(
+          (card) => moveCardToBoard(card, b.id),
+          (n) => flash(`${n} cards moved to ${b.name}.`),
+        ),
+    }));
+
+  /* TAGS OVER THE WHOLE SELECTION. Filing eleven cards under one tag was the
+     one thing this menu could not do, so it was eleven right-clicks or eleven
+     card openings, which is exactly the work a multi-select exists to avoid.
+
+     Shaped like the single-card tag menu (one drill-down per category, a tick
+     beside what is already on) with one addition it needs and that one does
+     not: a selection can be PARTLY tagged, so the mark has three states, and
+     clicking a partial one puts the tag on everything rather than taking it
+     off, which is what someone reaching for a half-applied tag means. */
+  const tagItems: MenuItem[] = [];
+  {
+    const categories = board?.tagCategories ?? [];
+    const boardTags = board?.tags ?? [];
+    for (const category of categories) {
+      /* A retired tag is still offered when some of the selection carries it,
+         so a bulk action can take one OFF; it is never offered as something to
+         put on. Same rule the card menu follows, read across a set. */
+      const catTags = boardTags.filter(
+        (t) =>
+          t.categoryId === category.id &&
+          (t.status === "active" || selection.some((c) => c.tagIds.includes(t.id))),
+      );
+      if (catTags.length === 0) continue;
+
+      tagItems.push({
+        label: category.name,
+        submenu: catTags.map((tag) => {
+          const on = selection.filter((c) => c.tagIds.includes(tag.id)).length;
+          /* Three states, not two: a figure space for none, a tick for all,
+             and a dash for some, all the same width so the names line up. */
+          const mark = on === 0 ? " " : on === count ? "✓" : "–";
+          return {
+            label: `${mark} ${tag.name}${on > 0 && on < count ? ` (${on} of ${count})` : ""}`,
+            swatch: tagColor(tag, categories) ?? undefined,
+            onClick: () => {
+              // Re-read at click time, not from `selection`: the count that
+              // decided the mark was taken when the menu was built.
+              const live = selectedCards();
+              const removing = live.length > 0 && live.every((c) => c.tagIds.includes(tag.id));
+              overSelection(
+                (card) => {
+                  if (removing) card.tagIds = card.tagIds.filter((id) => id !== tag.id);
+                  else if (!card.tagIds.includes(tag.id)) card.tagIds.push(tag.id);
+                  else return; // already correct, so nothing to stamp
+                  stampCard(card);
+                },
+                (n) =>
+                  flash(
+                    removing
+                      ? `"${tag.name}" taken off ${n} cards.`
+                      : `"${tag.name}" put on ${n} cards.`,
+                  ),
+              );
+            },
+          };
+        }),
+      });
+    }
+
+    if (tagItems.length > 0) {
+      tagItems.push({ separator: true });
+      tagItems.push({
+        label: "Clear All Tags",
+        danger: true,
+        disabled: selection.every((c) => c.tagIds.length === 0),
+        onClick: () =>
+          overSelection(
+            (card) => {
+              if (card.tagIds.length === 0) return;
+              card.tagIds = [];
+              stampCard(card);
+            },
+            (n) => flash(`Tags cleared from ${n} cards.`),
+          ),
+      });
+    }
+  }
+
+  return [
+    // Not clickable: a heading, so the menu says what it is about to act on.
+    { label: `${count} cards selected`, disabled: true },
+    { label: "Priority", submenu: priorityItems },
+    { label: "Effort", submenu: effortItems },
+    ...(tagItems.length > 0 ? [{ label: "Tags", submenu: tagItems }] : []),
+    ...(columnItems.length > 1 ? [{ label: "Move to Column", submenu: columnItems }] : []),
+    ...(boardItems.length > 0 ? [{ label: "Move to Board", submenu: boardItems }] : []),
+    {
+      label: "Duplicate Cards",
+      onClick: () => {
+        /* Read once and copied from that list, not from selectedCards() inside
+           the loop: each copy joins `cards`, and a loop re-reading the board
+           would find its own output and duplicate forever. */
+        const live = selectedCards();
+        let made = 0;
+        for (const card of live) if (duplicateCard(card)) made += 1;
+        clearCardSelection(false);
+        renderAll();
+        flash(made === live.length ? `Duplicated ${made} cards.` : `Duplicated ${made} of ${live.length} cards.`);
+      },
+    },
+    {
+      label: "Copy Titles",
+      onClick: () => {
+        const text = selectedCards().map((c) => c.title).join("\n");
+        void navigator.clipboard
+          .writeText(text)
+          .then(() => flash(`${selection.length} titles copied.`))
+          .catch(() => flash("Couldn't reach the clipboard.", "error"));
+      },
+    },
+    {
+      label: "Archive Cards",
+      onClick: () =>
+        overSelection(
+          (card) => {
+            card.archived = true;
+            stampCard(card);
+          },
+          (n) => flash(`${n} cards archived.`),
+        ),
+    },
+    {
+      label: "Delete Cards",
+      danger: true,
+      onClick: () => {
+        const live = selectedCards();
+        const remove = (): void => {
+          for (const card of live) deleteCard(card);
+          clearCardSelection(false);
+          renderAll();
+          flash(`${live.length} cards deleted.`);
+        };
+        /* ALWAYS confirmed, whatever the per-card setting says. That setting is
+           about the friction of deleting one card you are looking at; this is
+           several at once, some of them scrolled out of view, and it names the
+           count because that is the number worth checking before agreeing. */
+        kbConfirm(
+          {
+            title: `Delete ${live.length} cards?`,
+            message:
+              `${live.length} cards and everything on them go for good. ` +
+              `Archive instead if you only want them off the board.`,
+            confirmLabel: `Delete ${live.length}`,
+            /* Nothing to go back to, and said so rather than left out: this
+               came off a right-click on the board, so dismissing it lands on
+               the board, which is where it started. */
+            reopen: undefined,
+          },
+          remove,
+        );
+      },
+    },
+  ];
+}
+
 function boardCardMenu(card: Card): MenuItem[] {
   const board = getBoard(card.boardId);
 
@@ -3466,6 +4660,27 @@ function boardCardMenu(card: Card): MenuItem[] {
       renderAll();
     },
   }));
+
+  /* Effort and Tags are here because the SELECTION menu has them, and a menu
+     that can do more to eleven cards than to one reads as a bug in whichever
+     of the two you found second. Both are on the card face, so both are things
+     you can look at and want to change without opening anything. */
+  const effortItems: MenuItem[] = EFFORTS.map((eff) => ({
+    label: effortLabel(eff),
+    disabled: card.effort === eff,
+    onClick: () => {
+      card.effort = eff;
+      stampCard(card);
+      renderAll();
+    },
+  }));
+
+  // Same shape as the card modal's tag menu, one drill-down per category with
+  // a tick beside what is on, because it is the same question asked from a
+  // different place.
+  const tagItems: MenuItem[] = board
+    ? cardTagMenu(card, board.tagCategories, board.tags, () => renderAll())
+    : [];
 
   const columnItems: MenuItem[] = (board?.columns ?? []).map((col) => ({
     label: col.title,
@@ -3489,9 +4704,22 @@ function boardCardMenu(card: Card): MenuItem[] {
       },
     }));
 
+  const column = board?.columns.find((c) => c.id === card.columnId);
+
   return [
     { label: "Open Card…", onClick: () => openCard(card.id) },
+    /* Straight under this one, rather than at an end of the column. Writing a
+       list in order is the common case and the two existing entry points both
+       land somewhere else, so it was always a card added and then dragged. */
+    ...(board && column
+      ? [{
+          label: "Add Card Below",
+          onClick: () => reopenQuickAdd(board, column, { below: card.id }),
+        }]
+      : []),
     { label: "Priority", submenu: priorityItems },
+    { label: "Effort", submenu: effortItems },
+    ...(tagItems.length > 0 ? [{ label: "Tags", submenu: tagItems }] : []),
     // A one-column board has nowhere to move a card to, and a board with no
     // other boards beside it has nowhere to send one.
     ...(columnItems.length > 1
@@ -3634,14 +4862,45 @@ function buildTagChip(
 
 let dragCardId: string | null = null;
 let dragColumnId: string | null = null;
+/** The other selected cards travelling with the one under the pointer, in the
+ *  order they were in. Empty for an ordinary one-card drag. */
+let dragPassengerIds: string[] = [];
 
+/**
+ * DRAGGING A SELECTION.
+ *
+ * Picking up a card that is part of a selection picks up the whole selection,
+ * because that is what selecting them was for. The card under the pointer is
+ * the one the browser drags; the rest are moved to sit under it as it goes, so
+ * the group stays together and lands where the pointer says.
+ *
+ * IN THE ORDER THEY WERE IN, not the order they were clicked. A selection built
+ * by Ctrl+clicking around a column is still a set of cards with an arrangement
+ * on the board, and scrambling that on arrival would make a multi-card drag
+ * something you have to tidy up after.
+ *
+ * Dragging a card that is NOT in the selection drops the selection first: it is
+ * an action on that one card, and carrying an unrelated selection into it is
+ * how a drag moves eleven things you had forgotten were picked.
+ */
 function attachCardDragHandlers(board: Board, el: HTMLElement, card: Card): void {
   el.addEventListener("dragstart", (e) => {
     // Without this the column underneath also starts dragging when its own
     // draggable flag happens to be set.
     e.stopPropagation();
+
+    if (selectedCardIds.size > 1 && selectedCardIds.has(card.id)) {
+      dragPassengerIds = selectedCards()
+        .filter((c) => c.id !== card.id)
+        .map((c) => c.id);
+    } else {
+      clearCardSelection(false);
+      dragPassengerIds = [];
+    }
+
     dragCardId = card.id;
     el.classList.add("kb-dragging");
+    for (const id of dragPassengerIds) cardElement(id)?.classList.add("kb-dragging-with");
     e.dataTransfer?.setData("text/plain", card.id);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
   });
@@ -3649,16 +4908,29 @@ function attachCardDragHandlers(board: Board, el: HTMLElement, card: Card): void
   el.addEventListener("dragend", (e) => {
     e.stopPropagation();
     el.classList.remove("kb-dragging");
+    for (const id of dragPassengerIds) cardElement(id)?.classList.remove("kb-dragging-with");
     dragCardId = null;
+    dragPassengerIds = [];
     commitCardOrderFromDom(board);
+    // The selection survives the drag. Eleven cards just moved together and
+    // the next thing you do is as likely to be about the same eleven.
+    if (selectedCardIds.size > 0) renderBoardView();
   });
+}
+
+/** One card's element on the board, or null when it is not drawn. */
+function cardElement(cardId: string): HTMLElement | null {
+  return columnsEl.querySelector<HTMLElement>(`.kb-card[data-card-id="${CSS.escape(cardId)}"]`);
 }
 
 /** The first card in `body` whose midpoint is below `y`, i.e. the one the
  *  dragged card should be inserted before. null means "past the last one". */
 function cardBeforePoint(body: HTMLElement, y: number): HTMLElement | null {
+  /* The cards travelling WITH the dragged one are excluded too. They are being
+     moved to follow it, so measuring the drop point against them would have
+     the insertion point chase the group as it goes. */
   const others = Array.from(
-    body.querySelectorAll<HTMLElement>(".kb-card:not(.kb-dragging)"),
+    body.querySelectorAll<HTMLElement>(".kb-card:not(.kb-dragging):not(.kb-dragging-with)"),
   );
   for (const el of others) {
     const rect = el.getBoundingClientRect();
@@ -3685,6 +4957,19 @@ function attachCardDropTarget(body: HTMLElement): void {
     const before = cardBeforePoint(body, e.clientY);
     if (before) body.insertBefore(dragged, before);
     else body.appendChild(dragged);
+
+    /* The rest of the selection is parked directly under the card being
+       dragged, in board order, so the group arrives as a block rather than
+       scattered through whatever was already in the column. Done here rather
+       than on drop because the drop point is only known from the last dragover
+       the pointer produced. */
+    let after: HTMLElement = dragged;
+    for (const id of dragPassengerIds) {
+      const passenger = cardElement(id);
+      if (!passenger || passenger === dragged) continue;
+      after.after(passenger);
+      after = passenger;
+    }
   });
 
   // Needed only so the browser accepts the drop at all; the work is in dragend.
@@ -3698,6 +4983,8 @@ function commitCardOrderFromDom(board: Board): void {
   const todayStr = today();
   let changed = false;
   let autoStamped = 0;
+  /** Columns whose sort a drop just turned off, named so the toast can say so. */
+  const unsorted: string[] = [];
 
   for (const body of columnsEl.querySelectorAll<HTMLElement>(".kb-column-body")) {
     const columnId = body.dataset.columnId;
@@ -3706,6 +4993,17 @@ function commitCardOrderFromDom(board: Board): void {
     const ids = Array.from(body.querySelectorAll<HTMLElement>(".kb-card")).map(
       (el) => el.dataset.cardId ?? "",
     );
+
+    /* A card dropped into a SORTED column is a statement about where that one
+       card goes, and the sort would move it somewhere else the instant it
+       landed. The drop wins and the sort comes off, out loud: silently
+       ignoring the drop and silently keeping the sort both look like the drag
+       failed. Checked before the loop below writes the new order, because that
+       is what the sort would be fighting. */
+    if (column && rulesForColumn(board, column).length > 0 && ids.includes(dragCardId ?? "")) {
+      column.sort = [];
+      unsorted.push(column.title);
+    }
 
     ids.forEach((id, index) => {
       const card = getCard(id);
@@ -3730,6 +5028,11 @@ function commitCardOrderFromDom(board: Board): void {
     });
   }
 
+  if (unsorted.length > 0) {
+    flash(`${unsorted.join(" and ")} is back to manual order.`);
+    touchBoard(board);
+    if (!changed) renderBoardView();
+  }
   if (!changed) return;
   resequence(board.id);
   touchBoard(board);
@@ -3964,15 +5267,31 @@ function createCard(
     archived: false,
     createdAt: now,
     updatedAt: now,
-    // Placed at whichever end was asked for, by giving it an order the
-    // resequence below turns into a real index.
-    order: position === "top" ? -1 : existing.length,
+    /* Placed where it was asked for, by giving it an order the resequence
+       below turns into a real index. A half step past the card it goes under
+       is enough: nothing else can be sitting on it, because every other order
+       in the column is a whole number by the time resequence has run. */
+    order: newCardOrder(position, existing),
   };
   board.nextCardNumber += 1;
   cards.push(card);
   resequence(board.id);
   touchBoard(board);
   return card;
+}
+
+/** The order value a new card starts with, before resequence makes it an index.
+ *
+ *  A card added below another has to land between it and the next one, and the
+ *  only thing that can express "between" here is a fraction: resequence sorts
+ *  on this and renumbers, so 3.5 becomes 4 and everything after it shifts down
+ *  by one. Falling back to the bottom if the card is gone, which it can be by
+ *  the time a menu left open is finally clicked. */
+function newCardOrder(position: NewCardPosition, existing: Card[]): number {
+  if (position === "top") return -1;
+  if (position === "bottom") return existing.length;
+  const anchor = existing.find((c) => c.id === position.below);
+  return anchor ? anchor.order + 0.5 : existing.length;
 }
 
 function deleteCard(card: Card): void {
@@ -7719,49 +9038,82 @@ interface OverrideRow {
   info: string;
 }
 
-const BOARD_OVERRIDE_ROWS: OverrideRow[] = [
-  { key: "showTags", label: "Show Tags on Cards", info: "Tag chips on the card face." },
-  {
-    key: "showSubtasks",
-    label: "Show Subtask Progress on Cards",
-    info: "The progress bar and the done/total count on the card face.",
-  },
-  {
-    key: "showDates",
-    label: "Show Dates on Cards",
-    info: "The due chip and the stage chip on the card face.",
-  },
-  { key: "showNumbers", label: "Show Card Numbers", info: "The #12 handle on the card face." },
-  {
-    key: "showCardDelete",
-    label: "Show a Delete Button on Cards",
-    info: "A small bin in the corner of every card on this board.",
-  },
-  {
-    key: "showStages",
-    label: "Stage Dates",
-    info: "The Work Started / Testing Started / Completed dates and the button that stamps them.",
-  },
-  {
+/* THE SAME GROUPS, IN THE SAME ORDER, AS THE TOOL'S OWN PREFERENCES.
+
+   Seventeen rows in one column is a wall, and this list is a subset of that
+   wall: whoever reads the two screens is reading the same settings twice and
+   should not have to find them twice. So the grouping lives here as structure
+   rather than as a comment, and the dividers fall where index.html puts them.
+
+   The tool has two groups this one does not, the two ladders and the overdue
+   warning, because neither is something a single board can answer differently. */
+/* THE SAME BUCKETS, IN THE SAME ORDER, AS THE TOOL'S OWN PREFERENCES.
+
+   Seventeen rows in one column is a wall, and this list is a subset of that
+   wall: whoever reads the two screens is reading the same settings twice and
+   should not have to find them twice. So the grouping lives here as structure
+   rather than as a comment, and the dividers fall where index.html puts them.
+
+   The tool has the two ladders this one does not, because a level called "Huge"
+   on one board and "Epic" on another would make a card's chip mean different
+   things depending on where you were standing. */
+const BOARD_OVERRIDE_GROUPS: OverrideRow[][] = [
+  // Deadlines and urgency: the vocabulary a board tracks work in.
+  [
+    {
     key: "showDue",
     label: "Due Date",
     info: "The due date block and the due chip on the card face. Separate from stage dates. Off also means this board's cards never count as overdue.",
-  },
-  {
+    },
+    {
+    key: "showStages",
+    label: "Stage Dates",
+    info: "The Work Started / Testing Started / Completed dates and the button that stamps them.",
+    },
+    {
+    key: "overdueWarn",
+    label: "Warn on Overdue Cards",
+    info: "Whether this board's overdue cards pulse the Kanban sidebar icon and get counted in the tool header. A board that keeps due dates it does not work to can stop shouting about them without losing the dates.",
+    },
+  ],
+  // What happens when you use a board.
+  [
+    {
     key: "confirmDelete",
     label: "Confirm Before Deleting a Card",
     info: "Whether deleting a card on this board asks first.",
-  },
-  {
-    key: "autoCompleteOnDone",
-    label: "Stamp Complete on Drop into a Done Column",
-    info: "Only does anything when this board has a column marked as meaning done.",
-  },
-  {
+    },
+    {
     key: "openCardsInEditMode",
     label: "Open Cards in Edit Mode",
     info: "Cards open with their fields live, the way this tool always worked: each one saves as you leave it, and closing the card is a fine way to finish. No edit, save or discard buttons. Off, a card opens as something to read and the pencil switches to the fields.",
-  },
+    },
+    {
+    key: "autoCompleteOnDone",
+    label: "Stamp Complete on Drop into a Done Column",
+    info: "Only does anything when this board has a column marked as meaning done.",
+    },
+  ],
+  // What else a card face shows.
+  [
+    { key: "showTags", label: "Show Tags on Cards", info: "Tag chips on the card face." },
+    {
+    key: "showSubtasks",
+    label: "Show Subtask Progress on Cards",
+    info: "The progress bar and the done/total count on the card face.",
+    },
+    {
+    key: "showDates",
+    label: "Show Dates on Cards",
+    info: "The due chip and the stage chip on the card face.",
+    },
+    { key: "showNumbers", label: "Show Card Numbers", info: "The #12 handle on the card face." },
+    {
+    key: "showCardDelete",
+    label: "Show a Delete Button on Cards",
+    info: "A small bin in the corner of every card on this board.",
+    },
+  ],
 ];
 
 function renderBoardPrefs(): void {
@@ -7770,11 +9122,21 @@ function renderBoardPrefs(): void {
   list.replaceChildren();
   if (!board) return;
 
-  for (const row of BOARD_OVERRIDE_ROWS) {
-    list.appendChild(buildOverrideRow(board, row));
+  const divider = (): void => {
+    const rule = document.createElement("div");
+    rule.className = "settings-section-divider";
+    list.appendChild(rule);
+  };
+
+  for (const group of BOARD_OVERRIDE_GROUPS) {
+    if (list.children.length > 0) divider();
+    for (const row of group) list.appendChild(buildOverrideRow(board, row));
   }
 
-  // The two non-boolean settings, same three-state rule.
+  /* Third group: how cards look and how columns arrange them. The two selects
+     with the same three-state rule, then the two settings whose value is a list
+     and which open a screen of their own. */
+  divider();
   list.appendChild(
     buildOverrideSelect(board, "cardSize", "Card Size", [
       { value: "comfortable", label: "Comfortable" },
@@ -7789,45 +9151,57 @@ function renderBoardPrefs(): void {
     ]),
   );
 
-  // Card layout: a whole ordered list rather than one value, so it gets its own
-  // "follow the default" switch instead of a three-state select.
-  const layout = document.createElement("div");
-  layout.className = "settings-row";
-  const layoutLabel = document.createElement("span");
-  layoutLabel.className = "kb-label-with-info";
-  layoutLabel.textContent = "Card Layout";
-  layout.appendChild(layoutLabel);
+  /* The two list-valued settings. Both use the same row as every other "opens
+     its own editor" setting in the app: the name, a badge saying whether this
+     board has an answer of its own, and a button that always says Customize.
 
-  const layoutBtn = document.createElement("button");
-  layoutBtn.type = "button";
-  layoutBtn.className = "settings-action-btn";
-  const custom = board.overrides.sectionOrder !== undefined;
-  layoutBtn.textContent = custom ? "Follow the default" : "Set for this board";
-  layoutBtn.addEventListener("click", () => {
-    if (custom) delete board.overrides.sectionOrder;
-    else board.overrides.sectionOrder = [...effective(board).sectionOrder];
-    markBoard(board.id);
-    renderBoardPrefs();
-  });
-  layout.appendChild(layoutBtn);
-  list.appendChild(layout);
+     They used to be the odd ones out. Card Layout rendered its drag list inline
+     under the row, and Column Sort put the whole rule set in the button label,
+     which made the button as wide as the rules were long. Neither said in two
+     words what the row is read for: has anyone touched this. */
+  for (const setting of [
+    {
+      label: "Card Layout",
+      badge: boardBadge(board.overrides.sectionOrder !== undefined),
+      open: () =>
+        openCardLayoutEditor({ kind: "board", boardId: board.id }, () =>
+          openBoardSetup(board, "preferences"),
+        ),
+    },
+    {
+      label: "Column Sort",
+      badge: describeBoardSortBadge(board),
+      open: () =>
+        openSortEditor({ kind: "board", boardId: board.id }, () =>
+          openBoardSetup(board, "preferences"),
+        ),
+    },
+  ]) {
+    const row = document.createElement("div");
+    row.className = "settings-row";
 
-  const orderHost = document.createElement("div");
-  orderHost.className = "kb-section-order";
-  if (custom) {
-    renderSectionOrderInto(orderHost, board.overrides.sectionOrder!, () => {
-      markBoard(board.id);
-      renderBoardPrefs();
-    });
-  } else {
-    const note = document.createElement("span");
-    note.className = "kb-section-note";
-    note.textContent = `Following the default: ${effective(null)
-      .sectionOrder.map((sec) => CARD_SECTION_LABELS[sec])
-      .join(" · ")}`;
-    orderHost.appendChild(note);
+    const labelCol = document.createElement("div");
+    labelCol.className = "settings-label-col";
+    const name = document.createElement("span");
+    name.textContent = setting.label;
+    labelCol.appendChild(name);
+
+    const badge = document.createElement("span");
+    badge.className = "settings-status-badge";
+    badge.textContent = setting.badge;
+    labelCol.appendChild(badge);
+    row.appendChild(labelCol);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "settings-action-btn";
+    btn.textContent = "Customize";
+    // Back to this tab, not to the board: it is where the button was.
+    btn.addEventListener("click", setting.open);
+    row.appendChild(btn);
+
+    list.appendChild(row);
   }
-  list.appendChild(orderHost);
 }
 
 /** One three-state boolean row. */
@@ -8046,6 +9420,9 @@ function renderDefaultColumns(): void {
   const host = document.getElementById("kbDefaultColumnsList");
   if (!host) return;
   host.replaceChildren();
+  // The badge is behind this screen and comes back into view when it closes,
+  // so it is kept in step here rather than only on the way out.
+  renderDefaultColumnsSummary();
 
   const titles = defaultColumnTitles();
   if (titles.length === 0) {
@@ -8618,6 +9995,22 @@ function openColumnEditor(board: Board, column: Column | null): void {
     ? ""
     : "none";
 
+  /* Sort is offered only for a column that EXISTS. A column being created has
+     no rules to edit and nowhere to store them until it is saved, and a button
+     that silently did nothing would be worse than one that is not there. */
+  const sortRow = document.getElementById("kbColumnSortRow") as HTMLElement;
+  const sortBtn = document.getElementById("kbColumnSortBtn") as HTMLButtonElement;
+  const sortBadge = document.getElementById("kbColumnSortSummary")!;
+  sortRow.style.display = column ? "" : "none";
+  if (column) {
+    sortBadge.textContent = describeSortBadge(column);
+    sortBtn.onclick = () =>
+      // Back to this modal, on the same column, which is where the button was.
+      openSortEditor({ kind: "column", boardId: board.id, columnId: column.id }, () =>
+        openColumnEditor(board, column),
+      );
+  }
+
   getColumnEditModal().open();
 }
 
@@ -8659,7 +10052,7 @@ function saveColumnEditor(): void {
    SETUP MODAL
 ============================================================================= */
 
-type KbSetupTab = "boards" | "tags" | "preferences" | "data";
+type KbSetupTab = "boards" | "tags" | "defaults" | "preferences" | "data";
 
 let _setupTabs: ModalTabs<KbSetupTab> | null = null;
 
@@ -8671,11 +10064,15 @@ function getSetupTabs(): ModalTabs<KbSetupTab> {
       panes: {
         boards: "kbTabBoards",
         tags: "kbTabTags",
+        defaults: "kbTabDefaults",
         preferences: "kbTabPreferences",
         data: "kbTabData",
       },
       onActivate: (tab) => {
-        if (tab === "boards") renderDefaultColumns();
+        if (tab === "boards") {
+          renderDefaultColumnsSummary();
+          renderBoardOrderSummary();
+        }
         if (tab === "tags") {
           // The tool's Setup always edits the DEFAULTS. A board's own tags are
           // reached from inside that board.
@@ -8703,7 +10100,8 @@ function getSetupModal(): Modal {
     tabs: getSetupTabs(),
     onOpen: () => {
       applySettingsToForm();
-      renderDefaultColumns();
+      renderDefaultColumnsSummary();
+      renderBoardOrderSummary();
       tagEditScope = "global";
       tagEditBoardId = null;
       renderTagCategoriesList();
@@ -8720,10 +10118,16 @@ function getSetupModal(): Modal {
     .getElementById("kbEffortEditBtn")!
     .addEventListener("click", () => openScaleEditor("effort"));
 
-  document.getElementById("kbCardLayoutEditBtn")!.addEventListener("click", () => {
-    getSetupModal().close({ handoff: true });
-    getCardLayoutModal().open();
-  });
+  document.getElementById("kbCardLayoutEditBtn")!.addEventListener("click", () =>
+    openCardLayoutEditor({ kind: "tool" }, () => openSetupOnTab("defaults")),
+  );
+  /* Column Sort is a tool-level default too, like Priority, Effort and Card
+     Layout. It was reachable only per board and per column, which meant the one
+     answer most people want ("newest at the top, everywhere") had to be given
+     once per board. */
+  document.getElementById("kbColumnSortEditBtn")!.addEventListener("click", () =>
+    openSortEditor({ kind: "tool" }, () => openSetupOnTab("defaults")),
+  );
   document.getElementById("kbNewTagCategoryBtn")!.addEventListener("click", () => {
     openTagCategoryEditor(null, "global", null);
   });
@@ -8734,19 +10138,13 @@ function getSetupModal(): Modal {
     markSettings();
   });
 
-  document.getElementById("kbAddDefaultColumnBtn")!.addEventListener("click", () => {
-    const titles = defaultColumnTitles();
-    titles.push("New Column");
-    setDefaultColumnTitles(titles);
-    renderDefaultColumns();
-  });
+  document.getElementById("kbBoardOrderEditBtn")!.addEventListener("click", () =>
+    openBoardOrder(() => openSetupOnTab("boards")),
+  );
 
-  document.getElementById("kbResetDefaultColumnsBtn")!.addEventListener("click", () => {
-    kbSettings.defaultColumns = SYSTEM_DEFAULT_COLUMNS;
-    markSettings();
-    renderDefaultColumns();
-    flash("Default columns reset.");
-  });
+  document.getElementById("kbDefaultColumnsEditBtn")!.addEventListener("click", () =>
+    openDefaultColumns(() => openSetupOnTab("boards")),
+  );
 
   bindPreferenceControls();
 
@@ -9727,30 +11125,107 @@ function bindPreferenceControls(): void {
 
 }
 
-/** The default card layout, as a drag-reorderable list. A board that has not
- *  set its own follows whatever this ends up as, including later changes. */
+/* -----------------------------------------------------------------------------
+   THE CARD LAYOUT EDITOR
+
+   One screen for the tool default and for one board's override, the same way
+   the sort editor serves three levels. It used to be tool-only, and a board set
+   its layout on an inline drag list wedged into the Board Setup preferences
+   tab, which is why that row never looked like the rows around it.
+----------------------------------------------------------------------------- */
+
+type LayoutTarget = { kind: "tool" } | { kind: "board"; boardId: string };
+
+let layoutEditTarget: LayoutTarget = { kind: "tool" };
+let layoutEditReturn: (() => void) | null = null;
+
+/** The board being edited, or null when it is the tool default. */
+function layoutEditBoard(): Board | null {
+  return layoutEditTarget.kind === "board" ? getBoard(layoutEditTarget.boardId) : null;
+}
+
+/** The order being edited, as the live array so the drag list can splice it. */
+function layoutEditOrder(): CardSection[] | null {
+  if (layoutEditTarget.kind === "tool") return kbSettings.sectionOrder;
+  const board = layoutEditBoard();
+  if (!board) return null;
+  // Seeded from what it was already following, so opening the editor on a
+  // board that has no override of its own changes nothing until something is
+  // actually dragged.
+  if (board.overrides.sectionOrder === undefined) return null;
+  return board.overrides.sectionOrder;
+}
+
+function openCardLayoutEditor(target: LayoutTarget, back?: () => void): void {
+  layoutEditTarget = target;
+  layoutEditReturn = back ?? null;
+  topOpenKanbanModal()?.close({ handoff: true });
+  getCardLayoutModal().open();
+}
+
+/** The layout list, for whichever of the two things is being edited. */
 function renderDefaultSectionOrder(): void {
   const host = document.getElementById("kbSectionOrderList");
   if (!host) return;
-  renderSectionOrderInto(host, kbSettings.sectionOrder, () => {
-    markSettings();
+
+  const board = layoutEditBoard();
+  const order = layoutEditOrder();
+
+  const followRow = document.getElementById("kbCardLayoutFollowRow") as HTMLElement | null;
+  if (followRow) {
+    followRow.style.display = board ? "" : "none";
+    if (board) {
+      const custom = board.overrides.sectionOrder !== undefined;
+      document.getElementById("kbCardLayoutFollowBadge")!.textContent = boardBadge(custom);
+      document.getElementById("kbCardLayoutFollowBtn")!.textContent = custom
+        ? "Follow the tool default"
+        : "Set for this board";
+    }
+  }
+
+  const reset = document.getElementById("kbCardLayoutResetBtn") as HTMLElement | null;
+  if (reset) reset.style.display = board ? "none" : "";
+
+  if (!order) {
+    // A board following the default has no list of its own to drag yet.
+    host.replaceChildren();
+    const note = document.createElement("span");
+    note.className = "kb-section-note";
+    note.textContent = `Following the default: ${effective(null)
+      .sectionOrder.map((sec) => CARD_SECTION_LABELS[sec])
+      .join(" · ")}`;
+    host.appendChild(note);
+    renderCardLayoutSummary();
+    return;
+  }
+
+  renderSectionOrderInto(host, order, () => {
+    if (board) markBoard(board.id);
+    else markSettings();
     renderDefaultSectionOrder();
     renderCardLayoutSummary();
+    renderBoardView();
   });
   renderCardLayoutSummary();
 }
 
-/** The row's badge: the order in short, so the common case of never having
- *  changed it does not need the modal opened to confirm that. */
+/** The row's badge: two words, because that is what a badge is read for. It
+ *  used to print the whole order, which made the row as wide as the list. */
 function renderCardLayoutSummary(): void {
   const badge = document.getElementById("kbCardLayoutSummary");
   if (!badge) return;
   const isDefault =
     kbSettings.sectionOrder.length === DEFAULT_SETTINGS.sectionOrder.length &&
     kbSettings.sectionOrder.every((s, i) => s === DEFAULT_SETTINGS.sectionOrder[i]);
-  badge.textContent = isDefault
-    ? "Default"
-    : kbSettings.sectionOrder.map((s) => CARD_SECTION_LABELS[s]).join(" · ");
+  badge.textContent = toolBadge(isDefault);
+}
+
+/** The same, for the tool-wide column sort. Nothing is the default here, so
+ *  "Default" means every column keeps the order you dragged it into. */
+function renderColumnSortSummary(): void {
+  const badge = document.getElementById("kbColumnSortSummaryDefault");
+  if (!badge) return;
+  badge.textContent = toolBadge(kbSettings.defaultSort.length === 0);
 }
 
 let _cardLayoutModal: Modal | null = null;
@@ -9760,11 +11235,32 @@ function getCardLayoutModal(): Modal {
   _cardLayoutModal = new Modal(document.getElementById("kbCardLayoutBackdrop")!, {
     closeOnEsc: true,
     onOpen: () => renderDefaultSectionOrder(),
+    onClosed: () => {
+      const back = layoutEditReturn;
+      layoutEditReturn = null;
+      layoutEditTarget = { kind: "tool" };
+      back?.();
+    },
   });
 
   document.getElementById("kbCardLayoutBack")!.addEventListener("click", () => {
     _cardLayoutModal!.close();
-    openSetupOnTab("preferences");
+    // Where it was opened from, since it is now reached from two screens.
+    if (layoutEditReturn) layoutEditReturn();
+    else openSetupOnTab("defaults");
+  });
+
+  document.getElementById("kbCardLayoutFollowBtn")!.addEventListener("click", () => {
+    const board = layoutEditBoard();
+    if (!board) return;
+    if (board.overrides.sectionOrder === undefined) {
+      board.overrides.sectionOrder = [...effective(null).sectionOrder];
+    } else {
+      delete board.overrides.sectionOrder;
+    }
+    markBoard(board.id);
+    renderDefaultSectionOrder();
+    renderBoardView();
   });
   document
     .getElementById("kbCardLayoutClose")!
@@ -9789,6 +11285,348 @@ function getCardLayoutModal(): Modal {
   });
 
   return _cardLayoutModal;
+}
+
+/* -----------------------------------------------------------------------------
+   THE BOARD ORDER EDITOR
+   -----------------------------------------------------------------------------
+   `boards` array order IS gallery order, and until now nothing could change it:
+   a board sat wherever it was created, forever, and the only way to get the one
+   you use daily to the front was to delete and remake it. The sidebar has had
+   this since 0.5.0 and this is the same job one level down, so it is the same
+   gesture: one list, dragged.
+
+   Reached from Setup > Boards and from a right-click on the gallery
+   background. Both land here rather than one of them being a shortcut to a
+   different screen, because "anything offered in a right-click menu should
+   also be reachable without one" cuts both ways.
+
+   The search box on the gallery filters what is DRAWN, never what is stored,
+   so this list is always every board. Reordering a filtered subset would write
+   an order the person could not see the whole of.
+----------------------------------------------------------------------------- */
+
+/**
+ * Re-orders `boards` in place for the active mode. A no-op under "custom",
+ * which is the mode a drag puts you in: sorting there would undo the drag on
+ * the next render.
+ *
+ * Called from renderGallery rather than only when the mode is picked, so the
+ * usage-driven modes stay live the way the sidebar's do: opening a board
+ * re-ranks the gallery on the spot instead of at the next launch.
+ *
+ * Every usage-driven sort falls back to alphabetical, so boards that have never
+ * been opened land in a stable, predictable order rather than whatever the
+ * array happened to hold.
+ */
+function applyBoardSortMode(): void {
+  const mode = kbSettings.boardSort;
+  if (mode === "custom") return;
+  const byName = (a: Board, b: Board): number => a.name.localeCompare(b.name);
+  const next = [...boards];
+  switch (mode) {
+    case "newest":
+      next.sort((a, b) => b.createdAt - a.createdAt);
+      break;
+    case "oldest":
+      next.sort((a, b) => a.createdAt - b.createdAt);
+      break;
+    case "az":
+      next.sort(byName);
+      break;
+    case "za":
+      next.sort((a, b) => byName(b, a));
+      break;
+    case "recent":
+      next.sort((a, b) => (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0) || byName(a, b));
+      break;
+    case "used":
+      next.sort((a, b) => (b.openCount ?? 0) - (a.openCount ?? 0) || byName(a, b));
+      break;
+  }
+  // Only written when it actually moved. This runs on every gallery render, and
+  // marking the index dirty each time would be a disk write per repaint.
+  if (next.every((b, i) => boards[i].id === b.id)) return;
+  boards = next;
+  markIndex();
+}
+
+/** Switches the gallery's sort mode and applies it. */
+function setBoardSortMode(mode: BoardSortMode): void {
+  if (kbSettings.boardSort === mode) return;
+  kbSettings.boardSort = mode;
+  markSettings();
+  applyBoardSortMode();
+  renderGallery();
+  renderBoardOrderList();
+  renderBoardOrderSummary();
+}
+
+/** Notes that a board was opened, feeding the Most Recent / Most Used sorts.
+ *  Stamped separately from updatedAt: opening a board is not editing it. */
+function recordBoardUsage(board: Board): void {
+  board.lastOpenedAt = Date.now();
+  board.openCount = (board.openCount ?? 0) + 1;
+  markIndex();
+  // Under a usage-driven mode the order this just changed is on screen behind
+  // the board being opened, so it is re-applied now rather than at next launch.
+  if (kbSettings.boardSort === "recent" || kbSettings.boardSort === "used") {
+    applyBoardSortMode();
+  }
+}
+
+let _boardOrderModal: Modal | null = null;
+let boardOrderReturn: (() => void) | null = null;
+/* -----------------------------------------------------------------------------
+   THE DEFAULT COLUMNS EDITOR
+   -----------------------------------------------------------------------------
+   What a NEW board starts with. It used to draw its drag list inline under its
+   own row on Setup > Boards, which made that tab the one place in the tool
+   where a setting was edited in the middle of a list of settings, and gave a
+   drag list no room to be dragged in.
+
+   Now it is the same row every other list-valued setting uses (Card Layout,
+   Column Sort, Board Order): the name, a badge saying how it stands, and a
+   button that always says Customize.
+----------------------------------------------------------------------------- */
+
+let _defaultColumnsModal: Modal | null = null;
+let defaultColumnsReturn: (() => void) | null = null;
+
+/** Two words, because that is what a badge is read for: how many, and whether
+ *  anyone has touched it. */
+function renderDefaultColumnsSummary(): void {
+  const badge = document.getElementById("kbDefaultColumnsSummary");
+  if (!badge) return;
+  const count = defaultColumnTitles().length;
+  const untouched = kbSettings.defaultColumns === SYSTEM_DEFAULT_COLUMNS;
+  badge.textContent = `${count} ${count === 1 ? "column" : "columns"} \u00b7 ${toolBadge(untouched)}`;
+}
+
+function getDefaultColumnsModal(): Modal {
+  if (_defaultColumnsModal) return _defaultColumnsModal;
+
+  _defaultColumnsModal = new Modal(document.getElementById("kbDefaultColumnsBackdrop")!, {
+    closeOnEsc: true,
+    onOpen: () => renderDefaultColumns(),
+    onClosed: () => {
+      const back = defaultColumnsReturn;
+      defaultColumnsReturn = null;
+      renderDefaultColumnsSummary();
+      back?.();
+    },
+  });
+
+  document.getElementById("kbDefaultColumnsBack")!.addEventListener("click", () => {
+    _defaultColumnsModal!.close({ handoff: true });
+    const go = defaultColumnsReturn;
+    defaultColumnsReturn = null;
+    go?.();
+  });
+  document
+    .getElementById("kbDefaultColumnsClose")!
+    .addEventListener("click", () => _defaultColumnsModal!.close());
+
+  document.getElementById("kbAddDefaultColumnBtn")!.addEventListener("click", () => {
+    const titles = defaultColumnTitles();
+    titles.push("New Column");
+    setDefaultColumnTitles(titles);
+    renderDefaultColumns();
+  });
+
+  document.getElementById("kbResetDefaultColumnsBtn")!.addEventListener("click", () => {
+    kbConfirm(
+      {
+        title: "Reset the default columns?",
+        message:
+          "A new board goes back to starting with the five columns this app ships with. " +
+          "Boards that already exist keep theirs.",
+        confirmLabel: "Reset",
+        reopen: () => getDefaultColumnsModal().open(),
+      },
+      () => {
+        kbSettings.defaultColumns = SYSTEM_DEFAULT_COLUMNS;
+        markSettings();
+        renderDefaultColumns();
+        flash("Default columns reset.");
+      },
+    );
+  });
+
+  return _defaultColumnsModal;
+}
+
+/** Opens the editor. `back` is where its Back arrow goes. */
+function openDefaultColumns(back?: () => void): void {
+  defaultColumnsReturn = back ?? null;
+  const backBtn = document.getElementById("kbDefaultColumnsBack") as HTMLElement;
+  backBtn.style.display = back ? "" : "none";
+  topOpenKanbanModal()?.close({ handoff: true });
+  getDefaultColumnsModal().open();
+}
+
+/** Which row is mid-drag, shared by every row's dragover handler. */
+let boardOrderDragId: string | null = null;
+
+function renderBoardOrderSummary(): void {
+  const badge = document.getElementById("kbBoardOrderSummary");
+  if (!badge) return;
+  const label = BOARD_SORT_MODES.find((m) => m.mode === kbSettings.boardSort)?.label ?? "Newest First";
+  badge.textContent = `${boards.length} ${boards.length === 1 ? "board" : "boards"} \u00b7 ${label}`;
+}
+
+function renderBoardOrderList(): void {
+  const host = document.getElementById("kbBoardOrderList");
+  if (!host) return;
+  host.replaceChildren();
+
+  // The select shows the mode in force, including the Custom it can never be
+  // set to by hand.
+  const sortSelect = document.getElementById("kbBoardSortSelect") as HTMLSelectElement | null;
+  if (sortSelect) sortSelect.value = kbSettings.boardSort;
+
+  if (boards.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "placeholder-text";
+    empty.textContent = "No boards yet, so there is nothing to put in order.";
+    host.appendChild(empty);
+    return;
+  }
+
+  for (const board of boards) {
+    const row = document.createElement("div");
+    row.className = "kb-board-order-row";
+    row.draggable = boards.length > 1;
+    row.dataset.boardId = board.id;
+
+    const grip = document.createElement("span");
+    grip.className = "kb-column-grip";
+    grip.textContent = "⠳";
+    row.appendChild(grip);
+
+    const name = document.createElement("span");
+    name.className = "kb-board-order-name";
+    name.textContent = board.name;
+    row.appendChild(name);
+
+    const live = liveCardsOnBoard(board.id).length;
+    const count = document.createElement("span");
+    count.className = "setup-item-count";
+    count.textContent = `${live} ${live === 1 ? "card" : "cards"}`;
+    row.appendChild(count);
+
+    row.addEventListener("dragstart", (e) => {
+      boardOrderDragId = board.id;
+      row.classList.add("kb-dragging");
+      e.dataTransfer?.setData("text/plain", board.name);
+    });
+    // Committed on dragend rather than drop, so a release anywhere (on the
+    // list, on the padding, outside the window) still lands the new order.
+    row.addEventListener("dragend", () => {
+      row.classList.remove("kb-dragging");
+      boardOrderDragId = null;
+      commitBoardOrderFromDom(host, ".kb-board-order-row");
+    });
+    row.addEventListener("dragover", (e) => {
+      if (!boardOrderDragId || boardOrderDragId === board.id) return;
+      e.preventDefault();
+      const dragged = host.querySelector<HTMLElement>(
+        `.kb-board-order-row[data-board-id="${CSS.escape(boardOrderDragId)}"]`,
+      );
+      if (!dragged) return;
+      const rect = row.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      host.insertBefore(dragged, before ? row : row.nextSibling);
+    });
+
+    host.appendChild(row);
+  }
+}
+
+/** Reads the order back off the DOM and writes it to `boards`. Reading the DOM
+ *  rather than tracking indices through the drag is what makes a release
+ *  anywhere land correctly.
+ *
+ *  `selector` because boards are dragged in two places now: the reorder
+ *  modal's rows and the gallery's own tiles. Both carry data-board-id and both
+ *  land here, so the guards below are written once. */
+function commitBoardOrderFromDom(host: HTMLElement, selector: string): void {
+  const order = Array.from(host.querySelectorAll<HTMLElement>(selector))
+    .map((el) => el.dataset.boardId)
+    .filter((id): id is string => typeof id === "string");
+  // A count that does not match means the DOM and the data disagree. Dropping
+  // the reorder is the safe answer: the next render redraws from the data.
+  if (order.length !== boards.length) return;
+  if (order.every((id, i) => boards[i].id === id)) return;
+
+  const byId = new Map(boards.map((b) => [b.id, b]));
+  const next = order.map((id) => byId.get(id)).filter((b): b is Board => b !== undefined);
+  if (next.length !== boards.length) return;
+  boards = next;
+  /* The order lives in the INDEX, not in any board's own file: it is a fact
+     about the collection, and putting it in each board would mean one board's
+     file deciding where another one sits. */
+  markIndex();
+
+  /* A DRAG IS WHAT PUTS YOU IN CUSTOM. Without this the next render would
+     re-apply whatever sort was in force and undo the drag on the spot, which
+     reads as the drag not having worked. Same rule as the sidebar's. */
+  if (kbSettings.boardSort !== "custom") {
+    kbSettings.boardSort = "custom";
+    markSettings();
+    const sortSelect = document.getElementById("kbBoardSortSelect") as HTMLSelectElement | null;
+    if (sortSelect) sortSelect.value = "custom";
+  }
+  renderGallery();
+  renderBoardOrderSummary();
+}
+
+function getBoardOrderModal(): Modal {
+  if (_boardOrderModal) return _boardOrderModal;
+
+  _boardOrderModal = new Modal(document.getElementById("kbBoardOrderBackdrop")!, {
+    closeOnEsc: true,
+    onOpen: () => renderBoardOrderList(),
+    onClosed: () => {
+      const back = boardOrderReturn;
+      boardOrderReturn = null;
+      renderBoardOrderSummary();
+      back?.();
+    },
+  });
+
+  const back = (): void => {
+    _boardOrderModal!.close({ handoff: true });
+    const go = boardOrderReturn;
+    boardOrderReturn = null;
+    // No caller-supplied return means this was opened from the gallery's own
+    // background menu, which is where dismissing it already puts you.
+    go?.();
+  };
+  document.getElementById("kbBoardOrderBack")!.addEventListener("click", back);
+  document
+    .getElementById("kbBoardOrderClose")!
+    .addEventListener("click", () => _boardOrderModal!.close());
+
+  const sortSelect = document.getElementById("kbBoardSortSelect") as HTMLSelectElement;
+  sortSelect.addEventListener("change", () => {
+    const mode = BOARD_SORT_MODES.find((m) => m.mode === sortSelect.value)?.mode;
+    // "custom" is disabled in the markup, so this cannot arrive from a pick.
+    if (mode && mode !== "custom") setBoardSortMode(mode);
+  });
+
+  return _boardOrderModal;
+}
+
+/** Opens the reorder screen. `back` is where its Back arrow goes; omit it when
+ *  there is nothing behind this screen to return to. */
+function openBoardOrder(back?: () => void): void {
+  boardOrderReturn = back ?? null;
+  // The Back arrow only means anything when something asked to be returned to.
+  const backBtn = document.getElementById("kbBoardOrderBack") as HTMLElement;
+  backBtn.style.display = back ? "" : "none";
+  topOpenKanbanModal()?.close({ handoff: true });
+  getBoardOrderModal().open();
 }
 
 /** Pushes the stored preferences onto the controls. Called after a load, on
@@ -9828,6 +11666,7 @@ function applySettingsToForm(): void {
 
   renderScaleSummaries();
   renderCardLayoutSummary();
+  renderColumnSortSummary();
 }
 
 /* =============================================================================
@@ -11784,7 +13623,31 @@ export function initKanban(): void {
   headerNotice = document.getElementById("kbHeaderNotice")!;
 
   /* ── Header ── */
-  document.getElementById("kbSetupBtn")!.addEventListener("click", () => openSetupOnTab("tags"));
+  document.getElementById("kbSetupBtn")!.addEventListener("click", () => openSetupOnTab("boards"));
+
+  /* The gallery's own background. A tile's menu stops propagation, so this only
+     ever answers a click on the empty space around them, which is the one place
+     on this screen with no control to hang "reorder" off.
+
+     IT ENDS WITH THE APP-WIDE ROWS, and that is not decoration. attachMenu
+     stops the event once it has rows to show, so the window-level handler in
+     shell.ts never runs and About, App Settings, Toggle View and Exit simply
+     vanished from every right-click on this screen. Anything that answers a
+     right-click on a BACKGROUND has to carry them; backgroundMenu() is the
+     same list that handler would have shown, the open tool's header buttons
+     included. */
+  attachMenu(document.getElementById("kbViewBoards")!, () => [
+    { label: "New Board\u2026", onClick: () => openNewBoard() },
+    {
+      label: "Reorder Boards\u2026",
+      disabled: boards.length < 2,
+      // No return path: this came off the gallery background, which is where
+      // dismissing it already puts you.
+      onClick: () => openBoardOrder(),
+    },
+    { separator: true },
+    ...backgroundMenu(),
+  ]);
   boardSetupBtn.addEventListener("click", () => {
     const board = getBoard(currentBoardId);
     if (board) openBoardSetup(board);

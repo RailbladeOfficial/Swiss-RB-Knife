@@ -120,12 +120,17 @@ test("every Kanban preference is both saved and restored", () => {
   // Each switch is wired twice, in bindPreferenceControls (write) and in
   // applySettingsToForm (restore). One without the other is a setting that
   // works until you reopen Setup and find it reverted, with nothing logged.
+  //
+  // BOTH panes, because the settings are split across two tabs now: Defaults
+  // is what a board follows unless it overrides it, Preferences is what is
+  // true of the tool whichever board you are on. The wiring rule is the same
+  // on either side of that line, so it is checked across both.
   const html = read("index.html");
   const pane = html.slice(
-    html.indexOf('id="kbTabPreferences"'),
+    html.indexOf('id="kbTabDefaults"'),
     html.indexOf('id="kbTabData"'),
   );
-  assert.ok(pane.length > 500, "could not isolate the Kanban preferences pane");
+  assert.ok(pane.length > 500, "could not isolate the Kanban preference panes");
 
   const toggles = [...pane.matchAll(/id="(kb[A-Za-z]+Toggle)"/g)].map((m) => m[1]);
   const selects = [...pane.matchAll(/id="(kb[A-Za-z]+Select)"/g)].map((m) => m[1]);
@@ -148,8 +153,8 @@ test("every preference switch has a label that says which way it is set", () => 
   // applying correctly.
   const html = read("index.html");
   const pane = html.slice(
-    html.indexOf('id="kbTabPreferences"'),
-    html.indexOf('id="kbTabSecurity"'),
+    html.indexOf('id="kbTabDefaults"'),
+    html.indexOf('id="kbTabData"'),
   );
   const ids = htmlIds();
   const missing = [...pane.matchAll(/id="kb([A-Za-z]+)Toggle"/g)]
@@ -287,11 +292,14 @@ test("board-overridable settings are read through the resolver, never off the de
   // The tool-wide settings, which have no per-board answer and are read
   // directly on purpose.
   const allowed = [
-    "overdueWarn",
     "defaultColumns",
     "defaultBoardName",
     "lockOnOpen",
     "sectionOrder",
+    // How the GALLERY is ordered, which is a fact about the list of boards
+    // rather than about any one of them. A board cannot override where it
+    // sits any more than a tool can override the sidebar's sort.
+    "boardSort",
     // The two scales. Tool-wide on purpose: a level called "Huge" on one board
     // and "Epic" on another would make a card's chip mean different things
     // depending on where you were standing.
@@ -301,13 +309,18 @@ test("board-overridable settings are read through the resolver, never off the de
     "effortLabels",
   ];
 
-  // Three places may touch the defaults directly, because handling the defaults
-  // IS their job: the resolver that merges them with a board's overrides, and
-  // the two halves of the Preferences tab that read and write them.
+  /* A short list may touch the defaults directly, because handling the defaults
+     IS their job: the resolver that merges them with a board's overrides, the
+     two halves of the Preferences tab that read and write them, and the sort
+     editor, which is the one screen that edits all three levels and therefore
+     has to be able to address the tool default by name. */
   const exempt = [
     "function effective(board: Board | null)",
     "function bindPreferenceControls(",
     "function applySettingsToForm(",
+    "function sortEditRules(",
+    "function setSortEditRules(",
+    "function renderColumnSortSummary(",
   ].map((marker) => {
     const at = src.indexOf(marker);
     assert.notEqual(at, -1, `could not find ${marker}`);
@@ -339,14 +352,23 @@ test("every board-overridable setting survives being written and read back", () 
     src.indexOf("\n}", src.indexOf("export interface BoardScopedSettings {")),
   );
   assert.ok(iface.length > 0, "BoardScopedSettings is gone");
-  const declared = [...iface.matchAll(/^\s{2}([A-Za-z]+): boolean;$/gm)].map((m) => m[1]);
-  assert.ok(declared.length > 5, `only found ${declared.length} boolean settings`);
+  /* EVERY key, not only the booleans. The booleans were the ones that had gone
+     missing before, so that is what this checked, and a non-boolean added
+     later (defaultSort) went quiet in exactly the same way: saved, dropped on
+     the way back in, and the board silently on the tool default again. The
+     contract is the interface, so the check has to be the whole interface. */
+  const declared = [...iface.matchAll(/^\s{2}([A-Za-z]+)[?]?:/gm)].map((m) => m[1]);
+  assert.ok(declared.length > 8, `only found ${declared.length} board settings`);
 
   const at = src.indexOf("export function normalizeOverrides");
   const body = src.slice(at, src.indexOf("\n}", at));
+  /* Named in the boolean list, or handled by name in the body: cardSize,
+     sectionOrder and defaultSort each have their own branch, which counts. */
   const listed = [...body.matchAll(/"([A-Za-z]+)",/g)].map((m) => m[1]);
 
-  const missing = declared.filter((key) => !listed.includes(key));
+  const missing = declared.filter(
+    (key) => !listed.includes(key) && !body.includes(`src.${key}`),
+  );
   assert.deepEqual(
     missing,
     [],
@@ -490,9 +512,16 @@ test("an existing board is set up from inside itself, never from the tool's Setu
     html.indexOf('id="kbTabTags"'),
   );
   assert.ok(boardsTab.length > 200, "could not isolate the tool Setup's Boards tab");
+  /* The columns themselves are edited on their own screen now, like every
+     other list-valued setting in this tool, so the tab holds the ROW that
+     reaches them rather than the list. */
   assert.ok(
-    boardsTab.includes("kbDefaultColumnsList") && boardsTab.includes("kbDefaultBoardNameInput"),
+    boardsTab.includes("kbDefaultColumnsEditBtn") && boardsTab.includes("kbDefaultBoardNameInput"),
     "the Boards tab should hold the defaults for a new board",
+  );
+  assert.ok(
+    !boardsTab.includes("kbDefaultColumnsList"),
+    "the default columns are being edited inline in a list of settings again",
   );
   assert.ok(
     !boardsTab.includes("kbSetupBoardsList"),
@@ -1556,6 +1585,355 @@ test("the file header lists exactly the commands the file defines", () => {
   assert.deepEqual(undocumented, [], "these commands exist but the header does not name them");
   assert.deepEqual(phantom, [], "the header names these, and they do not exist");
 });
+
+test("a column sort is a view, not a rewrite of the board's order", () => {
+  /* The whole promise of the feature: `card.order` is the arrangement someone
+     made by hand, and a sort has to be something you can turn off and get it
+     back. A sort that renumbered the cards would be a one-way door. */
+  const src = read("src/tool/kanban.ts");
+  const sortFn = slice("src/tool/kanban.ts", "function sortCards(", "\n}");
+  assert.ok(
+    !/\.order\s*=/.test(sortFn),
+    "sortCards writes card.order, so clearing the sort could not put the hand-made order back",
+  );
+  assert.match(sortFn, /\[\.\.\.list\]/, "sortCards sorts the caller's array in place");
+  // Ties fall back to the hand-made order, so the same rules always draw the
+  // same result rather than relying on the sort being stable.
+  assert.match(sortFn, /a\.order - b\.order/, "a tie is left to chance instead of the manual order");
+
+  /* One editor, reached from both places. Two would have drifted: the rule set
+     is the same shape whether it is a board default or one column's override. */
+  assert.match(src, /function openSortEditor\(/, "there is no shared sort editor");
+  const opens = [...src.matchAll(/openSortEditor\(\{ kind: "(board|column)"/g)].map((m) => m[1]);
+  assert.ok(opens.includes("board"), "Board Setup cannot set the board's default sort");
+  assert.ok(opens.includes("column"), "a column's settings cannot override the sort");
+
+  // And one wording for a rule set, so the three places that describe it agree.
+  assert.match(src, /function describeSortRules\(/, "each screen words the rules its own way");
+});
+
+test("dragging one of several selected cards brings the rest", () => {
+  /* Selecting eleven cards and dragging one of them has to move eleven, or the
+     selection was for nothing. Dragging a card that is NOT selected drops the
+     selection first: that drag is about the one card, and carrying an unrelated
+     selection into it moves things nobody was looking at. */
+  const src = read("src/tool/kanban.ts");
+  const start = slice("src/tool/kanban.ts", 'el.addEventListener("dragstart"', "});");
+  assert.match(start, /selectedCardIds\.size > 1 && selectedCardIds\.has\(card\.id\)/,
+    "a drag does not notice whether the card is part of a selection");
+  assert.match(start, /clearCardSelection\(false\)/,
+    "dragging an unselected card carries the old selection along with it");
+
+  // The passengers are excluded from the drop-point measurement, or the
+  // insertion point chases the group as it moves.
+  const before = slice("src/tool/kanban.ts", "function cardBeforePoint(", "\n}");
+  assert.match(before, /:not\(\.kb-dragging-with\)/,
+    "the cards being carried are measured against as drop targets");
+});
+
+test("the sort rows read their value from a badge, not from their own button", () => {
+  /* The house shape for a setting that opens its own editor: the name, a status
+     badge saying where it stands, and a button whose label never changes.
+     Priority, Effort and Card Layout all use it.
+
+     Column Sort shipped with the RULES as the button label. It changed text on
+     every edit and stretched the row to whatever the rules happened to say, so
+     the control was also the readout and neither job was done well.
+
+     Pinned narrowly, at the two rows that got it wrong, rather than as a
+     general rule about buttons: "High to low" on a direction toggle is a label
+     that states a two-way choice, and "Copy for <client>" is an action naming
+     its target. Neither is a row reading itself back, and a check broad enough
+     to catch this one would have to list them as exceptions. */
+  const src = read("src/tool/kanban.ts");
+  const html = read("index.html");
+
+  // Board Setup > Preferences.
+  const prefs = slice("src/tool/kanban.ts", "function renderBoardPrefs(", "\n}");
+  assert.match(prefs, /btn\.textContent = "Customize";/, "the board's list-valued rows are labelled with their own value");
+  assert.match(prefs, /badge\.textContent = setting\.badge;/, "the board's list-valued rows have no badge");
+  /* BOTH of them, on the same row shape. Card Layout used to render its drag
+     list inline under the row instead, which is why it never matched its
+     neighbours. */
+  for (const label of ['label: "Card Layout"', 'label: "Column Sort"']) {
+    assert.ok(prefs.includes(label), `${label} is not one of the standard rows`);
+  }
+
+  // The column editor.
+  assert.match(
+    html,
+    /id="kbColumnSortBtn" class="settings-action-btn">Customize</,
+    "the column editor's sort button does not have a fixed label",
+  );
+  assert.match(
+    html,
+    /id="kbColumnSortSummary" class="settings-status-badge"/,
+    "the column editor's sort row has no badge to carry the rules",
+  );
+
+  /* And the badge says something SHORT for the two cases that are not a rule
+     list, so a glance tells "following the board" from "deliberately manual". */
+  const badge = slice("src/tool/kanban.ts", "function describeSortBadge(", "\n}");
+  assert.match(badge, /"Board Default"/, "a column following the board reads as something else");
+  assert.match(badge, /"Manual"/, "a column deliberately left manual reads as something else");
+  assert.match(badge, /"Customized"/, "a column with rules of its own spells them out in the badge");
+  /* And nothing in it builds a sentence. A badge that can grow to the length of
+     the rules is the thing this row was rebuilt to stop. */
+  assert.ok(
+    !badge.includes("describeSortRules("),
+    "the badge is still printing the whole rule set",
+  );
+});
+
+test("a settings badge says how it stands, not what it holds", () => {
+  /* A badge answers one question at a glance: has anyone touched this. The
+     answer is never a sentence, and a badge built from the value grows to the
+     length of the value and drags the row's layout around with it. Column Sort
+     and Card Layout both shipped that way.
+
+     The two wordings are the whole vocabulary, so a row cannot invent a third
+     way of saying the same thing. */
+  const src = read("src/tool/kanban.ts");
+  const tool = slice("src/tool/kanban.ts", "function toolBadge(", "\n}");
+  const board = slice("src/tool/kanban.ts", "function boardBadge(", "\n}");
+  assert.match(tool, /"Default"/, "a tool setting nobody has touched reads as something else");
+  assert.match(tool, /"Customized"/, "a tool setting that has been changed reads as something else");
+  assert.match(board, /"Tool Default"/, "a board following the tool reads as something else");
+  assert.match(board, /"Customized"/, "a board with its own answer reads as something else");
+
+  /* THE CHAIN. Each level either follows the one above it or answers for
+     itself, and NAMES the level it follows, so a badge says where to go to
+     change it. And a list-valued setting has three states, not two: an empty
+     list is a decision ("this sorts nothing"), not the absence of one. The
+     board badge used to collapse "deliberately manual" into "Customized". */
+  const boardSort = slice("src/tool/kanban.ts", "function describeBoardSortBadge(", "\n}");
+  for (const state of ['"Tool Default"', '"Manual"', '"Customized"']) {
+    assert.ok(boardSort.includes(state), `the board's sort badge cannot say ${state}`);
+  }
+  const columnSort = slice("src/tool/kanban.ts", "function describeSortBadge(", "\n}");
+  for (const state of ['"Board Default"', '"Manual"', '"Customized"']) {
+    assert.ok(columnSort.includes(state), `a column's sort badge cannot say ${state}`);
+  }
+
+  /* Every settings-status-badge in this tool is filled from one of the two
+     helpers, or from a fixed short string. Nothing formats a list into one. */
+  const offenders = [];
+  for (const m of src.matchAll(/(\w+)\.className = "settings-status-badge";([\s\S]{0,300}?)\n\n/g)) {
+    const [, name, after] = m;
+    const set = new RegExp(String.raw`${name}\.textContent\s*=\s*([\s\S]*?);`).exec(after);
+    if (!set) continue;
+    const value = set[1].trim();
+    const ok =
+      /^"[^"]*"$/.test(value) ||
+      /^(toolBadge|boardBadge|describeSortBadge|describeBoardSortBadge|setting\.badge)/.test(value);
+    if (!ok) {
+      const line = src.slice(0, m.index).split("\n").length;
+      offenders.push(`src/tool/kanban.ts:${line} ${name} = ${value.split("\n")[0]}`);
+    }
+  }
+  assert.deepEqual(offenders, [], "these badges are built from the value rather than saying how it stands");
+});
+
+test("the sort levels are dragged into order, like every other ordered list here", () => {
+  /* Card Layout's blocks are dragged. So are columns, and cards. A pair of
+     arrow buttons per row would have been a second way to express an order,
+     and two more controls in a row already carrying a name and a direction. */
+  const editor = slice("src/tool/kanban.ts", "function renderSortEditor(", "\n}");
+  assert.match(editor, /row\.draggable = true;/, "a sort level cannot be dragged");
+  assert.match(editor, /"dragstart"/, "nothing starts a drag on a sort level");
+  /* Committed on dragend, not drop: a release anywhere still lands the order.
+     Same reason as renderSectionOrderInto, which this follows. */
+  assert.match(editor, /"dragend"/, "the reordered list is never committed");
+  assert.ok(
+    !/kb-icon-btn[\s\S]{0,120}"\u25B2"/.test(editor) && !editor.includes("▲"),
+    "the arrow buttons are still there beside the drag handle",
+  );
+});
+
+test("the two preference screens group the same settings the same way", () => {
+  /* Seventeen rows in one column is a wall, and Board Setup shows a subset of
+     that same wall. Whoever reads both is reading the same settings twice, so
+     they are grouped the same and in the same order; finding a setting on one
+     screen has to teach you where it is on the other.
+
+     The tool's half is the DEFAULTS tab. That is what the split was for: a
+     default is exactly a setting a board can override, so the tab and the
+     board's override list hold the same rows by definition, and the tool's
+     Preferences tab is what is left over, which no board can override.
+
+     Checked as ORDER, not as a count of dividers: the point is that the rows
+     a board can override appear in the sequence the tool puts them in, so a row
+     inserted on one screen and not the other shows up here. */
+  const html = read("index.html");
+  const pane = slice("index.html", 'id="kbTabDefaults"', 'id="kbTabPreferences"');
+
+  // The tool's order, read off the markup rather than restated here.
+  const toolOrder = [...pane.matchAll(/kb-label-with-info">([^<\n]+)|^\s*<span>([A-Z][^<]{2,45})<\/span>/gm)]
+    .map((m) => (m[1] ?? m[2]).trim());
+  assert.ok(toolOrder.length >= 13, `only found ${toolOrder.length} default rows`);
+
+  // The board's order, read off its groups.
+  const src = read("src/tool/kanban.ts");
+  const groups = slice("src/tool/kanban.ts", "const BOARD_OVERRIDE_GROUPS", "\n];");
+  const boardOrder = [...groups.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(boardOrder.length >= 8, `only found ${boardOrder.length} overridable rows`);
+
+  /* Every overridable row appears on the tool screen, in the same relative
+     order. A row the tool does not have at all is the other failure worth
+     catching: a board cannot override something that does not exist. */
+  const positions = boardOrder.map((label) => {
+    const at = toolOrder.indexOf(label);
+    assert.notEqual(at, -1, `Board Setup offers "${label}" and the tool's Defaults has no such row`);
+    return at;
+  });
+  const sorted = [...positions].sort((a, b) => a - b);
+  assert.deepEqual(
+    positions,
+    sorted,
+    "Board Setup lists the overridable settings in a different order from the tool's own Defaults",
+  );
+
+  // Both screens actually draw the rules, rather than running the rows together.
+  /* Enough rules that the rows are in buckets at all. Not an exact count: the
+     buckets are a judgement about what belongs together and that judgement is
+     allowed to change, unlike the two screens agreeing with each other, which
+     is what the rest of this test is for. */
+  assert.ok(
+    (pane.match(/settings-section-divider/g) ?? []).length >= 3,
+    "the tool's defaults are one undivided wall of rows",
+  );
+  const render = slice("src/tool/kanban.ts", "function renderBoardPrefs(", "\n}");
+  assert.match(render, /settings-section-divider/, "Board Setup draws no dividers between its groups");
+});
+
+test("every ordered list in Kanban is dragged, and none of them has arrows", () => {
+  /* Card Layout's blocks, sort levels, columns, cards, boards, tag categories
+     and the tags inside them are all orders someone sets, and they are all set
+     the same way. Two gestures for one idea is worse than either, and the tag
+     categories were the last holdout: a pair of arrow buttons per block, on one
+     screen where the chips inside those blocks drag.
+
+     Checked as a rule rather than per list, so a list added later is caught. */
+  const lists = {
+    "the sort levels": "function renderSortEditor(",
+    "the card layout blocks": "function renderSectionOrderInto(",
+    "the default columns": "function renderDefaultColumns(",
+    "the board order": "function renderBoardOrderList(",
+  };
+  const problems = [];
+  for (const [what, marker] of Object.entries(lists)) {
+    const editor = slice("src/tool/kanban.ts", marker, "\n}");
+    if (!/\.draggable = /.test(editor)) problems.push(`${what} cannot be dragged`);
+    if (!editor.includes('"dragstart"')) problems.push(`${what} starts no drag`);
+    /* Committed on dragend, not drop: a release anywhere still lands the
+       order. renderSectionOrderInto is the one the others follow. */
+    if (!editor.includes('"dragend"')) problems.push(`${what} never commits the new order`);
+    if (editor.includes("\u25B2") || editor.includes("\u25BC")) {
+      problems.push(`${what} has arrow buttons as well as a drag`);
+    }
+  }
+  assert.deepEqual(problems, []);
+
+  /* The two vocabulary lists are built by one renderer, so they are checked on
+     it rather than twice. The chips and the blocks around them both drag, and
+     the chip has to stop the event or one gesture would start both. */
+  const vocab = ts();
+  assert.match(vocab, /function attachTagCategoryDrag/, "a tag category cannot be dragged");
+  assert.match(vocab, /function attachTagChipDrag/, "a tag cannot be dragged within its category");
+  const chip = slice("src/tool/kanban.ts", "function attachTagChipDrag(", "\n}");
+  assert.match(
+    chip,
+    /e\.stopPropagation\(\);/,
+    "a chip drag also reaches the category block around it, so one gesture starts two drags",
+  );
+  const cat = slice("src/tool/kanban.ts", "function attachTagCategoryDrag(", "\n}");
+  assert.match(
+    cat,
+    /grip\.addEventListener\("pointerdown"/,
+    "the whole category block is draggable, so a missed chip drags the block",
+  );
+});
+
+test("a reordered list is written back from the DOM, and dropped if it disagrees", () => {
+  /* Every one of these reads the order back off the DOM at the end of the drag
+     rather than tracking indices through it, which is what makes a release
+     anywhere land correctly. The other half is the guard: if the DOM and the
+     data hold different numbers of things (a row deleted from under the drag,
+     a stray node), the reorder is dropped rather than writing a short list
+     over a longer one. */
+  const committers = [
+    "function commitBoardOrderFromDom(",
+    "function reorderTagsInCategory(",
+    "function commitTagCategoryOrder(",
+  ];
+  const problems = [];
+  for (const marker of committers) {
+    const fn = slice("src/tool/kanban.ts", marker, "\n}");
+    if (!/\.length !== /.test(fn)) {
+      problems.push(`${marker} writes the new order without checking it is the same size`);
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test("boards can be put in order, from a control and from the background menu", () => {
+  /* `boards` array order is gallery order and nothing could change it: a board
+     sat where it was created, and getting the one you use daily to the front
+     meant deleting and remaking it.
+
+     Two ways in, because anything offered in a right-click menu has to be
+     reachable without one. The Setup row is the one without. */
+  const ids = htmlIds();
+  for (const id of [
+    "kbBoardOrderBackdrop",
+    "kbBoardOrderModal",
+    "kbBoardOrderList",
+    "kbBoardOrderEditBtn",
+    "kbBoardOrderSummary",
+    "kbBoardOrderBack",
+    "kbBoardOrderClose",
+  ]) {
+    assert.ok(ids.has(id), `the board reorder screen has no #${id}`);
+  }
+
+  const src = ts();
+  assert.match(src, /openBoardOrder\(\(\) => openSetupOnTab\("boards"\)\)/, "Setup has no way in");
+  assert.match(src, /"Reorder Boards/, "the gallery background menu does not offer it");
+
+  /* The Setup row sits on the Boards tab, which is where a fact about the
+     boards you have belongs; the rest of that tab is what a NEW board starts
+     as, so the two are ruled apart. */
+  const html = read("index.html");
+  const boardsTab = html.slice(html.indexOf('id="kbTabBoards"'), html.indexOf('id="kbTabTags"'));
+  assert.ok(boardsTab.includes("kbBoardOrderEditBtn"), "the reorder row is not on the Boards tab");
+
+  // The order is a fact about the collection, so it lives in the index. Put in
+  // each board's own file it would mean one board deciding where another sits.
+  const commit = slice("src/tool/kanban.ts", "function commitBoardOrderFromDom(", "\n}");
+  assert.match(commit, /markIndex\(\);/, "a reorder is never saved");
+  assert.ok(!commit.includes("markBoard("), "the board order is being written into a board's own file");
+});
+
+test("a bulk selection can be tagged, the same way one card can", () => {
+  /* Tagging eleven cards at once was the one thing the multi-select could not
+     do, so it was eleven right-clicks or eleven card openings, which is the
+     work a multi-select exists to avoid.
+
+     The mark has three states here and two on a single card, because a
+     selection can be PARTLY tagged, and clicking a partial one puts the tag on
+     everything rather than taking it off. */
+  const menu = slice("src/tool/kanban.ts", "function bulkCardMenu(", "\nfunction ");
+  assert.match(menu, /label: "Tags", submenu: tagItems/, "the bulk menu offers no Tags");
+  assert.match(menu, /on === 0 \? "/, "the bulk tag rows do not distinguish none from some");
+  assert.match(
+    menu,
+    /const removing = live\.length > 0 && live\.every\(/,
+    "a partly-tagged selection is not resolved before acting on it",
+  );
+  assert.match(menu, /const live = selectedCards\(\);/, "the selection is not re-read when the row runs");
+  assert.match(menu, /"Clear All Tags"/, "there is no way to take every tag off a selection");
+});
+
 test("the card's tag search can reach a tag that does not exist yet", () => {
   /* The moment you find a tag missing is the moment you were going to add it,
      and until now that meant leaving the card for Board Setup and finding your
@@ -1576,6 +1954,16 @@ test("the card's tag search can reach a tag that does not exist yet", () => {
   assert.match(src, /function closeTagSearch/, "the dropdown cannot be closed");
   const cardModal = slice("src/tool/kanban.ts", "_cardModal = new Modal(backdrop, {", "\n  });");
   assert.match(cardModal, /closeTagSearch\(\);/, "closing the card leaves its tag dropdown on screen");
+});
+
+test("Kanban Setup opens on Boards, not on Tags", () => {
+  // The first thing in a setup screen should be the thing the screen is named
+  // after. It opened on Tags, which is the third tab.
+  assert.match(
+    ts(),
+    /getElementById\("kbSetupBtn"\)!\.addEventListener\("click", \(\) => openSetupOnTab\("boards"\)\)/,
+    "the Setup button does not land on Boards",
+  );
 });
 
 test("a stage stamp carries a time, and a due date does not", () => {
@@ -1712,3 +2100,84 @@ test("resetting a board's card numbers cannot reuse a number in play", () => {
   assert.match(reset, /markBoard\(board\.id\)/, "the reset is not saved to the board it belongs to");
 });
 
+test("the board gallery sorts the way the sidebar does", () => {
+  /* The same shape as the sidebar's sort, the same rule that dragging switches
+     you to Custom, and the same reason: this is that feature one level down.
+
+     NOT the same modes, though. The sidebar's "Classic" is the order ALL_TOOLS
+     is written in, which a person can recognize; boards have no such order, so
+     "Classic" there meant "oldest first" while saying nothing about it. Two
+     honest modes instead, newest first by default. */
+  const modes = slice("src/tool/kanban.ts", "export const BOARD_SORT_MODES", "\n];");
+  for (const mode of ["newest", "oldest", "az", "za", "recent", "used", "custom"]) {
+    assert.ok(modes.includes(`"${mode}"`), `the board sort has no ${mode} mode`);
+  }
+  assert.ok(
+    !modes.includes('"classic"'),
+    "the board sort still offers Classic, which means nothing for boards",
+  );
+
+  /* No rename map, on purpose. Board sorting has not shipped, so "classic"
+     cannot be sitting in anyone's file, and a permanent map guarding a value
+     that never existed in the wild is machinery with nothing behind it. An
+     unrecognized stored mode falls back to the default like any other. */
+  const norm = slice("src/tool/kanban.ts", "function normalizeBoardSort(", "\n}");
+  assert.ok(
+    !norm.includes("RENAMED"),
+    "the board sort carries a rename map for a value that never shipped",
+  );
+  assert.match(
+    norm,
+    /DEFAULT_SETTINGS\.boardSort/,
+    "an unrecognized stored board sort does not fall back to the default",
+  );
+
+  // New installs open newest first.
+  const defaults = slice("src/tool/kanban.ts", "const DEFAULT_SETTINGS: KbSettings = {", "\n};");
+  assert.match(defaults, /boardSort: "newest"/, "a new install does not open newest first");
+
+  // Every mode offered is one the sorter actually handles.
+  const sorter = slice("src/tool/kanban.ts", "function applyBoardSortMode(", "\n}");
+  for (const mode of ["newest", "oldest", "az", "za", "recent", "used"]) {
+    assert.ok(sorter.includes(`case "${mode}"`), `the sorter does not handle ${mode}`);
+  }
+
+  // Custom is reachable only by dragging, so it is disabled in the picker.
+  const html = read("index.html");
+  const select = html.slice(html.indexOf('id="kbBoardSortSelect"'), html.indexOf("</select>", html.indexOf('id="kbBoardSortSelect"')));
+  assert.match(select, /value="custom" disabled/, "Custom can be picked from the list");
+
+  // A drag switches the mode, or the next render would undo the drag.
+  const commit = slice("src/tool/kanban.ts", "function commitBoardOrderFromDom(", "\n}");
+  assert.match(commit, /kbSettings\.boardSort = "custom"/, "dragging a board does not switch to Custom");
+
+  // Opening a board is what feeds the usage sorts, and it is NOT an edit.
+  const usage = slice("src/tool/kanban.ts", "function recordBoardUsage(", "\n}");
+  assert.match(usage, /board\.lastOpenedAt = Date\.now\(\)/, "opening a board is not recorded");
+  assert.ok(!usage.includes("updatedAt"), "opening a board is being recorded as editing it");
+
+  // Both places a board can be dragged land on the same committer.
+  const src = ts();
+  assert.match(src, /commitBoardOrderFromDom\(boardGrid, "\.kb-board-tile"\)/, "gallery tiles cannot be dragged");
+  assert.match(src, /commitBoardOrderFromDom\(host, "\.kb-board-order-row"\)/, "the reorder modal cannot be dragged");
+});
+
+test("a tool's own background menu keeps the app-wide rows", () => {
+  /* attachMenu stops the event once it has rows to show, so a menu on a whole
+     view replaces the window-level one in shell.ts rather than adding to it.
+     Kanban's gallery grew a menu and quietly took About, App Settings, Toggle
+     View and Exit away from every right-click on that screen. */
+  const src = ts();
+  const at = src.indexOf('attachMenu(document.getElementById("kbViewBoards")');
+  assert.notEqual(at, -1, "the gallery background has no menu");
+  const menu = src.slice(at, src.indexOf("]);", at));
+  assert.match(menu, /\.\.\.backgroundMenu\(\)/, "the gallery menu drops the app-wide rows");
+  assert.match(menu, /\{ separator: true \}/, "the tool's own rows are not ruled off from the app's");
+
+  // And shell.ts has to be offering it.
+  assert.match(
+    read("src/core/shell.ts"),
+    /export function backgroundMenu\(\)/,
+    "the app-wide background menu is not shared",
+  );
+});

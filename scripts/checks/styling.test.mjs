@@ -123,3 +123,32 @@ test("no source file carries an invisible control character", () => {
   }
   assert.deepEqual(offenders, [], "these files contain an invisible control character");
 });
+
+test("every button class either styles something or selects something", () => {
+  /* Four back buttons carried class="modal-back-btn", and no stylesheet has
+     ever had a rule for it. They rendered as unstyled blocks with the chevron
+     invisible: Card Layout, the priority/effort scale editor, agent permissions
+     and (briefly) the column sort editor. The class LOOKS right, which is
+     exactly why nothing caught it.
+
+     Checked for the button classes this app defines rather than every class in
+     the file: a typo in one of these is invisible until someone opens that
+     screen and looks carefully. */
+  const html = read("index.html");
+  const css = filesUnder("src", ".css").map(read).join("\n");
+
+  const used = new Set();
+  for (const m of html.matchAll(/class="([^"]*btn[^"]*)"/g)) {
+    for (const cls of m[1].split(/\s+/)) if (cls.endsWith("-btn")) used.add(cls);
+  }
+
+  /* A class earns its place by being STYLED or by being SELECTED. Some are
+     purely behavioral hooks (pay-period-preset-btn is only ever a
+     querySelectorAll target), and those are fine; a class that does neither is
+     a typo, because it is doing nothing at all. */
+  const ts = filesUnder("src", ".ts").map(read).join(" ");
+  const orphans = [...used]
+    .filter((cls) => !css.includes(`.${cls}`) && !ts.includes(cls))
+    .sort();
+  assert.deepEqual(orphans, [], "these button classes neither style anything nor select anything");
+});

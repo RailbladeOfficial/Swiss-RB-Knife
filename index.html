@@ -7636,6 +7636,7 @@
         <div class="modal-tabs">
           <button class="modal-tab active" data-kb-tab="boards">Boards</button>
           <button class="modal-tab" data-kb-tab="tags">Tags</button>
+          <button class="modal-tab" data-kb-tab="defaults">Defaults</button>
           <button class="modal-tab" data-kb-tab="preferences">Preferences</button>
           <button class="modal-tab" data-kb-tab="data">Data</button>
         </div>
@@ -7654,17 +7655,38 @@
                 autocomplete="off" placeholder="Leave empty for no suggestion" />
             </div>
 
+            <!-- The boards you HAVE, not what a new one starts as, so it sits
+                 apart from the rest of this tab. It is here rather than on the
+                 gallery because the gallery has no chrome to hang it off, and
+                 a right-click on the gallery background opens the same
+                 screen. -->
             <div class="settings-row">
-              <span class="kb-label-with-info">Default Columns
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="The columns a new board starts with, in order. Drag to rearrange. Exactly one can mean done: throughput counts from it, and it stamps cards complete.">&#8505;</button>
-              </span>
-              <div class="kb-default-column-actions">
-                <button id="kbResetDefaultColumnsBtn" class="settings-action-btn">Reset</button>
-                <button id="kbAddDefaultColumnBtn" class="settings-action-btn">+ Column</button>
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Board Order
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="The order your boards appear in on the Kanban home screen. Drag to rearrange. Also reachable by right-clicking the gallery background.">&#8505;</button>
+                </span>
+                <span id="kbBoardOrderSummary" class="settings-status-badge"></span>
               </div>
+              <button id="kbBoardOrderEditBtn" class="settings-action-btn">Reorder</button>
             </div>
-            <div id="kbDefaultColumnsList" class="kb-default-columns"></div>
+
+            <!-- A list-valued setting that opens its own editor, the same row
+                 Card Layout and Column Sort use: the name, a badge saying how
+                 it stands, and a button that always says Customize. It used to
+                 render its drag list inline under the row, which made this tab
+                 the only place in the tool where a setting was edited in the
+                 middle of a list of settings. -->
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Default Columns
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="The columns a new board starts with, in order. Exactly one can mean done: throughput counts from it, and it stamps cards complete.">&#8505;</button>
+                </span>
+                <span id="kbDefaultColumnsSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbDefaultColumnsEditBtn" class="settings-action-btn">Customize</button>
+            </div>
 
           </div>
         </div>
@@ -7683,10 +7705,62 @@
           <div id="kbTagCategoriesList" class="kb-tagcat-list"></div>
         </div>
 
-        <!-- PREFERENCES -->
-        <div id="kbTabPreferences" class="modal-tab-pane" style="display:none;">
+        <!-- DEFAULTS
+             What every board follows unless it says otherwise. Each of these
+             has a matching row in Board Setup > Overrides, where a board can
+             break ranks; that screen groups them the same way and in the same
+             order, so whoever reads both is reading one list twice rather than
+             two lists once. -->
+        <div id="kbTabDefaults" class="modal-tab-pane" style="display:none;">
+          <p class="subhint kb-tab-lead">What every board follows unless it overrides it in Board Setup &gt; Overrides.
+            Changing one here moves every board that has not.</p>
           <div class="setup-preferences-list">
 
+            <div class="settings-row">
+              <span class="kb-label-with-info">Due Date
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="The due date block and the due chip on the card face. Separate from stage dates. Off also leaves the overdue warning nothing to report.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbShowDueLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowDueToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Stage Dates
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Work Started / Testing Started / Completed, the button that stamps them, and the durations computed from them. Due dates are separate and stay available.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbShowStagesLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbShowStagesToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <span class="kb-label-with-info">Warn on Overdue Cards
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Pulses the Kanban sidebar icon and counts overdue cards in the tool header. Cards on locked boards are not counted.">&#8505;</button>
+              </span>
+              <div class="toggle-with-label">
+                <span id="kbOverdueWarnLabel">On</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="kbOverdueWarnToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-section-divider"></div>
+
+            <!-- What happens when you use a board. -->
             <div class="settings-row">
               <span>Confirm Before Deleting a Card</span>
               <div class="toggle-with-label">
@@ -7728,6 +7802,7 @@
 
             <div class="settings-section-divider"></div>
 
+            <!-- What else a card face shows. -->
             <div class="settings-row">
               <span>Show Tags on Cards</span>
               <div class="toggle-with-label">
@@ -7786,34 +7861,9 @@
               </div>
             </div>
 
-            <div class="settings-row">
-              <span class="kb-label-with-info">Due Date
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="The due date block and the due chip on the card face. Separate from stage dates. Off also leaves the overdue warning nothing to report.">&#8505;</button>
-              </span>
-              <div class="toggle-with-label">
-                <span id="kbShowDueLabel">On</span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="kbShowDueToggle" />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
+            <div class="settings-section-divider"></div>
 
-            <div class="settings-row">
-              <span class="kb-label-with-info">Stage Dates
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="Work Started / Testing Started / Completed, the button that stamps them, and the durations computed from them. Due dates are separate and stay available.">&#8505;</button>
-              </span>
-              <div class="toggle-with-label">
-                <span id="kbShowStagesLabel">On</span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="kbShowStagesToggle" />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-
+            <!-- How cards look and how columns arrange them. -->
             <div class="settings-row">
               <span>Card Size</span>
               <select id="kbCardSizeSelect" class="settings-select">
@@ -7833,6 +7883,40 @@
                 <option value="priority">Its priority</option>
               </select>
             </div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Card Layout
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="The order the blocks appear in on an open card's Basic tab. Boards can override this in Board Setup &gt; Overrides.">&#8505;</button>
+                </span>
+                <span id="kbCardLayoutSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbCardLayoutEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Column Sort
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="How every column orders its cards, unless a board or a column says otherwise. Nothing here means each column keeps the order you dragged it into.">&#8505;</button>
+                </span>
+                <span id="kbColumnSortSummaryDefault" class="settings-status-badge"></span>
+              </div>
+              <button id="kbColumnSortEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- PREFERENCES
+             What is true of the tool itself, whichever board you are looking
+             at. The two ladders are here rather than in Defaults because they
+             are not defaults: a level called "Huge" on one board and "Epic" on
+             another would make a card's chip mean different things depending on
+             where you were standing, so no board can override them. -->
+        <div id="kbTabPreferences" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
 
             <div class="settings-row">
               <div class="settings-label-col">
@@ -7856,37 +7940,10 @@
               <button id="kbEffortEditBtn" class="settings-action-btn">Customize</button>
             </div>
 
-            <div class="settings-row">
-              <div class="settings-label-col">
-                <span class="kb-label-with-info">Card Layout
-                  <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="The order the blocks appear in on an open card's Basic tab. Boards can override this in Board Setup &gt; Preferences.">&#8505;</button>
-                </span>
-                <span id="kbCardLayoutSummary" class="settings-status-badge"></span>
-              </div>
-              <button id="kbCardLayoutEditBtn" class="settings-action-btn">Customize</button>
-            </div>
-
-            <div class="settings-section-divider"></div>
-
-            <div class="settings-row">
-              <span class="kb-label-with-info">Warn on Overdue Cards
-                <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="Pulses the Kanban sidebar icon and counts overdue cards in the tool header. Cards on locked boards are not counted.">&#8505;</button>
-              </span>
-              <div class="toggle-with-label">
-                <span id="kbOverdueWarnLabel">On</span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="kbOverdueWarnToggle" />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-
           </div>
         </div>
 
-                <!-- DATA -->
+        <!-- DATA -->
         <div id="kbTabData" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
 
@@ -7998,7 +8055,7 @@
         <div class="modal-tabs">
           <button class="modal-tab active" data-kb-board-tab="board">Board</button>
           <button class="modal-tab" data-kb-board-tab="tags">Tags</button>
-          <button class="modal-tab" data-kb-board-tab="preferences">Preferences</button>
+          <button class="modal-tab" data-kb-board-tab="preferences">Overrides</button>
           <button class="modal-tab" data-kb-board-tab="agents">Agents</button>
         </div>
 
@@ -8095,7 +8152,7 @@
           <div class="settings-row">
             <span class="kb-label-with-info">Overrides
               <button type="button" class="info-trigger-btn kb-info-btn"
-                data-tooltip="Default follows Setup &gt; Preferences and keeps following it. On or Off pins the row for this board only. Only what you change is stored.">&#8505;</button>
+                data-tooltip="Default follows Setup &gt; Defaults and keeps following it. On or Off pins the row for this board only. Only what you change is stored.">&#8505;</button>
             </span>
             <button id="kbBoardResetPrefsBtn" class="settings-action-btn">Reset All to Default</button>
           </div>
@@ -8223,13 +8280,13 @@
        something instead of just holding cards.
   ====================================================================== -->
   <!-- CARD LAYOUT
-       Reached by Customize on Setup > Preferences. A drag list needs room to be
+       Reached by Customize on Setup > Defaults. A drag list needs room to be
        dragged in, and it was competing for height with nine other rows on a tab
        that scrolls. -->
   <div id="kbCardLayoutBackdrop" class="modal-backdrop" style="display: none;">
     <div id="kbCardLayoutModal" class="modal">
       <div class="modal-header">
-        <button id="kbCardLayoutBack" class="modal-back-btn" title="Back to Setup">
+        <button id="kbCardLayoutBack" class="nav-back-btn modal-header-left" title="Back to Setup">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -8246,10 +8303,153 @@
         <p class="kb-agent-note">The order these blocks appear in on an open card's Basic tab.
           Drag to rearrange. The title, the three columns at the top and the Subtasks and
           Comments tabs have fixed places and are not listed.</p>
+        <!-- Only when a BOARD's layout is being edited: whether that board has
+             an answer of its own. On the Board Setup row it would be a second
+             button competing with Customize; here it sits with what it decides. -->
+        <div class="settings-row" id="kbCardLayoutFollowRow" style="display:none;">
+          <div class="settings-label-col">
+            <span>This board</span>
+            <span id="kbCardLayoutFollowBadge" class="settings-status-badge"></span>
+          </div>
+          <button type="button" id="kbCardLayoutFollowBtn" class="settings-action-btn">Set for this board</button>
+        </div>
         <div id="kbSectionOrderList" class="kb-section-order"></div>
         <div class="settings-row">
-          <span class="kb-section-note">Boards can override this in Board Setup &gt; Preferences.</span>
+          <span class="kb-section-note">Boards can override this in Board Setup &gt; Overrides.</span>
           <button id="kbCardLayoutResetBtn" class="modal-cancel-btn">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEFAULT COLUMNS
+       What a NEW board starts with. Reached by Customize on Setup > Boards.
+       A drag list needs room to be dragged in, which is why this is a screen
+       of its own rather than a block wedged into that tab. -->
+  <div id="kbDefaultColumnsBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbDefaultColumnsModal" class="modal">
+      <div class="modal-header">
+        <button id="kbDefaultColumnsBack" class="nav-back-btn modal-header-left" title="Back to Setup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span>Default Columns</span>
+        <button id="kbDefaultColumnsClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <p class="kb-agent-note">The columns a new board starts with, in order. Drag to rearrange. Exactly one
+          can mean done: throughput counts from it, and it is the column that stamps a card complete.
+          Changing these never touches a board that already exists.</p>
+        <div id="kbDefaultColumnsList" class="kb-default-columns"></div>
+        <div class="settings-row">
+          <button id="kbAddDefaultColumnBtn" class="settings-action-btn">+ Column</button>
+          <button id="kbResetDefaultColumnsBtn" class="modal-cancel-btn">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOARD ORDER
+       Reached from Setup > Boards and from a right-click on the gallery
+       background. One list, dragged, exactly like the sidebar's own Edit
+       Home/Sidebar: this is the same job one level down. -->
+  <div id="kbBoardOrderBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbBoardOrderModal" class="modal">
+      <div class="modal-header">
+        <button id="kbBoardOrderBack" class="nav-back-btn modal-header-left" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span>Board Order</span>
+        <button id="kbBoardOrderClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <!-- Same shape as Edit Home/Sidebar, because this is that feature one
+             level down: a persistent sort mode above the list it describes, and
+             dragging a row switches the select to Custom. -->
+        <div class="settings-row">
+          <span>Sort:</span>
+          <select id="kbBoardSortSelect" class="settings-select">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="az">A-Z</option>
+            <option value="za">Z-A</option>
+            <option value="recent">Most Recent</option>
+            <option value="used">Most Used</option>
+            <!-- Reachable only by dragging a board, never by picking it, so it
+                 is disabled rather than absent: the select still has to be able
+                 to show the order you are actually in. -->
+            <option value="custom" disabled>Custom (dragged)</option>
+          </select>
+        </div>
+        <p class="kb-agent-note">The order boards appear in on the Kanban home screen. Drag to rearrange, here
+          or on the gallery itself; either one switches the sort to Custom.</p>
+        <div id="kbBoardOrderList" class="kb-board-order"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLUMN SORT EDITOR
+       ONE editor, opened from two places: Board Setup > Overrides sets the
+       board's default, and a column's own settings override it for that column.
+       The same screen either way, so "priority, then type, then name" is built
+       the same way wherever it is being set and there is no second layout to
+       keep in step. Which one is being edited is held in kanban.ts, not here.
+
+       The rules are an ORDERED list, because that is what layering is: each
+       level only decides the order when every level above it has tied. -->
+  <div id="kbSortBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbSortModal" class="modal">
+      <div class="modal-header">
+        <button id="kbSortBack" class="nav-back-btn modal-header-left" title="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbSortTitle">Column Sort</span>
+        <button id="kbSortClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <p id="kbSortIntro" class="kb-agent-note"></p>
+        <!-- Only when the board's default is what is being edited: whether this
+             board has an answer of its own at all. On the row it would be a
+             second button competing with Customize; here it sits with the thing
+             it decides. -->
+        <div class="settings-row" id="kbSortFollowRow" style="display:none;">
+          <div class="settings-label-col">
+            <span>This board</span>
+            <span id="kbSortFollowBadge" class="settings-status-badge"></span>
+          </div>
+          <button type="button" id="kbSortFollowBtn" class="settings-action-btn">Set for this board</button>
+        </div>
+        <div id="kbSortRules" class="kb-sort-rules"></div>
+        <div class="settings-row">
+          <span class="kb-label-with-info">Add a level
+            <button type="button" class="info-trigger-btn kb-info-btn"
+              data-tooltip="A level only decides the order when every level above it has tied.">&#8505;</button>
+          </span>
+          <select id="kbSortAdd" class="settings-select"></select>
+        </div>
+        <div class="settings-row">
+          <span class="kb-section-note">Cards keep the order you dragged them into. Clearing this puts it straight back.</span>
+          <button id="kbSortClearBtn" class="modal-cancel-btn">Clear, back to manual</button>
         </div>
       </div>
     </div>
@@ -8263,7 +8463,7 @@
   <div id="kbScaleBackdrop" class="modal-backdrop" style="display: none;">
     <div id="kbScaleModal" class="modal">
       <div class="modal-header">
-        <button id="kbScaleBack" class="modal-back-btn" title="Back to Setup">
+        <button id="kbScaleBack" class="nav-back-btn modal-header-left" title="Back to Setup">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -8294,7 +8494,7 @@
   <div id="kbAgentPermBackdrop" class="modal-backdrop" style="display: none;">
     <div id="kbAgentPermModal" class="modal">
       <div class="modal-header">
-        <button id="kbAgentPermBack" class="modal-back-btn" title="Back to Setup">
+        <button id="kbAgentPermBack" class="nav-back-btn modal-header-left" title="Back to Setup">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -8375,6 +8575,21 @@
                 <span class="toggle-slider"></span>
               </label>
             </div>
+          </div>
+
+          <!-- Same shape as every other "opens its own editor" row in the app:
+               the name, a badge saying where it stands, and a Customize button
+               whose label never changes. The rules themselves are data and
+               belong in the badge, not in the button. -->
+          <div class="settings-row" id="kbColumnSortRow">
+            <div class="settings-label-col">
+              <span class="kb-label-with-info">Sort Cards
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Overrides the board's default for this column only. A card dragged into a sorted column turns the sort back off.">&#8505;</button>
+              </span>
+              <span id="kbColumnSortSummary" class="settings-status-badge"></span>
+            </div>
+            <button type="button" id="kbColumnSortBtn" class="settings-action-btn">Customize</button>
           </div>
 
           <div class="setup-actions">

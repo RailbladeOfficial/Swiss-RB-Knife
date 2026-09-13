@@ -1795,8 +1795,15 @@ function backgroundMenuAvailable(): boolean {
 
 /** The whole background menu: the open tool's header buttons, then the
  *  app-wide rows. The separator between them is dropped by menu.ts when the
- *  first group is empty, which is every right-click on Home. */
-function backgroundMenu(): MenuItem[] {
+ *  first group is empty, which is every right-click on Home.
+ *
+ *  EXPORTED so a tool that puts its own menu on a background can append this
+ *  rather than replace it. attachMenu stops propagation once it has rows to
+ *  show, which is right for a card inside a column and wrong for a whole
+ *  view: Kanban's gallery grew a menu and quietly took About, App Settings,
+ *  Toggle View and Exit away from every right-click on that screen. A tool
+ *  menu ends with these rows or it is a menu that removed something. */
+export function backgroundMenu(): MenuItem[] {
   return [...toolHeaderItems(), { separator: true }, ...appMenuItems()];
 }
 

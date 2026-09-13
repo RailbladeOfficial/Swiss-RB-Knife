@@ -622,6 +622,83 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* Quick add: the form stays open after each Enter, so this is a place you sit
    for a minute rather than a dialog you dismiss. */
+/* The quick-add form opened by "Add Card Below" sits in the card list rather
+   than the footer, so it needs the gap the footer gave it for free. */
+/* A selected card. An OUTLINE rather than a border or a background: a card's
+   own color is the thing you picked it out by, so the mark that says "this one
+   is selected" has to sit outside the card without repainting any of it. The
+   offset keeps it clear of the card's own rounded edge. */
+.kb-card-selected {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The mark on a column that is sorted rather than hand-arranged. Muted: it is
+   an explanation for why the cards are where they are, not a control. */
+/* One level of a column sort, in the editor. The rank sits in a fixed-width
+   box so the field names line up however many levels there are. */
+/* A card travelling with the one under the pointer during a multi-card drag.
+   Dimmed rather than hidden: seeing the whole group move is the point, and a
+   hidden card would make the column appear to lose things mid-drag. */
+.kb-dragging-with {
+  opacity: 0.55;
+}
+
+.kb-sort-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.kb-sort-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-input-bg);
+  /* Dragged to reorder, like the card layout list. The grab cursor is the only
+     thing that says so before you try it. */
+  cursor: grab;
+}
+
+.kb-sort-rule:active {
+  cursor: grabbing;
+}
+
+.kb-sort-rank {
+  flex: 0 0 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+/* Takes the slack, so the buttons stay right-aligned in every row. */
+.kb-sort-field {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-sort-remove {
+  color: var(--color-danger);
+}
+
+.kb-column-sorted {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.kb-quick-add-slot {
+  display: flex;
+  flex-direction: column;
+}
+
 .kb-quick-add {
   display: flex;
   flex-direction: column;
