@@ -1365,9 +1365,13 @@ function renderMarkdown(md: string): string {
       .replace(
         /\[([^\]]+)\]\(([^)]+)\)/g,
         (_match, label: string, href: string) => {
-          // Route internal doc links to their modal; everything else opens in browser
-          if (INTERNAL_DOC_LINKS[href]) {
-            return `<a href="#" class="md-internal-link" data-doc="${href}">${label}</a>`;
+          // Route internal doc links to their modal; everything else opens in browser.
+          // The root docs link THIRD_PARTY_LICENSES.md by its real path under
+          // public/, since that is the only place the generated file exists and
+          // anything else is a dead link on GitHub. In here it is the same modal.
+          const doc = href.startsWith("public/") ? href.slice("public/".length) : href;
+          if (INTERNAL_DOC_LINKS[doc]) {
+            return `<a href="#" class="md-internal-link" data-doc="${doc}">${label}</a>`;
           }
           // In-page section links scroll this modal instead. Without this
           // they'd pick up target="_blank" like any other link and leave the

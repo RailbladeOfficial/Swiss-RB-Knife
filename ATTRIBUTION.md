@@ -341,4 +341,4 @@ Swiss RB Knife is built with the following open-source technologies:
 
 ## Third-Party Dependencies
 
-This application depends on various open-source npm and Cargo packages. A full list of those packages and their respective licenses is maintained in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md), which is regenerated automatically at build time.
+This application depends on various open-source npm and Cargo packages. A full list of those packages and their respective licenses is maintained in [THIRD_PARTY_LICENSES.md](public/THIRD_PARTY_LICENSES.md), which is regenerated automatically at build time.

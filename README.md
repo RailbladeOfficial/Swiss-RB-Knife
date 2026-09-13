@@ -363,7 +363,7 @@ If that still makes you uneasy (a healthy instinct), don't take my word for it. 
 
 `npm run tauri build`
 
-The prebuild step will automatically regenerate `THIRD_PARTY_LICENSES.md` before each build.
+The prebuild step will automatically regenerate `public/THIRD_PARTY_LICENSES.md` before each build.
 
 ---
 
@@ -385,4 +385,4 @@ See [LICENSE](LICENSE) for the full license text, and [LICENSING.md](LICENSING.m
 ## Attribution
 
 See [ATTRIBUTION.md](ATTRIBUTION.md) for credits, sound effect licenses, and technology attributions.  
-See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the full list of open-source dependency licenses.
+See [THIRD_PARTY_LICENSES.md](public/THIRD_PARTY_LICENSES.md) for the full list of open-source dependency licenses.

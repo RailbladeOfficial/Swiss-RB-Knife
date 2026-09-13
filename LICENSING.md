@@ -39,7 +39,7 @@ The full license text is available in the [LICENSE](LICENSE) file included with 
 
 ## Third-Party Software
 
-Swiss RB Knife depends on various open-source libraries and packages. Each is used in accordance with its own license. A full list of dependencies and their respective licenses is available in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+Swiss RB Knife depends on various open-source libraries and packages. Each is used in accordance with its own license. A full list of dependencies and their respective licenses is available in [THIRD_PARTY_LICENSES.md](public/THIRD_PARTY_LICENSES.md).
 
 ---
 
