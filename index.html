@@ -8051,6 +8051,25 @@
 
             <div class="settings-section-divider"></div>
 
+            <!-- Card numbers only ever go up, which is what makes them a
+                 permanent handle. This is the one way back down, and it is
+                 deliberately narrow: it winds the counter to just past the
+                 highest number still on the board, so it can close a gap left
+                 by cards you deleted and can never hand out a number something
+                 else already has. -->
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Card Numbering
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Winds the next card number back to just past the highest one still on this board, archived cards included. It never renumbers a card that exists, so nothing you have written down stops matching. On an empty board it goes back to 1.">&#8505;</button>
+                </span>
+                <span id="kbBoardNumberSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="kbBoardResetNumbersBtn" class="settings-action-btn">Reset</button>
+            </div>
+
+            <div class="settings-section-divider"></div>
+
             <div class="setup-actions">
               <button id="kbBoardEditDelete" class="danger-btn">Delete Board</button>
             </div>

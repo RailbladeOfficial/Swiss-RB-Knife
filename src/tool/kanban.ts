@@ -7543,6 +7543,10 @@ function getBoardSetupModal(): Modal {
     }),
   );
 
+  document
+    .getElementById("kbBoardResetNumbersBtn")!
+    .addEventListener("click", requestResetCardNumbers);
+
   document.getElementById("kbBoardEditDelete")!.addEventListener("click", () => {
     const board = getBoard(boardEditId);
     if (!board) return;
@@ -7585,6 +7589,7 @@ function renderBoardSetupBoardTab(): void {
     board.background?.brightness ?? 100,
   );
   renderBoardBgPreview();
+  renderBoardNumberSummary();
 }
 
 function renderBoardBgPreview(): void {
@@ -8345,6 +8350,97 @@ function duplicateBoardAsTemplate(board: Board): void {
   markBoard(copy.id);
   showKbView("board", copy.id);
   flash("Copied the board's columns into a new board. Give it its own background.");
+}
+
+/* -----------------------------------------------------------------------------
+   RESETTING A BOARD'S CARD NUMBERS
+   -----------------------------------------------------------------------------
+   A card number is per board, permanent and human-facing: it is what you write
+   in a commit message, say out loud, and hand an agent. So `nextCardNumber`
+   only ever goes up, and nothing renumbers a card that already exists.
+
+   That is right and it leaves one honest complaint. Make a board, make three
+   test cards, delete them, and the first real card is #4 forever. The counter
+   is remembering something nothing else does.
+
+   WHAT THIS DOES, AND WHY IT IS SAFE. It winds the counter to one past the
+   highest number STILL ON THE BOARD, archived cards included, and to 1 when
+   nothing is left. It does not touch a single card. So:
+
+     - It can only ever close a gap at the TOP, left by cards that are gone.
+       Delete #1 and #2 but keep #3 and the answer is still 4, because 1 and 2
+       are numbers you might still have written down and #3 would collide.
+     - It can never hand out a number something already has, which is the whole
+       failure this is guarding against.
+     - Archived cards count. They are not deleted, they come back, and a
+       restored #3 landing on a live #3 would be two cards with one name.
+
+   AND IT IS SAFE AGAINST BACKUPS, which is the part worth stating out loud.
+   The counter lives in the board's own file next to the cards it counts, so a
+   snapshot holds both halves of the same moment. Restoring an older snapshot
+   brings back its cards AND the counter that belonged to them; it cannot mix a
+   wound-back counter with cards that were numbered under the old one. Nothing
+   here reaches into the backups folder at all.
+----------------------------------------------------------------------------- */
+
+/** The lowest value `nextCardNumber` may safely take for this board. */
+function safeNextCardNumber(boardId: string): number {
+  // Archived included: they still exist and still hold their number.
+  const highest = cards
+    .filter((c) => c.boardId === boardId)
+    .reduce((max, c) => Math.max(max, c.number), 0);
+  return highest + 1;
+}
+
+/** The badge on the Board Setup row: where the counter is, and whether there
+ *  is anything to reclaim. */
+function renderBoardNumberSummary(): void {
+  const badge = document.getElementById("kbBoardNumberSummary");
+  if (!badge) return;
+  const board = getBoard(boardEditId);
+  const button = document.getElementById("kbBoardResetNumbersBtn") as HTMLButtonElement | null;
+  if (!board) {
+    badge.textContent = "";
+    if (button) button.disabled = true;
+    return;
+  }
+  const safe = safeNextCardNumber(board.id);
+  const gap = board.nextCardNumber - safe;
+  badge.textContent =
+    gap > 0
+      ? `next #${board.nextCardNumber} \u00b7 ${gap} to reclaim`
+      : `next #${board.nextCardNumber} \u00b7 nothing to reclaim`;
+  // Nothing to do is said with a disabled button rather than a toast after the
+  // fact, which is the house rule for a control that is sometimes available.
+  if (button) button.disabled = gap <= 0;
+}
+
+function requestResetCardNumbers(): void {
+  const board = getBoard(boardEditId);
+  if (!board) return;
+  const safe = safeNextCardNumber(board.id);
+  if (safe >= board.nextCardNumber) return;
+
+  const live = cards.filter((c) => c.boardId === board.id).length;
+  kbConfirm(
+    {
+      title: "Reset this board's card numbering?",
+      message:
+        `The next new card becomes #${safe} instead of #${board.nextCardNumber}. ` +
+        (live === 0
+          ? "This board holds no cards, so numbering starts over at 1. "
+          : `The ${live} ${live === 1 ? "card" : "cards"} already here keep the numbers they have. `) +
+        "Nothing is renumbered, and no number that is still in use can be handed out again.",
+      confirmLabel: "Reset Numbering",
+      reopen: () => openBoardSetup(board, "board"),
+    },
+    () => {
+      board.nextCardNumber = safe;
+      markBoard(board.id);
+      renderBoardNumberSummary();
+      flash(`Next card on this board is #${safe}.`);
+    },
+  );
 }
 
 /* =============================================================================

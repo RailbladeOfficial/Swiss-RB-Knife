@@ -1647,3 +1647,32 @@ test("changing the shape of a stored field bumps the data-folder version", () =>
   assert.match(lib, /2 = Kanban stage stamps carry a time/, "the new version is not written down");
 });
 
+test("resetting a board's card numbers cannot reuse a number in play", () => {
+  /* A card number is permanent and human-facing: it goes in commit messages and
+     gets handed to agents. The counter only goes up, which is right, and leaves
+     one honest complaint: three deleted test cards mean the first real one is
+     #4 forever.
+
+     The reset winds the counter to one past the highest number STILL on the
+     board. It closes a gap at the top and nothing else. */
+  const safe = slice("src/tool/kanban.ts", "function safeNextCardNumber(", "\n}");
+  assert.match(safe, /Math\.max\(max, c\.number\)/, "the floor is not the highest number in use");
+  assert.ok(
+    !safe.includes("archived"),
+    "archived cards are excluded, so restoring one could collide with a live card",
+  );
+
+  const reset = slice("src/tool/kanban.ts", "function requestResetCardNumbers(", "\n}");
+  assert.match(reset, /if \(safe >= board\.nextCardNumber\) return;/, "the reset can raise the counter");
+  assert.match(reset, /kbConfirm\(/, "the reset does not ask first");
+  assert.match(reset, /board\.nextCardNumber = safe;/, "the reset writes something other than the safe floor");
+
+  // It must not renumber anything: that is what would break every reference
+  // anybody has written down.
+  assert.ok(!/\.number\s*=/.test(reset), "the reset renumbers existing cards");
+
+  // And it is per board, in that board's own file, which is what keeps it safe
+  // against snapshots: a restore brings back cards and counter together.
+  assert.match(reset, /markBoard\(board\.id\)/, "the reset is not saved to the board it belongs to");
+});
+
