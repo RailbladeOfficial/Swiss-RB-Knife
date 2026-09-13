@@ -1,15 +1,14 @@
 [
   {
     "version": "0.7.0",
-    "date": "2026-09-04",
+    "date": "2026-09-13",
     "changes": {
       "features": {
         "App Overall": [
           "Added right-click functionality app-wide and in every tool. Right click a thing, you can do things to that thing. I dunno why I didn't add this sooner.",
           "Added View Modes in App Settings, allowing you to cycle through Standard, Spacious (hides the sidebar and top bar), and Fullscreen (like Spacious but also hides the Tool Header bar) for those who need more screen to work in.",
           "You can also cycle View Modes by pressing F11 on your keyboard while in the app, as well as via right-click menus.",
-          "Added a Data tab to the App Settings modal where you can now export all your data as well as import all of it via JSON. No more going to %APPDATA%.",
-          "This tab also links directly to tools with additional unique import/export capabilities, like the CSV import in Time Tracker or Excel import in Game Stats.",
+          "Added a Data tab to the App Settings modal where you can now export all your data as well as import all of it via a zip folder.",
           "New Theme Added - Liminal.",
           "Added ability to set a sound to play on opening of modals, with volume control.",
           "Added ability to set a sound to play on clicking of buttons, with volume control.",
@@ -42,11 +41,21 @@
           "A card's color can come from the card itself, from its tags, or from its priority, set per board and overridable on any single card.",
           "Rearrange the blocks inside a card with the Card Layout editor, as a default and again per board if one board wants a different shape.",
           "Nearly every board preference can be set once for the tool and then overridden on individual boards.",
-          "Stage dates track when a card started, went to testing, and finished. An Advance button stamps the next one with today, and every date stays directly editable, because the honest case is that work started Tuesday and you are filling the card in on Thursday.",
+          "Kanban Setup has a Defaults tab for what every board follows unless it says otherwise, and Board Setup's Overrides tab lists a board's own answers grouped the same way. Overdue warnings can be switched off per board.",
+          "Select several cards at once with Ctrl+click or Shift+click, then set their priority, effort, tags or column in one go from the right-click menu, or drag them all together.",
+          "Sort any column by priority, effort, due date and more without losing the order you dragged it into, as a board default or per column.",
+          "Sort the board gallery by newest, oldest, name, most recently opened or most used, or just drag the boards into your own order.",
+          "Search a board's tags right from the card, create a new one on the spot when it doesn't exist yet, and drag tags and tag categories into whatever order you want.",
+          "Archive cards one at a time, in bulk, or a whole column at once, and restore them whenever.",
+          "Reset a board's card numbering, so deleting a pile of test cards doesn't leave your first real card stuck as #4. It never hands out a number a card still has.",
+          "Right-click a card to Add Card Below it, and see a card's Effort on its face right beside its Priority.",
+          "Stage dates track when a card started, went to testing, and finished. An Advance button stamps the next one with the current date/time, and every date (except created) stays directly editable.",
           "Boards, cards and their attachments are included in the app's snapshots and in the Data tab's export and import.",
           "You can connect a local AI coding agent to a single board so it can read and change cards while you work in it, using Claude Code, OpenAI's Codex, or anything else that speaks MCP.",
           "The agent talks to the app over a local pipe. Nothing is sent over the internet, and the app itself decides every request rather than trusting the agent to check.",
-          "Board Setup > Agents is where you switch it on, and every permission starts off. Grant only creating cards, or add editing, moving, tagging, dates, subtasks, comments, archiving, deleting and column changes as you need them."
+          "Board Setup > Agents is where you switch it on, and every permission starts off. Grant only creating cards, or add editing, moving, tagging, dates, subtasks, comments, archiving, deleting and column changes as you need them.",
+          "Connecting an agent is one paste: pick your agent, press Copy Command, and paste it into Command Prompt or PowerShell. It sets the agent up, replaces any older connection for that board, and tells you in plain words whether it worked. Editors like Cursor and VS Code get a config block for their settings file instead.",
+          "Each connection shows when an agent last used it, and the board shows when an agent is active on it right now."
         ],
         "Countdown Timer": [
           "Added a customizable Display View that can run while the timer counts down."
@@ -68,7 +77,13 @@
           "Generalized the Holiday Overrides feature and brought it out of the theme cycling feature, so you can still have automatic holiday overrides even if you just use one theme all the time.",
           "Moved Notification Volume back into the Choose Sound Pack modal, and renamed it the Choose Notification Sound Pack modal.",
           "Added option in Edit Home/Sidebar modal to enabling grouping of tools on Home and Sidebar by their new categories (that's right, tool categories are back baby).",
-          "Did some housecleaning / file reorganization in the src folder to keep things running more smoothly."
+          "Did some housecleaning / file reorganization in the src folder to keep things running more smoothly.",
+          "Classic sidebar order now ranks tools by how much they do: Kanban, Budget Tracker, Time Tracker, Auto-Backup, Countdown Timer, Image CCR, Game Stats, TTS Repeater, Dummy File Generator, Days Between Dates, RNGesus. Grouped by category, Productivity comes first to match.",
+          "The Blades theme now colors tools by their position in the sidebar, so reordering the sidebar keeps the colors in order and new tools get one too.",
+          "A tool added in an update now lands next to its neighbors in a sidebar you've arranged by hand, instead of getting dumped at the bottom.",
+          "Your data folder is now organized into one folder per tool. Heads up: if you go back to 0.6.1 it won't find your data. Nothing is deleted, it's just looking in the old places.",
+          "If you open a data folder written by a newer version of the app, it now opens read-only and tells you, instead of quietly saving over data it doesn't understand.",
+          "The installer wears the app's own look now, instead of the stock gray 90s wizard."
         ],
         "Time Tracker": [
           "Added stats for Projects.",
@@ -85,7 +100,10 @@
       },
       "bugfixes": {
         "App Overall": [
-          "Theme Editor wasn't loading its basing theme properly."
+          "Theme Editor wasn't loading its basing theme properly.",
+          "Theme Editor's preview now matches what your saved theme actually looks like.",
+          "Fixed an issue where a data file that couldn't be read (say, one held open by antivirus) loaded as empty and then got saved over. The app now refuses to save over it and tells you which file.",
+          "Fixed an issue where the window could save a size too small to use, and reopen as little more than a title bar."
         ],
         "Budget Tracker": [
           "Reminder Day Number fields no longer show browser autofill dropdown."
@@ -94,7 +112,8 @@
           "Reminder Day Number fields no longer show browser autofill dropdown."
         ],
         "Game Stats": [
-          "Fixed an issue where the tool like to resurrect deleted history."
+          "Fixed an issue where the tool like to resurrect deleted history.",
+          "Fixed an issue where adding a profile, a game or an import could say it saved before it actually had."
         ]
       }
     }
