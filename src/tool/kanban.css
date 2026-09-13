@@ -1162,6 +1162,81 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   align-items: center;
 }
 
+/* Draggable to reorder within the category. The grab cursor is the only
+   affordance a chip this small has room for; the tooltip says the rest. */
+.kb-tag-edit-chip[draggable="true"] {
+  cursor: grab;
+}
+
+.kb-tag-edit-chip[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Opacity only, matching the other drag lists. A chip carries its tag's color
+   as an inline background, which any border or background rule here would lose
+   a fight with. */
+.kb-tag-edit-chip.kb-dragging {
+  opacity: 0.45;
+}
+
+/* =============================================================================
+   SETUP: BOARD ORDER
+   -----------------------------------------------------------------------------
+   The reorder list, shaped like the default-column and card-layout lists so a
+   drag list looks like a drag list wherever it turns up in this tool.
+============================================================================= */
+
+/* A gallery tile is draggable in place: it is a card in a grid, and every
+   other ordered thing in this tool is dragged where it sits. Grab only while
+   it is actually draggable, which it is not while the search box is filtering
+   (see attachBoardTileDrag for why). */
+.kb-board-tile[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.kb-board-tile.kb-dragging {
+  opacity: 0.45;
+}
+
+.kb-board-order {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.kb-board-order-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-input-bg);
+  font-size: 0.82rem;
+}
+
+.kb-board-order-row[draggable="true"] {
+  cursor: grab;
+}
+
+.kb-board-order-row[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.kb-board-order-row.kb-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.kb-board-order-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* =============================================================================
    SETUP: BOARD EDITOR
 ============================================================================= */
@@ -2003,6 +2078,186 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 }
 
 /* -----------------------------------------------------------------------------
+   THE TAG SEARCH
+   -----------------------------------------------------------------------------
+   The filter box and its two buttons, and the grouped list that drops out of
+   it. See the block of the same name in kanban.ts for why this is not a native
+   <select> with <optgroup>, which is the shape it is imitating.
+----------------------------------------------------------------------------- */
+
+/* The heading line: the word "Tags" on the left, the three controls hard
+   right, and what the card wears on the row below. */
+.kb-tag-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/* The three travel together and sit at the end of the heading line, so they
+   are in the same place on every card however many tags it carries. */
+.kb-tag-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* The label is the flex item the heading is measured from, so it gives up its
+   own bottom spacing to .kb-tag-head. */
+.kb-tag-head .kb-card-prop-label {
+  margin: 0;
+}
+
+.kb-tag-search {
+  width: 118px;
+  padding: 2px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.kb-tag-search:focus {
+  outline: none;
+  border-color: var(--color-accent-input);
+}
+
+/* The gear, sized to sit level with the + beside it rather than to the height
+   of its own glyph. */
+.kb-tag-manage-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+}
+
+.kb-tag-manage-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.kb-tag-dropdown {
+  position: fixed;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: min(320px, 92vw);
+  max-height: min(340px, 60vh);
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+}
+
+.kb-tag-dd-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sticky so the heading is still there when a long category has scrolled: the
+   values under "Versions" mean nothing without it. */
+.kb-tag-dd-head {
+  position: sticky;
+  top: -5px;
+  z-index: 1;
+  padding: 5px 8px 3px;
+  background: var(--color-panel);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.kb-tag-dd-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* One highlight for both the mouse and the arrow keys, so what Enter will take
+   is what the pointer would have taken. */
+.kb-tag-dd-row:hover,
+.kb-tag-dd-row.is-active {
+  background: var(--color-hover);
+}
+
+.kb-tag-dd-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+}
+
+/* A tag is allowed to have no color, and an invented one would read as
+   meaning something. A hollow dot says "none" without picking one. */
+.kb-tag-dd-swatch-none {
+  background: transparent;
+  border-style: dashed;
+}
+
+.kb-tag-dd-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-tag-dd-tick {
+  flex: 0 0 auto;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+}
+
+.kb-tag-dd-retired {
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  color: var(--color-text-muted);
+}
+
+.kb-tag-dd-empty {
+  padding: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* Ruled off from the tags above it, because it does something different: every
+   row above puts an existing tag on the card, this one makes a new one. */
+.kb-tag-dd-create {
+  margin-top: 3px;
+  padding: 6px 8px;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 4px 4px;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kb-tag-dd-create:hover {
+  background: var(--color-hover);
+}
+
+/* -----------------------------------------------------------------------------
    THE TABS
 ----------------------------------------------------------------------------- */
 
@@ -2069,25 +2324,33 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* =============================================================================
    TAG CATEGORY RANK
-   Position is rank, so the buttons that move a category are what set it.
+   Position is rank, and rank is set by dragging the block, like every other
+   ordered list in this tool. It was a pair of arrow buttons until the tags
+   inside these blocks became draggable too, at which point one screen had two
+   gestures for one idea.
 ========================================================================== */
 
-.kb-tagcat-rank {
-  display: inline-flex;
-  gap: 2px;
-  margin-left: auto;
+/* The whole block only becomes draggable while this is held (see
+   attachTagCategoryDrag), so the grip is the affordance and has to look like
+   one on its own. */
+.kb-tagcat-grip {
+  cursor: grab;
 }
 
-.kb-tagcat-rank .kb-icon-btn {
-  width: 20px;
-  height: 20px;
-  font-size: 0.6rem;
+.kb-tagcat-grip:active {
+  cursor: grabbing;
 }
 
-/* The count used to claim the auto margin; the rank block does now, so the
-   count sits with the name it belongs to. */
+.kb-tagcat.kb-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+/* The count claims the auto margin again, so the Edit and + Tag buttons sit
+   against the right edge with the count just before them. The rank block used
+   to hold it. */
 .kb-tagcat-head .setup-item-count {
-  margin-left: 0;
+  margin-left: auto;
 }
 
 /* =============================================================================

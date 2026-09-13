@@ -4104,6 +4104,9 @@ function getCardModal(): Modal {
     onClosed: () => {
       openCardId = null;
       closeMenu();
+      // The tag search panel is parented to <body>, not to the card, so
+      // closing the card does not take it with it.
+      closeTagSearch();
       /* A comment being written is thrown away only when the card is really
          being left. A handoff (the picture viewer, a confirm) has already
          opened its replacement by the time this runs, so an open Kanban modal
@@ -6365,7 +6368,9 @@ function renderCardSubtasks(card: Card): void {
 
 function renderCardTags(card: Card): void {
   const row = document.getElementById("kbCardTagPicker")!;
+  const tools = document.getElementById("kbCardTagTools")!;
   row.replaceChildren();
+  tools.replaceChildren();
 
   // This card's own board's vocabulary, not the defaults. A card can only wear
   // a tag that exists on the board it is on.
@@ -6398,22 +6403,347 @@ function renderCardTags(card: Card): void {
     row.appendChild(none);
   }
 
+  /* THE THREE CONTROLS live on the heading line, not at the end of the chips.
+     A card with nine tags would otherwise put them a wrapped row lower than a
+     card with one, so the thing you reach for moves every time you open a
+     different card.
+
+     Search first, because it is the one that scales: a board with sixty tags
+     is four drill-downs and a scroll away from the one you want through the
+     menu, and one word away through this. The menu stays because it is the
+     faster answer when there are eight tags and you want to see all of them,
+     and Manage Tags gets its own button because it was buried at the bottom of
+     that menu, which is a long way to go for the thing you reach for when the
+     tag you want does not exist yet. */
+  const search = document.createElement("input");
+  search.type = "text";
+  search.className = "kb-tag-search";
+  search.placeholder = "Find a tag";
+  search.spellcheck = false;
+  search.autocomplete = "off";
+  search.title = "Type to filter, Enter to apply. A name that does not exist offers to make it.";
+  tools.appendChild(search);
+
   const add = document.createElement("button");
   add.type = "button";
   add.className = "kb-tag-add-btn";
-  add.textContent = worn.length === 0 ? "+ Add" : "+";
-  add.title = "Put a tag on this card";
+  add.textContent = "+";
+  add.title = "Put a tag on this card, by category";
   add.addEventListener("click", (e) => {
+    closeTagSearch();
     openMenu(e.currentTarget as HTMLElement, cardTagMenu(card, boardCategories, boardTags));
   });
-  row.appendChild(add);
+  tools.appendChild(add);
+
+  const manage = document.createElement("button");
+  manage.type = "button";
+  manage.className = "kb-tag-add-btn kb-tag-manage-btn";
+  manage.title = "Manage this board's tags";
+  manage.innerHTML = GEAR_SVG;
+  manage.addEventListener("click", () => {
+    closeTagSearch();
+    openBoardTagsFromCard(card);
+  });
+  tools.appendChild(manage);
+
+  wireTagSearch(search, card);
+}
+
+/** The gear on the Manage Tags button. Inline so it takes the theme's colors
+ *  the way every other icon in the app does. */
+const GEAR_SVG = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>`;
+
+/** Leaves the card for this board's tag vocabulary, and comes back here rather
+ *  than to Board Setup: the card is where the trip started. */
+function openBoardTagsFromCard(card: Card): void {
+  const board = getBoard(card.boardId);
+  if (!board) return;
+  // This board's own vocabulary, not the defaults: those are templates, and
+  // adding one there would not put a tag on this card.
+  //
+  // Optional, because this is now also reached from the board's right-click
+  // menu, where there is no open card to step aside for. close() is a no-op on
+  // a modal that is not open, but the instance itself may never have been
+  // built at all.
+  _cardModal?.close({ handoff: true });
+  openBoardSetup(board, "tags");
+}
+
+/* -----------------------------------------------------------------------------
+   THE TAG SEARCH
+   -----------------------------------------------------------------------------
+   A filter box beside the card's tags, with a grouped list under it: one
+   heading per tag category, that category's tags below it, ticked where the
+   card already wears one.
+
+   WHY NOT A <select> WITH <optgroup>, which is the obvious answer and the
+   shape this is imitating. A native select cannot be typed into to filter, has
+   no room for a color swatch or a tick, and on Windows renders in the OS's own
+   colors, so it would be the one control in the tool that ignores the theme.
+
+   FIXED POSITIONING, measured off the input. The card modal's body scrolls,
+   and a scroll container clips an absolutely positioned child, so a panel
+   parented to the row would be cut off at the bottom of the field. Same reason
+   menu.ts positions its panels in viewport coordinates, and the same
+   consequence: a scroll or a resize closes it rather than being chased.
+
+   ENTER ON A NAME THAT DOES NOT EXIST OFFERS TO MAKE IT. That is the whole
+   point of typing rather than picking: the moment you find a tag missing is
+   the moment you were going to add it, and until now that meant leaving the
+   card for Board Setup and finding your way back.
+----------------------------------------------------------------------------- */
+
+let tagSearchPanel: HTMLElement | null = null;
+let tagSearchCleanup: (() => void) | null = null;
+
+/** Takes the panel down. Safe to call when nothing is open. */
+function closeTagSearch(): void {
+  tagSearchCleanup?.();
+  tagSearchCleanup = null;
+  tagSearchPanel?.remove();
+  tagSearchPanel = null;
+}
+
+function wireTagSearch(input: HTMLInputElement, card: Card): void {
+  const open = (): void => openTagSearch(input, card);
+  input.addEventListener("focus", open);
+  input.addEventListener("click", open);
+  input.addEventListener("input", open);
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeTagSearch();
+      input.blur();
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      openTagSearch(input, card);
+      moveTagSearchCursor(e.key === "ArrowDown" ? 1 : -1);
+      return;
+    }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const rows = tagSearchRows();
+    // The highlighted row, or the only one there is: with a single match left
+    // there is nothing to choose between, and making someone press Down first
+    // is a keystroke that answers a question they have already answered.
+    const chosen = rows.find((r) => r.classList.contains("is-active")) ?? (rows.length === 1 ? rows[0] : null);
+    if (chosen) {
+      chosen.click();
+      return;
+    }
+    const name = input.value.trim();
+    if (name) newTagFromCard(card, name);
+  });
+}
+
+function tagSearchRows(): HTMLElement[] {
+  return tagSearchPanel
+    ? Array.from(tagSearchPanel.querySelectorAll<HTMLElement>(".kb-tag-dd-row"))
+    : [];
+}
+
+/** Moves the highlight, wrapping at both ends and scrolling it into view. */
+function moveTagSearchCursor(delta: number): void {
+  const rows = tagSearchRows();
+  if (rows.length === 0) return;
+  const at = rows.findIndex((r) => r.classList.contains("is-active"));
+  const next = at === -1 ? (delta > 0 ? 0 : rows.length - 1) : (at + delta + rows.length) % rows.length;
+  rows.forEach((r, i) => r.classList.toggle("is-active", i === next));
+  rows[next].scrollIntoView({ block: "nearest" });
+}
+
+function openTagSearch(input: HTMLInputElement, card: Card): void {
+  const board = getBoard(card.boardId);
+  if (!board) return;
+
+  const needle = input.value.trim().toLowerCase();
+  const categories = board.tagCategories;
+
+  // Rebuilt rather than filtered in place, so a tag added, retired or renamed
+  // while this is open is right the next keystroke.
+  const wasOpen = tagSearchPanel !== null;
+  closeTagSearch();
+
+  const panel = document.createElement("div");
+  panel.className = "kb-tag-dropdown";
+  tagSearchPanel = panel;
+
+  let matches = 0;
+  for (const category of categories) {
+    /* A retired tag stays reachable for a card that already carries it (so it
+       can be taken off) and is not offered to one that does not. Same rule the
+       drill-down menu follows. */
+    const catTags = board.tags.filter(
+      (t) =>
+        t.categoryId === category.id &&
+        (t.status === "active" || card.tagIds.includes(t.id)) &&
+        (!needle ||
+          t.name.toLowerCase().includes(needle) ||
+          category.name.toLowerCase().includes(needle)),
+    );
+    if (catTags.length === 0) continue;
+
+    const group = document.createElement("div");
+    group.className = "kb-tag-dd-group";
+    const head = document.createElement("span");
+    head.className = "kb-tag-dd-head";
+    head.textContent = category.name;
+    group.appendChild(head);
+
+    for (const tag of catTags) {
+      matches += 1;
+      const on = card.tagIds.includes(tag.id);
+      const rowBtn = document.createElement("button");
+      rowBtn.type = "button";
+      rowBtn.className = "kb-tag-dd-row";
+      if (on) rowBtn.classList.add("is-on");
+
+      const swatch = document.createElement("span");
+      swatch.className = "kb-tag-dd-swatch";
+      const color = tagColor(tag, categories);
+      if (color) swatch.style.background = color;
+      else swatch.classList.add("kb-tag-dd-swatch-none");
+      rowBtn.appendChild(swatch);
+
+      const name = document.createElement("span");
+      name.className = "kb-tag-dd-name";
+      name.textContent = tag.name;
+      rowBtn.appendChild(name);
+
+      if (on) {
+        const tick = document.createElement("span");
+        tick.className = "kb-tag-dd-tick";
+        tick.textContent = "\u2713";
+        rowBtn.appendChild(tick);
+      }
+      if (tag.status === "retired") {
+        const badge = document.createElement("span");
+        badge.className = "kb-tag-dd-retired";
+        badge.textContent = "retired";
+        rowBtn.appendChild(badge);
+      }
+
+      rowBtn.addEventListener("click", () => {
+        if (card.tagIds.includes(tag.id)) {
+          card.tagIds = card.tagIds.filter((id) => id !== tag.id);
+        } else {
+          card.tagIds.push(tag.id);
+        }
+        stampCard(card);
+        closeTagSearch();
+        renderCardTags(card);
+      });
+      group.appendChild(rowBtn);
+    }
+    panel.appendChild(group);
+  }
+
+  const typed = input.value.trim();
+  if (matches === 0 && !typed) {
+    const empty = document.createElement("span");
+    empty.className = "kb-tag-dd-empty";
+    empty.textContent = "This board has no tags yet.";
+    panel.appendChild(empty);
+  }
+  if (typed) {
+    /* Offered whether or not something matched: "Bug" matching "Bugfix" is not
+       a reason to refuse to make "Bug". An exact name that already exists is
+       the one case where it would only produce a rejection, so it is left out. */
+    const exists = board.tags.some((t) => t.name.toLowerCase() === typed.toLowerCase());
+    if (!exists) {
+      const create = document.createElement("button");
+      create.type = "button";
+      create.className = "kb-tag-dd-create";
+      create.textContent = `Create "${typed}"\u2026`;
+      create.addEventListener("click", () => newTagFromCard(card, typed));
+      panel.appendChild(create);
+    }
+  }
+
+  document.body.appendChild(panel);
+  positionTagSearch(panel, input);
+  // Keep the highlight where it was through a rebuild, so typing a letter does
+  // not drop a selection the arrow keys just made.
+  if (wasOpen) tagSearchRows()[0]?.classList.add("is-active");
+
+  const controller = new AbortController();
+  const { signal } = controller;
+  // Pointerdown rather than click: a click that lands outside has already
+  // moved focus by the time it fires, and a modal underneath would see it.
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      const target = e.target as Node;
+      if (panel.contains(target) || target === input) return;
+      closeTagSearch();
+    },
+    { signal },
+  );
+  // Positioned in viewport coordinates against a layout that is about to
+  // change, so it is closed rather than chased. Same rule as menu.ts.
+  window.addEventListener("resize", closeTagSearch, { signal });
+  document.getElementById("mainContent")?.addEventListener("scroll", closeTagSearch, { signal });
+  panel.closest(".modal-body")?.addEventListener("scroll", closeTagSearch, { signal });
+  tagSearchCleanup = () => controller.abort();
+}
+
+/** Under the input, flipped above it when there is no room below, and never
+ *  wider than the window. */
+function positionTagSearch(panel: HTMLElement, input: HTMLElement): void {
+  const rect = input.getBoundingClientRect();
+  const gap = 4;
+  panel.style.minWidth = `${Math.max(rect.width, 200)}px`;
+  const height = panel.offsetHeight;
+  const below = window.innerHeight - rect.bottom - gap;
+  const flip = height > below && rect.top - gap > below;
+  panel.style.top = flip ? `${Math.max(gap, rect.top - gap - height)}px` : `${rect.bottom + gap}px`;
+  panel.style.left = `${Math.max(gap, Math.min(rect.left, window.innerWidth - panel.offsetWidth - gap))}px`;
+}
+
+/** Opens the New Tag editor with the typed name filled in, and puts the tag on
+ *  this card once it is saved. The card is closed for the trip (a modal opened
+ *  from a modal replaces it rather than stacking) and reopened afterwards. */
+function newTagFromCard(card: Card, name: string): void {
+  const board = getBoard(card.boardId);
+  if (!board) return;
+  if (board.tagCategories.length === 0) {
+    flash("Make a tag category first: a tag has to live in one.", "error");
+    return;
+  }
+  closeTagSearch();
+  const cardId = card.id;
+  tagEditReturn = () => openCard(cardId);
+  tagEditOnCreate = (tag) => {
+    const live = getCard(cardId);
+    if (!live || live.tagIds.includes(tag.id)) return;
+    live.tagIds.push(tag.id);
+    stampCard(live);
+  };
+  _cardModal!.close({ handoff: true });
+  openTagEditor(null, board.tagCategories[0].id, "board", board, name);
 }
 
 /** One drill-down per category, tags inside, ticked where the card wears one.
  *
  *  Built fresh on every open so a tag added in the manager and come back from
  *  is in the list without the card being reopened. */
-function cardTagMenu(card: Card, categories: TagCategory[], tags: Tag[]): MenuItem[] {
+function cardTagMenu(
+  card: Card,
+  categories: TagCategory[],
+  tags: Tag[],
+  /** What to redraw after a tag goes on or comes off. The open card redraws
+   *  its own tag row; the board's right-click menu redraws the board, because
+   *  the card face carries the chips too. Defaults to the card modal's row,
+   *  which is where this menu has always been used from. */
+  afterChange: () => void = () => renderCardTags(card),
+): MenuItem[] {
   const items: MenuItem[] = [];
 
   const usable = categories.filter(
@@ -6449,7 +6779,7 @@ function cardTagMenu(card: Card, categories: TagCategory[], tags: Tag[]): MenuIt
             card.tagIds.push(tag.id);
           }
           stampCard(card);
-          renderCardTags(card);
+          afterChange();
         },
       })),
     });
@@ -6463,17 +6793,10 @@ function cardTagMenu(card: Card, categories: TagCategory[], tags: Tag[]): MenuIt
   }
 
   items.push({ separator: true });
-  items.push({
-    label: "Manage Tags\u2026",
-    onClick: () => {
-      const board = getBoard(card.boardId);
-      if (!board) return;
-      // This board's own vocabulary, not the defaults: those are templates, and
-      // adding one there would not put a tag on this card.
-      _cardModal!.close({ handoff: true });
-      openBoardSetup(board, "tags");
-    },
-  });
+  // Same trip the gear beside the search box makes, through the same function.
+  // It is offered in both places because a menu row is where it has always
+  // been and muscle memory is worth more than tidiness.
+  items.push({ label: "Manage Tags\u2026", onClick: () => openBoardTagsFromCard(card) });
 
   return items;
 }
@@ -8388,10 +8711,31 @@ function renderTagVocabulary(wrap: HTMLElement, scope: TagScope, board: Board | 
   for (const category of categories) {
     const block = document.createElement("div");
     block.className = "kb-tagcat";
+    block.dataset.categoryId = category.id;
     if (category.status === "retired") block.classList.add("kb-tagcat-retired");
 
     const head = document.createElement("div");
     head.className = "kb-tagcat-head";
+
+    /* Rank. A category's position decides where its tags sit on a card and
+       which one a tag-colored card takes its color from, so it has to be
+       movable.
+
+       Dragged, like every other ordered list in this tool: card layout blocks,
+       sort levels, columns, boards and (since this release) the tags inside
+       these very blocks. It used to be a pair of arrow buttons, on the grounds
+       that the blocks are tall and "one step up" is all anyone wants. That was
+       defensible while nothing else on the screen dragged; with the chips
+       inside each block now dragging, two gestures for one idea on one screen
+       is worse than either. */
+    if (categories.length > 1) {
+      const grip = document.createElement("span");
+      grip.className = "kb-column-grip kb-tagcat-grip";
+      grip.textContent = "⠳";
+      grip.title = "Drag to rank this category";
+      attachTagCategoryDrag(block, grip, wrap, category, scope, board);
+      head.appendChild(grip);
+    }
 
     const swatch = document.createElement("span");
     swatch.className = "kb-tagcat-swatch";
@@ -8419,35 +8763,6 @@ function renderTagVocabulary(wrap: HTMLElement, scope: TagScope, board: Board | 
     count.className = "setup-item-count";
     count.textContent = `${catTags.length} ${catTags.length === 1 ? "tag" : "tags"}`;
     head.appendChild(count);
-
-    /* Rank. A category's position decides where its tags sit on a card and
-       which one a tag-colored card takes its color from, so it needs to be
-       movable. Buttons rather than a drag: the list is short, the blocks are
-       tall enough that a drag would scroll, and "one step up" is the whole
-       operation anyone wants here. */
-    const index = categories.indexOf(category);
-    const rank = document.createElement("span");
-    rank.className = "kb-tagcat-rank";
-
-    const up = document.createElement("button");
-    up.type = "button";
-    up.className = "kb-icon-btn";
-    up.textContent = "▲";
-    up.title = "Rank this category higher";
-    up.disabled = index === 0;
-    up.addEventListener("click", () => moveTagCategory(scope, board, category.id, -1));
-    rank.appendChild(up);
-
-    const down = document.createElement("button");
-    down.type = "button";
-    down.className = "kb-icon-btn";
-    down.textContent = "▼";
-    down.title = "Rank this category lower";
-    down.disabled = index === categories.length - 1;
-    down.addEventListener("click", () => moveTagCategory(scope, board, category.id, 1));
-    rank.appendChild(down);
-
-    head.appendChild(rank);
 
     const editBtn = document.createElement("button");
     editBtn.type = "button";
@@ -8477,6 +8792,7 @@ function renderTagVocabulary(wrap: HTMLElement, scope: TagScope, board: Board | 
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "kb-tag-toggle kb-tag-edit-chip";
+      btn.dataset.tagId = tag.id;
       btn.textContent = tag.name;
       paintTagChip(btn, tagColor(tag, categories), true);
       if (tag.status === "retired") btn.classList.add("kb-tag-chip-retired");
@@ -8487,8 +8803,20 @@ function renderTagVocabulary(wrap: HTMLElement, scope: TagScope, board: Board | 
         scope === "board" ? cards.filter((c) => c.tagIds.includes(tag.id)).length : null;
       btn.title =
         (used === null ? tag.name : `${tag.name}: on ${used} card(s)`) +
-        (tag.status === "retired" ? " · retired" : "");
+        (tag.status === "retired" ? " · retired" : "") +
+        (catTags.length > 1 ? " · drag to reorder" : "");
       btn.addEventListener("click", () => openTagEditor(tag, tag.categoryId, scope, board));
+      /* Order matters here for the same reason it does one level up: the tags
+         on a card are drawn in vocabulary order, and a tag-colored card takes
+         the first color it finds walking them. A category could be ranked and
+         its contents could not, so "Critical" stayed wherever it happened to
+         be typed.
+
+         A drag rather than the category's up/down buttons: a category list is
+         a handful of tall blocks and a "one step up" button suits it, but a
+         category's tags are small chips that wrap over several rows, where a
+         pair of arrows per chip would be bigger than the chips. */
+      if (catTags.length > 1) attachTagChipDrag(btn, chips, tag, scope, board);
       chips.appendChild(btn);
     }
     block.appendChild(chips);
@@ -8496,23 +8824,203 @@ function renderTagVocabulary(wrap: HTMLElement, scope: TagScope, board: Board | 
   }
 }
 
-/** Moves one category up or down the rank. */
-function moveTagCategory(scope: TagScope, board: Board | null, id: string, delta: number): void {
-  const list = scope === "board" ? board?.tagCategories : globalTagCategories;
+/** Which chip is mid-drag, shared by every chip's dragover handler so a chip
+ *  can find the node actually being dragged. */
+let tagChipDragId: string | null = null;
+
+/** Drag-to-reorder for one tag chip inside its category's chip row. Committed
+ *  on dragend rather than drop, so a release anywhere still lands the order,
+ *  which is the same rule the column and card-layout lists follow. */
+function attachTagChipDrag(
+  chip: HTMLElement,
+  row: HTMLElement,
+  tag: Tag,
+  scope: TagScope,
+  board: Board | null,
+): void {
+  chip.draggable = true;
+
+  chip.addEventListener("dragstart", (e) => {
+    // The block around this one is draggable too. Without this, reordering a
+    // chip would also look like the start of a category drag.
+    e.stopPropagation();
+    tagChipDragId = tag.id;
+    chip.classList.add("kb-dragging");
+    // Without a payload Firefox refuses to start the drag at all, and the
+    // chip's own name is the honest thing to be carrying.
+    e.dataTransfer?.setData("text/plain", tag.name);
+  });
+
+  chip.addEventListener("dragend", () => {
+    chip.classList.remove("kb-dragging");
+    tagChipDragId = null;
+    const order = Array.from(row.querySelectorAll<HTMLElement>(".kb-tag-edit-chip"))
+      .map((el) => el.dataset.tagId)
+      .filter((id): id is string => typeof id === "string");
+    reorderTagsInCategory(scope, board, tag.categoryId, order);
+  });
+
+  chip.addEventListener("dragover", (e) => {
+    if (!tagChipDragId || tagChipDragId === tag.id) return;
+    e.preventDefault();
+    const dragged = row.querySelector<HTMLElement>(
+      `.kb-tag-edit-chip[data-tag-id="${CSS.escape(tagChipDragId)}"]`,
+    );
+    if (!dragged) return;
+    /* Chips wrap, so this reads the horizontal midpoint rather than the
+       vertical one the stacked lists use: on a row of chips "before or after"
+       is a left/right question, and measuring it top/bottom would put every
+       drop on the same side of whatever chip the cursor was over. */
+    const rect = chip.getBoundingClientRect();
+    const before = e.clientX < rect.left + rect.width / 2;
+    row.insertBefore(dragged, before ? chip : chip.nextSibling);
+  });
+}
+
+/**
+ * Rewrites one category's tags into `orderedIds`, leaving every other
+ * category alone.
+ *
+ * Tags are one flat array with a categoryId on each, not a list per category,
+ * so a category's tags own a set of SLOTS in that array rather than a
+ * contiguous run. The reorder refills those same slots in the new order, which
+ * keeps every other category exactly where it was: splicing the run out and
+ * back in would move tags belonging to categories interleaved with this one.
+ */
+function reorderTagsInCategory(
+  scope: TagScope,
+  board: Board | null,
+  categoryId: string,
+  orderedIds: string[],
+): void {
+  const list = scope === "board" ? board?.tags : globalTags;
   if (!list) return;
-  const from = list.findIndex((c) => c.id === id);
-  const to = from + delta;
-  if (from < 0 || to < 0 || to >= list.length) return;
-  const [moved] = list.splice(from, 1);
-  list.splice(to, 0, moved);
+
+  const slots: number[] = [];
+  list.forEach((t, i) => {
+    if (t.categoryId === categoryId) slots.push(i);
+  });
+
+  const byId = new Map(list.map((t) => [t.id, t]));
+  const next = orderedIds
+    .map((id) => byId.get(id))
+    .filter((t): t is Tag => t !== undefined && t.categoryId === categoryId);
+
+  // A count that does not match means the DOM and the data disagree (a tag
+  // deleted from under the drag, a stray node). Dropping the reorder is the
+  // safe answer; the next render puts the chips back where the data says.
+  if (next.length !== slots.length) return;
+  if (next.every((t, i) => t.id === list[slots[i]].id)) return;
+
+  slots.forEach((slot, i) => {
+    list[slot] = next[i];
+  });
 
   if (scope === "board" && board) markBoard(board.id);
   else markIndex();
-  renderTagVocabulary(
-    document.getElementById(scope === "board" ? "kbBoardTagCategoriesList" : "kbTagCategoriesList")!,
-    scope,
-    board,
+  redrawTagVocabulary(scope, board);
+}
+
+/** Redraws whichever of the two vocabulary lists holds `scope`. Both the
+ *  category drag and the tag drag end here, rather than each naming the host
+ *  element itself and having to agree about which id belongs to which scope. */
+function redrawTagVocabulary(scope: TagScope, board: Board | null): void {
+  const host = document.getElementById(
+    scope === "board" ? "kbBoardTagCategoriesList" : "kbTagCategoriesList",
   );
+  if (host) renderTagVocabulary(host, scope, board);
+}
+
+/** Which category block is mid-drag, shared by every block's dragover handler.
+ *  Kept apart from tagChipDragId because a chip drag happens INSIDE a block
+ *  and both sets of handlers see it. */
+let tagCatDragId: string | null = null;
+
+/**
+ * Drag-to-rank for one category block.
+ *
+ * Only by the grip. A category block is most of the screen and holds a row of
+ * draggable chips and four buttons; making the whole thing draggable would
+ * mean a stray drag every time someone missed a chip. `draggable` is switched
+ * on when the grip is pressed and back off at the end of the drag, which is
+ * the only way to say "this element drags, from here" in HTML5 drag and drop.
+ */
+function attachTagCategoryDrag(
+  block: HTMLElement,
+  grip: HTMLElement,
+  host: HTMLElement,
+  category: TagCategory,
+  scope: TagScope,
+  board: Board | null,
+): void {
+  block.draggable = false;
+  grip.addEventListener("pointerdown", () => {
+    block.draggable = true;
+  });
+  /* A press that never became a drag must not leave the block armed for the
+     next one, which would turn a stray press anywhere on it into a drag. On
+     the block rather than the grip, so a press-and-release that wandered off
+     the grip first still disarms it. */
+  block.addEventListener("pointerup", () => {
+    block.draggable = false;
+  });
+
+  block.addEventListener("dragstart", (e) => {
+    // A chip inside started this one. Its own handler has it.
+    if (!block.draggable) return;
+    e.stopPropagation();
+    tagCatDragId = category.id;
+    block.classList.add("kb-dragging");
+    e.dataTransfer?.setData("text/plain", category.name);
+  });
+
+  block.addEventListener("dragend", () => {
+    block.draggable = false;
+    block.classList.remove("kb-dragging");
+    if (!tagCatDragId) return;
+    tagCatDragId = null;
+    const order = Array.from(host.querySelectorAll<HTMLElement>(".kb-tagcat"))
+      .map((el) => el.dataset.categoryId)
+      .filter((id): id is string => typeof id === "string");
+    commitTagCategoryOrder(scope, board, order);
+  });
+
+  block.addEventListener("dragover", (e) => {
+    if (!tagCatDragId || tagCatDragId === category.id) return;
+    e.preventDefault();
+    const dragged = host.querySelector<HTMLElement>(
+      `.kb-tagcat[data-category-id="${CSS.escape(tagCatDragId)}"]`,
+    );
+    if (!dragged) return;
+    const rect = block.getBoundingClientRect();
+    const before = e.clientY < rect.top + rect.height / 2;
+    host.insertBefore(dragged, before ? block : block.nextSibling);
+  });
+}
+
+/** Writes a dragged category order back. Same shape as the board reorder: read
+ *  off the DOM so a release anywhere lands, and dropped whole if the DOM and
+ *  the data disagree about how many there are. */
+function commitTagCategoryOrder(
+  scope: TagScope,
+  board: Board | null,
+  orderedIds: string[],
+): void {
+  const list = scope === "board" ? board?.tagCategories : globalTagCategories;
+  if (!list) return;
+  if (orderedIds.length !== list.length) return;
+  if (orderedIds.every((id, i) => list[i].id === id)) return;
+
+  const byId = new Map(list.map((c) => [c.id, c]));
+  const next = orderedIds
+    .map((id) => byId.get(id))
+    .filter((c): c is TagCategory => c !== undefined);
+  if (next.length !== list.length) return;
+  list.splice(0, list.length, ...next);
+
+  if (scope === "board" && board) markBoard(board.id);
+  else markIndex();
+  redrawTagVocabulary(scope, board);
 }
 
 /**
@@ -8665,7 +9173,24 @@ function getTagCatEditModal(): Modal {
  *  handoff to open this editor, and a handoff still runs onClosed a moment
  *  later, which clears boardEditId; by the time you press Save it is long gone.
  *  tagEditBoardId belongs to the editor and lives exactly as long as it does. */
+/* Where the tag editors go back to, when it is not the list they were opened
+   from. Set by the card's tag search, which reaches the New Tag editor without
+   passing through Board Setup at all: dumping someone into Board Setup > Tags
+   after they added a tag from a card would be a screen they never asked for
+   and had no way back from to the card they were filling in. Cleared as it is
+   used, so it never redirects the next, ordinary trip. */
+let tagEditReturn: (() => void) | null = null;
+/** Run with the tag a save just CREATED, never with one it edited. The card's
+ *  tag search uses it to put the new tag straight on the card. */
+let tagEditOnCreate: ((tag: Tag) => void) | null = null;
+
 function returnToTagList(): void {
+  const custom = tagEditReturn;
+  tagEditReturn = null;
+  if (custom) {
+    custom();
+    return;
+  }
   if (tagEditScope === "global") {
     openSetupOnTab("tags");
     return;
@@ -8759,6 +9284,13 @@ function getTagEditModal(): Modal {
     onOpen: () => setTimeout(() => nameInput.focus(), 50),
     onClosed: () => {
       tagEditId = null;
+      /* Both dropped here, so a cancelled "create from a card" leaves nothing
+         armed for whatever tag is edited next. Safe despite the back and save
+         paths needing tagEditReturn AFTER they close this modal: onClosed
+         fires a fade later, by which time returnToTagList has already run and
+         cleared it itself. */
+      tagEditOnCreate = null;
+      tagEditReturn = null;
     },
   });
 
@@ -8851,6 +9383,10 @@ function openTagEditor(
   categoryId: string | null,
   scope: TagScope,
   board: Board | null,
+  /** Pre-fills the name on a NEW tag. The card's tag search passes what was
+   *  typed into it, so "the tag I wanted does not exist" and "make it" are one
+   *  gesture rather than two screens and a retype. */
+  startName?: string,
 ): void {
   tagEditScope = scope;
   tagEditBoardId = board?.id ?? null;
@@ -8879,7 +9415,7 @@ function openTagEditor(
   const nameInput = document.getElementById("kbTagNameInput") as HTMLInputElement;
   const colorInput = document.getElementById("kbTagColorInput") as HTMLInputElement;
   const modeSelect = document.getElementById("kbTagColorModeSelect") as HTMLSelectElement;
-  nameInput.value = tag?.name ?? "";
+  nameInput.value = tag?.name ?? startName ?? "";
   // A NEW tag starts on inherit, which is the answer that keeps a category
   // looking like one thing until somebody deliberately breaks ranks.
   modeSelect.value = tag?.color ? "own" : "inherit";
@@ -8888,7 +9424,7 @@ function openTagEditor(
   colorInput.style.display = modeSelect.value === "own" ? "" : "none";
 
   const preview = document.getElementById("kbTagPreview")!;
-  preview.textContent = tag?.name || "Tag";
+  preview.textContent = tag?.name || startName || "Tag";
   paintTagChip(
     preview,
     tag ? tagColor(tag, categories) : (categories.find((c) => c.id === targetCategory)?.color ?? null),
@@ -8900,8 +9436,14 @@ function openTagEditor(
   retire.textContent = tag?.status === "retired" ? "Reactivate" : "Retire";
   (document.getElementById("kbTagEditDelete") as HTMLElement).style.display = tag ? "" : "none";
 
-  if (scope === "board") getBoardSetupModal().close({ handoff: true });
-  else getSetupModal().close({ handoff: true });
+  /* Whichever list this came off, closed on the way in: a modal opened from a
+     modal replaces it rather than stacking. Skipped when the caller has named
+     its own way back, because then neither list is open and closing one would
+     be closing something that is not there. */
+  if (!tagEditReturn) {
+    if (scope === "board") getBoardSetupModal().close({ handoff: true });
+    else getSetupModal().close({ handoff: true });
+  }
   getTagEditModal().open();
 }
 
@@ -8941,13 +9483,17 @@ function saveTagEditor(): void {
     existing.color = color;
     existing.categoryId = categoryId;
   } else {
-    scopedTagList().push({
+    const made: Tag = {
       id: newId(),
       categoryId,
       name: name.slice(0, 60),
       color,
       status: "active",
-    });
+    };
+    scopedTagList().push(made);
+    const onCreate = tagEditOnCreate;
+    tagEditOnCreate = null;
+    onCreate?.(made);
   }
   commitTagScope();
   _tagEditModal!.close({ handoff: true });

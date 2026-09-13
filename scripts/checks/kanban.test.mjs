@@ -1520,6 +1520,28 @@ test("the file header lists exactly the commands the file defines", () => {
   assert.deepEqual(undocumented, [], "these commands exist but the header does not name them");
   assert.deepEqual(phantom, [], "the header names these, and they do not exist");
 });
+test("the card's tag search can reach a tag that does not exist yet", () => {
+  /* The moment you find a tag missing is the moment you were going to add it,
+     and until now that meant leaving the card for Board Setup and finding your
+     own way back. Both halves are checked: the offer, and the return trip. */
+  const src = ts();
+  assert.match(src, /function newTagFromCard/, "there is no way to make a tag from a card");
+  assert.match(src, /tagEditReturn = \(\) => openCard\(cardId\)/, "the trip does not come back to the card");
+  assert.match(src, /tagEditOnCreate = \(tag\) =>/, "a tag made this way is not put on the card");
+
+  // The editor honors that destination instead of its own list, and clears it
+  // so an ordinary trip afterwards is not redirected.
+  const back = slice("src/tool/kanban.ts", "function returnToTagList(", "\n}");
+  assert.match(back, /const custom = tagEditReturn;/, "returnToTagList ignores a caller's destination");
+  assert.match(back, /tagEditReturn = null;/, "the destination is never cleared, so it fires twice");
+
+  /* The panel is parented to <body> to escape the card modal's scroll
+     container, which means nothing takes it down on its own. */
+  assert.match(src, /function closeTagSearch/, "the dropdown cannot be closed");
+  const cardModal = slice("src/tool/kanban.ts", "_cardModal = new Modal(backdrop, {", "\n  });");
+  assert.match(cardModal, /closeTagSearch\(\);/, "closing the card leaves its tag dropdown on screen");
+});
+
 test("a stage stamp carries a time, and a due date does not", () => {
   /* A due date is a TARGET, compared as whole days by the overdue check. A
      stage stamp is a RECORD of something that happened, and the time it

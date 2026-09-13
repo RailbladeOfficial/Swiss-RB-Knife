@@ -8520,7 +8520,15 @@
                  you do it to find the card again, not to change what it says. -->
             <div class="kb-card-prop-col kb-card-prop-tags">
               <div class="kb-card-prop kb-card-prop-stacked">
-                <span class="kb-card-prop-label">Tags</span>
+                <!-- The heading and the three controls share a line, and what
+                     the card WEARS sits under them. The controls used to be at
+                     the end of the chip row, which put them somewhere different
+                     on every card: after one tag, after nine, or on the next
+                     line down once the chips wrapped. -->
+                <div class="kb-tag-head">
+                  <span class="kb-card-prop-label">Tags</span>
+                  <div id="kbCardTagTools" class="kb-tag-tools"></div>
+                </div>
                 <div class="kb-card-prop-value">
                   <div id="kbCardTagPicker" class="kb-tag-row"></div>
                 </div>
