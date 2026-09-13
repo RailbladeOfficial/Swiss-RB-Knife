@@ -313,7 +313,9 @@ test("the test button runs the sidecar rather than guessing", () => {
     /pub async fn kanban_agent_test_connection/,
     "the test command is missing, or is not async and would deadlock the front end",
   );
-  assert.match(gate, /\.arg\("capabilities"\)/, "the test does not actually run the sidecar");
+  assert.match(gate, /\.arg\("check"\)/, "the test does not actually run the sidecar");
+  // Marked, or the app's own test reads as an agent having used the connection.
+  assert.match(gate, /SRBK_AGENT_PROBE/, "the test is counted as an agent using the connection");
   assert.match(
     read("src-tauri/src/lib.rs"),
     /kanban_agent_test_connection/,
@@ -551,4 +553,75 @@ test("a permission flipped mid-session reaches the agent's tool list", () => {
     /fn spawn_permission_watcher/,
     "no watcher, so the notification can never fire",
   );
+});
+
+test("a copied command replaces the old connection and says whether the new one works", () => {
+  /* Three ways a paste used to quietly fail. `mcp add` refuses a name it
+     already has, and Revoke cannot reach the agent's settings, so the command
+     failed for every board that had ever been connected. Claude Code's default
+     scope is the folder the command runs in, and an elevated terminal opens in
+     System32. And nothing afterwards said whether it had worked. */
+  const src = read("src/tool/kanban-agents.ts");
+  const fn = src.slice(src.indexOf("export function connectionCommand"));
+  const body = fn.slice(0, fn.indexOf("\n}"));
+
+  const claude = body.slice(body.indexOf('"claude-code"'), body.indexOf('"codex"'));
+  const remove = claude.indexOf("claude mcp remove");
+  assert.ok(
+    remove !== -1 && remove < claude.indexOf("claude mcp add"),
+    "Claude Code's command adds without removing the old entry first",
+  );
+  assert.match(claude, /"-s user"/, "Claude Code's connection is saved to whatever folder the command ran in");
+
+  const codex = body.slice(body.indexOf('"codex"'));
+  const codexRemove = codex.indexOf("codex mcp remove");
+  assert.ok(
+    codexRemove !== -1 && codexRemove < codex.indexOf("codex mcp add"),
+    "Codex's command adds without removing the old entry first",
+  );
+
+  assert.match(body, /check --token/, "the command does not check the connection it just saved");
+  assert.match(
+    sidecar(),
+    /"check"\s*=>\s*std::process::exit\(run_check/,
+    "the sidecar has no check command for the pasted line to run",
+  );
+});
+
+test("a dev build's connection can never replace the installed app's", () => {
+  /* The command replaces whatever is saved under its key. With one key for
+     both builds, connecting a dev board would disconnect the installed app's
+     board of the same name, and the other way round. */
+  const src = read("src/tool/kanban-agents.ts");
+  const key = src.slice(src.indexOf("export function serverKey"), src.indexOf("THE CLIENTS"));
+  assert.match(key, /isDevPipe\(pipeName\)/, "the key does not depend on which build it is for");
+  assert.match(key, /srbk-dev-kanban/, "a dev connection is saved under the installed app's name");
+
+  // Every call has to pass the pipe, or it falls back to the installed name.
+  const bare = [...src.matchAll(/serverKey\(([^)]*)\)/g)]
+    .map((m) => m[1])
+    .filter((args) => !args.includes(": string"))
+    .filter((args) => !/pipeName/.test(args));
+  assert.deepEqual(bare, [], "serverKey is called without the pipe name");
+  assert.match(gate(), /swiss-rb-knife\.agent\.dev/, "a dev build no longer listens on a pipe of its own");
+});
+
+test("the permissions modal knows its board without asking Board Setup", () => {
+  /* Board Setup steps aside with a handoff when Customize opens this modal,
+     and its onClosed clears boardEditId a moment later. Back, Turn All Off and
+     the redraw after a switch all read boardEditId, so all three did nothing. */
+  const src = kanban();
+  const modal = src.slice(src.indexOf("function agentPermModal("), src.indexOf("function wireAgentsTab("));
+  assert.ok(modal.length > 0, "the permissions modal is gone");
+  const code = modal.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!/boardEditId/.test(code), "the permissions modal reads boardEditId, which is null while it is open");
+  assert.match(
+    src,
+    /agentPermBoardId = board\.id;\s*getBoardSetupModal\(\)\.close\(\{ handoff: true \}\)/,
+    "Customize does not hand the modal its board before Board Setup steps aside",
+  );
+  const allOff = src.slice(src.indexOf('getElementById("kbAgentAllOffBtn")'));
+  assert.match(allOff.slice(0, 200), /agentBoard\(\)/, "Turn All Off asks Board Setup which board it is on");
+  const render = src.slice(src.indexOf("async function renderAgentsTab("));
+  assert.match(render.slice(0, 300), /agentBoard\(\)/, "the Agents screens do not redraw while Customize is open");
 });

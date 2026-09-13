@@ -314,6 +314,10 @@ struct AgentRequest {
     op: String,
     #[serde(default)]
     params: Value,
+    /// Set by the sidecar when the app's own Test Connection started it, so the
+    /// request is not counted as an agent having used the connection.
+    #[serde(default)]
+    probe: bool,
 }
 
 fn error_response(code: &str, message: String) -> Value {
@@ -396,6 +400,31 @@ fn listen_error() -> String {
 static PENDING: OnceLock<Mutex<HashMap<u64, Sender<Result<Value, String>>>>> = OnceLock::new();
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
+/// When each connection last reached this app, by connection id, in epoch ms.
+///
+/// Test Connection can only prove a connection works from HERE. Whether the
+/// agent was actually set up with it is a separate question, and the only
+/// evidence this app can have is a request arriving with that token. In memory,
+/// so it reads "since the app started", which is all the Agents tab claims.
+/// Every accepted request counts, capabilities included: an agent's session
+/// polls that every few seconds, so a connected agent stays current. The app's
+/// own test is marked as a probe and does not count.
+static LAST_SEEN: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+
+fn last_seen() -> &'static Mutex<HashMap<String, u64>> {
+    LAST_SEEN.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn note_seen(connection_id: &str) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    if let Ok(mut map) = last_seen().lock() {
+        map.insert(connection_id.to_string(), now);
+    }
+}
+
 fn pending() -> &'static Mutex<HashMap<u64, Sender<Result<Value, String>>>> {
     PENDING.get_or_init(|| Mutex::new(HashMap::new()))
 }
@@ -450,8 +479,10 @@ fn authorize<'a>(
     let Some((board_id, token)) = find_token(config, secret) else {
         return Err(Refusal {
             code: "unknown_token",
-            message: "This connection is not recognized. It may have been revoked. Copy a new \
-                      connection from Swiss RB Knife: Kanban > the board > Setup > Agents."
+            message: "This connection is not recognized, so it was revoked or replaced. In Swiss \
+                      RB Knife, open Kanban > the board > Setup > Agents, press Copy as Command, \
+                      and paste it into PowerShell. It replaces the old connection. Then restart \
+                      the agent."
                 .to_string(),
             logged: false,
         });
@@ -527,6 +558,10 @@ fn handle_request(app: &AppHandle, raw: &[u8]) -> Value {
         }
     };
 
+    if !request.probe {
+        note_seen(&allowed.token.id);
+    }
+
     // Answered here rather than by the front end, so an agent starting up while
     // the app is still loading its boards still learns what it may do.
     if request.op == "capabilities" {
@@ -534,10 +569,18 @@ fn handle_request(app: &AppHandle, raw: &[u8]) -> Value {
             .iter()
             .map(|(id, _)| (*id, allowed.board.permissions.get(*id).copied().unwrap_or(false)))
             .collect();
+        // The same thing as words, for `srbk-agent check` to print. The words
+        // live here so the sidecar never needs its own copy of the switch names.
+        let granted: Vec<&str> = PERMISSION_LABELS
+            .iter()
+            .filter(|(id, _)| allowed.board.permissions.get(*id).copied().unwrap_or(false))
+            .map(|(_, label)| *label)
+            .collect();
         return ok_response(json!({
             "board": { "id": allowed.board_id, "name": allowed.name },
             "connection": { "id": allowed.token.id, "label": allowed.token.label },
             "permissions": permissions,
+            "allowed": granted,
             "appVersion": env!("CARGO_PKG_VERSION"),
         }));
     }
@@ -736,6 +779,8 @@ pub struct AgentStatus {
     pub sidecar_path: String,
     pub sidecar_found: bool,
     pub permission_ids: Vec<&'static str>,
+    /// Connection id to epoch ms. See LAST_SEEN.
+    pub last_seen: HashMap<String, u64>,
 }
 
 #[tauri::command]
@@ -748,6 +793,7 @@ pub fn kanban_agent_status(app: AppHandle) -> AgentStatus {
         sidecar_found: sidecar.as_ref().map(|p| p.exists()).unwrap_or(false),
         sidecar_path: sidecar.map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
         permission_ids: permission_ids(),
+        last_seen: last_seen().lock().map(|map| map.clone()).unwrap_or_default(),
     }
 }
 
@@ -799,11 +845,18 @@ fn sidecar_path(_app: &AppHandle) -> Option<PathBuf> {
    cannot give. The badge says this app is listening. It cannot say whether the
    sidecar runs, whether antivirus ate it, or whether a token still works.
 
-   SO IT RUNS THE REAL BINARY. `srbk-agent capabilities` is the same program an
-   agent launches, taking the same pipe and the same token, so a pass here means
-   the whole path works and a failure names the part that does not. Testing by
-   opening the pipe from in here would prove less and skip the two things that
-   actually break.
+   SO IT RUNS THE REAL BINARY. `srbk-agent check` is the same program an agent
+   launches, taking the same pipe and the same token, so a pass here means the
+   app's half of the path works and a failure names the part that does not.
+   Testing by opening the pipe from in here would prove less and skip the two
+   things that actually break. `check` is also what the copied command runs
+   last, so the button and the terminal describe a result in the same words.
+
+   WHAT IT CANNOT SEE is the agent's own settings. A pass used to read as
+   "Connection works" while the agent was still set up with a revoked token, so
+   the front end pairs the result with LAST_SEEN rather than claiming anything
+   about the agent. The request is marked as a probe so this test does not
+   count as an agent using the connection.
 ============================================================================= */
 
 #[derive(Serialize)]
@@ -847,9 +900,10 @@ pub async fn kanban_agent_test_connection(app: AppHandle, token: String) -> Agen
 
     let mut command = Command::new(&sidecar);
     command
-        .arg("capabilities")
+        .arg("check")
         .env("SRBK_AGENT_TOKEN", &token)
         .env("SRBK_AGENT_PIPE", pipe_name())
+        .env("SRBK_AGENT_PROBE", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -869,15 +923,27 @@ pub async fn kanban_agent_test_connection(app: AppHandle, token: String) -> Agen
 
     let out = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    // `check` writes its report to stdout whichever way it went. stderr only
+    // carries something when it never got as far as checking.
+    let report = if out.is_empty() { err } else { out };
 
     if output.status.success() {
-        AgentTestResult { ok: true, summary: "Connection works".to_string(), detail: out }
-    } else {
-        test_failed(
-            "The agent could not reach this board",
-            if err.is_empty() { out } else { err },
-        )
+        return AgentTestResult { ok: true, summary: "Connection works".to_string(), detail: report };
     }
+
+    // The report's first line is already a sentence written to be read alone.
+    let first = report.lines().next().unwrap_or("").trim().to_string();
+    let summary = if first.starts_with("Unknown command") {
+        // A sidecar from before `check` existed: a dev copy an agent was holding
+        // open when the app was rebuilt, most likely.
+        "srbk-agent.exe is older than this app. Close any agent using it and restart Swiss RB Knife."
+            .to_string()
+    } else if first.is_empty() {
+        "The agent could not reach this board".to_string()
+    } else {
+        first
+    };
+    test_failed(&summary, report)
 }
 
 /* =============================================================================

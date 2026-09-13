@@ -68,6 +68,9 @@ const PERMISSION_POLL: Duration = Duration::from_secs(5);
 struct Connection {
     pipe: String,
     token: String,
+    /// Set when the app's own Test Connection started this (SRBK_AGENT_PROBE=1),
+    /// so the app does not count its test as an agent using the connection.
+    probe: bool,
 }
 
 impl Connection {
@@ -103,14 +106,23 @@ impl Connection {
                     .to_string(),
             );
         }
-        Ok(Connection { pipe, token: token.trim().to_string() })
+        let probe = std::env::var("SRBK_AGENT_PROBE").map(|v| v == "1").unwrap_or(false);
+        Ok(Connection { pipe, token: token.trim().to_string(), probe })
+    }
+
+    /// Whether this is aimed at a dev build, which listens on a pipe of its own.
+    fn is_dev(&self) -> bool {
+        self.pipe.ends_with(".dev")
     }
 
     /// One request, one connection. Retries only the "all instances busy" case,
     /// which means another request is in flight rather than anything being
     /// wrong.
     fn send(&self, op: &str, params: &Value) -> Result<Value, AppError> {
-        let payload = json!({ "token": self.token, "op": op, "params": params });
+        let mut payload = json!({ "token": self.token, "op": op, "params": params });
+        if self.probe {
+            payload["probe"] = json!(true);
+        }
         let bytes = serde_json::to_vec(&payload).map_err(|err| AppError {
             code: "bad_request".to_string(),
             message: format!("Could not encode the request: {err}"),
@@ -628,7 +640,23 @@ fn run_mcp(connection: Connection) {
     // Asked once at startup so the board's name can go in the instructions and
     // the tool list can be trimmed to what is allowed. A failure here is not
     // fatal: the app may simply not be open yet.
-    let capabilities = connection.send("capabilities", &json!({})).ok();
+    //
+    // Said on stderr either way, which is where an MCP client keeps a server's
+    // log. A connection that silently does nothing is the failure people cannot
+    // diagnose, so the log carries the same words `srbk-agent check` prints.
+    let capabilities = match connection.send("capabilities", &json!({})) {
+        Ok(result) => {
+            eprintln!("srbk-agent: {}", connected_line(&result, connection.is_dev()));
+            Some(result)
+        }
+        Err(err) => {
+            let report = describe_failure(&err, connection.is_dev());
+            for line in report.lines().filter(|line| !line.trim().is_empty()) {
+                eprintln!("srbk-agent: {line}");
+            }
+            None
+        }
+    };
 
     spawn_permission_watcher(
         Arc::clone(&connection),
@@ -779,6 +807,111 @@ fn pretty(value: &Value) -> String {
    THE COMMAND LINE
 ============================================================================= */
 
+fn build_name(dev: bool) -> &'static str {
+    if dev {
+        "dev build"
+    } else {
+        "installed"
+    }
+}
+
+/// What the board allows, as the words on its switches.
+fn allowed_labels(result: &Value) -> Vec<String> {
+    if let Some(list) = result.get("allowed").and_then(Value::as_array) {
+        return list.iter().filter_map(Value::as_str).map(str::to_lowercase).collect();
+    }
+    // An app from before it sent the words: the ids are all there is to show.
+    result
+        .get("permissions")
+        .and_then(Value::as_object)
+        .map(|map| {
+            map.iter()
+                .filter(|(_, on)| on.as_bool() == Some(true))
+                .map(|(id, _)| id.clone())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// One line for an MCP client's server log.
+fn connected_line(result: &Value, dev: bool) -> String {
+    let board = result.pointer("/board/name").and_then(Value::as_str).unwrap_or("?");
+    let label = result.pointer("/connection/label").and_then(Value::as_str).unwrap_or("?");
+    format!(
+        "connected to the board \"{board}\" in Swiss RB Knife ({}) as \"{label}\".",
+        build_name(dev)
+    )
+}
+
+/// What `check` prints when the board answered.
+fn describe_success(result: &Value, dev: bool) -> String {
+    let board = result.pointer("/board/name").and_then(Value::as_str).unwrap_or("?");
+    let label = result.pointer("/connection/label").and_then(Value::as_str).unwrap_or("?");
+    let allowed = allowed_labels(result);
+    let may = if allowed.is_empty() {
+        format!(
+            "read the board, and nothing else yet. Switch on what it may change in \
+             Kanban > {board} > Setup > Agents."
+        )
+    } else {
+        format!("read the board, {}", allowed.join(", "))
+    };
+    format!(
+        "Connection works.\n\n  App:         Swiss RB Knife ({})\n  Board:       {board}\n  \
+         Connection:  {label}\n  It may:      {may}\n\nRestart your agent so it picks up the \
+         connection.",
+        build_name(dev)
+    )
+}
+
+/// What `check` prints, and what the MCP log carries, when the board did not
+/// answer. The first line stands alone, because the app's Test Connection shows
+/// it as its one-line result; the lines after it say what to do.
+fn describe_failure(err: &AppError, dev: bool) -> String {
+    match err.code.as_str() {
+        "app_not_running" => {
+            let other = if dev {
+                "This connection is for the dev build. The installed app does not answer it."
+            } else {
+                "This connection is for the installed app. A dev build does not answer it."
+            };
+            format!(
+                "Connection not checked: Swiss RB Knife ({}) is not running.\n\nOpen it, then \
+                 run this command again. {other}",
+                build_name(dev)
+            )
+        }
+        "unknown_token" => "Connection does not work: Swiss RB Knife does not recognize it.\n\n\
+             It was revoked, or replaced by a newer one. In Swiss RB Knife, open Kanban > the \
+             board > Setup > Agents, press Copy as Command on the connection you want, and \
+             paste it into PowerShell. It replaces this one."
+            .to_string(),
+        "access_disabled" | "board_disabled" => {
+            format!("Connection does not work yet: agent access is off.\n\n{}", err.message)
+        }
+        _ => format!("Connection does not work: {} ({})", err.message, err.code),
+    }
+}
+
+/// `srbk-agent check`: the connection, tried and described in words.
+///
+/// The copied command runs this last, so pasting it ends with a sentence about
+/// whether it worked rather than with the agent's own "added" line, which only
+/// means a config entry was written. It all goes to stdout because it is a
+/// report either way; the exit code says which kind.
+fn run_check(connection: &Connection) -> i32 {
+    match connection.send("capabilities", &json!({})) {
+        Ok(result) => {
+            println!("{}", describe_success(&result, connection.is_dev()));
+            0
+        }
+        Err(err) => {
+            println!("{}", describe_failure(&err, connection.is_dev()));
+            1
+        }
+    }
+}
+
 fn run_cli(connection: Connection, op: &str, raw_params: Option<&str>) -> i32 {
     let params: Value = match raw_params {
         Some(text) => match serde_json::from_str(text) {
@@ -809,6 +942,7 @@ fn usage() {
 USAGE
   srbk-agent --mcp                  Speak MCP on stdin/stdout. This is what an
                                     AI agent's config launches.
+  srbk-agent check                  Say whether this connection works, in words.
   srbk-agent capabilities           Print the board and what it allows.
   srbk-agent call <op> [json]       Send one operation and print the result.
   srbk-agent tools                  List the operations this build knows.
@@ -854,6 +988,7 @@ fn main() {
 
     match first {
         "--mcp" | "mcp" => run_mcp(connection),
+        "check" => std::process::exit(run_check(&connection)),
         "capabilities" => std::process::exit(run_cli(connection, "capabilities", None)),
         "call" => {
             let Some(op) = args.get(1) else {
@@ -941,5 +1076,53 @@ mod tests {
         let names: Vec<&str> =
             visible_tools(only_others.as_object()).iter().map(|t| t.name).collect();
         assert!(names.contains(&"kanban_update_card"));
+    }
+
+    fn failure(code: &str) -> AppError {
+        AppError { code: code.to_string(), message: "from the app".to_string() }
+    }
+
+    #[test]
+    fn a_revoked_connection_says_how_to_replace_it() {
+        let text = describe_failure(&failure("unknown_token"), false);
+        assert!(text.starts_with("Connection does not work"), "{text}");
+        assert!(text.contains("Copy as Command"), "{text}");
+        assert!(text.contains("replaces"), "{text}");
+    }
+
+    #[test]
+    fn a_closed_app_names_which_build_the_connection_is_for() {
+        let dev = describe_failure(&failure("app_not_running"), true);
+        assert!(dev.contains("(dev build) is not running"), "{dev}");
+        let installed = describe_failure(&failure("app_not_running"), false);
+        assert!(installed.contains("(installed) is not running"), "{installed}");
+    }
+
+    #[test]
+    fn the_first_line_of_a_failure_stands_alone() {
+        // The app shows only that line as Test Connection's result.
+        for code in ["app_not_running", "unknown_token", "board_disabled", "transport"] {
+            let first = describe_failure(&failure(code), false).lines().next().unwrap_or("").to_string();
+            assert!(first.starts_with("Connection "), "{code}: {first}");
+        }
+    }
+
+    #[test]
+    fn a_working_connection_names_the_board_and_what_it_may_do() {
+        let result = json!({
+            "board": { "name": "SRBK" },
+            "connection": { "label": "Claude Code" },
+            "allowed": ["Create cards", "Move cards between columns"]
+        });
+        let text = describe_success(&result, true);
+        assert!(text.starts_with("Connection works."), "{text}");
+        assert!(text.contains("SRBK") && text.contains("Claude Code"), "{text}");
+        assert!(text.contains("create cards, move cards between columns"), "{text}");
+    }
+
+    #[test]
+    fn nothing_switched_on_says_where_to_switch_it() {
+        let result = json!({ "board": { "name": "SRBK" }, "connection": { "label": "x" }, "allowed": [] });
+        assert!(describe_success(&result, false).contains("Kanban > SRBK > Setup > Agents"));
     }
 }

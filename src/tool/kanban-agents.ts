@@ -369,16 +369,28 @@ export interface ConnectionInfo {
   pipeName: string;
 }
 
+/** True for the pipe a dev build listens on. agent_gate.rs's pipe_name() adds
+ *  the suffix, so this is the one place the front end can tell the two apart. */
+export function isDevPipe(pipeName: string): boolean {
+  return /\.dev$/.test(pipeName);
+}
+
 /** The key the agent's config file lists this server under. Derived from the
  *  board's name so a user with three boards connected can tell them apart in
- *  their own config. */
-export function serverKey(boardName: string): string {
+ *  their own config.
+ *
+ *  A DEV BUILD GETS ITS OWN KEY. The copied command replaces whatever is saved
+ *  under this key, so if the dev and installed apps shared one, connecting a
+ *  dev board would silently disconnect the installed app's board of the same
+ *  name, and the other way round. */
+export function serverKey(boardName: string, pipeName = ""): string {
   const slug = boardName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 32);
-  return slug ? `srbk-kanban-${slug}` : "srbk-kanban";
+  const base = isDevPipe(pipeName) ? "srbk-dev-kanban" : "srbk-kanban";
+  return slug ? `${base}-${slug}` : base;
 }
 
 /* =============================================================================
@@ -439,7 +451,7 @@ export const AGENT_CLIENTS: readonly AgentClient[] = [
     id: "claude-code",
     label: "Claude Code",
     format: "mcpServers",
-    where: ".mcp.json in your project, or run the command below",
+    where: "Copy as Command and paste it into PowerShell, or .mcp.json in your project",
     cli: true,
   },
   {
@@ -497,13 +509,17 @@ function launch(info: ConnectionInfo) {
 
 /** The "mcpServers" shape: Claude Code, Cursor, Windsurf, Gemini CLI. */
 export function connectionJson(info: ConnectionInfo): string {
-  return JSON.stringify({ mcpServers: { [serverKey(info.boardName)]: launch(info) } }, null, 2);
+  return JSON.stringify(
+    { mcpServers: { [serverKey(info.boardName, info.pipeName)]: launch(info) } },
+    null,
+    2,
+  );
 }
 
 /** VS Code: "servers" rather than "mcpServers", and an explicit stdio type. */
 export function vsCodeConnectionJson(info: ConnectionInfo): string {
   return JSON.stringify(
-    { servers: { [serverKey(info.boardName)]: { type: "stdio", ...launch(info) } } },
+    { servers: { [serverKey(info.boardName, info.pipeName)]: { type: "stdio", ...launch(info) } } },
     null,
     2,
   );
@@ -515,7 +531,7 @@ export function vsCodeConnectionJson(info: ConnectionInfo): string {
  *  TOML basic string would otherwise read \n and \t as control characters and
  *  produce a command that points nowhere. */
 export function codexConnectionToml(info: ConnectionInfo): string {
-  const key = serverKey(info.boardName);
+  const key = serverKey(info.boardName, info.pipeName);
   const esc = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return [
     `[mcp_servers.${key}]`,
@@ -535,27 +551,50 @@ export function connectionConfig(info: ConnectionInfo, client: AgentClient): str
   return connectionJson(info);
 }
 
-/** The same thing as a command, for the clients that have one. Null for the
- *  editors, which are configured by editing their file. */
+/**
+ * The same thing as a command, for the clients that have one. Null for the
+ * editors, which are configured by editing their file.
+ *
+ * One line for PowerShell, which is what Windows Terminal opens, built so that
+ * pasting it is the whole job however many times it has been done before:
+ *
+ *   1. REMOVE, then add. `mcp add` refuses a name that is already saved, and
+ *      Revoke cannot reach the agent's settings, so an add-only command failed
+ *      for every board that had ever been connected. Nothing on screen said the
+ *      fix was to remove the old entry by hand. A remove with nothing to remove
+ *      prints an error, which `2>$null` hides.
+ *   2. USER SCOPE for Claude Code. The default scope is the folder the command
+ *      is run in, and an elevated terminal opens in System32, so the connection
+ *      was saved somewhere Claude would never be started from. The local-scope
+ *      remove clears an entry an older version of this command left behind.
+ *   3. CHECK. srbk-agent runs once with the same token and pipe and prints, in
+ *      words, whether the board answered and what to do if it did not. It is
+ *      the only feedback a pasted command gives before the agent is restarted.
+ *
+ * Replacing is safe because the key is per board and per build: see serverKey.
+ */
 export function connectionCommand(info: ConnectionInfo, client: AgentClient): string | null {
-  const key = serverKey(info.boardName);
-  const env = [`SRBK_AGENT_TOKEN=${info.token}`, `SRBK_AGENT_PIPE=${info.pipeName}`];
+  const key = serverKey(info.boardName, info.pipeName);
+  const env = [`SRBK_AGENT_TOKEN=${info.token}`, `SRBK_AGENT_PIPE=${info.pipeName}`].map(
+    (e) => `--env ${e}`,
+  );
+  const exe = `"${info.sidecarPath}"`;
+  const check = `& ${exe} check --token ${info.token} --pipe ${info.pipeName}`;
 
   if (client.id === "claude-code") {
     return [
-      "claude mcp add",
-      key,
-      ...env.map((e) => `--env ${e}`),
-      `-- "${info.sidecarPath}" --mcp`,
-    ].join(" ");
+      `claude mcp remove ${key} -s local 2>$null`,
+      `claude mcp remove ${key} -s user 2>$null`,
+      ["claude mcp add", key, "-s user", ...env, `-- ${exe} --mcp`].join(" "),
+      check,
+    ].join("; ");
   }
   if (client.id === "codex") {
     return [
-      "codex mcp add",
-      key,
-      ...env.map((e) => `--env ${e}`),
-      `-- "${info.sidecarPath}" --mcp`,
-    ].join(" ");
+      `codex mcp remove ${key} 2>$null`,
+      ["codex mcp add", key, ...env, `-- ${exe} --mcp`].join(" "),
+      check,
+    ].join("; ");
   }
   return null;
 }
@@ -571,6 +610,9 @@ export interface AgentStatus {
   sidecarPath: string;
   sidecarFound: boolean;
   permissionIds: string[];
+  /** Connection id to when an agent last reached this app with it, in epoch ms.
+   *  Since the app started; the app's own Test Connection is not counted. */
+  lastSeen: Record<string, number>;
 }
 
 export async function agentStatus(): Promise<AgentStatus> {

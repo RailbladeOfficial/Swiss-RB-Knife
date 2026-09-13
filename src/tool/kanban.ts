@@ -12121,6 +12121,7 @@ function renderAgentLive(latest: AgentLogEntry | null): void {
 /** Rough and readable, not precise. Nobody needs the seconds. */
 function describeAgo(ms: number): string {
   const minutes = Math.round(ms / 60000);
+  if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return hours === 1 ? "an hour ago" : `${hours} hours ago`;
@@ -12247,7 +12248,12 @@ function renderAgentClientPicker(): void {
 function renderAgentConnections(
   board: Board,
   tokens: AgentToken[],
-  status: { pipeName: string; sidecarPath: string; sidecarFound: boolean },
+  status: {
+    pipeName: string;
+    sidecarPath: string;
+    sidecarFound: boolean;
+    lastSeen: Record<string, number>;
+  },
 ): void {
   const list = document.getElementById("kbAgentConnectionList")!;
   list.replaceChildren();
@@ -12271,7 +12277,13 @@ function renderAgentConnections(
     name.textContent = token.label;
     const made = document.createElement("span");
     made.className = "kb-agent-connection-date";
-    made.textContent = `Added ${formatDate(new Date(token.createdAt).toLocaleDateString("en-CA"))}`;
+    /* Whether an agent has actually used it, beside when it was made. This is
+       the half Test Connection cannot see: a connection can work perfectly from
+       here while the agent is still set up with an older one. */
+    const seenAt = status.lastSeen?.[token.id];
+    made.textContent =
+      `Added ${formatDate(new Date(token.createdAt).toLocaleDateString("en-CA"))} · ` +
+      (seenAt ? `last used ${describeAgo(Date.now() - seenAt)}` : "not used since the app started");
     head.append(name, made);
     row.appendChild(head);
 
@@ -12308,14 +12320,26 @@ function renderAgentConnections(
     const copyCmd = document.createElement("button");
     copyCmd.className = "settings-action-btn";
     copyCmd.textContent = "Copy as Command";
+    copyCmd.title =
+      `For PowerShell. Replaces this board's earlier connection in ${client.label}, ` +
+      "then checks that the new one works.";
     copyCmd.addEventListener("click", () => {
-      if (command) void copyAgentText(command, "Command");
+      if (command) {
+        void copyAgentText(command, "Command", "Paste it into PowerShell and press Enter.");
+      }
     });
 
-    /* The one button that answers the question the others only imply. It runs
-       srbk-agent.exe for real, so a pass means this connection works end to
-       end and a failure names the part that does not: the exe missing, an
-       antivirus blocking it, or a token this board no longer knows. */
+    /* Runs srbk-agent.exe for real, so a failure names the part that does not
+       work: the exe missing, an antivirus blocking it, or a token this board no
+       longer knows.
+
+       WHAT A PASS DOES NOT PROVE, and the reason the result is worded the way it
+       is. This tests the connection as Swiss RB Knife holds it. It cannot see
+       the agent's own settings, so it passed happily for a connection whose
+       agent was still set up with an older, revoked one. "Connection works" on
+       its own was a claim about the agent it had no way to make. The only
+       evidence this app can have about the agent is a request arriving, so the
+       result says whether one has. */
     const testBtn = document.createElement("button");
     testBtn.className = "settings-action-btn";
     testBtn.textContent = "Test Connection";
@@ -12327,14 +12351,24 @@ function renderAgentConnections(
       testResult.textContent = "Testing…";
       testResult.title = "";
       void testAgentConnection(token.token)
-        .then((result) => {
+        .then(async (result) => {
+          const seenAt = await agentStatus()
+            .then((fresh) => fresh.lastSeen?.[token.id])
+            .catch(() => undefined);
           testResult.className = result.ok
             ? "kb-agent-test-result kb-agent-test-ok"
             : "kb-agent-test-result kb-agent-test-bad";
-          testResult.textContent = result.summary;
-          // The full output is the tooltip rather than the line, because it is
-          // several lines of JSON when it passes and a stack of detail when it
-          // does not.
+          if (!result.ok) {
+            testResult.textContent = result.summary;
+          } else if (seenAt) {
+            testResult.textContent = `Works. An agent last used it ${describeAgo(Date.now() - seenAt)}.`;
+          } else {
+            testResult.textContent =
+              "Works in Swiss RB Knife, but no agent has used it since the app started. If " +
+              "your agent can't see this board, copy the command again and paste it.";
+          }
+          // The sidecar's full report is the tooltip rather than the line: the
+          // board, the connection and what it may do, or what to do about it.
           testResult.title = result.detail;
         })
         .finally(() => {
@@ -12350,8 +12384,9 @@ function renderAgentConnections(
         {
           title: "Revoke this connection?",
           message:
-            `"${token.label}" stops working immediately, and any agent using it needs a new ` +
-            "connection. Cards it already created keep its name.",
+            `"${token.label}" stops working immediately. To reconnect an agent, copy a ` +
+            "connection's command and paste it again, which replaces the old one. Cards it " +
+            "already created keep its name.",
           confirmLabel: "Revoke",
           reopen: () => openBoardSetup(board, "agents"),
         },
@@ -12415,10 +12450,14 @@ function renderAgentLog(entries: AgentLogEntry[]): void {
 
 /** The same success/failure toast the rest of the app uses for a clipboard
  *  write. */
-async function copyAgentText(text: string, what: string): Promise<void> {
+async function copyAgentText(
+  text: string,
+  what: string,
+  next = "Paste it into your AI agent's config.",
+): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
-    flash(`${what} copied. Paste it into your AI agent's config.`, "success", 5000);
+    flash(`${what} copied. ${next}`, "success", 5000);
   } catch {
     flash("Couldn't reach the clipboard", "error");
   }
