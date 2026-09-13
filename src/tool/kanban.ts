@@ -5910,7 +5910,8 @@ function renderCardModal(): void {
   (document.getElementById("kbCardTitleInput") as HTMLInputElement).value = card.title;
   document.getElementById("kbCardTitleDisplay")!.textContent = card.title || "Untitled card";
   renderCardReadonlyValues(card);
-  renderCardTabCounts(card);
+  // The tab counts are drawn by renderCardComments and renderCardSubtasks
+  // below, which is also what keeps them current after every change.
   renderCardDescription(card);
   renderCardAttachments(card);
   renderCardComments(card);
@@ -7504,6 +7505,10 @@ function commentStamp(comment: CardComment): string {
 }
 
 function renderCardComments(card: Card): void {
+  // The Comments tab's count, redrawn with the list for the same reason the
+  // Subtasks one is: every add and delete comes back through here.
+  renderCardTabCounts(card);
+
   const list = document.getElementById("kbCardCommentList")!;
   clearMediaHost(list);
 
@@ -7719,6 +7724,11 @@ function renderCardSubtasks(card: Card): void {
   (document.getElementById("kbCardSubtaskBar") as HTMLElement).style.width = `${pct}%`;
   document.getElementById("kbCardSubtaskSummary")!.textContent =
     total === 0 ? "None yet." : `${done} of ${total} done (${pct}%)`;
+
+  /* The Subtasks tab's "X/Y" is the same fact as the line above, so it is
+     redrawn with it. It used to be drawn only when the card opened, and every
+     tick, add and remove left the tab stale until the card was reopened. */
+  renderCardTabCounts(card);
 }
 
 /* -----------------------------------------------------------------------------

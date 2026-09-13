@@ -2181,3 +2181,14 @@ test("a tool's own background menu keeps the app-wide rows", () => {
     "the app-wide background menu is not shared",
   );
 });
+
+test("the Subtasks and Comments tab counts follow every change, not just opening the card", () => {
+  /* Ticking a subtask redrew "2 of 5 done (40%)" and left the tab reading 1/5
+     until the card was closed and opened again, because the counts were only
+     drawn on open. Every subtask and comment change already comes back through
+     its list's render, so the counts are drawn there. */
+  const subtasks = slice("src/tool/kanban.ts", "function renderCardSubtasks(", "\n}");
+  assert.match(subtasks, /renderCardTabCounts\(card\)/, "ticking a subtask leaves the Subtasks tab count stale");
+  const comments = slice("src/tool/kanban.ts", "function renderCardComments(", "\n}");
+  assert.match(comments, /renderCardTabCounts\(card\)/, "adding a comment leaves the Comments tab count stale");
+});
