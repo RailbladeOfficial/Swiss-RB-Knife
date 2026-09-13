@@ -663,3 +663,23 @@ test("the Copy As hint names the button as it is labeled, whichever way is picke
   assert.match(ui, /copyBtn\.textContent = COPY_CONFIG_LABEL/, "the config button has its own label");
   assert.match(ui, /clientHint\(client, agentCopyMode\)/, "the line under Copy As is not the hint for the way picked");
 });
+
+test("the active-agent badge and the connection rows read the same evidence", () => {
+  /* The badge read only the activity log, which records card operations. A
+     reconnected agent that had not touched a card yet showed "last seen 11 min
+     ago" beside a connection row saying "last used just now". The badge has to
+     take the app's last-seen record too, and the newer of the two. */
+  const ui = kanban();
+  assert.match(
+    ui,
+    /renderAgentLive\(latestAgentContact\(mine\.tokens, status\.lastSeen, entries\[0\] \?\? null\)\)/,
+    "the live badge does not look at when a connection was last seen",
+  );
+
+  // A person trying the connection from a terminal is not the agent using it.
+  assert.match(
+    sidecar(),
+    /if first == "check" \|\| first == "connect" \{\s*connection\.probe = true;/,
+    "pasting the command counts as the agent being active",
+  );
+});

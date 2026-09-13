@@ -12084,11 +12084,37 @@ async function renderAgentsTab(): Promise<void> {
   renderAgentPermissions(board, mine.permissions);
   renderAgentClientPicker();
   renderAgentConnections(board, mine.tokens, status);
-  // One read of the log, used twice: the list below and the live badge above
-  // are the same facts at two lengths.
   const entries = (await readAgentLog(200)).filter((entry) => entry.boardId === board.id);
-  renderAgentLive(entries[0] ?? null);
+  renderAgentLive(latestAgentContact(mine.tokens, status.lastSeen, entries[0] ?? null));
   renderAgentLog(entries);
+}
+
+/**
+ * When an agent last reached this board, and which connection it used.
+ *
+ * TWO SOURCES, AND THE BADGE HAS TO READ BOTH. The activity log only records
+ * operations (reading and changing cards), so a freshly reconnected agent that
+ * had not touched a card yet left the badge reading "last seen 11 min ago"
+ * while the connection row beside it said "last used just now". The app's
+ * last-seen record also catches the capabilities check an agent's session makes
+ * every few seconds, so it is the live one; but it is in memory, so after a
+ * restart the log is all there is. Whichever is newer wins.
+ */
+function latestAgentContact(
+  tokens: AgentToken[],
+  lastSeen: Record<string, number> | undefined,
+  logged: AgentLogEntry | null,
+): { agent: string; at: number } | null {
+  let best: { agent: string; at: number } | null = null;
+  for (const token of tokens) {
+    const at = lastSeen?.[token.id];
+    if (at && (!best || at > best.at)) best = { agent: token.label, at };
+  }
+  const loggedAt = logged ? new Date(logged.at).getTime() : NaN;
+  if (logged && !Number.isNaN(loggedAt) && (!best || loggedAt > best.at)) {
+    best = { agent: logged.agent, at: loggedAt };
+  }
+  return best;
 }
 
 /** How recently counts as "right now". Long enough to still say so between two
@@ -12104,20 +12130,14 @@ const AGENT_LIVE_WINDOW_MS = 2 * 60 * 1000;
  * how long ago, which is the difference between a setup that works and a setup
  * that merely looks right.
  */
-function renderAgentLive(latest: AgentLogEntry | null): void {
+function renderAgentLive(latest: { agent: string; at: number } | null): void {
   const badge = document.getElementById("kbAgentLiveBadge")!;
   if (!latest) {
     badge.style.display = "none";
     return;
   }
 
-  const at = new Date(latest.at).getTime();
-  if (Number.isNaN(at)) {
-    badge.style.display = "none";
-    return;
-  }
-
-  const ago = Date.now() - at;
+  const ago = Date.now() - latest.at;
   badge.style.display = "";
   if (ago <= AGENT_LIVE_WINDOW_MS) {
     badge.classList.add("kb-agent-live");

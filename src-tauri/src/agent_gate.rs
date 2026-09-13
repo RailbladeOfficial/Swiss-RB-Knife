@@ -407,8 +407,9 @@ static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 /// evidence this app can have is a request arriving with that token. In memory,
 /// so it reads "since the app started", which is all the Agents tab claims.
 /// Every accepted request counts, capabilities included: an agent's session
-/// polls that every few seconds, so a connected agent stays current. The app's
-/// own test is marked as a probe and does not count.
+/// polls that every few seconds, so a connected agent stays current. Requests
+/// marked as a probe do not count: the app's own Test Connection, and
+/// `srbk-agent check` / `connect` run by a person at a terminal.
 static LAST_SEEN: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
 
 fn last_seen() -> &'static Mutex<HashMap<String, u64>> {

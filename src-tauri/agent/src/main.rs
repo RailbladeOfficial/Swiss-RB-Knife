@@ -1218,13 +1218,20 @@ fn main() {
         std::process::exit(if first.is_empty() { 2 } else { 0 });
     }
 
-    let connection = match Connection::from_env() {
+    let mut connection = match Connection::from_env() {
         Ok(connection) => connection,
         Err(message) => {
             eprintln!("{message}");
             std::process::exit(2);
         }
     };
+    // `check` and `connect` are a PERSON at a terminal trying the connection,
+    // not the agent using it, so they do not count toward "last used" or the
+    // "active now" badge. Pasting the command would otherwise show Claude Code
+    // as active before Claude Code had even been started.
+    if first == "check" || first == "connect" {
+        connection.probe = true;
+    }
 
     match first {
         "--mcp" | "mcp" => run_mcp(connection),
