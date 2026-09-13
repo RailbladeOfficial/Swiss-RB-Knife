@@ -38,6 +38,7 @@
       "binaries/srbk-agent"
     ],
     "publisher": "Railblade",
+    "licenseFile": "../LICENSE",
     "copyright": "© 2026 Railblade",
     "targets": "nsis",
     "icon": [
@@ -50,8 +51,12 @@
     "windows": {
       "nsis": {
         "installMode": "perMachine",
+        "template": "installer/installer.nsi",
         "installerIcon": "icons/icon.ico",
-        "startMenuFolder": "Swiss RB Knife"
+        "uninstallerIcon": "icons/icon.ico",
+        "startMenuFolder": "Swiss RB Knife",
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/sidebar.bmp"
       }
     }
   }
