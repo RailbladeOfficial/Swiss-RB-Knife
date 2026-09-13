@@ -19,6 +19,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen }         from "@tauri-apps/api/event";
 import { open }           from "@tauri-apps/plugin-dialog";
 import { Modal }          from "../modal/modal";
+import { formatBytes } from "../core/format";
 import { flash, escapeHtml } from "../core/shell";
 import { attachMenu }     from "../menu/menu";
 
@@ -114,12 +115,6 @@ const resizeState = {
 // =============================================================================
 //  UTILITIES
 // =============================================================================
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024)        return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
 
 function pathToSrc(filePath: string): string {
   return convertFileSrc(filePath);

@@ -352,13 +352,21 @@ export function attachMenuDelegated(
   });
 }
 
-/** Mirrors shell.ts's isTextEntry(): the elements that get the text-editing
- *  menu (Cut / Copy / Paste / Select All / Undo / Redo) instead of whatever
- *  the surrounding row would have offered. Duplicated rather than imported
- *  because menu.ts imports nothing, which is what keeps it safe to pull into
- *  any module without risking a load-order loop. It is six lines and the rule
- *  has not changed since inputs existed. */
-function isTextEntry(target: EventTarget | null): boolean {
+/**
+ * The elements that get the text-editing menu (Cut / Copy / Paste / Select All
+ * / Undo / Redo) instead of whatever the surrounding row would have offered. A
+ * non-text input (checkbox, range, color, file) has nothing to cut or paste, so
+ * it is treated like the rest of the page.
+ *
+ * A readonly field still qualifies: Copy and Select All are the point there.
+ *
+ * THIS FILE OWNS IT, and shell.ts imports it from here rather than the other
+ * way around. menu.ts imports nothing, which is what keeps it safe to pull into
+ * any module without risking a load-order loop, and that stays true only while
+ * the shared thing lives at this end. It used to be a copy at each end with a
+ * comment on one of them saying so.
+ */
+export function isTextEntry(target: EventTarget | null): boolean {
   if (target instanceof HTMLTextAreaElement) return true;
   if (target instanceof HTMLElement && target.isContentEditable) return true;
   if (target instanceof HTMLInputElement) {

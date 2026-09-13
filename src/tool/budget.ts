@@ -27,6 +27,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { registerTransferable } from "../core/data-transfer";
+import { newId } from "../core/ids";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { flash, escapeHtml, setToolAttention } from "../core/shell";
@@ -39,6 +40,7 @@ import {
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
 import { devError } from "../core/dev-log";
+import { formatStoredDate, localDay, today } from "../core/timestamp";
 import { renderToolBackups, type ToolBackup } from "../core/tool-backups";
 
 /* =============================================================================
@@ -258,21 +260,13 @@ let sessionPassword = "";       // in-memory only; "" when not authenticated
    ID GENERATION
 ============================================================================= */
 
-function makeId(): string {
-  return crypto.randomUUID();
-}
+
 
 /* =============================================================================
    DATE HELPERS
 ============================================================================= */
 
-function localDateString(d: Date): string {
-  return d.toLocaleDateString("en-CA"); // YYYY-MM-DD
-}
 
-function today(): string {
-  return localDateString(new Date());
-}
 
 function parseDate(dateStr: string): Date {
   return new Date(dateStr + "T00:00:00");
@@ -315,7 +309,7 @@ export function advanceDate(dateStr: string, recurrence: Recurrence): string {
       d.setFullYear(d.getFullYear() + n);
       break;
   }
-  return localDateString(d);
+  return localDay(d);
 }
 
 /* =============================================================================
@@ -464,7 +458,7 @@ function sanitizeRecurringBill(raw: unknown): RecurringBill | null {
     billType: r.billType === "variable" ? "variable" : "fixed",
     amount: toNum(r.amount, null),
     recurrence: sanitizeRecurrence(r.recurrence),
-    nextDue: toStr(r.nextDue) || localDateString(new Date()),
+    nextDue: toStr(r.nextDue) || localDay(new Date()),
     autopay: toBool(r.autopay),
     payMethod: toStr(r.payMethod),
     status: sanitizeStatus(r.status),
@@ -481,10 +475,10 @@ function sanitizeBillInstance(raw: unknown): BillInstance | null {
   return {
     id,
     billId,
-    dueDate: toStr(r.dueDate) || localDateString(new Date()),
+    dueDate: toStr(r.dueDate) || localDay(new Date()),
     plannedAmount: toNum(r.plannedAmount, null),
     actualAmount: toNumReq(r.actualAmount),
-    paidDate: toStr(r.paidDate) || localDateString(new Date()),
+    paidDate: toStr(r.paidDate) || localDay(new Date()),
     cleared: toBool(r.cleared),
     clearedDate: toStr(r.clearedDate),
     notes: toStr(r.notes),
@@ -498,7 +492,7 @@ function sanitizeIncomeEntry(raw: unknown): IncomeEntry | null {
   if (!id) return null;
   return {
     id,
-    date: toStr(r.date) || localDateString(new Date()),
+    date: toStr(r.date) || localDay(new Date()),
     sourceId: toStr(r.sourceId),
     expected: toNumReq(r.expected),
     actual: toNumReq(r.actual),
@@ -513,7 +507,7 @@ function sanitizeFluctuatingExpense(raw: unknown): FluctuatingExpense | null {
   if (!id) return null;
   return {
     id,
-    date: toStr(r.date) || localDateString(new Date()),
+    date: toStr(r.date) || localDay(new Date()),
     categoryId: toStr(r.categoryId),
     description: toStr(r.description),
     amount: toNumReq(r.amount),
@@ -742,7 +736,7 @@ function findOrCreate(
       item.name.toLowerCase() === trimmed.toLowerCase(),
   );
   if (existing) return existing.id;
-  const id = makeId();
+  const id = newId();
   list.push({ id, name: trimmed, status: "active" });
   return id;
 }
@@ -891,14 +885,14 @@ function computeMonthRange(
 ): { start: string; end: string } {
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
-  return { start: localDateString(first), end: localDateString(last) };
+  return { start: localDay(first), end: localDay(last) };
 }
 
 /** Computes [start, end] for whatever the current viewMode is. */
 function computeViewRange(): { start: string; end: string; label: string } {
   switch (viewMode) {
     case "day": {
-      const d = localDateString(new Date(viewYear, viewMonth, viewDay));
+      const d = localDay(new Date(viewYear, viewMonth, viewDay));
       return { start: d, end: d, label: formatDate(d) };
     }
     case "week": {
@@ -906,7 +900,7 @@ function computeViewRange(): { start: string; end: string; label: string } {
       const start = viewWeekStart;
       const endD = parseDate(start);
       endD.setDate(endD.getDate() + 6);
-      const end = localDateString(endD);
+      const end = localDay(endD);
       // Week label: "Jun 16 – Jun 22, 2026"
       const s = parseDate(start);
       const e = parseDate(end);
@@ -961,7 +955,7 @@ function snapToCurrent(): void {
   viewYear = now.getFullYear();
   viewMonth = now.getMonth();
   viewDay = now.getDate();
-  viewWeekStart = localDateString(mondayOf(now));
+  viewWeekStart = localDay(mondayOf(now));
   renderRangeNav();
   renderAll();
 }
@@ -979,7 +973,7 @@ function shiftRange(delta: number): void {
     case "week": {
       const d = parseDate(viewWeekStart);
       d.setDate(d.getDate() + delta * 7);
-      viewWeekStart = localDateString(d);
+      viewWeekStart = localDay(d);
       break;
     }
     case "month": {
@@ -1010,7 +1004,7 @@ function setViewMode(mode: ViewMode): void {
   if (mode === "day") {
     viewDay = viewDay || now.getDate();
   } else if (mode === "week") {
-    viewWeekStart = localDateString(
+    viewWeekStart = localDay(
       mondayOf(new Date(viewYear, viewMonth, viewDay || 1)),
     );
   }
@@ -1087,7 +1081,7 @@ function commitRangeInput(): void {
       );
       const y = parseInt(parts[1], 10);
       if (mi >= 0 && !isNaN(y)) {
-        viewWeekStart = localDateString(mondayOf(new Date(y, mi, 1)));
+        viewWeekStart = localDay(mondayOf(new Date(y, mi, 1)));
         viewYear = y;
         viewMonth = mi;
         jumped = true;
@@ -1498,9 +1492,7 @@ export function setBudgetAmericanDates(value: boolean): void {
 
 /** Formats a YYYY-MM-DD date string per the shared date format setting. */
 function formatDate(dateStr: string): string {
-  if (!appSettings.americanDates) return dateStr;
-  const [y, m, d] = dateStr.split("-");
-  return `${m}-${d}-${y}`;
+  return formatStoredDate(dateStr, appSettings.americanDates);
 }
 
 /* =============================================================================
@@ -4062,9 +4054,9 @@ function cloneLedgerEntries(list: EntryItem[]): void {
   if (live.length === 0) return;
   for (const item of live) {
     if (item.kind === "income") {
-      data.incomeEntries.push({ ...item.entry, id: makeId() });
+      data.incomeEntries.push({ ...item.entry, id: newId() });
     } else {
-      data.fluctuatingExpenses.push({ ...item.entry, id: makeId() });
+      data.fluctuatingExpenses.push({ ...item.entry, id: newId() });
     }
   }
   queueSave();
@@ -4095,7 +4087,7 @@ function refundLedgerEntries(list: EntryItem[]): void {
     if (item.kind === "income") {
       data.incomeEntries.push({
         ...item.entry,
-        id: makeId(),
+        id: newId(),
         date: day,
         expected: -item.entry.expected,
         actual: -item.entry.actual,
@@ -4103,7 +4095,7 @@ function refundLedgerEntries(list: EntryItem[]): void {
     } else {
       data.fluctuatingExpenses.push({
         ...item.entry,
-        id: makeId(),
+        id: newId(),
         date: day,
         amount: -item.entry.amount,
       });
@@ -4485,7 +4477,7 @@ function applySplit(): void {
   if (host.kind === "income") {
     parts.forEach((part, i) => {
       data.incomeEntries.push({
-        id: makeId(),
+        id: newId(),
         date: host.entry.date,
         sourceId: findOrCreateIncomeSource(part.source),
         expected: part.expected,
@@ -4508,7 +4500,7 @@ function applySplit(): void {
       const categoryId = findOrCreateCategory(part.category);
       if (part.source) findOrCreateExpenseSource(part.source);
       data.fluctuatingExpenses.push({
-        id: makeId(),
+        id: newId(),
         date: host.entry.date,
         categoryId,
         description: part.source,
@@ -4837,7 +4829,7 @@ function confirmMerge(): void {
   if (plan.kind === "income") {
     data.incomeEntries = data.incomeEntries.filter((e) => !ids.has(e.id));
     data.incomeEntries.push({
-      id: makeId(),
+      id: newId(),
       date,
       sourceId: sourceValue,
       expected: plan.expectedTotal,
@@ -4848,7 +4840,7 @@ function confirmMerge(): void {
     const categoryId = (document.getElementById("budgetMergeCategory") as HTMLSelectElement).value;
     data.fluctuatingExpenses = data.fluctuatingExpenses.filter((e) => !ids.has(e.id));
     data.fluctuatingExpenses.push({
-      id: makeId(),
+      id: newId(),
       date,
       categoryId,
       description: sourceValue,
@@ -5245,7 +5237,7 @@ function saveBillAction(): void {
   if (activeBillAction.mode === "pay") {
     const dueDate = bill.nextDue;
     data.billInstances.push({
-      id: makeId(),
+      id: newId(),
       billId: bill.id,
       dueDate,
       plannedAmount: bill.amount,
@@ -5370,7 +5362,7 @@ function addIncomeEntry(): void {
   const sourceId = findOrCreateIncomeSource(sourceName);
 
   data.incomeEntries.push({
-    id: makeId(),
+    id: newId(),
     date,
     sourceId,
     expected,
@@ -5407,7 +5399,7 @@ function addExpenseEntry(): void {
   if (description) findOrCreateExpenseSource(description);
 
   data.fluctuatingExpenses.push({
-    id: makeId(),
+    id: newId(),
     date,
     categoryId,
     description,
@@ -6170,7 +6162,7 @@ function addOrReactivateSimple(kind: SimpleListKind, name: string): void {
   if (existing) {
     existing.status = "active";
   } else {
-    list.push({ id: makeId(), name: trimmed, status: "active" });
+    list.push({ id: newId(), name: trimmed, status: "active" });
   }
 
   const label = SIMPLE_ADD_LABEL[kind];
@@ -6306,7 +6298,7 @@ function saveBillEdit(): void {
     bill.notes = notes;
   } else {
     data.recurringBills.push({
-      id: makeId(),
+      id: newId(),
       name,
       billType,
       amount,
@@ -7380,7 +7372,7 @@ async function _continueInit(): Promise<void> {
   viewYear = now.getFullYear();
   viewMonth = now.getMonth();
   viewDay = now.getDate();
-  viewWeekStart = localDateString(mondayOf(now));
+  viewWeekStart = localDay(mondayOf(now));
   viewMode = "month"; // default
 
   if (appSettings.startupMode === "last-view") {

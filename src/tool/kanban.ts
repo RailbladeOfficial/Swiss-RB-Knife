@@ -102,8 +102,12 @@ import {
 } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, closeMenu, openMenu, type MenuItem } from "../menu/menu";
-import { formatBackupName, formatBackupBytes as formatBytes } from "../core/tool-backups";
 import { registerTransferable } from "../core/data-transfer";
+import { formatBackupName } from "../core/tool-backups";
+import { formatBytes } from "../core/format";
+import { newId } from "../core/ids";
+import { bindInfoTooltips, toggleInfoTooltip } from "../core/info-tooltip";
+import { formatStoredDate, today } from "../core/timestamp";
 import {
   AGENT_PERMISSIONS,
   AGENT_PERMISSION_GROUPS,
@@ -922,17 +926,6 @@ let headerNotice: HTMLElement;
 /* =============================================================================
    SMALL UTILITIES
 ============================================================================= */
-
-function newId(): string {
-  return crypto.randomUUID();
-}
-
-/** Today as YYYY-MM-DD in LOCAL time. Not toISOString(), which is UTC and
- *  stamps a card with tomorrow's date for anyone east of Greenwich in the
- *  evening. */
-function today(): string {
-  return new Date().toLocaleDateString("en-CA");
-}
 
 /** Parses a YYYY-MM-DD string to a local Date at midday. Midday, not midnight,
  *  so a day difference computed across a daylight-saving boundary is still a
@@ -7277,7 +7270,7 @@ function buildOverrideRow(board: Board, row: OverrideRow): HTMLElement {
   info.title = row.info;
   info.addEventListener("click", (e) => {
     e.stopPropagation();
-    toggleInfoTooltip(info, row.info);
+    toggleInfoTooltip(info, row.info, "kb-info-tooltip");
   });
   label.appendChild(info);
   wrap.appendChild(label);
@@ -9222,64 +9215,6 @@ async function reviveAttachmentsFor(boardIds: string[]): Promise<void> {
    setting in. The words are worth keeping and worth getting out of the way.
 ============================================================================= */
 
-let infoTooltipEl: HTMLDivElement | null = null;
-let infoTooltipOpenBtn: HTMLButtonElement | null = null;
-
-function closeInfoTooltip(): void {
-  infoTooltipEl?.classList.remove("visible");
-  infoTooltipOpenBtn = null;
-}
-
-function toggleInfoTooltip(btn: HTMLButtonElement, text: string): void {
-  if (infoTooltipOpenBtn === btn) {
-    closeInfoTooltip();
-    return;
-  }
-  if (!infoTooltipEl) {
-    infoTooltipEl = document.createElement("div");
-    infoTooltipEl.className = "kb-info-tooltip";
-    document.body.appendChild(infoTooltipEl);
-  }
-  infoTooltipEl.textContent = text;
-  infoTooltipEl.classList.add("visible");
-
-  // Measured after being made visible, so the clamping below works off the real
-  // rendered size rather than off zero.
-  const rect = btn.getBoundingClientRect();
-  const width = infoTooltipEl.offsetWidth;
-  const height = infoTooltipEl.offsetHeight;
-  const left = Math.min(
-    Math.max(8, rect.left + rect.width / 2 - width / 2),
-    window.innerWidth - width - 8,
-  );
-  // Flipped above the button when there is no room below, which there often is
-  // not: these live in a modal that can reach the bottom of the window.
-  const top =
-    rect.bottom + height + 10 > window.innerHeight
-      ? Math.max(8, rect.top - height - 6)
-      : rect.bottom + 6;
-  infoTooltipEl.style.left = `${left}px`;
-  infoTooltipEl.style.top = `${top}px`;
-  infoTooltipOpenBtn = btn;
-}
-
-function bindInfoTooltips(): void {
-  document
-    .querySelectorAll<HTMLButtonElement>(".kb-info-btn[data-tooltip]")
-    .forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        // Without this the document listener below sees the same click and
-        // closes the bubble the instant it opens.
-        e.stopPropagation();
-        toggleInfoTooltip(btn, btn.dataset.tooltip ?? "");
-      });
-    });
-  document.addEventListener("click", () => closeInfoTooltip());
-  // A bubble is positioned against a button that has just moved, so it goes
-  // rather than pointing at nothing.
-  window.addEventListener("resize", () => closeInfoTooltip());
-}
-
 /* =============================================================================
    INIT + SHELL HOOKS
 ============================================================================= */
@@ -9606,7 +9541,7 @@ function permissionRow(
   info.title = permission.help;
   info.addEventListener("click", (e) => {
     e.stopPropagation();
-    toggleInfoTooltip(info, permission.help);
+    toggleInfoTooltip(info, permission.help, "kb-info-tooltip");
   });
   label.appendChild(info);
   row.appendChild(label);
@@ -11058,7 +10993,7 @@ export function initKanban(): void {
     ]);
   });
 
-  bindInfoTooltips();
+  bindInfoTooltips(document, ".kb-info-btn[data-tooltip]", "kb-info-tooltip");
 
   // Claimed once, for the life of the app. The handler checks whether this
   // tool is on screen before answering, so holding it permanently is safe and

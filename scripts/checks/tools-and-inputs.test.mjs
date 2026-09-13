@@ -307,6 +307,49 @@ test("nothing logs to the console except through the dev-only helpers", () => {
   assert.deepEqual(offenders, [], "these log straight to the console in production builds");
 });
 
+test("a helper that exists twice has been promoted, not kept in step by hand", () => {
+  /* The rule this encodes: a second implementation gets promoted to shared. It
+     applies to four-line helpers, not only to dialogs and pickers, because the
+     four-line ones are exactly the sort that drift without anyone noticing. The
+     info tooltip is the proof: two copies, and only one of them had learned to
+     flip the bubble above the button when there was no room below.
+
+     Each entry names the ONE file allowed to define it. A new copy anywhere
+     else fails this, and the fix is to import the shared one. */
+  const owned = [
+    ["formatBytes", "src/core/format.ts"],
+    ["formatDataSize", "src/core/format.ts"],
+    ["newId", "src/core/ids.ts"],
+    ["today", "src/core/timestamp.ts"],
+    ["localDay", "src/core/timestamp.ts"],
+    ["escapeHtmlText", "src/core/rich-text.ts"],
+    ["toggleInfoTooltip", "src/core/info-tooltip.ts"],
+    ["closeInfoTooltip", "src/core/info-tooltip.ts"],
+    ["bindInfoTooltips", "src/core/info-tooltip.ts"],
+    ["isTextEntry", "src/menu/menu.ts"],
+  ];
+
+  const strays = [];
+  for (const file of filesUnder("src", ".ts")) {
+    const text = read(file);
+    for (const [name, home] of owned) {
+      if (file === home) continue;
+      const decl = new RegExp(String.raw`^\s*(?:export\s+)?(?:async\s+)?function\s+${name}\s*\(`, "m");
+      if (decl.test(text)) strays.push(`${file} defines its own ${name}() (belongs to ${home})`);
+    }
+  }
+  assert.deepEqual(strays, [], "these are second copies of a helper that already has a home");
+
+  // And the homes still hold them, or the check above passes by naming nothing.
+  for (const [name, home] of owned) {
+    assert.match(
+      read(home),
+      new RegExp(String.raw`function\s+${name}\s*\(`),
+      `${home} no longer defines ${name}(), so nothing is guarding it`,
+    );
+  }
+});
+
 test("there is one base64 codec, not one per tool", () => {
   // Game Stats moves a spreadsheet across the IPC boundary and Kanban moves a
   // pasted image. Both need base64, and for a while both had their own copy of

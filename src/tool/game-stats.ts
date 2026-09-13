@@ -38,6 +38,7 @@ import { devError, flash, setSubNavHandler, shortPath, navigateToTool } from "..
 import { Modal, ModalTabs } from "../modal/modal";
 import { renderDbBackups } from "../core/db-backups";
 import { registerTransferable } from "../core/data-transfer";
+import { newId } from "../core/ids";
 import { fileTimestamp } from "../core/timestamp";
 import { diffRows } from "../core/row-diff";
 import { attachMenu } from "../menu/menu";
@@ -182,9 +183,7 @@ let games: GameInstance[] = [];
 let tables: GameTable[] = [];
 let settings: GameStatsSettings = { ...DEFAULT_SETTINGS };
 
-function makeId(): string {
-  return crypto.randomUUID();
-}
+
 
 /* =============================================================================
    PERSISTENCE
@@ -573,7 +572,7 @@ function addOrReactivateProfile(name: string): boolean {
   if (existing) {
     existing.status = "active";
   } else {
-    profiles.push({ id: makeId(), name: trimmed, status: "active" });
+    profiles.push({ id: newId(), name: trimmed, status: "active" });
   }
 
   flash(wasReactivated ? "Profile reactivated" : "Profile added", "success");
@@ -1165,7 +1164,7 @@ function provisionalPlayerIds(names: string[], pending: Map<string, string>): st
     if (existing) return existing.id;
     let id = pending.get(key);
     if (!id) {
-      id = makeId();
+      id = newId();
       pending.set(key, id);
     }
     return id;
@@ -1209,7 +1208,7 @@ function prepareImport(sheets: { name: string; rows: string[][] }[], gameType: G
 
     const now = new Date().toISOString();
     const game: GameInstance = {
-      id: makeId(),
+      id: newId(),
       gameType,
       gameNumber: parsed.gameNumber,
       // Spreadsheets carry no date, and the app has always allowed games
@@ -1801,7 +1800,7 @@ function resolvePlayerName(name: string): string | null {
     }
     return existing.id;
   }
-  const profile: Profile = { id: makeId(), name: trimmed, status: "active" };
+  const profile: Profile = { id: newId(), name: trimmed, status: "active" };
   profiles.push(profile);
   saveToDisk();
   refreshProfileDatalist();
@@ -2459,7 +2458,7 @@ function startNewGame(): void {
   const now = new Date().toISOString();
 
   newGameDraft = {
-    id: makeId(),
+    id: newId(),
     gameType: gsNewGameType,
     gameNumber,
     date,

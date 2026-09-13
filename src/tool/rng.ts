@@ -274,7 +274,11 @@ function formatValue(value: number, places: number): string {
   return places > 0 ? value.toFixed(places) : String(value);
 }
 
-function newId(): string {
+/** An id for one roll. Deliberately NOT the shared rollId(): a roll is a line in
+ *  a capped, disposable history, and a short sortable string is a better fit
+ *  than a 36-character UUID. Named for what it makes, so nobody reaches for the
+ *  shared one here by accident or the other way around. */
+function rollId(): string {
   return `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
 
@@ -378,7 +382,7 @@ function generate(): void {
   batchCounter++;
   for (let i = 0; i < rngSettings.count; i++) {
     results.push({
-      id: newId(),
+      id: rollId(),
       value: drawValue(lo, hi, places),
       places,
       batch: batchCounter,

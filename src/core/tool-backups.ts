@@ -20,6 +20,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { formatFileTimestamp } from "./timestamp";
+import { formatBytes } from "./format";
 
 export interface ToolBackupFile {
   /** The .bak filename inside the snapshot folder. */
@@ -39,11 +40,7 @@ export interface ToolBackup {
  *  One implementation, shared with the database snapshot list. */
 export const formatBackupName = formatFileTimestamp;
 
-export function formatBackupBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
+
 
 export interface ToolBackupListOptions {
   /** Which tool's snapshots to list, matching lib.rs's tool_file table. */
@@ -135,7 +132,7 @@ export async function renderToolBackups(opts: ToolBackupListOptions): Promise<vo
 
       const size = document.createElement("span");
       size.className = "tool-backup-size";
-      size.textContent = formatBackupBytes(entry.bytes);
+      size.textContent = formatBytes(entry.bytes);
       row.appendChild(size);
 
       const restore = document.createElement("button");

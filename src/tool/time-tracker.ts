@@ -29,7 +29,8 @@ import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
 import { renderToolBackups, readToolBackup } from "../core/tool-backups";
 import { registerTransferable } from "../core/data-transfer";
-import { fileTimestamp } from "../core/timestamp";
+import { newId } from "../core/ids";
+import { fileTimestamp, formatStoredDate, localDay, today } from "../core/timestamp";
 
 /* =============================================================================
    TYPES
@@ -106,9 +107,7 @@ let endDateManuallySet = false;
 let viewStart: string = today();
 let viewEnd: string = today();
 
-function makeId(): string {
-  return crypto.randomUUID();
-}
+
 
 let settings: TTSettings = {
   fontScale: 0,
@@ -138,18 +137,10 @@ let pendingDeleteIndex: number | null = null;
    DATE HELPERS
 ============================================================================= */
 
-function localDateString(d = new Date()): string {
-  return d.toLocaleDateString("en-CA");
-}
 
-function today(): string {
-  return localDateString();
-}
 
 function formatDate(dateStr: string): string {
-  if (!settings.americanDates) return dateStr;
-  const [y, m, d] = dateStr.split("-");
-  return `${m}-${d}-${y}`;
+  return formatStoredDate(dateStr, settings.americanDates);
 }
 
 /** Returns a YYYY-MM-DD date offset by `days` (may be negative). Uses local
@@ -157,7 +148,7 @@ function formatDate(dateStr: string): string {
 function addDaysToDate(dateStr: string, days: number): string {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + days);
-  return localDateString(d);
+  return localDay(d);
 }
 
 /** Whole-day index for a YYYY-MM-DD string, for duration math across dates.
@@ -174,7 +165,7 @@ function daysBetween(a: string, b: string): number {
 
 function getPresetRange(preset: string): { start: string; end: string } {
   const now = new Date();
-  const todayStr = localDateString(now);
+  const todayStr = localDay(now);
 
   switch (preset) {
     case "today":
@@ -183,7 +174,7 @@ function getPresetRange(preset: string): { start: string; end: string } {
     case "yesterday": {
       const d = new Date(now);
       d.setDate(d.getDate() - 1);
-      const s = localDateString(d);
+      const s = localDay(d);
       return { start: s, end: s };
     }
 
@@ -191,47 +182,47 @@ function getPresetRange(preset: string): { start: string; end: string } {
       const d = new Date(now);
       const day = d.getDay() || 7;
       d.setDate(d.getDate() - (day - 1));
-      return { start: localDateString(d), end: todayStr };
+      return { start: localDay(d), end: todayStr };
     }
 
     case "last-7": {
       const d = new Date(now);
       d.setDate(d.getDate() - 6);
-      return { start: localDateString(d), end: todayStr };
+      return { start: localDay(d), end: todayStr };
     }
 
     case "month-to-date": {
       const d = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { start: localDateString(d), end: todayStr };
+      return { start: localDay(d), end: todayStr };
     }
 
     case "last-14": {
       const d = new Date(now);
       d.setDate(d.getDate() - 13);
-      return { start: localDateString(d), end: todayStr };
+      return { start: localDay(d), end: todayStr };
     }
 
     case "last-30": {
       const d = new Date(now);
       d.setDate(d.getDate() - 29);
-      return { start: localDateString(d), end: todayStr };
+      return { start: localDay(d), end: todayStr };
     }
 
     case "last-month": {
       const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const last = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { start: localDateString(first), end: localDateString(last) };
+      return { start: localDay(first), end: localDay(last) };
     }
 
     case "year-to-date": {
       const d = new Date(now.getFullYear(), 0, 1);
-      return { start: localDateString(d), end: todayStr };
+      return { start: localDay(d), end: todayStr };
     }
 
     case "last-year": {
       const first = new Date(now.getFullYear() - 1, 0, 1);
       const last = new Date(now.getFullYear() - 1, 11, 31);
-      return { start: localDateString(first), end: localDateString(last) };
+      return { start: localDay(first), end: localDay(last) };
     }
 
     case "this-pay-period": {
@@ -508,7 +499,7 @@ function formatImportTimestamp(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   const timeStr = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `${formatDate(localDateString(d))} ${formatTime(timeStr)}`;
+  return `${formatDate(localDay(d))} ${formatTime(timeStr)}`;
 }
 
 /* =============================================================================
@@ -896,8 +887,8 @@ function getPayPeriodContaining(
     periodEnd.setDate(periodEnd.getDate() + lengthDays - 1);
     if (periodEnd >= target) {
       return {
-        start: localDateString(periodStart),
-        end: localDateString(periodEnd),
+        start: localDay(periodStart),
+        end: localDay(periodEnd),
       };
     }
     periodStart.setDate(periodStart.getDate() + lengthDays);
@@ -918,7 +909,7 @@ function getLastPayPeriod(): { start: string; end: string } | null {
   prevEnd.setDate(prevEnd.getDate() - 1);
   const prevStart = new Date(prevEnd);
   prevStart.setDate(prevStart.getDate() - lengthDays + 1);
-  return { start: localDateString(prevStart), end: localDateString(prevEnd) };
+  return { start: localDay(prevStart), end: localDay(prevEnd) };
 }
 
 /* =============================================================================
@@ -985,7 +976,7 @@ function updateDurationPreview(
       const startDate = startDatePicker.value || today();
       const startTotalSeconds = dateToDayIndex(startDate) * 86400 + parseTime(normalizedStart);
       const nowTotalSeconds =
-        dateToDayIndex(localDateString(now)) * 86400 +
+        dateToDayIndex(localDay(now)) * 86400 +
         now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
       const diffSeconds = Math.max(0, nowTotalSeconds - startTotalSeconds);
       renderDurationPreview(durationPreview, diffSeconds);
@@ -2815,7 +2806,7 @@ function findOrCreateActivity(name: string): void {
     (a) => a.status === "active" && a.name.toLowerCase() === trimmed.toLowerCase(),
   );
   if (existing) return;
-  activities.push({ id: makeId(), name: trimmed, status: "active" });
+  activities.push({ id: newId(), name: trimmed, status: "active" });
   saveSettings();
   refreshActivityDatalist();
   renderActivitiesList();
@@ -2843,7 +2834,7 @@ function addOrReactivateActivity(name: string): boolean {
   if (existing) {
     existing.status = "active";
   } else {
-    activities.push({ id: makeId(), name: trimmed, status: "active" });
+    activities.push({ id: newId(), name: trimmed, status: "active" });
   }
 
   flash(wasReactivated ? "Activity reactivated" : "Activity added", "success");
@@ -2967,7 +2958,7 @@ function findOrCreateProject(name: string): void {
     (p) => p.status === "active" && p.name.toLowerCase() === trimmed.toLowerCase(),
   );
   if (existing) return;
-  projects.push({ id: makeId(), projectNumber: nextProjectNumber(), name: trimmed, status: "active" });
+  projects.push({ id: newId(), projectNumber: nextProjectNumber(), name: trimmed, status: "active" });
   saveSettings();
   refreshProjectDatalist();
   renderProjectsList();
@@ -3006,7 +2997,7 @@ function addOrReactivateProject(name: string, projectNumber: number): boolean {
     return false;
   }
 
-  projects.push({ id: makeId(), projectNumber, name: trimmed, status: "active" });
+  projects.push({ id: newId(), projectNumber, name: trimmed, status: "active" });
   flash("Project added", "success");
   saveSettings();
   refreshProjectDatalist();
@@ -4734,7 +4725,7 @@ function shiftDate(dateStr: string, delta: string): string {
   const sign = delta.startsWith("+") ? 1 : -1;
   const unit = delta.replace(/[+-]/, "");
   if (unit === "day") d.setDate(d.getDate() + sign);
-  return localDateString(d);
+  return localDay(d);
 }
 
 /* =============================================================================

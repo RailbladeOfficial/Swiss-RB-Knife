@@ -28,6 +28,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { registerTransferable } from "../core/data-transfer";
+import { bindInfoTooltips, closeInfoTooltip } from "../core/info-tooltip";
+import { formatDataSize as formatBytes } from "../core/format";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { flash, devError, devWarn, setToolAttention } from "../core/shell";
@@ -551,15 +553,6 @@ async function loadPresets(): Promise<void> {
 /* =============================================================================
    UTILITIES
 ============================================================================= */
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = bytes;
-  let ui = 0;
-  while (size >= 1024 && ui < units.length - 1) { size /= 1024; ui++; }
-  return `${size.toFixed(2)} ${units[ui]}`;
-}
 
 function formatSeconds(secs: number): string {
   const h = Math.floor(secs / 3600);
@@ -2121,57 +2114,6 @@ function renderSetupReminderMode(): void {
   setupReminderModeLabel.textContent = config.reminderAggressive ? "Aggressive" : "Gentle";
 }
 
-/* ── Info tooltips ─────────────────────────────────────────────────────────
-   Small click-to-toggle popovers for the (i) buttons in this modal, not
-   full modals, just a floating explanation anchored under whichever icon
-   was clicked. Single shared bubble element, repositioned per click. */
-let infoTooltipEl: HTMLDivElement | null = null;
-let infoTooltipOpenBtn: HTMLButtonElement | null = null;
-
-function closeInfoTooltip(): void {
-  infoTooltipEl?.classList.remove("visible");
-  infoTooltipOpenBtn = null;
-}
-
-function toggleInfoTooltip(btn: HTMLButtonElement, text: string): void {
-  if (infoTooltipOpenBtn === btn) {
-    closeInfoTooltip();
-    return;
-  }
-  if (!infoTooltipEl) {
-    infoTooltipEl = document.createElement("div");
-    infoTooltipEl.className = "ab-info-tooltip";
-    document.body.appendChild(infoTooltipEl);
-  }
-  infoTooltipEl.textContent = text;
-  infoTooltipEl.classList.add("visible");
-  // Position after adding to the DOM (and after the text is set) so its
-  // rendered width is known, anchored just below the icon, clamped so it
-  // can't run off the right edge of the window.
-  const rect = btn.getBoundingClientRect();
-  const bubbleWidth = infoTooltipEl.offsetWidth;
-  const left = Math.min(
-    Math.max(8, rect.left + rect.width / 2 - bubbleWidth / 2),
-    window.innerWidth - bubbleWidth - 8,
-  );
-  infoTooltipEl.style.top  = `${rect.bottom + 6}px`;
-  infoTooltipEl.style.left = `${left}px`;
-  infoTooltipOpenBtn = btn;
-}
-
-/** Wires every (i) button inside `container` to toggle the shared tooltip
- *  bubble with its `data-tooltip` text. Also closes the bubble on any other
- *  click in the document, so it behaves like a normal popover. */
-function initInfoTooltips(container: HTMLElement): void {
-  container.querySelectorAll<HTMLButtonElement>(".ab-info-btn[data-tooltip]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      toggleInfoTooltip(btn, btn.dataset.tooltip ?? "");
-    });
-  });
-  document.addEventListener("click", () => closeInfoTooltip());
-}
-
 function initSetupModal(): void {
   setupBtn           = document.getElementById("ab-setup-btn") as HTMLButtonElement;
   setupWarningToggle = document.getElementById("ab-setup-warning-toggle") as HTMLInputElement;
@@ -2250,7 +2192,7 @@ function initSetupModal(): void {
     renderSetupReminderMode();
   });
 
-  initInfoTooltips(setupModalEl);
+  bindInfoTooltips(setupModalEl, ".ab-info-btn[data-tooltip]", "ab-info-tooltip");
 }
 
 /** Reminder status returned when a nudge is due, null otherwise (reminders

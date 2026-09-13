@@ -26,6 +26,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { formatFileTimestamp } from "./timestamp";
+import { formatBytes } from "./format";
 
 export interface DbBackup {
   /** The snapshot folder's name, a local-time timestamp in the house format. */
@@ -38,11 +39,7 @@ export interface DbBackup {
  *  identical copy of it. */
 export const formatSnapshotName = formatFileTimestamp;
 
-export function formatSnapshotBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
+
 
 export interface DbBackupListOptions {
   /** Which tool's tables a restore should replace. */
@@ -131,7 +128,7 @@ export async function renderDbBackups(opts: DbBackupListOptions): Promise<void> 
 
     const size = document.createElement("span");
     size.className = "tool-backup-size";
-    size.textContent = formatSnapshotBytes(item.bytes);
+    size.textContent = formatBytes(item.bytes);
     row.appendChild(size);
 
     const restore = document.createElement("button");

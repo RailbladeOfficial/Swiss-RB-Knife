@@ -34,6 +34,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { devError, devWarn, isDev } from "./dev-log";
 import { fileTimestamp } from "./timestamp";
 import { initDataTransfer, refreshDataTab } from "./data-transfer";
+import { escapeHtmlText } from "./rich-text";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { Modal, ModalTabs, setGlobalModalOpenHook } from "../modal/modal";
@@ -151,7 +152,7 @@ import {
   openSidebarEditModal,
   setPinned,
 } from "./sidebar-edit";
-import { attachMenu, openMenu, type MenuItem } from "../menu/menu";
+import { attachMenu, openMenu, isTextEntry, type MenuItem } from "../menu/menu";
 import { openEditMenu, setEditMenuNotify } from "../menu/edit-menu";
 // Re-exported so tool files keep importing it from "./shell", their existing
 // convention, rather than reaching into a shell-internal module.
@@ -754,12 +755,7 @@ updateClock();
  * through this.
  */
 export function escapeHtml(value: unknown): string {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return escapeHtmlText(String(value));
 }
 
 /* =============================================================================
@@ -1563,21 +1559,6 @@ window.addEventListener("contextmenu", (e: MouseEvent) => {
   if (!backgroundMenuAvailable()) return;
   openMenu({ x: e.clientX, y: e.clientY }, backgroundMenu());
 });
-
-/** True for the elements that get the text-editing menu: a text-editable
- *  input, a textarea, or a contenteditable region. A non-text input
- *  (checkbox, range, color, file) has nothing to cut or paste, so it is
- *  treated like the rest of the page. */
-function isTextEntry(target: EventTarget | null): boolean {
-  if (target instanceof HTMLTextAreaElement) return true;
-  if (target instanceof HTMLElement && target.isContentEditable) return true;
-  if (target instanceof HTMLInputElement) {
-    // Types that hold selectable, editable text. A readonly field still
-    // qualifies: Copy and Select All are the point there.
-    return /^(text|search|url|tel|email|password|number|)$/.test(target.type);
-  }
-  return false;
-}
 
 /* =============================================================================
    IMMERSIVE MODE  (F11)
