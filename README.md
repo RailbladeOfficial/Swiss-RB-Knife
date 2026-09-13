@@ -46,6 +46,41 @@ Swiss RB Knife is open-source for two reasons; 1). I've spent three months worki
 
 ## Tools
 
+### - **Kanban**
+I've bounced off every board tool on the web. They all want an account, most of them want a subscription the moment you cross some arbitrary card count, and every single one decides your data lives on their server instead of yours. All I ever wanted was columns and cards that stay on my machine. So here we are. Make as many boards as you want, each with its own columns, drag cards between them, and give a board a background image with adjustable blur and brightness so you can tell one from another at a glance. Columns get renamed, reordered, collapsed, and given a work-in-progress limit that flags you when you go over it rather than nannying you into stopping. Mark a column as meaning done and anything you drop in it gets its Completed date stamped for you. Cards hold proper Markdown descriptions and comments, subtasks, and file attachments - images, video and audio play right there in the card, and Ctrl+V pastes a screenshot straight in. Priority and Effort are five levels each and you can rename every one of them and pick its color, because your "Critical" and my "Critical" are probably different animals. Tags live in categories, so a Types category can hold Bug and Feature while a Versions category holds your releases, and you filter on each independently. Stage dates track when a card started, went to testing, and finished, down to the time of day, and every one of them stays editable, because the honest case is that work started Tuesday and you're filling the card in on Thursday. Board Stats reads off those dates and hands you lead and cycle times, what's in flight, what's overdue, and what you've actually finished this week. Ctrl+click or Shift+click a bunch of cards to tag, prioritize, or move them all at once. Sort a column by priority, due date and friends without losing the order you dragged it into, and sort the board gallery however you like, or just drag the boards around. Search a board's tags right from the card, and make a new one on the spot when the one you wanted doesn't exist yet. Done-and-dusted cards can be archived out of the way and restored whenever, and if you made a pile of test cards and deleted them, you can reset a board's card numbering so the first real card is #1 instead of #4. Nearly every preference is set once for the tool and then overridden on any single board that wants a different shape.
+
+And if you use an AI coding agent, you can hand it one board. Claude Code, Codex, anything that speaks MCP - it reads and changes cards while you work in the same board, and nothing goes over the internet, because it's talking to the app on your own machine. Every permission starts off. Grant it card creation and nothing else, or add editing, moving, tagging, dates, subtasks, comments, archiving and deleting as you decide to trust it with them. The app checks every single request itself rather than taking the agent's word for it, every request it makes gets logged whether it was allowed or refused, and a refusal tells you exactly which switch would have let it through. Setting it up is one button and one paste: pick your agent, hit Copy Command, and paste the line into Command Prompt or PowerShell. It sets the agent up, swaps out any older connection for that board, and tells you in plain words whether it worked. Editors like Cursor and VS Code get a config block to drop into their settings file instead. Test Connection shows when an agent last actually used it, and one switch in Setup cuts every agent off every board at once.
+
+<p align="center">
+  <a href="./screenshots/kanban/kanban-boards.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-boards.png" width="100%" alt="Kanban: Board Gallery" />
+  </a>
+  <a href="./screenshots/kanban/kanban-board.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board.png" width="100%" alt="Kanban: Board View" />
+  </a>
+  <a href="./screenshots/kanban/kanban-board-stats.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board-stats.png" width="49%" alt="Kanban: Board Stats" />
+  </a>
+  <a href="./screenshots/kanban/kanban-card.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-card.png" width="49%" alt="Kanban: Card View" />
+  </a>
+  <a href="./screenshots/kanban/kanban-card-comments.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-card-comments.png" width="49%" alt="Kanban: Card Comments" />
+  </a>
+  <a href="./screenshots/kanban/kanban-board-setup.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board-setup.png" width="49%" alt="Kanban: Board Setup" />
+  </a>
+  <a href="./screenshots/kanban/kanban-setup-tags.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-setup-tags.png" width="49%" alt="Kanban: Setup Modal - Tag Categories" />
+  </a>
+  <a href="./screenshots/kanban/kanban-setup-preferences.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-setup-preferences.png" width="49%" alt="Kanban: Setup Modal - Preferences" />
+  </a>
+  <a href="./screenshots/kanban/kanban-agents.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-agents.png" width="100%" alt="Kanban: Board Setup - Agents" />
+  </a>
+</p>
+
 ### - **Budget Tracker**
 Input Income earned and Expenses incurred. Yeah, your bank statement may tell you your transaction history - but do they format it in a way that makes visual sense? If they don't, whatcha gonna do, switch banks? Instead, list your transaction history in here and see analytical breakdowns of where your money is going, by category and by source. Wanna push yourself to only spend $100 a month on random Amazon purchases? Setup Expense Thresholds to help you stay within budget. Setup Income Expectations to ensure you're earning up to your potential. Input recurring bills with their due dates and make sure you don't miss paying any of your bills that still require an in-person check or have questionably designed Auto-Pay systems you don't trust. Encrypt your Budget data so that it takes a password to reveal your payments to your side-piece. Your data isn't readable except by the app, in memory only.
 
@@ -121,41 +156,6 @@ Log and track time entries with pay period summaries, running totals, and CSV ex
   </a>
 </p>
 
-### - **Kanban**
-I've bounced off every board tool on the web. They all want an account, most of them want a subscription the moment you cross some arbitrary card count, and every single one decides your data lives on their server instead of yours. All I ever wanted was columns and cards that stay on my machine. So here we are. Make as many boards as you want, each with its own columns, drag cards between them, and give a board a background image with adjustable blur and brightness so you can tell one from another at a glance. Columns get renamed, reordered, collapsed, and given a work-in-progress limit that flags you when you go over it rather than nannying you into stopping. Mark a column as meaning done and anything you drop in it gets its Completed date stamped for you. Cards hold proper Markdown descriptions and comments, subtasks, and file attachments - images, video and audio play right there in the card, and Ctrl+V pastes a screenshot straight in. Priority and Effort are five levels each and you can rename every one of them and pick its color, because your "Critical" and my "Critical" are probably different animals. Tags live in categories, so a Types category can hold Bug and Feature while a Versions category holds your releases, and you filter on each independently. Stage dates track when a card started, went to testing, and finished, down to the time of day, and every one of them stays editable, because the honest case is that work started Tuesday and you're filling the card in on Thursday. Board Stats reads off those dates and hands you lead and cycle times, what's in flight, what's overdue, and what you've actually finished this week. Ctrl+click or Shift+click a bunch of cards to tag, prioritize, or move them all at once. Sort a column by priority, due date and friends without losing the order you dragged it into, and sort the board gallery however you like, or just drag the boards around. Search a board's tags right from the card, and make a new one on the spot when the one you wanted doesn't exist yet. Done-and-dusted cards can be archived out of the way and restored whenever, and if you made a pile of test cards and deleted them, you can reset a board's card numbering so the first real card is #1 instead of #4. Nearly every preference is set once for the tool and then overridden on any single board that wants a different shape.
-
-And if you use an AI coding agent, you can hand it one board. Claude Code, Codex, anything that speaks MCP - it reads and changes cards while you work in the same board, and nothing goes over the internet, because it's talking to the app on your own machine. Every permission starts off. Grant it card creation and nothing else, or add editing, moving, tagging, dates, subtasks, comments, archiving and deleting as you decide to trust it with them. The app checks every single request itself rather than taking the agent's word for it, every request it makes gets logged whether it was allowed or refused, and a refusal tells you exactly which switch would have let it through. Setting it up is one button and one paste: pick your agent, hit Copy Command, and paste the line into Command Prompt or PowerShell. It sets the agent up, swaps out any older connection for that board, and tells you in plain words whether it worked. Editors like Cursor and VS Code get a config block to drop into their settings file instead. Test Connection shows when an agent last actually used it, and one switch in Setup cuts every agent off every board at once.
-
-<p align="center">
-  <a href="./screenshots/kanban/kanban-boards.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-boards.png" width="100%" alt="Kanban: Board Gallery" />
-  </a>
-  <a href="./screenshots/kanban/kanban-board.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-board.png" width="100%" alt="Kanban: Board View" />
-  </a>
-  <a href="./screenshots/kanban/kanban-board-stats.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-board-stats.png" width="49%" alt="Kanban: Board Stats" />
-  </a>
-  <a href="./screenshots/kanban/kanban-card.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-card.png" width="49%" alt="Kanban: Card View" />
-  </a>
-  <a href="./screenshots/kanban/kanban-card-comments.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-card-comments.png" width="49%" alt="Kanban: Card Comments" />
-  </a>
-  <a href="./screenshots/kanban/kanban-board-setup.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-board-setup.png" width="49%" alt="Kanban: Board Setup" />
-  </a>
-  <a href="./screenshots/kanban/kanban-setup-tags.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-setup-tags.png" width="49%" alt="Kanban: Setup Modal - Tag Categories" />
-  </a>
-  <a href="./screenshots/kanban/kanban-setup-preferences.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-setup-preferences.png" width="49%" alt="Kanban: Setup Modal - Preferences" />
-  </a>
-  <a href="./screenshots/kanban/kanban-agents.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-agents.png" width="100%" alt="Kanban: Board Setup - Agents" />
-  </a>
-</p>
-
 ### - **Auto-Backup**
 Configure source and destination folder pairs and run mirror backups via Windows' robocopy utility. Store your most common Source / Destination mappings as presets for the future. Click Run and then go watch TV while this handles backing up one drive to another, without having to babysit it.
 
@@ -189,15 +189,6 @@ Configure source and destination folder pairs and run mirror backups via Windows
   </a>
 </p>
 
-### - **Game Stats**
-I'm a stats nerd, I like tracking numbers, clearly. That said, I'm getting kinda tired of Excel. Powerful, sure, but also lowkey tedious, especially for bigger operations. I've been tracking Five Crowns games in Excel for a few years, and having to manually update formulas is notably tedious - I'd rather have it automated and give it a pretty interface. So now it's here, with a generalized approach. Add player profiles, log Five Crowns game data, see stats based on player groupings (aka Tables), see who gets 200 points the most often. Import existing game data via an Excel workbook. Designed such that other games can be added in in the future with ease.
-
-<p align="center">
-  <a href="./screenshots/game-stats/game-stats-main.png" target="_blank">
-    <img class="md-img" src="./screenshots/game-stats/game-stats-main.png" width="100%" alt="Game Stats" />
-  </a>
-</p>
-
 ### - **Image CCR**
 Combine multiple images along a specified side, compress an image to help upload it to websites with strict dimension / filesize restrictions, or resize a set of images to have homogenized dimensions (great for uploading them to a website's image carousel).
 
@@ -228,12 +219,12 @@ Combine multiple images along a specified side, compress an image to help upload
   </a>
 </p>
 
-### - **Days Between Dates**
-I used to have an app on my phone that told you the number of elapsed days between two dates. Google now tells me I can't have that app anymore because its old. Some online calculators don't get the math right, or cryptically include the start date. I'm about clarity and ease of access. So now we have a tool to quickly calculate the days between dates, with options for including the start date if that really makes you feel warm and fuzzy inside.
+### - **Game Stats**
+I'm a stats nerd, I like tracking numbers, clearly. That said, I'm getting kinda tired of Excel. Powerful, sure, but also lowkey tedious, especially for bigger operations. I've been tracking Five Crowns games in Excel for a few years, and having to manually update formulas is notably tedious - I'd rather have it automated and give it a pretty interface. So now it's here, with a generalized approach. Add player profiles, log Five Crowns game data, see stats based on player groupings (aka Tables), see who gets 200 points the most often. Import existing game data via an Excel workbook. Designed such that other games can be added in in the future with ease.
 
 <p align="center">
-  <a href="./screenshots/days-between-dates/dbd-main.png" target="_blank">
-    <img class="md-img" src="./screenshots/days-between-dates/dbd-main.png" width="100%" alt="Days Between Dates" />
+  <a href="./screenshots/game-stats/game-stats-main.png" target="_blank">
+    <img class="md-img" src="./screenshots/game-stats/game-stats-main.png" width="100%" alt="Game Stats" />
   </a>
 </p>
 
@@ -258,6 +249,15 @@ In my QA work, sometimes you just need a random assortment of meaningless files 
   </a>
   <a href="./screenshots/dfg/dfg-3.png" target="_blank">
     <img class="md-img" src="./screenshots/dfg/dfg-3.png" width="100%" alt="Dummy File Generator Filled In" />
+  </a>
+</p>
+
+### - **Days Between Dates**
+I used to have an app on my phone that told you the number of elapsed days between two dates. Google now tells me I can't have that app anymore because its old. Some online calculators don't get the math right, or cryptically include the start date. I'm about clarity and ease of access. So now we have a tool to quickly calculate the days between dates, with options for including the start date if that really makes you feel warm and fuzzy inside.
+
+<p align="center">
+  <a href="./screenshots/days-between-dates/dbd-main.png" target="_blank">
+    <img class="md-img" src="./screenshots/days-between-dates/dbd-main.png" width="100%" alt="Days Between Dates" />
   </a>
 </p>
 

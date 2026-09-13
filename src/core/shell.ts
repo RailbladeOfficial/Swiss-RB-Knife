@@ -229,11 +229,13 @@ export type ToolCategoryId = "productivity" | "tracking" | "calculators" | "file
 /* Array order IS heading order, on the sidebar, on the Home dashboard and in
    the Edit Home/Sidebar modal's drag list. Nothing else reads it, so this is
    the one place to reorder them. */
+// In the order each category's first tool appears in ALL_TOOLS, so the
+// headings follow the Classic ranking rather than an order of their own.
 export const TOOL_CATEGORIES: { id: ToolCategoryId; label: string }[] = [
-  // Records you add to over time and look back at.
-  { id: "tracking", label: "Tracking" },
   // Things that have not happened yet.
   { id: "productivity", label: "Productivity" },
+  // Records you add to over time and look back at.
+  { id: "tracking", label: "Tracking" },
   // Takes files off disk, hands files back.
   { id: "files", label: "File Tools" },
   // One-off answers. Nothing is kept.
@@ -414,22 +416,31 @@ export function currentSoundPackId(id: string): string {
   return RENAMED_SOUND_PACKS[id] ?? id;
 }
 
-/* Every real, navigable tool in the app, in the app's original/default
-   order. This is the single source of truth for the Edit Sidebar modal, the
-   Home dashboard, and the "Specific Tool" options in the On Startup select,
-   add a tool here (matching its data-section/data-tool attributes in
-   index.html) and it's automatically pinnable/reorderable/hideable. */
+/* Every real, navigable tool in the app, in CLASSIC order: the order the app
+   ranks them in, by how much each one does and how often it earns its place,
+   heaviest first. This is the single source of truth for the Edit Sidebar
+   modal, the Home dashboard, and the "Specific Tool" options in the On
+   Startup select, add a tool here (matching its data-section/data-tool
+   attributes in index.html) and it's automatically pinnable/reorderable/
+   hideable.
+
+   Everything that reads "Classic" reads this array: the Classic sidebar sort,
+   a fresh install's default order, where a tool added in an update slots into
+   a hand-arranged sidebar, and (through the drawn order) the Blades colors.
+   TOOL_CATEGORIES above has to list the categories in the order their first
+   tool appears here, so the headings follow the ranking too; a check holds
+   the two together. */
 export const ALL_TOOLS: ToolMeta[] = [
+  { key: "productivity/kanban", section: "productivity", tool: "kanban", label: "Kanban" },
   { key: "tracking/budget", section: "tracking", tool: "budget", label: "Budget Tracker" },
   { key: "tracking/time-tracker", section: "tracking", tool: "time-tracker", label: "Time Tracker" },
-  { key: "productivity/kanban", section: "productivity", tool: "kanban", label: "Kanban" },
   { key: "files/auto-backup", section: "files", tool: "auto-backup", label: "Auto-Backup" },
   { key: "productivity/countdown", section: "productivity", tool: "countdown", label: "Countdown Timer" },
-  { key: "tracking/game-stats", section: "tracking", tool: "game-stats", label: "Game Stats" },
   { key: "files/image-ccr", section: "files", tool: "image-ccr", label: "Image CCR" },
-  { key: "calculators/days-between", section: "calculators", tool: "days-between", label: "Days Between Dates" },
+  { key: "tracking/game-stats", section: "tracking", tool: "game-stats", label: "Game Stats" },
   { key: "productivity/tts-repeater", section: "productivity", tool: "tts-repeater", label: "TTS Repeater" },
   { key: "files/dummy-file-generator", section: "files", tool: "dummy-file-generator", label: "Dummy File Generator" },
+  { key: "calculators/days-between", section: "calculators", tool: "days-between", label: "Days Between Dates" },
   { key: "calculators/rng", section: "calculators", tool: "rng", label: "RNGesus" },
 ];
 
