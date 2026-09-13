@@ -2834,27 +2834,26 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
    THE PERMISSION GRID
    Reached by Customize. Three columns at most, because a fourth makes each one
    too narrow for a switch and its label to sit on one line, and the groups are
-   short enough that a fourth column would mostly be empty anyway. It steps down
-   to two and then to one so the modal still reads on a narrow window.
+   short enough that a fourth column would mostly be empty anyway.
+
+   SIZED BY THE MODAL, NOT BY THE WINDOW. The columns used to step up on
+   viewport media queries while the modal kept the default 500px panel, so a
+   wide window put three columns into a panel with room for one and every label
+   wrapped under its own switch. The panel is wide enough for three now, and
+   auto-fit decides from the space the grid actually has: 260px is the
+   narrowest a group reads at, so a 1000px panel fits three and a panel squeezed
+   by a small window drops to two, then one, on its own.
 ----------------------------------------------------------------------------- */
+
+#kbAgentPermModal {
+  width: min(1000px, 94vw);
+}
 
 .kb-agent-perm-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 14px;
   margin-top: 12px;
-}
-
-@media (min-width: 620px) {
-  .kb-agent-perm-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 940px) {
-  .kb-agent-perm-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 .kb-agent-perm-group {

@@ -12027,7 +12027,8 @@ function agentBoardConfig(config: AgentConfig, boardId: string) {
 }
 
 async function renderAgentsTab(): Promise<void> {
-  const board = getBoard(boardEditId);
+  // agentBoard(), so a switch flipped in the Customize modal redraws it too.
+  const board = agentBoard();
   if (!board) return;
   const config = await loadAgentConfigForTab();
   const mine = boardConfig(config, board.id);
@@ -12480,7 +12481,22 @@ function wireAgentGlobalRow(): void {
   });
 }
 
-/** Wires the Agents tab. Called once, from initKanban. */
+/** The board the Customize modal is showing, handed to it by the Customize
+ *  button.
+ *
+ *  NOT read from boardEditId. Board Setup steps aside with a handoff when this
+ *  modal opens, and its onClosed runs a moment later and clears boardEditId. So
+ *  everything in this modal that asked boardEditId which board it was on got
+ *  null: Back went nowhere, Turn All Off did nothing, and a switch flipped here
+ *  saved without redrawing. */
+let agentPermBoardId: string | null = null;
+
+/** The board the Agents screens are about: Board Setup's while it is open, or
+ *  the Customize modal's while that is. */
+function agentBoard(): Board | null {
+  return getBoard(boardEditId) ?? getBoard(agentPermBoardId);
+}
+
 /** The Customize modal. Built once, on first use, like the rest of this tool's
  *  modals, so a board that never opens it never pays for it. */
 function agentPermModal(): Modal {
@@ -12488,11 +12504,14 @@ function agentPermModal(): Modal {
 
   _agentPermModal = new Modal(document.getElementById("kbAgentPermBackdrop")!, {
     closeOnEsc: true,
+    onClosed: () => {
+      agentPermBoardId = null;
+    },
   });
 
   const back = () => {
+    const board = getBoard(agentPermBoardId);
     _agentPermModal!.close();
-    const board = getBoard(boardEditId);
     if (board) openBoardSetup(board, "agents");
   };
   document.getElementById("kbAgentPermBack")!.addEventListener("click", back);
@@ -12538,12 +12557,14 @@ function wireAgentsTab(): void {
   document.getElementById("kbAgentPermEditBtn")!.addEventListener("click", () => {
     const board = getBoard(boardEditId);
     if (!board) return;
+    agentPermBoardId = board.id;
     getBoardSetupModal().close({ handoff: true });
     agentPermModal().open();
   });
 
+  // Lives in the Customize modal, where boardEditId has already been cleared.
   document.getElementById("kbAgentAllOffBtn")!.addEventListener("click", () => {
-    const board = getBoard(boardEditId);
+    const board = agentBoard();
     if (!board) return;
     void commitAgentConfig((config) => {
       const mine = agentBoardConfig(config, board.id);
