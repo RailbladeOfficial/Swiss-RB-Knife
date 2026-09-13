@@ -8225,17 +8225,17 @@
 
             <!-- WHICH AGENT, because the config file is not the same for all of
                  them. Picking one here changes what the copy buttons below
-                 produce and tells you which file to put it in. -->
+                 produce, and the line under it says where that goes. A hint
+                 rather than a badge: a badge says how something stands, and
+                 this is an instruction. -->
             <div class="settings-row">
-              <div class="settings-label-col">
-                <span class="kb-label-with-info">Copy For
-                  <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="They all speak the same protocol. What differs is where each one keeps its server list and what that file looks like, so the buttons below give you the right shape for the one you use.">&#8505;</button>
-                </span>
-                <span id="kbAgentClientWhere" class="settings-status-badge"></span>
-              </div>
+              <span class="kb-label-with-info">Copy For
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="They all speak the same protocol. What differs is where each one keeps its server list and what that file looks like, so the buttons below give you the right shape for the one you use.">&#8505;</button>
+              </span>
               <select id="kbAgentClientSelect" class="settings-select"></select>
             </div>
+            <p id="kbAgentClientWhere" class="kb-section-hint"></p>
 
             <div id="kbAgentConnectionList" class="kb-agent-connections"></div>
 
