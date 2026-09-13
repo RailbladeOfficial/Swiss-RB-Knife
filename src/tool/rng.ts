@@ -28,8 +28,8 @@
      save_rng_data, load_rng_data
 ============================================================================= */
 
-import { invoke } from "@tauri-apps/api/core";
 import { flash, escapeHtml } from "../core/shell";
+import { loadToolJson, saveToolJson } from "../core/tool-store";
 import { attachMenuDelegated } from "../menu/menu";
 
 /* =============================================================================
@@ -153,8 +153,7 @@ let rowsEl: HTMLElement;
 
 async function loadStore(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "rng", kind: "data" });
-    const parsed = JSON.parse(raw) as Partial<RngStore>;
+    const parsed = await loadToolJson<Partial<RngStore>>("rng", "data");
     rngSettings = normalizeSettings(parsed.settings ?? {});
     // slice(-n) rather than slice(0, n): if a hand-edited file (or an older
     // build with a larger cap) holds more than fits, the recent end is the
@@ -168,9 +167,10 @@ async function loadStore(): Promise<void> {
   } catch (err) {
     flash(`Couldn't load RNGesus data: ${String(err)}`, "error");
   } finally {
-    // Set even on failure: a load that errored has already been reported, and
-    // leaving writes blocked forever would silently stop persisting anything
-    // for the rest of the session.
+    // Set even on failure. This is no longer the thing standing between a
+    // failed load and an overwrite: the file store blocks saves to a file it
+    // could not read, so leaving this false as well would only stop the tool
+    // rendering. See core/tool-store.ts.
     storeLoaded = true;
   }
 
@@ -182,7 +182,7 @@ async function saveStore(): Promise<void> {
   if (!storeLoaded) return;
   const store: RngStore = { settings: rngSettings, results };
   try {
-    await invoke("save_tool_file", { toolId: "rng", kind: "data", data: JSON.stringify(store) });
+    await saveToolJson("rng", "data", store);
   } catch (err) {
     flash(`Couldn't save RNGesus data: ${String(err)}`, "error");
   }

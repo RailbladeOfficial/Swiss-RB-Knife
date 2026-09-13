@@ -29,6 +29,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { devError } from "../core/dev-log";
+import { loadToolJson, saveToolJson } from "../core/tool-store";
 
 /* =============================================================================
    PERMISSIONS
@@ -296,10 +297,19 @@ export function normalizeAgentConfig(raw: unknown): AgentConfig {
   return { enabled: c.enabled === true, boards };
 }
 
+/**
+ * Reads the agent config, or the empty one if it could not be read.
+ *
+ * The empty one is the safe FALLBACK here in a way it is not elsewhere: every
+ * permission off and the bridge disabled is the right answer to "I cannot tell
+ * what this file says". What would not be safe is saving it back. This file
+ * holds the tokens pasted into agent configs elsewhere on the machine, so
+ * writing an empty one over it breaks every agent with nothing saying why.
+ * loadToolJson has already blocked that write by the time this returns.
+ */
 export async function loadAgentConfig(): Promise<AgentConfig> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "kanban", kind: "agents" });
-    return normalizeAgentConfig(JSON.parse(raw));
+    return normalizeAgentConfig(await loadToolJson<unknown>("kanban", "agents"));
   } catch (err) {
     devError("[kanban] agent config load failed", err);
     return emptyAgentConfig();
@@ -315,11 +325,7 @@ export async function loadAgentConfig(): Promise<AgentConfig> {
  * still use it. Turning something off has to mean it is off.
  */
 export async function saveAgentConfig(config: AgentConfig): Promise<void> {
-  await invoke("save_tool_file", {
-    toolId: "kanban",
-    kind: "agents",
-    data: JSON.stringify(config),
-  });
+  await saveToolJson("kanban", "agents", config);
 }
 
 export function boardConfig(config: AgentConfig, boardId: string): BoardAgentConfig {

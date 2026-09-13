@@ -34,6 +34,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { devError, devWarn, isDev } from "./dev-log";
 import { fileTimestamp } from "./timestamp";
 import { initDataTransfer, refreshDataTab } from "./data-transfer";
+import { initToolStore } from "./tool-store";
+import { checkDataFolder } from "./data-version";
 import { escapeHtmlText } from "./rich-text";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
@@ -1874,17 +1876,22 @@ export function applySettings(): void {
 export async function saveSettings(): Promise<void> {
   try {
     await invoke("merge_settings", { patch: JSON.stringify(settings) });
-  } catch {
-    flash("Failed to save settings", "error");
+  } catch (err) {
+    // The reason, not just the fact. The one failure worth telling apart is a
+    // settings.json that will not parse: merge_settings refuses that rather
+    // than starting from an empty object and writing every other owner's keys
+    // out of the file, and "Failed to save settings" would have hidden the
+    // one sentence that says what to do about it.
+    flash(`Failed to save settings: ${String(err)}`, "error", 10000);
   }
 }
 
 /** Validates a loaded sidebarItems value against ALL_TOOLS: drops entries
  *  with the wrong shape or an unknown key (e.g. a tool removed since this was
- *  saved), de-dupes repeated keys, and appends any ALL_TOOLS entry missing
- *  from the loaded array (e.g. a tool added since this was saved) as pinned
- *  at the end, so a fresh install and an upgrade both always cover every
- *  known tool exactly once. */
+ *  saved), de-dupes repeated keys, and slots in any ALL_TOOLS entry missing
+ *  from the loaded array (e.g. a tool added since this was saved) as pinned,
+ *  beside the neighbors ALL_TOOLS gives it, so a fresh install and an upgrade
+ *  both always cover every known tool exactly once. */
 /* Tools whose category (and therefore whose key) has changed, old key ->
    current key. Same permanence and the same bar as RENAMED_SOUND_PACKS and
    THEME_ID_MIGRATIONS: an entry earns its place the day a key that shipped
@@ -2187,8 +2194,20 @@ async function loadSettings(): Promise<void> {
           ? merged.toolCategories
           : DEFAULT_SETTINGS.toolCategories,
     });
-  } catch {
+  } catch (err) {
+    /* Opens on defaults, so the app is usable. It does NOT then write them
+       back: merge_settings refuses a settings.json it could not parse, so the
+       file stays as it is until someone looks at it. Said out loud, because a
+       silent reset to defaults reads as the app losing its mind. */
+    devError("[shell] settings load failed", err);
     setSettings({ ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() });
+    flash(
+      "Your settings file could not be read, so this session is running on defaults. " +
+        "Nothing has been written over it. Close the app, then repair or move " +
+        "app/settings.json.",
+      "error",
+      12000,
+    );
   }
   // Checked as a pair, which the per-field coercion above structurally can't
   // do. Both edges revert together: keeping one half of a window the schedule
@@ -2238,6 +2257,11 @@ initDataTransfer({
   flash: (msg, kind, ms) => flash(msg, kind ?? "success", ms),
   confirm: (opts, run) => appConfirm({ ...opts, reopen: () => openSettingsOnTab("data") }, run),
 });
+
+/* Same reason, for the file store: every tool imports it, and it needs to be
+   able to say out loud that a file would not read. */
+initToolStore({ flash: (msg, kind, ms) => flash(msg, kind ?? "success", ms) });
+
 
 /* =============================================================================
    APP CONFIRM
@@ -3249,6 +3273,11 @@ async function init(): Promise<void> {
     maybeRegenerateRandom();
     playModalCue();
   });
+
+  /* BEFORE any tool, because a tool that has loaded saves the moment anything
+     is touched. If this folder came from a newer build, every write is frozen
+     here and the explanation is the first startup gate. See core/data-version. */
+  await checkDataFolder();
 
   initTimeTracker();
   initImageCCR();

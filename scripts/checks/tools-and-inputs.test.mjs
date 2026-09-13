@@ -622,9 +622,9 @@ test("an export carries every file its tool writes", () => {
      silently dropped the named sets you had saved, which is the half worth
      moving. The import succeeded, so nothing said a word.
 
-     A tool's own load_tool_file/save_tool_file calls name the kinds it uses.
-     Every one of those has to appear inside its registerTransferable block, or
-     the export has a hole in it exactly like that one. */
+     A tool's own calls into core/tool-store name the kinds it uses. Every one
+     of those has to appear inside its registerTransferable block, or the
+     export has a hole in it exactly like that one. */
   const holes = [];
 
   for (const file of filesUnder("src/tool", ".ts")) {
@@ -640,15 +640,14 @@ test("an export carries every file its tool writes", () => {
     assert.notEqual(end, -1, `${file}'s transferable block is not closed`);
     const block = text.slice(at, end);
 
-    /* Every kind this tool WRITES. Matched as the toolId/kind pair that
-       save_tool_file takes, not on "kind:" alone: several tools have unrelated
-       fields by that name (a card's author kind, a budget row's kind) and
-       counting those would demand an export carry files that do not exist.
-       Reads are not enough either, or a legacy file a tool only migrates FROM
-       would look like something it still owns. */
-    const kindPair = /toolId:\s*"[a-z-]+"\s*,\s*kind:\s*"([a-z-]+)"/g;
-    const savePair =
-      /save_tool_file"[\s\S]{0,80}?toolId:\s*"[a-z-]+"\s*,\s*kind:\s*"([a-z-]+)"/g;
+    /* Every kind this tool WRITES. Matched on the tool-store call that takes
+       the pair, not on "kind" alone: several tools have unrelated fields by
+       that name (a card's author kind, a budget row's kind) and counting those
+       would demand an export carry files that do not exist. Reads are not
+       enough either, or a legacy file a tool only migrates FROM would look
+       like something it still owns. */
+    const anyPair = /(?:load|save|unblockAfterReplacement)\w*\(\s*"[a-z-]+"\s*,\s*"([a-z-]+)"/g;
+    const savePair = /save(?:ToolJson|ToolText)\(\s*"[a-z-]+"\s*,\s*"([a-z-]+)"/g;
 
     const kinds = new Set([...text.matchAll(savePair)].map((m) => m[1]));
     for (const kind of NOT_EXPORTED) kinds.delete(kind);
@@ -657,10 +656,10 @@ test("an export carries every file its tool writes", () => {
        which is what the record-holding tools do. So a kind counts as covered
        if the block names it OR the block reads no files at all, in which case
        the records come from memory and only the exclusions above are at stake. */
-    const namesFiles = /load_tool_file|save_tool_file/.test(block);
+    const namesFiles = /\b(?:loadTool|saveTool|unblockAfterReplacement)/.test(block);
     if (!namesFiles) continue;
 
-    const covered = new Set([...block.matchAll(kindPair)].map((m) => m[1]));
+    const covered = new Set([...block.matchAll(anyPair)].map((m) => m[1]));
     for (const kind of kinds) {
       if (!covered.has(kind)) holes.push(`${id} writes "${kind}" but never exports it`);
     }
@@ -746,11 +745,14 @@ test("moving an old data folder into the new shape cannot destroy anything", () 
   const migrate = lib.slice(lib.indexOf("pub(crate) fn migrate_data_layout"));
   assert.match(migrate, /\["", "-wal", "-shm"\]/, "the database moves without its WAL");
 
-  // And it runs before any command can read a file.
-  assert.match(
-    lib,
-    /\.setup\(\|app\|[\s\S]{0,300}migrate_data_layout\(app\.handle\(\)\);/,
-    "the layout migration does not run at startup",
+  /* And it runs in setup(), before any command can read a file. Behind the
+     data-folder verdict, not ahead of it: rearranging a folder written by a
+     newer build is one of the things being prevented. */
+  const setup = slice("src-tauri/src/lib.rs", ".setup(|app|", "app.manage(DataFolderVerdict");
+  assert.match(setup, /migrate_data_layout\(app\.handle\(\)\);/, "the layout migration does not run at startup");
+  assert.ok(
+    setup.indexOf("migrate_data_layout(") > setup.indexOf("set_data_frozen("),
+    "the folder is rearranged before anything decides whether it may be",
   );
 });
 

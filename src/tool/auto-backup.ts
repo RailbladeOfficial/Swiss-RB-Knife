@@ -30,6 +30,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { registerTransferable } from "../core/data-transfer";
 import { bindInfoTooltips, closeInfoTooltip } from "../core/info-tooltip";
 import { formatDataSize as formatBytes } from "../core/format";
+import { loadToolJson, saveToolJson, unblockAfterReplacement } from "../core/tool-store";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { flash, devError, devWarn, setToolAttention } from "../core/shell";
@@ -426,7 +427,7 @@ let _abInitialized = false;
 
 async function saveConfig(): Promise<void> {
   try {
-    await invoke("save_tool_file", { toolId: "auto-backup", kind: "data", data: JSON.stringify(config) });
+    await saveToolJson("auto-backup", "data", config);
   } catch (e) {
     devError("Failed to save backup config:", e);
   }
@@ -446,8 +447,7 @@ async function saveConfig(): Promise<void> {
 
 async function loadConfig(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "auto-backup", kind: "data" });
-    const parsed = JSON.parse(raw);
+    const parsed = await loadToolJson<Record<string, unknown> | null>("auto-backup", "data");
     // Coerce each field to its expected type rather than trusting the stored shape.
     const sources = Array.isArray(parsed?.sources)
       ? parsed.sources.filter((s: unknown) => typeof s === "string")
@@ -486,8 +486,12 @@ async function loadConfig(): Promise<void> {
       typeof parsed?.lastBackupCompletedAt === "string"
         ? parsed.lastBackupCompletedAt
         : null;
-  } catch {
-    // use defaults
+  } catch (e) {
+    // Opens on defaults, which is fine: the tool is a folder list and a
+    // schedule, and an empty one is usable. Saving those defaults over a file
+    // that would not read is what is NOT fine, and the store has already
+    // refused every write to it for the session.
+    devError("Failed to load backup config:", e);
   }
 }
 
@@ -503,7 +507,7 @@ async function savePresets(): Promise<void> {
   }
   // Also persist via Rust for proper AppData storage (registered in lib.rs).
   try {
-    await invoke("save_tool_file", { toolId: "auto-backup", kind: "presets", data: JSON.stringify(presets) });
+    await saveToolJson("auto-backup", "presets", presets);
   } catch (e) {
     devWarn("save_backup_presets invoke failed:", e);
   }
@@ -530,8 +534,7 @@ async function loadPresets(): Promise<void> {
 
   // Try Rust storage first (proper AppData location).
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "auto-backup", kind: "presets" });
-    const loaded = sanitizePresets(JSON.parse(raw));
+    const loaded = sanitizePresets(await loadToolJson<unknown>("auto-backup", "presets"));
     // If Rust returned real data, sync it to localStorage as well.
     if (loaded.length > 0) {
       presets = loaded;
@@ -539,7 +542,10 @@ async function loadPresets(): Promise<void> {
       return;
     }
   } catch {
-    // Rust read failed, fall through to localStorage.
+    // Rust read failed, fall through to localStorage. The presets file is the
+    // one place a localStorage copy is a real second source rather than a
+    // guess, so falling back to it is not the same as falling back to nothing.
+    // Writes to the file itself are blocked by then either way.
   }
   // Fall back to localStorage (e.g. first run before any Rust write has occurred).
   try {

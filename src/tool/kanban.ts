@@ -107,6 +107,7 @@ import { formatBackupName } from "../core/tool-backups";
 import { formatBytes } from "../core/format";
 import { newId } from "../core/ids";
 import { bindInfoTooltips, toggleInfoTooltip } from "../core/info-tooltip";
+import { loadToolJson, saveToolJson, writesFrozen } from "../core/tool-store";
 import { formatStoredDate, today } from "../core/timestamp";
 import {
   AGENT_PERMISSIONS,
@@ -1102,6 +1103,62 @@ function applySolidColor(
    every board is simply read.
 ----------------------------------------------------------------------------- */
 
+/* -----------------------------------------------------------------------------
+   FILES THIS SESSION COULD NOT READ
+
+   Kanban keeps one file per board plus an index, and its own load/save
+   commands rather than the shared tool store, so the store's block does not
+   cover them. This is the same rule written for the files it does not cover: a
+   file that would not READ is never WRITTEN.
+
+   It has to be per file rather than per tool. A board whose file is corrupt is
+   in memory as an empty board, and saving it would replace the cards; the
+   index and the eleven other boards are fine and must keep saving. Blocking
+   everything would mean one bad board file quietly stopped the whole tool
+   persisting, which is the same class of surprise in the other direction.
+
+   Ids are "settings", "index", or a board id. Cleared only by a snapshot
+   restore or an import, which REPLACE the file rather than write the empty
+   thing that was loaded in its place.
+----------------------------------------------------------------------------- */
+
+/** Whether the whole-folder freeze has been mentioned this session. See
+ *  writeDirty: once is right, every few seconds is not. */
+let frozenNoticeShown = false;
+
+const unreadableFiles = new Set<string>();
+/** Ids already reported as skipped, so a debounced save that fires every few
+ *  seconds says it once rather than every time. */
+const reportedSkips = new Set<string>();
+
+function blockKanbanFile(id: string, describe: string, err: unknown): void {
+  unreadableFiles.add(id);
+  devError(`[kanban] ${describe} could not be read`, err);
+  flash(
+    `Kanban could not read ${describe}. It will not be written over this session. ` +
+      `Close the app, then repair or move that file.`,
+    "error",
+    12000,
+  );
+}
+
+/** Called where a file is REPLACED rather than repaired: a snapshot restore or
+ *  an import. Both carry a whole file that did not come from the empty thing
+ *  the failed load left in memory. */
+function unblockKanbanFile(id: string): void {
+  unreadableFiles.delete(id);
+  reportedSkips.delete(id);
+}
+
+function skipWrite(id: string, describe: string): boolean {
+  if (!unreadableFiles.has(id)) return false;
+  if (!reportedSkips.has(id)) {
+    reportedSkips.add(id);
+    flash(`Kanban is not saving ${describe}: that file could not be read.`, "error", 9000);
+  }
+  return true;
+}
+
 async function loadAll(): Promise<void> {
   try {
     // Where the attachment files live. Asked for once, because every card that
@@ -1114,9 +1171,10 @@ async function loadAll(): Promise<void> {
     devError("[kanban] load failed", err);
     flash(`Couldn't load Kanban data: ${String(err)}`, "error", 8000);
   } finally {
-    // Set even on failure. A load that errored has already been reported, and
-    // leaving writes blocked for the rest of the session would silently stop
-    // persisting everything the user does next.
+    // Set even on failure, so the tool still works. This is no longer what
+    // stands between a failed load and an overwrite: the file that failed is
+    // in unreadableFiles and writeDirty skips it, which is a block on the one
+    // file rather than on everything the user does next.
     storeLoaded = true;
   }
   applySettingsToForm();
@@ -1124,8 +1182,17 @@ async function loadAll(): Promise<void> {
 }
 
 async function loadSettings(): Promise<void> {
-  const raw = await invoke<string>("load_tool_file", { toolId: "kanban", kind: "settings" });
-  kbSettings = normalizeSettings((JSON.parse(raw) ?? {}) as Partial<KbSettings>);
+  try {
+    const parsed = await loadToolJson<Partial<KbSettings> | null>("kanban", "settings");
+    kbSettings = normalizeSettings(parsed ?? {});
+  } catch (err) {
+    // Preferences, so the defaults are a usable screen. The store has already
+    // said so and blocked the write; this only keeps the rest of the load
+    // going, since a preferences file has nothing to do with the boards.
+    devError("[kanban] settings load failed", err);
+    kbSettings = normalizeSettings({});
+    unreadableFiles.add("settings");
+  }
 }
 
 /** The index, then every board's contents.
@@ -1142,8 +1209,15 @@ async function loadRecords(): Promise<void> {
 
 /** The board list and the default tag vocabulary. */
 async function loadIndex(): Promise<void> {
-  const raw = await invoke<string>("load_kanban_index");
-  const parsed = (JSON.parse(raw) ?? {}) as Partial<KanbanIndex>;
+  let parsed: Partial<KanbanIndex>;
+  try {
+    parsed = ((JSON.parse(await invoke<string>("load_kanban_index")) ?? {}) as Partial<KanbanIndex>);
+  } catch (err) {
+    // No board list, so nothing below finds any boards and the gallery is
+    // empty. The file itself is left exactly as it is.
+    blockKanbanFile("index", "the board list (kanban/kanban-index.json)", err);
+    parsed = {};
+  }
 
   globalTagCategories = Array.isArray(parsed.tagCategories)
     ? parsed.tagCategories.map(normalizeTagCategory).filter((c): c is TagCategory => c !== null)
@@ -1160,8 +1234,18 @@ async function loadIndex(): Promise<void> {
 /** Pulls one board's columns and cards into memory. A board file that is not
  *  there yet is a brand-new board, not an error. */
 async function loadBoardContents(board: Board): Promise<void> {
-  const raw = await invoke<string>("load_kanban_board", { boardId: board.id });
-  const parsed = JSON.parse(raw) as Partial<BoardContents> | null;
+  let parsed: Partial<BoardContents> | null;
+  try {
+    parsed = JSON.parse(await invoke<string>("load_kanban_board", { boardId: board.id }));
+  } catch (err) {
+    /* A board file that is not THERE is a brand-new board and comes back as
+       the empty shape, which parses. One that is there and will not parse is a
+       board whose cards are still on disk, and it opens empty. Writing that
+       empty board back is what this stops. */
+    blockKanbanFile("board", `the board "${board.name}"`, err);
+    unreadableFiles.add(board.id);
+    parsed = null;
+  }
   const contents = normalizeContents(parsed ?? {});
 
   board.columns = contents.columns;
@@ -1269,6 +1353,22 @@ function saveNow(): Promise<void> {
 
 async function writeDirty(): Promise<void> {
   if (!storeLoaded) return;
+  /* The whole data folder is off limits this session. Asked here rather than
+     relied on at the store, because the index and the board files go through
+     Kanban's own commands and never reach it.
+
+     Said ONCE. The startup gate has already explained it at length, and this
+     runs every few seconds, but staying silent is worse than it sounds here:
+     the edit is on screen. Tick a subtask and the bar moves, so without a word
+     the only thing to conclude is that it saved. */
+  const frozen = writesFrozen();
+  if (frozen) {
+    if (!frozenNoticeShown) {
+      frozenNoticeShown = true;
+      flash(`Kanban is not saving: ${frozen}`, "error", 12000);
+    }
+    return;
+  }
 
   /* Everything that is dirty is taken and CLEARED before the write, so an edit
      made while the write is in flight marks itself dirty again rather than
@@ -1283,23 +1383,20 @@ async function writeDirty(): Promise<void> {
   dirtySettings = false;
 
   try {
-    if (wantSettings) {
-      await invoke("save_tool_file", {
-        toolId: "kanban",
-        kind: "settings",
-        data: JSON.stringify(kbSettings),
-      });
+    if (wantSettings && !skipWrite("settings", "your Kanban preferences")) {
+      await saveToolJson("kanban", "settings", kbSettings);
     }
     /* The index goes FIRST. Every write snapshots what it is replacing, and a
        board's contents and the index entry naming it are only meaningful as a
        pair; a snapshot holding cards for a board the index has never heard of
        restores nothing you can reach. */
-    if (wantIndex) {
+    if (wantIndex && !skipWrite("index", "the board list")) {
       await invoke("save_kanban_index", { data: JSON.stringify(buildIndex()) });
     }
     for (const id of boardIds) {
       const board = getBoard(id);
       if (!board) continue;
+      if (skipWrite(id, `the board "${board.name}"`)) continue;
       await invoke("save_kanban_board", {
         boardId: id,
         data: JSON.stringify(buildContents(board)),
@@ -9123,6 +9220,9 @@ async function restoreIndexSnapshot(raw: string): Promise<void> {
     board.overrides = live.overrides;
   }
   boards = restored;
+  // The list has been REPLACED from a snapshot, so it may be written again
+  // even if the file on disk is the one that would not read.
+  unblockKanbanFile("index");
   globalTagCategories = Array.isArray(parsed.tagCategories)
     ? parsed.tagCategories.map(normalizeTagCategory).filter((c): c is TagCategory => c !== null)
     : [];
@@ -9168,6 +9268,8 @@ async function restoreBoardSnapshot(boardId: string, raw: string): Promise<void>
   cards.push(...contents.cards);
 
   reconcile();
+  // Replaced from a snapshot, so this board may be written again.
+  unblockKanbanFile(boardId);
   markBoard(boardId);
   await flushSave();
   await reviveAttachmentsFor([boardId]);

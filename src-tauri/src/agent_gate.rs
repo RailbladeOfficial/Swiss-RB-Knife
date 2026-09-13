@@ -715,6 +715,7 @@ pub fn read_kanban_agent_log(app: AppHandle, limit: Option<usize>) -> Result<Vec
 
 #[tauri::command]
 pub fn clear_kanban_agent_log(app: AppHandle) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     let path = get_data_path(&app, LOG_FILE);
     if path.exists() {
         atomic_write(&path, b"")?;

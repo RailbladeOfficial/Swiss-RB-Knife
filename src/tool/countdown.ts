@@ -40,6 +40,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { registerTransferable } from "../core/data-transfer";
+import { loadToolJson, saveToolJson, unblockAfterReplacement } from "../core/tool-store";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import {
@@ -496,8 +497,7 @@ let presetsModal: Modal | null = null;
 
 async function loadStore(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "countdown", kind: "data" });
-    const parsed = JSON.parse(raw) as Partial<CountdownStore>;
+    const parsed = await loadToolJson<Partial<CountdownStore>>("countdown", "data");
     log = Array.isArray(parsed.log) ? parsed.log.filter(isValidLogEntry) : [];
     session = isValidSession(parsed.session) ? parsed.session : null;
     cdSettings = normalizeSettings(parsed.settings ?? {});
@@ -535,7 +535,7 @@ async function saveStore(): Promise<void> {
     session, log, settings: cdSettings, presets, lastDurationMs: pendingDurationMs, display,
   };
   try {
-    await invoke("save_tool_file", { toolId: "countdown", kind: "data", data: JSON.stringify(store) });
+    await saveToolJson("countdown", "data", store);
   } catch (err) {
     flash(`Couldn't save Countdown Timer data: ${String(err)}`, "error");
   }

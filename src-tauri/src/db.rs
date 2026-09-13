@@ -83,12 +83,47 @@ pub fn with_db<T>(app: &AppHandle, f: impl FnOnce(&Connection) -> rusqlite::Resu
         let conn = Connection::open(&path)
             .map_err(|e| format!("Could not open the database: {e}"))?;
         configure(&conn).map_err(|e| format!("Could not configure the database: {e}"))?;
-        migrate(&conn).map_err(|e| format!("Could not prepare the database: {e}"))?;
+
+        /* THE WHOLE-FOLDER FREEZE, for the one set of records that never goes
+           near a file the app writes itself. Game Stats keeps its games, rounds
+           and scores in here, so a folder written by a newer build would
+           otherwise stay fully writable through the one path the freeze at
+           atomic_write cannot see.
+
+           query_only rather than a check in each statement: it refuses at the
+           engine, which covers every write in this file today and every one
+           added after it, transactions included. There is no list to keep in
+           step with.
+
+           The migration is SKIPPED rather than run first. Its steps are exactly
+           the kind of change that must not be made to a folder from a newer
+           build: creating tables it may already have in another shape, and
+           moving user_version. Reads are untouched, which is the point of a
+           read-only session. */
+        if crate::data_is_frozen() {
+            conn.pragma_update(None, "query_only", "ON")
+                .map_err(|e| format!("Could not open the database read-only: {e}"))?;
+        } else {
+            migrate(&conn).map_err(|e| format!("Could not prepare the database: {e}"))?;
+        }
         *guard = Some(conn);
     }
 
     let conn = guard.as_ref().expect("just opened");
-    f(conn).map_err(|e| e.to_string())
+    f(conn).map_err(|e| {
+        /* A write refused by query_only comes back as "attempt to write a
+           readonly database", which is true and tells the user nothing they can
+           act on. Swapped for the app's own sentence, and ONLY that one: an
+           error with any other text is a real database problem and keeps its
+           own words, frozen folder or not. */
+        let text = e.to_string();
+        if text.contains("readonly database") {
+            if let Err(refusal) = crate::deny_if_frozen() {
+                return refusal;
+            }
+        }
+        text
+    })
 }
 
 fn configure(conn: &Connection) -> rusqlite::Result<()> {
@@ -105,6 +140,7 @@ fn configure(conn: &Connection) -> rusqlite::Result<()> {
     // everyone once. Cards belong to boards; a card whose board is gone should
     // go with it rather than linger as an orphan nothing renders.
     conn.pragma_update(None, "foreign_keys", "ON")?;
+
     Ok(())
 }
 
@@ -456,6 +492,7 @@ fn columns_of(conn: &Connection, schema: &str, table: &str) -> rusqlite::Result<
 /// the newest, exactly as it was with the JSON files.
 #[tauri::command]
 pub fn restore_db_backup(app: AppHandle, tool_id: String, name: String) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     if !crate::valid_bucket_name(&name) {
         return Err("That snapshot name is not one of ours.".to_string());
     }

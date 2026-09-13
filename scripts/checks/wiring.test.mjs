@@ -132,6 +132,75 @@ test("no backend action exists that nothing ever calls", () => {
   assert.deepEqual(unused, [], "these backend actions exist but nothing calls them");
 });
 
+test("a save is not called a success before it has landed", () => {
+  /* Game Stats flashed "Profile added" and THEN called saveToDisk() without
+     waiting. A refused write put a green success and a red failure on screen in
+     the same moment, and an ordinary failure (a locked file, a full disk) was
+     reported as a success with nothing to contradict it.
+
+     The rule: a message that claims something was saved waits for the save and
+     is skipped if it did not land. The check is that saveToDisk answers the
+     question at all, and that every caller who then congratulates the user has
+     awaited it. */
+  const src = read("src/tool/game-stats.ts");
+
+  assert.match(
+    src,
+    /async function saveToDisk\(\): Promise<boolean>/,
+    "saveToDisk no longer reports whether the write landed, so no caller can tell",
+  );
+
+  /* Every success flash in this file must have an awaited save above it, close
+     enough to be the same action. Errors and prompts are not claims that
+     something was written, so only "success" is checked.
+
+     Each call is read up to where the NEXT one begins. Matching a flash( and
+     then scanning ahead a fixed number of characters looks equivalent and is
+     not: an error flash a few lines above a success one swallows it, and the
+     site being checked is then the wrong one. That is not hypothetical, it is
+     what this check did on its first draft, and it reported a clean pass on a
+     deliberately broken file. */
+  const optimistic = [];
+  const calls = [...src.matchAll(/\bflash\(/g)];
+  for (let i = 0; i < calls.length; i++) {
+    const at = calls[i].index;
+    const call = src.slice(at, i + 1 < calls.length ? calls[i + 1].index : src.length);
+    if (!/"success"/.test(call.slice(0, 300))) continue;
+
+    const line = src.slice(0, at).split("\n").length;
+    // What ran just before it. Fifteen lines is the longest gap any of these
+    // has, and short enough that an unrelated save above cannot vouch for one.
+    const before = src.slice(0, at).split("\n").slice(-15).join("\n");
+    if (!/await saveToDisk\(\)/.test(before)) continue;
+
+    /* There IS a save above it, so the message has to be GATED on the answer,
+       not merely downstream of a variable holding it. One of these three
+       shapes, spelled out rather than loosely matched: an early return on a
+       failed save, or the flash itself sitting behind the result. */
+    const gated =
+      /if \(!\(await saveToDisk\(\)\)\) return/.test(before) ||
+      /if \(!saved\) return/.test(before) ||
+      /if \(saved\)\s*$/.test(before);
+    if (!gated) optimistic.push(`src/tool/game-stats.ts:${line}`);
+  }
+  assert.deepEqual(
+    optimistic,
+    [],
+    "these announce a successful save without checking whether it succeeded",
+  );
+
+  // And nothing calls it without either awaiting or deliberately not caring.
+  const unawaited = [];
+  for (const m of src.matchAll(/^[ \t]*saveToDisk\(\);/gm)) {
+    const line = src.slice(0, m.index).split("\n").length;
+    const after = src.slice(m.index, m.index + 400);
+    if (/"success"/.test(after.split("\n").slice(0, 6).join("\n"))) {
+      unawaited.push(`src/tool/game-stats.ts:${line}`);
+    }
+  }
+  assert.deepEqual(unawaited, [], "these flash a success behind a save nobody waited for");
+});
+
 test("the Game Stats draft is actually saved, restored and cleared", () => {
   // Specifically pinned because this feature was plumbed and left unconnected
   // once already. Presence of the commands is not enough; all three moments
@@ -141,12 +210,12 @@ test("the Game Stats draft is actually saved, restored and cleared", () => {
   // own file; what matters here is that both halves are still wired.
   assert.match(
     src,
-    /invoke\("save_tool_file", \{ toolId: "game-stats", kind: "draft"/,
+    /saveToolText\("game-stats", "draft"/,
     "nothing saves the draft",
   );
   assert.match(
     src,
-    /invoke<string>\("load_tool_file", \{ toolId: "game-stats", kind: "draft"/,
+    /loadToolJson<[\s\S]{0,120}?>\(\s*"game-stats",\s*"draft"/,
     "nothing restores the draft",
   );
   assert.match(src, /function clearGameStatsDraft/, "nothing clears the draft");

@@ -522,6 +522,10 @@ pub(crate) fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> Result<(), S
     use std::sync::atomic::{AtomicU64, Ordering};
     static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+    // Before the temp file, not after: a refused write should leave nothing at
+    // all behind, including the staging file.
+    deny_if_frozen()?;
+
     let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     let mut tmp_name = path.as_os_str().to_owned();
     tmp_name.push(format!(".tmp-{}-{}", std::process::id(), n));
@@ -541,6 +545,49 @@ pub(crate) fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> Result<(), S
         let _ = fs::remove_file(&tmp_path);
     }
     write_result
+}
+
+/// Copies `source` onto `dest` without ever leaving a half-copied file behind.
+/// The file-to-file twin of `atomic_write`, and it exists for the same reason:
+/// a copy interrupted part way through would otherwise sit in the live folder
+/// under the name something already points at, looking like the real file.
+///
+/// Kanban's attachment store is the caller. Both of its copy-into-place sites
+/// used to roll their own, and the difference between them was the bug: one
+/// did temp-then-rename and the other copied straight onto the final name. One
+/// helper means the durability story is the same wherever a file lands, and the
+/// `sync_all` half (see `atomic_write` above for why that half matters) cannot
+/// be the thing one caller forgets.
+pub(crate) fn atomic_copy(source: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    deny_if_frozen()?;
+
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let mut tmp_name = dest.as_os_str().to_owned();
+    tmp_name.push(format!(".tmp-{}-{}", std::process::id(), n));
+    let tmp_path = PathBuf::from(tmp_name);
+
+    let copy_result = (|| -> Result<(), String> {
+        // Streamed by fs::copy rather than read into memory, so an attachment
+        // can be a screen recording rather than something that has to fit in RAM.
+        fs::copy(source, &tmp_path).map_err(|e| e.to_string())?;
+        // fs::copy closes its own handles, so the bytes have to be pushed to
+        // storage through a fresh one before the rename can land.
+        let file = fs::File::options()
+            .write(true)
+            .open(&tmp_path)
+            .map_err(|e| e.to_string())?;
+        file.sync_all().map_err(|e| e.to_string())?;
+        drop(file); // release the handle before rename, required on Windows
+        fs::rename(&tmp_path, dest).map_err(|e| e.to_string())
+    })();
+
+    if copy_result.is_err() {
+        let _ = fs::remove_file(&tmp_path);
+    }
+    copy_result
 }
 
 /// Width of each backup bucket, in seconds. Every write within the same
@@ -867,11 +914,24 @@ fn merge_settings(app: tauri::AppHandle, patch: String) -> Result<(), String> {
 
     let path = get_data_path(&app, "app/settings.json");
 
-    // Existing file → JSON object; missing or corrupt → start from empty.
-    let mut on_disk: serde_json::Value = fs::read_to_string(&path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or(serde_json::Value::Null);
+    /* MISSING AND CORRUPT ARE NOT THE SAME STARTING POINT. This used to treat
+       both as an empty object, and settings.json has several owners: the shell
+       writes its keys through here, and Time Tracker's and Budget's settings
+       used to live alongside them. A file that would not parse therefore came
+       back as {}, and the merge then wrote a settings.json holding only the
+       keys of whichever screen happened to save first. Everything else in the
+       file was gone, from a write nobody asked for.
+
+       Absent is still an empty object, because for a first run that is true. */
+    let mut on_disk: serde_json::Value = match fs::read_to_string(&path) {
+        Ok(text) => serde_json::from_str(&text).map_err(|e| {
+            format!(
+                "app/settings.json is on disk but could not be read as JSON ({e}), so                  nothing was written over it. Repair or move that file."
+            )
+        })?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::json!({}),
+        Err(e) => return Err(format!("Could not read app/settings.json: {e}")),
+    };
     if !on_disk.is_object() {
         on_disk = serde_json::json!({});
     }
@@ -894,11 +954,17 @@ fn merge_settings(app: tauri::AppHandle, patch: String) -> Result<(), String> {
 /// Loads the saved settings JSON from disk.
 /// Returns `"{}"` (empty object) if the file doesn't exist, shell.ts then
 /// merges over DEFAULT_SETTINGS so every key gets a safe fallback value.
+///
+/// Only for a file that is NOT THERE. This used to answer every read error with
+/// `"{}"`, the same conflation load_tool_file carried: a settings.json held open
+/// by antivirus read as a first run, and the merge behind the next preference
+/// change wrote a fresh file over it. See merge_settings.
 #[tauri::command]
 fn load_settings(app: tauri::AppHandle) -> Result<String, String> {
     match fs::read_to_string(get_data_path(&app, "app/settings.json")) {
         Ok(content) => Ok(content),
-        Err(_) => Ok("{}".to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".to_string()),
+        Err(e) => Err(format!("Could not read app/settings.json: {e}")),
     }
 }
 
@@ -1045,13 +1111,234 @@ fn save_tool_file(
 
 /// Reads one of a tool's own files, or the empty shape that tool expects when
 /// there is no file yet. Callers merge that over their own defaults.
+///
+/// A MISSING FILE AND AN UNREADABLE ONE ARE NOT THE SAME ANSWER. This used to
+/// return the empty shape for every error, so "there is no file yet" and "the
+/// file is right there and I could not open it" arrived at the front end
+/// identically, both looking like a clean read of an empty tool. A file held
+/// open by antivirus or a backup tool for the moment this ran therefore
+/// presented as an empty tool, and the next save wrote that emptiness over the
+/// real thing.
+///
+/// Only NotFound is an empty tool. Every other error is returned, so a caller
+/// can tell the difference and refuse to act on nothing. The one-time Game
+/// Stats migration is the case this matters most for: it records itself as done
+/// and never reads the old file again, so it must not run on a read that
+/// failed.
 #[tauri::command]
 fn load_tool_file(app: tauri::AppHandle, tool_id: String, kind: String) -> Result<String, String> {
     let f = tool_file(&tool_id, &kind)?;
     match fs::read_to_string(get_data_path(&app, f.name)) {
         Ok(content) => Ok(content),
-        Err(_) => Ok(f.empty.to_string()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(f.empty.to_string()),
+        Err(e) => Err(format!("Could not read {}: {e}", f.name)),
     }
+}
+
+/* =============================================================================
+   THE DATA FOLDER'S VERSION STAMP
+   -----------------------------------------------------------------------------
+   One small file recording the shape this app last wrote the data folder in,
+   read once at startup.
+
+   WHY ONE STAMP AND NOT ELEVEN. The obvious design is a version key inside each
+   data file, and it is the expensive one: three of them are a bare list or a
+   bare `null` at the top level, and a list cannot carry a key. Giving them one
+   means a migration, to build the thing whose whole purpose is to let old
+   migrations be deleted. A single file records the same fact once.
+
+   WHAT IT BUYS. Not the ability to migrate: migrations already run and are
+   keyed on what they find. It buys the ability to say NO. A folder written by a
+   newer version is a folder this build cannot be trusted to write to, and
+   without a stamp there is nothing to notice that with. What happens instead is
+   a parse that half works, defaults where fields were not understood, and a
+   save that puts those defaults on disk.
+
+   ONE NUMBER FOR THE FOLDER, not the app version. The app version changes every
+   release; this changes only when the SHAPE does, so most releases leave it
+   alone and most upgrades therefore have nothing to say. The app version is
+   written alongside it purely so a person reading the file can tell which
+   release put it there.
+
+   WHEN IT IS WRITTEN. At startup, after the migrations have run, which is the
+   only moment the folder's shape can change: the shape is a property of the
+   build that is running, and no save alters it. Writing it on every save would
+   be the same fact rewritten thousands of times a session.
+============================================================================= */
+
+/// The shape of the data folder THIS build reads and writes.
+///
+/// Bump it when a change makes the folder unreadable to an older build: a file
+/// that moves, a field whose meaning changes, a list that becomes an object.
+/// Do NOT bump it for a field an older build would simply ignore, which is most
+/// of them, or every release would lock out the one before it for no reason.
+///
+/// 1 = the 0.7.0 shape: one folder per tool, Game Stats in SQLite.
+/// 2 = Kanban stage stamps carry a time. `started`, `testing` and `completed`
+///     are written as YYYY-MM-DDTHH:MM instead of YYYY-MM-DD.
+///
+/// THE SECOND ONE IS EXACTLY THE CASE THIS EXISTS FOR, and worth spelling out
+/// because it looks at first like the "an older build would ignore it" case
+/// that must NOT bump. It is not: the field did not appear, it changed shape in
+/// place. An older build hands each value to a YYYY-MM-DD regex, gets no match,
+/// and normalizes it to null. So it does not ignore the time, it drops the
+/// whole stamp, and then writes the card back without it. Silent data loss on a
+/// downgrade is worse than the folder being refused, which is at least a
+/// sentence the person can read.
+pub(crate) const DATA_SCHEMA_VERSION: u32 = 2;
+
+const DATA_STAMP_FILE: &str = "app/data-version.json";
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct DataStamp {
+    /// The only field that is READ. Everything else is for a human with the
+    /// file open.
+    schema: u32,
+    app: String,
+    written_at: String,
+}
+
+/// What the folder on disk says, as the front end needs to hear it.
+#[derive(serde::Serialize, Clone)]
+pub struct DataFolderStatus {
+    /// "fresh" (no stamp yet), "ok", "newer", or "unreadable".
+    state: String,
+    /// The number found, when there was one to find.
+    found: Option<u32>,
+    supported: u32,
+}
+
+/// The verdict, decided once at startup and remembered.
+///
+/// In managed state rather than recomputed per call, because the answer has to
+/// be reached BEFORE any command can write, and the stamping that follows it
+/// would otherwise change the answer the next call gets.
+pub struct DataFolderVerdict(pub DataFolderStatus);
+
+/// Reads the stamp and decides. Reads only: a folder this build must not touch
+/// is not touched by the check that decides so.
+///
+/// Called from setup() before ANYTHING else, including the layout migration.
+/// The shape of the folder is what is in question, so nothing may rearrange it
+/// until the question is answered. Doing this from the front end would put a
+/// round trip between the app starting and the decision, and every tool loads
+/// in that gap.
+pub(crate) fn judge_data_folder(app: &tauri::AppHandle) -> DataFolderStatus {
+    let text = match fs::read_to_string(get_data_path(app, DATA_STAMP_FILE)) {
+        Ok(t) => Some(t),
+        // No stamp is not a problem. It is either a first run or an install
+        // from before stamping existed, and both are folders this build wrote
+        // or can write: every migration is keyed on what it finds, not on this.
+        Err(_) => None,
+    };
+    judge_stamp(text.as_deref(), DATA_SCHEMA_VERSION)
+}
+
+/// Records that this build wrote this folder.
+///
+/// Called from setup() only once the verdict has ACCEPTED the folder. Stamping
+/// one from a newer version would erase the single piece of evidence saying so,
+/// and the next launch would then write to it happily.
+pub(crate) fn stamp_data_folder(app: &tauri::AppHandle) {
+    let stamp = DataStamp {
+        schema: DATA_SCHEMA_VERSION,
+        app: app.package_info().version.to_string(),
+        written_at: chrono::Local::now().to_rfc3339(),
+    };
+    if let Ok(text) = serde_json::to_string_pretty(&stamp) {
+        // Best effort. An unstamped folder reads as "fresh" next launch, which
+        // is the same answer as today, so a failure costs next time's warning
+        // and nothing else.
+        let _ = atomic_write(&get_data_path(app, DATA_STAMP_FILE), text.as_bytes());
+    }
+}
+
+/// What was decided at startup.
+#[tauri::command]
+fn data_folder_status(verdict: tauri::State<'_, DataFolderVerdict>) -> DataFolderStatus {
+    verdict.0.clone()
+}
+
+/* -----------------------------------------------------------------------------
+   THE FREEZE, ENFORCED WHERE IT CANNOT BE MISSED
+
+   The front end refuses to save when the folder is from a newer build, and that
+   is what produces the messages a person can act on. It is not what makes the
+   refusal true: it holds only for the write paths that remembered to ask, and
+   the app has a lot of them. Game Stats keeps its records in SQLite and never
+   touches the tool store at all; the shell writes its own settings; Kanban
+   deletes attachment files; every snapshot restore replaces a file wholesale.
+
+   So the same answer is given again down here, at the three places EVERY write
+   into the data folder has to pass through:
+
+     atomic_write / atomic_copy   every file the app writes, by the rule the
+                                  check suite already enforces
+     the database connection      PRAGMA query_only, which refuses a write this
+                                  code has not been written yet
+
+   A command that deletes rather than writes passes through none of those, so
+   the handful that do are guarded by hand with deny_if_frozen(); they are
+   listed in the check that goes with this.
+----------------------------------------------------------------------------- */
+
+/// Set once at startup, read everywhere. A plain global rather than managed
+/// state because the two write helpers are ordinary functions taking a path:
+/// threading an AppHandle into them to answer a question that is the same for
+/// the whole process would change every call site for no gain.
+static DATA_FROZEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) fn set_data_frozen(frozen: bool) {
+    DATA_FROZEN.store(frozen, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub(crate) fn data_is_frozen() -> bool {
+    DATA_FROZEN.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The sentence a refused write comes back with. One wording, so every path
+/// says the same thing whether it was stopped by a helper or by a guard.
+pub(crate) fn deny_if_frozen() -> Result<(), String> {
+    if data_is_frozen() {
+        return Err(
+            "This data folder was written by a newer version of Swiss RB Knife, so nothing              is being changed in it. Close this and open the newer version instead."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// The decision, with the file taken out of it: `None` is a folder with no
+/// stamp. Separated so it can be tested without an app handle and a temp
+/// directory, which is the only reason the four answers are readable at all.
+fn judge_stamp(text: Option<&str>, supported: u32) -> DataFolderStatus {
+    let Some(text) = text else {
+        return DataFolderStatus { state: "fresh".into(), found: None, supported };
+    };
+
+    // A stamp that will not parse is the one case where guessing is worst. It
+    // says the folder was written by SOMETHING, and not being able to read the
+    // one file whose only job is to be readable is a reason to stop rather than
+    // to assume the best.
+    let Ok(stamp) = serde_json::from_str::<DataStamp>(text) else {
+        return DataFolderStatus { state: "unreadable".into(), found: None, supported };
+    };
+
+    // Older or equal is fine: this build reads every shape up to its own, which
+    // is what makes most upgrades silent. Only NEWER is refused.
+    let state = if stamp.schema > supported { "newer" } else { "ok" };
+    DataFolderStatus { state: state.into(), found: Some(stamp.schema), supported }
+}
+
+/// What a tool's file is CALLED, for a message that has to name it.
+///
+/// The front end knows a tool id and a kind; the mapping from those to a path
+/// lives here and only here. A message like "kanban/kanban-settings.json could
+/// not be read" is something you can act on, and a second copy of this table in
+/// TypeScript would be a message that goes stale the first time a file moves.
+#[tauri::command]
+fn tool_file_name(tool_id: String, kind: String) -> Result<String, String> {
+    Ok(tool_file(&tool_id, &kind)?.name.to_string())
 }
 
 /* =============================================================================
@@ -1319,6 +1606,7 @@ fn lock_is_set(app: tauri::AppHandle) -> bool {
 /// Removes the stored lock hash, disabling the lock entirely.
 #[tauri::command]
 fn clear_lock_hash(app: tauri::AppHandle) -> Result<(), String> {
+    deny_if_frozen()?;
     let path = get_data_path(&app, "app/lock.json");
     if path.exists() {
         fs::remove_file(path).map_err(|e| e.to_string())?;
@@ -1427,9 +1715,28 @@ pub fn run() {
         // frontend uses it (all file I/O goes through custom commands), so
         // shipping it would only widen the attack surface for no benefit.
         .setup(|app| {
-            // FIRST, before any command can read a file: an install from before
-            // the data folder had a shape needs its files moved into it.
-            migrate_data_layout(app.handle());
+            /* Then, before anything reads a file and before anything moves
+               one: is this folder one this build may touch at all?
+
+               Ahead of the layout migration on purpose. The migration rearranges
+               the folder, and rearranging a folder written by a newer build is
+               the thing being prevented. In practice it would find nothing to
+               move there, but "in practice" is not a guarantee and the ordering
+               is free. */
+            let verdict = judge_data_folder(app.handle());
+            /* Read from here on by atomic_write, atomic_copy and the database
+               connection, so the refusal holds for every write path rather than
+               the ones that remembered to ask. The front end is told separately
+               so it can explain it in words. */
+            set_data_frozen(verdict.state == "newer" || verdict.state == "unreadable");
+
+            if !data_is_frozen() {
+                // An install from before the data folder had a shape needs its
+                // files moved into it, once, before anything reads them.
+                migrate_data_layout(app.handle());
+                stamp_data_folder(app.handle());
+            }
+            app.manage(DataFolderVerdict(verdict));
 
             /* WHAT THE WEBVIEW MAY RENDER FROM DISK.
                ---------------------------------------------------------------
@@ -1482,6 +1789,8 @@ pub fn run() {
             load_settings,
             save_tool_file,
             load_tool_file,
+            tool_file_name,
+            data_folder_status,
             list_tool_backups,
             export_tool_json,
             import_tool_json,

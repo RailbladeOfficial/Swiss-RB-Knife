@@ -38,6 +38,7 @@ import { devError, flash, setSubNavHandler, shortPath, navigateToTool } from "..
 import { Modal, ModalTabs } from "../modal/modal";
 import { renderDbBackups } from "../core/db-backups";
 import { registerTransferable } from "../core/data-transfer";
+import { loadToolJson, saveToolJson, saveToolText, unblockAfterReplacement } from "../core/tool-store";
 import { newId } from "../core/ids";
 import { fileTimestamp } from "../core/timestamp";
 import { diffRows } from "../core/row-diff";
@@ -323,7 +324,19 @@ function listsJson(): string {
   return JSON.stringify({ profiles, tables });
 }
 
-async function saveToDisk(): Promise<void> {
+/**
+ * Writes whatever changed, and SAYS WHETHER IT LANDED.
+ *
+ * The boolean is what lets a caller hold its "Profile added" until there is a
+ * profile on disk to have added. They used to flash first and save afterwards
+ * without waiting, so a refused write put a green success and a red failure on
+ * screen at the same moment, and a save that failed for any ordinary reason
+ * (a locked file, a full disk) reported success and nothing else.
+ *
+ * True also covers "there was nothing to write", which is the honest answer for
+ * a caller asking whether the state is on disk.
+ */
+async function saveToDisk(): Promise<boolean> {
   const rows = games.map(gameToRow);
   const diff = diffRows(rows, (r) => r.id, writtenGames);
   const lists = listsJson();
@@ -331,7 +344,7 @@ async function saveToDisk(): Promise<void> {
   const prefs = JSON.stringify(settings);
   const prefsChanged = prefs !== writtenSettings;
   const gamesChanged = diff.changed.length > 0 || diff.deleted.length > 0;
-  if (!gamesChanged && !listsChanged && !prefsChanged) return;
+  if (!gamesChanged && !listsChanged && !prefsChanged) return true;
   try {
     if (gamesChanged || listsChanged) {
       await invoke("gs_save", {
@@ -350,21 +363,26 @@ async function saveToDisk(): Promise<void> {
     if (prefsChanged) {
       // Preferences stay a settings file, like every other tool's. They are two
       // switches and a timestamp, read once at launch and never queried.
-      await invoke("save_tool_file", { toolId: "game-stats", kind: "settings", data: prefs });
+      await saveToolText("game-stats", "settings", prefs);
       writtenSettings = prefs;
     }
   } catch (err) {
     devError("Game Stats: failed to save data", err);
     flash(`Couldn't save Game Stats data: ${String(err)}`, "error", 9000);
+    return false;
   }
+  return true;
 }
 
 async function loadSettingsFile(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "game-stats", kind: "settings" });
-    settings = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<GameStatsSettings>) };
+    const stored = await loadToolJson<Partial<GameStatsSettings>>("game-stats", "settings");
+    settings = { ...DEFAULT_SETTINGS, ...stored };
   } catch {
-    // No file yet, or an unreadable one: the defaults are the answer either way.
+    // Two switches and a timestamp, so the defaults are a usable screen either
+    // way. They are NOT a usable thing to write back over a file that would
+    // not read, which is why this no longer treats the two cases alike: the
+    // store has blocked the write by the time this catch runs.
     settings = { ...DEFAULT_SETTINGS };
   }
   writtenSettings = JSON.stringify(settings);
@@ -396,7 +414,17 @@ async function loadFromDisk(): Promise<void> {
         snapshot = await invoke<GsSnapshot>("gs_load");
         if (moved > 0) flash(`Moved ${moved} games into the new storage.`, "success", 9000);
       } catch (err) {
+        /* SAID OUT LOUD, not just to the dev log. The flag is deliberately not
+           set on this path, so the move is retried on the next launch and the
+           old file stays where it is. That is the safe outcome, but it is not a
+           silent one: if this keeps happening the file needs looking at, and
+           nobody can look at a problem they were never told about. */
         devError("Game Stats: could not finish the one-off JSON migration", err);
+        flash(
+          `Your older Game Stats history has not moved across yet: ${String(err)}`,
+          "error",
+          12000,
+        );
       }
     }
     await loadSettingsFile();
@@ -433,14 +461,27 @@ async function loadFromDisk(): Promise<void> {
  *  preferences in that file are from before the move and must NOT be written
  *  over the ones in use. */
 async function migrateGamesFromJson(hadGames: boolean): Promise<number> {
-  let parsed: Partial<GameStatsData> = {};
+  /* A READ THAT FAILED IS NOT AN EMPTY HISTORY, and telling them apart is the
+     whole reason this is not a plain try/catch that shrugs and carries on.
+
+     This call records itself as done and never opens the old file again. So a
+     transient failure here (antivirus holding the file, a backup tool with it
+     open, a permissions hiccup) would mark a full history as migrated, having
+     carried nothing across. The file would still be sitting on disk, intact and
+     unreachable, with no way back to it from inside the app.
+
+     load_tool_file now returns the empty shape ONLY for a file that is not
+     there, and an error for one that is there and would not open. So an error
+     means "ask again next launch": leave the flag alone, leave the file alone,
+     and come back to it. A fresh install still lands in the normal path and
+     still gets marked, because for it there genuinely is nothing to read. */
+  let parsed: Partial<GameStatsData>;
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "game-stats", kind: "data" });
-    parsed = (JSON.parse(raw) as Partial<GameStatsData>) ?? {};
-  } catch {
-    // No readable file is a fresh install. The command is still called, because
-    // calling it is what records that there is nothing left to read.
-    parsed = {};
+    parsed = (await loadToolJson<Partial<GameStatsData>>("game-stats", "data")) ?? {};
+  } catch (err) {
+    throw new Error(
+      `the old game-stats.json could not be read, so the move was left for next time: ${String(err)}`,
+    );
   }
 
   const carried = (Array.isArray(parsed.games) ? parsed.games : [])
@@ -462,11 +503,7 @@ async function migrateGamesFromJson(hadGames: boolean): Promise<number> {
      asked to change. */
   if (!hadGames && parsed.settings && Object.keys(parsed.settings).length > 0) {
     const merged = { ...DEFAULT_SETTINGS, ...parsed.settings };
-    await invoke("save_tool_file", {
-      toolId: "game-stats",
-      kind: "settings",
-      data: JSON.stringify(merged),
-    });
+    await saveToolJson("game-stats", "settings", merged);
   }
   return moved;
 }
@@ -556,7 +593,7 @@ function setGsContextLines(container: HTMLElement, lines: string[]): void {
  * profiles can't share a name. Returns false on that failure so the modal
  * can stay open. Mirrors Time Tracker's addOrReactivateActivity.
  */
-function addOrReactivateProfile(name: string): boolean {
+async function addOrReactivateProfile(name: string): Promise<boolean> {
   const trimmed = name.trim();
   if (!trimmed) {
     flash("Name cannot be empty", "error");
@@ -575,11 +612,12 @@ function addOrReactivateProfile(name: string): boolean {
     profiles.push({ id: newId(), name: trimmed, status: "active" });
   }
 
-  flash(wasReactivated ? "Profile reactivated" : "Profile added", "success");
-  saveToDisk();
+  const saved = await saveToDisk();
   // A new/reactivated name has to reach the autocomplete datalist and the
   // Stats compare pickers, not just the Setup list it was added from.
   refreshGsNameDependentUI();
+  if (!saved) return false;
+  flash(wasReactivated ? "Profile reactivated" : "Profile added", "success");
   return true;
 }
 
@@ -799,8 +837,10 @@ function getProfileAddModal(): Modal {
     });
 
     function goBack() { gsProfileAddModal!.close(); openGsSetupOnTab("profiles"); }
-    function doSave() {
-      if (!addOrReactivateProfile(nameInput.value)) return;
+    async function doSave() {
+      // Awaited, so a refused write leaves the modal open with the name still
+      // in it rather than closing on a change that did not happen.
+      if (!(await addOrReactivateProfile(nameInput.value))) return;
       gsProfileAddModal!.close();
       openGsSetupOnTab("profiles");
     }
@@ -833,7 +873,7 @@ function getProfileEditModal(): Modal {
     });
 
     function goBack() { gsProfileEditModal!.close(); openGsSetupOnTab("profiles"); }
-    function doSave() {
+    async function doSave() {
       if (!gsProfileEditItem) return;
       const item = gsProfileEditItem;
       const name = nameInput.value.trim();
@@ -850,9 +890,9 @@ function getProfileEditModal(): Modal {
       }
 
       item.name = name;
-      saveToDisk();
+      const saved = await saveToDisk();
       refreshGsNameDependentUI();
-      flash("Profile saved", "success");
+      if (saved) flash("Profile saved", "success");
       goBack();
     }
 
@@ -862,12 +902,15 @@ function getProfileEditModal(): Modal {
     document.getElementById("gsProfileEditSave")!.addEventListener("click", doSave);
     nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doSave(); } });
 
-    retireBtn.addEventListener("click", () => {
+    retireBtn.addEventListener("click", async () => {
       if (!gsProfileEditItem) return;
       gsProfileEditItem.status = gsProfileEditItem.status === "active" ? "retired" : "active";
-      saveToDisk();
+      // Read before the await: gsProfileEditItem is cleared when the modal
+      // closes, which can happen while the write is in flight.
+      const retired = gsProfileEditItem.status === "retired";
+      const saved = await saveToDisk();
       refreshGsNameDependentUI();
-      flash(gsProfileEditItem.status === "retired" ? "Profile retired" : "Profile reactivated", "success");
+      if (saved) flash(retired ? "Profile retired" : "Profile reactivated", "success");
       goBack();
     });
 
@@ -1062,7 +1105,7 @@ function getTableEditModal(): Modal {
     });
 
     function goBack() { gsTableEditModal!.close(); openGsSetupOnTab("tables"); }
-    function doSave() {
+    async function doSave() {
       const table = tables.find((t) => t.key === gsTableEditKey);
       if (!table) return;
       const name = nameInput.value.trim();
@@ -1079,7 +1122,7 @@ function getTableEditModal(): Modal {
 
       table.name = name;
       if (orderChanged) applySeatOrder(table, orderedIds);
-      saveToDisk();
+      if (!(await saveToDisk())) return;
       flash(
         orderChanged && name ? "Table updated" : orderChanged ? "Seat order updated" : name ? "Table renamed" : "Table name cleared",
         "success",
@@ -1403,13 +1446,25 @@ async function runGsImport(): Promise<void> {
 
   commitImport(imports, newProfiles);
   settings.lastImportAt = new Date().toISOString();
-  saveToDisk();
+  const saved = await saveToDisk();
   refreshGsImportStatusUI();
 
   const profileNote = newProfiles.size
     ? ` New ${newProfiles.size === 1 ? "profile" : "profiles"}: ${[...newProfiles.keys()].join(", ")}.`
     : "";
   runBtn.disabled = false;
+  /* An import that could not be written is not an import. The games are in
+     memory and on screen, which is why this says so rather than staying quiet:
+     what is on the page and what is on disk have come apart. */
+  if (!saved) {
+    openGsImportResult(
+      "error",
+      `Read ${imports.length} ${imports.length === 1 ? "game" : "games"}, but they could not ` +
+        `be saved. Nothing was written. Close the app and check the data folder.`,
+      [],
+    );
+    return;
+  }
   openGsImportResult(
     "success",
     `Imported ${imports.length} ${imports.length === 1 ? "game" : "games"}.${profileNote}`,
@@ -1485,16 +1540,19 @@ function getProfileDeleteModal(): Modal {
       onClosed: () => { pendingProfileDelete = null; },
     });
 
-    document.getElementById("gsProfileDeleteConfirmBtn")!.addEventListener("click", () => {
+    document.getElementById("gsProfileDeleteConfirmBtn")!.addEventListener("click", async () => {
       if (!pendingProfileDelete) return;
       const { id } = pendingProfileDelete;
       profiles = profiles.filter((p) => p.id !== id);
       pendingProfileDelete = null;
-      saveToDisk();
+      const saved = await saveToDisk();
       refreshGsNameDependentUI();
       gsProfileDeleteModal!.close();
       openGsSetupOnTab("profiles");
-      flash("Profile deleted", "success");
+      // Only if it actually went. saveToDisk has already said why if not, and
+      // the list behind this modal is redrawn from memory either way, so a
+      // "deleted" on top of that would be the only thing claiming it stuck.
+      if (saved) flash("Profile deleted", "success");
     });
 
     document.getElementById("gsProfileDeleteCancelBtn")!.addEventListener("click", () => {
@@ -2385,12 +2443,12 @@ function enterEditMode(): void {
   applyGsGameMode();
 }
 
-function saveGameChanges(): void {
+async function saveGameChanges(): Promise<void> {
   if (!newGameDraft || !editingGameId) return;
   newGameDraft.updatedAt = new Date().toISOString();
   const idx = games.findIndex((g) => g.id === editingGameId);
   if (idx >= 0) games[idx] = newGameDraft;
-  saveToDisk();
+  if (!(await saveToDisk())) return;
   flash("Changes saved", "success");
   gsGameMode = "view";
   gsPreEditSnapshot = null;
@@ -2882,7 +2940,7 @@ function saveGameStatsDraft(): void {
   gsDraftSaveTimer = window.setTimeout(async () => {
     gsDraftSaveTimer = null;
     try {
-      await invoke("save_tool_file", { toolId: "game-stats", kind: "draft", data: snapshot });
+      await saveToolText("game-stats", "draft", snapshot);
     } catch (err) {
       devError("Game Stats: failed to save draft", err);
     }
@@ -2899,7 +2957,7 @@ function clearGameStatsDraft(): void {
     clearTimeout(gsDraftSaveTimer);
     gsDraftSaveTimer = null;
   }
-  invoke("save_tool_file", { toolId: "game-stats", kind: "draft", data: "null" }).catch((err) =>
+  saveToolText("game-stats", "draft", "null").catch((err) =>
     devError("Game Stats: failed to clear draft", err),
   );
 }
@@ -2912,8 +2970,9 @@ function clearGameStatsDraft(): void {
  *  saving it would file a game against a player who no longer exists. */
 async function loadGameStatsDraft(): Promise<boolean> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "game-stats", kind: "draft" });
-    const stored = JSON.parse(raw);
+    const stored = await loadToolJson<
+      { game?: GameInstance; gameType?: GameInstance["gameType"] } | null
+    >("game-stats", "draft");
     const game = stored?.game as GameInstance | undefined;
     if (!game || !Array.isArray(game.rounds) || !Array.isArray(game.playerIds)) return false;
 
@@ -2924,7 +2983,7 @@ async function loadGameStatsDraft(): Promise<boolean> {
     }
 
     newGameDraft = game;
-    gsNewGameType = stored.gameType ?? game.gameType;
+    gsNewGameType = stored?.gameType ?? game.gameType;
     gsGameMode = "create";
     editingGameId = null;
     return true;
@@ -2934,7 +2993,7 @@ async function loadGameStatsDraft(): Promise<boolean> {
   }
 }
 
-function saveNewGame(): void {
+async function saveNewGame(): Promise<void> {
   if (!newGameDraft) return;
   newGameDraft.updatedAt = new Date().toISOString();
 
@@ -2947,7 +3006,10 @@ function saveNewGame(): void {
   // A brand-new roster becomes a nameable table the moment its first game is
   // saved, same as a typed name becomes a profile.
   ensureTableFor(newGameDraft);
-  saveToDisk();
+  /* The draft is cleared only once the game is on disk. Clearing it first
+     would drop the half-filled entry on the floor for a save that never
+     landed, which is the one thing the draft exists to prevent. */
+  if (!(await saveToDisk())) return;
   clearGameStatsDraft();
   flash("Game saved", "success");
 
@@ -3270,7 +3332,7 @@ function getGameDeleteModal(): Modal {
       onClosed: () => { pendingGameDelete = null; },
     });
 
-    document.getElementById("gsGameDeleteConfirmBtn")!.addEventListener("click", () => {
+    document.getElementById("gsGameDeleteConfirmBtn")!.addEventListener("click", async () => {
       if (!pendingGameDelete) return;
       games = games.filter((g) => g.id !== pendingGameDelete);
       const wasViewingDeleted = pendingGameDelete === editingGameId;
@@ -3278,9 +3340,9 @@ function getGameDeleteModal(): Modal {
       pendingGameDelete = null;
       // Deleting a table's last game retires the table record with it.
       backfillTables();
-      saveToDisk();
+      const saved = await saveToDisk();
       gsGameDeleteModal!.close();
-      flash("Game deleted", "success");
+      if (saved) flash("Game deleted", "success");
       if (wasViewingDeleted) {
         newGameDraft = null;
         editingGameId = null;

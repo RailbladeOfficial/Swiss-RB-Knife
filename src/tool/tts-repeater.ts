@@ -43,6 +43,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { registerTransferable } from "../core/data-transfer";
+import { loadToolJson, saveToolJson, unblockAfterReplacement } from "../core/tool-store";
 import { listen } from "@tauri-apps/api/event";
 import { flash, escapeHtml } from "../core/shell";
 import { Modal } from "../modal/modal";
@@ -270,22 +271,20 @@ let setupModal: Modal | null = null;
 
 async function loadStore(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "tts-repeater", kind: "data" });
-    const parsed = JSON.parse(raw) as Partial<TtsStore>;
+    const parsed = await loadToolJson<Partial<TtsStore>>("tts-repeater", "data");
     presets = Array.isArray(parsed.presets) ? parsed.presets : [];
     display = normalizeDisplay(parsed.display ?? {});
     applyDisplayToSetupForm();
     syncSetupUI();
     if (parsed.settings) applyConfig(normalizeConfig(parsed.settings));
   } catch (err) {
-    // A corrupt or unreadable data file shouldn't cost the user the tool,
-    // fall back to defaults and say so once.
+    // A corrupt or unreadable data file shouldn't cost the user the tool, so
+    // it still opens on defaults. What it must not do is SAVE those defaults
+    // over the file, and that half is the store's: it has already refused
+    // every write to this file for the session and said so.
     presets = [];
     flash(`Couldn't load saved TTS Repeater data: ${String(err)}`, "error");
   } finally {
-    // Set even on failure: a load that errored has already been reported, and
-    // leaving writes blocked forever would silently stop persisting anything
-    // for the rest of the session.
     storeLoaded = true;
   }
 }
@@ -294,7 +293,7 @@ async function saveStore(): Promise<void> {
   if (!storeLoaded) return;
   const store: TtsStore = { settings: readConfig(), presets, display };
   try {
-    await invoke("save_tool_file", { toolId: "tts-repeater", kind: "data", data: JSON.stringify(store) });
+    await saveToolJson("tts-repeater", "data", store);
   } catch (err) {
     flash(`Couldn't save TTS Repeater data: ${String(err)}`, "error");
   }

@@ -1142,14 +1142,13 @@ test("an attachment is a copy the app owns, not the file that was picked", () =>
   const at = rs.indexOf("fn store_attachment");
   const body = rs.slice(at, rs.indexOf("\n}\n", at));
 
-  // Streamed, never read whole: an attachment can be a screen recording, and
-  // the encrypted path has to hold one chunk rather than one file.
-  assert.match(body, /fs::copy\(source, &temp\)/, "the copy is not streamed");
+  // Through the shared helper, which streams (an attachment can be a screen
+  // recording), writes under a temporary name so a copy interrupted half way
+  // never appears under the name a card is about to point at, and fsyncs before
+  // the rename. This used to be rolled by hand here, without that last part.
+  assert.match(body, /atomic_copy\(source, &final_path\)/, "the copy is not atomic");
   assert.ok(!/fs::read\(/.test(body), "the whole file is read into memory to copy it");
-
-  // Through a temporary name, so a copy interrupted half way never appears
-  // under the name a card is about to point at.
-  assert.match(body, /fs::rename\(&temp, &final_path\)/, "the copy is not renamed into place");
+  assert.ok(!/fs::copy\(/.test(body), "this copies by hand instead of using atomic_copy");
 
   // The name on disk is the id, never the name that was picked.
   assert.ok(
@@ -1306,10 +1305,13 @@ test("two saves can never be in flight at once", () => {
   const flush = src.slice(flushAt, src.indexOf("\n}", flushAt));
   assert.match(flush, /await saveNow\(\)/, "flushSave does not await the chain");
 
-  // Nothing may reach the writer except through the chain: its declaration,
-  // the one .then() that runs it, and the comment naming it.
-  const uses = [...src.matchAll(/\bwriteDirty\b/g)].length;
-  assert.equal(uses, 3, `writeDirty is named ${uses} times; only the declaration, the chain and one comment should mention it`);
+  /* Nothing may reach the writer except through the chain: its declaration and
+     the one .then() that runs it. Counted in CODE rather than in the file, so a
+     comment that mentions it by name is not a failure; the old count included
+     comments, which turned every explanatory edit into a broken test. */
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const uses = [...code.matchAll(/\bwriteDirty\b/g)].length;
+  assert.equal(uses, 2, `writeDirty is reached ${uses} times in code; only the declaration and the chain should reach it`);
 });
 
 test("an attachment is never destroyed in place", () => {

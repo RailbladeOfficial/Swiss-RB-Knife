@@ -150,6 +150,7 @@ pub fn restore_budget_backup(
     name: String,
     kind: String,
 ) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     if !crate::valid_bucket_name(&name) {
         return Err("That snapshot name is not one of ours.".to_string());
     }
@@ -518,6 +519,7 @@ pub fn budget_save_entities_encrypted(app: tauri::AppHandle, password: String, d
 
 #[tauri::command]
 pub fn budget_enable_encryption(app: tauri::AppHandle, password: String) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     // Wipe the password from memory when this function returns (all paths).
     let password = Zeroizing::new(password);
     let data_path = get_data_path(&app, "budget/budget-data.json");
@@ -599,6 +601,7 @@ pub fn budget_enable_encryption(app: tauri::AppHandle, password: String) -> Resu
 
 #[tauri::command]
 pub fn budget_disable_encryption(app: tauri::AppHandle, password: String) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     // Wipe the password from memory when this function returns (all paths).
     let password = Zeroizing::new(password);
     let data_envelope = read_data_envelope(&app).ok_or_else(|| "Encryption is not enabled".to_string())?;

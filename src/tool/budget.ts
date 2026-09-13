@@ -27,6 +27,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { registerTransferable } from "../core/data-transfer";
+import { loadToolJson, saveToolJson, writesFrozen } from "../core/tool-store";
 import { newId } from "../core/ids";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
@@ -561,6 +562,13 @@ function sanitizeData(raw: unknown): BudgetData {
 /**
  * What went wrong on load, if anything. Set by loadFromDisk(), read by
  * initBudget() after the window is shown to decide whether to warn the user.
+ *
+ * IT ALSO BLOCKS EVERY SAVE. The warning modal used to be the whole defense,
+ * and a warning is not one: `data` holds an empty budget by the time it opens,
+ * so anything that wrote before the user answered it, or after they chose to
+ * keep the file, put that empty budget on disk. saveToDisk refuses while this
+ * is set. Only the reset button clears it, and only because reset is a
+ * deliberate "yes, replace what is in there".
  */
 let loadError: string | null = null;
 
@@ -613,6 +621,18 @@ async function loadFromDisk(): Promise<void> {
 }
 
 async function saveToDisk(): Promise<void> {
+  // The whole folder, before this one tool's own state. Budget's records go
+  // through its own commands (encrypted or not) and never reach the shared
+  // store, so the freeze has to be asked about here.
+  const frozen = writesFrozen();
+  if (frozen) throw new Error(frozen);
+
+  if (loadError) {
+    throw new Error(
+      "Budget will not write over a file it could not read. Close the app and " +
+        "repair or move budget/budget-data.json, or choose Reset in the warning.",
+    );
+  }
   const entities = JSON.stringify(pickFields(data, ENTITY_FIELDS));
   const entries = JSON.stringify(pickFields(data, ENTRY_FIELDS));
 
@@ -1179,8 +1199,7 @@ async function loadAppSettings(): Promise<void> {
     const shared = JSON.parse(sharedRaw || "{}");
     appSettings.americanDates = !!shared.americanDates;
 
-    const ownRaw = await invoke<string>("load_tool_file", { toolId: "budget", kind: "settings" });
-    const own = JSON.parse(ownRaw || "{}");
+    const own = await loadToolJson<Record<string, unknown> | null>("budget", "settings");
     const hasOwnFile =
       own && typeof own === "object" &&
       ("quickDelete" in own || "showCleared" in own || "startupMode" in own);
@@ -1259,7 +1278,7 @@ async function saveAppSettings(): Promise<void> {
       lastUpdatedAt: appSettings.lastUpdatedAt,
       dataNewestAt: appSettings.dataNewestAt,
     };
-    await invoke("save_tool_file", { toolId: "budget", kind: "settings", data: JSON.stringify(own) });
+    await saveToolJson("budget", "settings", own);
   } catch {
     /* non-critical */
   }
@@ -6718,13 +6737,18 @@ function getDataLoadWarningModal(): Modal {
       .getElementById("budgetDataWarnResetBtn")!
       .addEventListener("click", async () => {
         data = emptyData();
+        // Cleared BEFORE the save, because it is what blocks the save. Put
+        // back if the write fails, so a reset that did not land does not
+        // leave the file unprotected.
+        const blockedBy = loadError;
+        loadError = null;
         try {
           await saveToDisk();
         } catch (e) {
+          loadError = blockedBy;
           flash(`Failed to save the reset budget: ${e}`, "error", 8000);
           return; // keep the warning modal open. Nothing was written
         }
-        loadError = null;
         dataLoadWarningModal!.close();
         renderAll();
         flash("Budget data reset to empty", "success");

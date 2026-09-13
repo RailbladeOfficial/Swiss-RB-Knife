@@ -28,6 +28,7 @@ import {
   settingsModal,
   openSettingsOnTab,
   quitApp,
+  appConfirm,
   maybeShowBackupReminder,
   maybeShowBudgetReminder,
   setAboutUpdatePulse,
@@ -36,6 +37,7 @@ import {
   LICENSE_VERSION,
 } from "./shell";
 import { showLockScreen } from "./lockscreen";
+import { showDataFolderGate } from "./data-version";
 
 const LICENSE_ACCEPTED_KEY = "shell-license-accepted-version";
 const CHANGELOG_SEEN_KEY = "shell-changelog-seen-version";
@@ -1629,6 +1631,11 @@ licenseDeclineBtn.addEventListener("click", () => {
  *     changelog is shown this run, or 2s after the user dismisses the
  *     auto-opened changelog if one is. See runStartupNudges(). */
 export async function runStartupGates(appVersion: string): Promise<void> {
+  /* Gate 0: the data folder. Ahead of the app lock on purpose. If writing has
+     been frozen, that is the single most important thing about this session,
+     and someone who cannot get past the lock would otherwise never be told. */
+  await showDataFolderGate({ confirm: appConfirm, quit: quitApp });
+
   // Gate 1: App lock, verify before anything else is visible
   if (settings.appLock) {
     const hasHash = await invoke<boolean>("lock_is_set").catch(() => false);

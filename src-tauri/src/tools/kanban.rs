@@ -39,7 +39,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use tauri::AppHandle;
 
-use crate::{atomic_write, backed_up_write_group, get_data_path};
+use crate::{atomic_copy, atomic_write, backed_up_write_group, get_data_path};
 
 
 /// Folder holding imported board backgrounds.
@@ -178,6 +178,7 @@ pub fn load_kanban_board(app: AppHandle, board_id: String) -> Result<String, Str
 /// is still in the last snapshot rather than gone.
 #[tauri::command]
 pub fn delete_kanban_board(app: AppHandle, board_id: String) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     if !valid_board_id(&board_id) {
         return Err("That board id is not one of ours.".to_string());
     }
@@ -441,6 +442,7 @@ pub fn import_kanban_image(app: AppHandle, path: String) -> Result<String, Strin
 /// general-purpose delete.
 #[tauri::command]
 pub fn delete_kanban_image(app: AppHandle, path: String) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     let dir = image_dir(&app);
     /* A BARE FILENAME IS RESOLVED HERE, an absolute path is taken as given and
        then checked. Board records written before the data folder was split per
@@ -605,6 +607,24 @@ fn stored_name(attachment_id: &str, source: &Path) -> String {
     }
 }
 
+/// Whether a filename is a half-finished copy rather than an attachment.
+///
+/// Two suffixes, because the staging name has MOVED. This folder used to be
+/// written by a hand-rolled copy that staged at `<id>.part`, and it now goes
+/// through `atomic_copy`, which stages at `<name>.tmp-<pid>-<n>`. A leftover
+/// can only exist if a copy died between writing the temp and cleaning it up,
+/// which is exactly the moment all of this is about, so both have to be
+/// recognized: the older name for anything already on disk, the current one
+/// for anything written from here on.
+///
+/// Getting this wrong is not cosmetic. attachment_files matches on the id as a
+/// PREFIX, so a temp left beside `<id>.png` is called `<id>.png.tmp-1234-0` and
+/// matches that prefix. Without this test it would be returned as the
+/// attachment, and the card would present a half-copied file as its own.
+fn is_staging_name(name: &str) -> bool {
+    name.ends_with(".part") || name.contains(".tmp-")
+}
+
 /// Every filename in `dir` that belongs to this attachment: the bare id, as
 /// stored before extensions were kept, and the id plus any one extension.
 ///
@@ -621,7 +641,7 @@ fn attachment_files(dir: &Path, attachment_id: &str) -> Vec<PathBuf> {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             // Not the half-written temp from an interrupted copy.
-            if name.starts_with(&prefix) && !name.ends_with(".part") && entry.path().is_file() {
+            if name.starts_with(&prefix) && !is_staging_name(&name) && entry.path().is_file() {
                 out.push(entry.path());
             }
         }
@@ -667,10 +687,9 @@ fn display_name(path: &Path) -> String {
 
 /// Puts a file into the board's folder under `attachment_id`.
 ///
-/// Written under a temporary name and renamed into place, so a copy interrupted
-/// half way never appears under the name a card points at. The copy is streamed
-/// rather than read into memory, which is why an attachment can be a screen
-/// recording rather than something that has to fit in RAM.
+/// Goes through `atomic_copy`, so a copy interrupted half way never appears
+/// under the name a card points at, and the bytes are on storage before the
+/// name lands. It used to roll that pattern by hand here, minus the fsync.
 /// `type_from` is what the extension is taken from, which is not always the
 /// file being copied: a pasted image is staged under a temporary name, and it
 /// is the name the paste was given that says what it is.
@@ -687,16 +706,8 @@ fn store_attachment(
     }
     let name = stored_name(attachment_id, type_from);
     let final_path = dir.join(&name);
-    let temp = dir.join(format!("{attachment_id}.part"));
 
-    if let Err(e) = fs::copy(source, &temp) {
-        let _ = fs::remove_file(&temp);
-        return Err(format!("Could not copy that file: {e}"));
-    }
-    if let Err(e) = fs::rename(&temp, &final_path) {
-        let _ = fs::remove_file(&temp);
-        return Err(format!("Could not store that file: {e}"));
-    }
+    atomic_copy(source, &final_path).map_err(|e| format!("Could not store that file: {e}"))?;
     Ok(name)
 }
 
@@ -898,6 +909,7 @@ pub fn delete_kanban_attachment(
     board_id: String,
     attachment_id: String,
 ) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     if let Some(path) = find_attachment(&app, &board_id, &attachment_id)? {
         // Retired rather than unlinked, so the snapshot taken before this
         // delete can still be restored with its files. See the store's note.
@@ -909,6 +921,7 @@ pub fn delete_kanban_attachment(
 /// Removes every attachment a board owns, folder and all.
 #[tauri::command]
 pub fn delete_kanban_board_attachments(app: AppHandle, board_id: String) -> Result<(), String> {
+    crate::deny_if_frozen()?;
     if !valid_board_id(&board_id) {
         return Err("That board id is not one of ours.".to_string());
     }
@@ -943,6 +956,7 @@ pub fn sweep_kanban_attachments(
     board_id: String,
     keep: Vec<String>,
 ) -> Result<u32, String> {
+    crate::deny_if_frozen()?;
     if !valid_board_id(&board_id) {
         return Err("That board id is not one of ours.".to_string());
     }
@@ -963,7 +977,8 @@ pub fn sweep_kanban_attachments(
         // Swept files are retired too. An orphan is usually the tail of a
         // delete that already happened, but it can also be the file a board
         // snapshot is about to be restored ON TOP of, and unlinking it here
-        // would beat the restore to it. ".part" leftovers go the same way.
+        // would beat the restore to it. Staging leftovers go the same way; see
+        // is_staging_name for the two shapes one of those can have.
         retire_attachment(&app, &board_id, &entry.path());
         removed += 1;
     }
@@ -1082,7 +1097,11 @@ fn revive_attachment(app: &AppHandle, board_id: &str, attachment_id: &str) -> bo
        same file the card was pointing at. */
     for from in attachment_files(&dir, attachment_id) {
         let Some(name) = from.file_name() else { continue };
-        if fs::copy(&from, live_dir.join(name)).is_ok() {
+        // Through atomic_copy, not a plain one. This lands in the LIVE folder
+        // under the name a card already points at, so a copy interrupted part
+        // way would put a truncated file where the card expects its attachment
+        // and the card would then present it as such.
+        if atomic_copy(&from, &live_dir.join(name)).is_ok() {
             return true;
         }
     }
@@ -1173,6 +1192,36 @@ pub fn revive_kanban_attachments(
 mod tests {
     use super::*;
 
+
+    /// A half-finished copy sitting next to a real attachment must never be
+    /// mistaken for it. The id is matched as a PREFIX, so a temp staged beside
+    /// `<id>.png` shares that prefix and is only excluded because it is
+    /// recognized as staging.
+    ///
+    /// This nearly went wrong when both copy sites moved onto atomic_copy: the
+    /// staging suffix changed from `.part` to `.tmp-<pid>-<n>`, and the filter
+    /// here still only knew the old one. A leftover would then have been
+    /// returned as the attachment, and the card would have shown a partial file
+    /// as its own.
+    #[test]
+    fn a_half_finished_copy_is_never_returned_as_the_attachment() {
+        let id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+        for staging in [
+            format!("{id}.part"),
+            format!("{id}.png.part"),
+            format!("{id}.png.tmp-1234-0"),
+            format!("{id}.tmp-99-7"),
+        ] {
+            assert!(
+                is_staging_name(&staging),
+                "{staging} would be picked up as a real attachment",
+            );
+        }
+        // And the real names are not swept up by the same test.
+        for real in [id.to_string(), format!("{id}.png"), format!("{id}.tar.gz")] {
+            assert!(!is_staging_name(&real), "{real} was mistaken for a temp file");
+        }
+    }
 
     #[test]
     fn a_board_id_is_a_name_and_never_a_path() {

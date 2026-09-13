@@ -30,6 +30,12 @@ import { attachMenu } from "../menu/menu";
 import { renderToolBackups, readToolBackup } from "../core/tool-backups";
 import { registerTransferable } from "../core/data-transfer";
 import { newId } from "../core/ids";
+import {
+  loadToolJson,
+  saveToolJson,
+  saveToolText,
+  unblockAfterReplacement,
+} from "../core/tool-store";
 import { fileTimestamp, formatStoredDate, localDay, today } from "../core/timestamp";
 
 /* =============================================================================
@@ -590,9 +596,7 @@ function saveSettings(): void {
       pausedTasks: settings.pausedTasks,
     };
     try {
-      await invoke("save_tool_file", { toolId: "time-tracker", kind: "settings",
-        data: JSON.stringify(own),
-      });
+      await saveToolJson("time-tracker", "settings", own);
     } catch (e) {
       // This fires from a timer. Without a catch, a failed save would
       // vanish as an unhandled rejection while the user believes the
@@ -615,8 +619,7 @@ async function loadSettings(): Promise<void> {
     // exist yet (first run after the split), the legacy values merged above
     // stand, and get persisted to the new home so the migration happens
     // exactly once.
-    const ownRaw = await invoke<string>("load_tool_file", { toolId: "time-tracker", kind: "settings" });
-    const own = JSON.parse(ownRaw || "{}");
+    const own = await loadToolJson<Record<string, unknown> | null>("time-tracker", "settings");
     const hasOwnFile =
       own && typeof own === "object" &&
       ("quickDelete" in own || "payPeriod" in own || "activities" in own || "projects" in own);
@@ -703,11 +706,7 @@ function entryToRow(e: Entry): Entry {
 
 async function saveToDisk(): Promise<void> {
   try {
-    await invoke("save_tool_file", {
-      toolId: "time-tracker",
-      kind: "data",
-      data: JSON.stringify(entries.map(entryToRow)),
-    });
+    await saveToolJson("time-tracker", "data", entries.map(entryToRow));
   } catch (err) {
     devError("Save failed:", err);
     flash(`Couldn't save your entries: ${String(err)}`, "error", 9000);
@@ -716,8 +715,7 @@ async function saveToDisk(): Promise<void> {
 
 async function loadFromDisk(): Promise<void> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "time-tracker", kind: "data" });
-    entries = parseEntries(raw);
+    entries = entriesFrom(await loadToolJson<unknown>("time-tracker", "data"));
   } catch (err) {
     devError("Load failed:", err);
     flash(`Couldn't load your entries: ${String(err)}`, "error", 9000);
@@ -737,13 +735,13 @@ async function loadFromDisk(): Promise<void> {
  * A record that is not an entry at all is dropped rather than fixed. One
  * malformed line must not take the whole ledger down with it.
  */
-function parseEntries(raw: string): Entry[] {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw || "[]");
-  } catch {
-    return [];
-  }
+function entriesFrom(parsed: unknown): Entry[] {
+  /* An empty ledger is what an ABSENT file means, and the back end answers a
+     missing time-tracker.json with "[]" so that case arrives here as one. It is
+     not what a file that would not parse means, and this used to return it for
+     both: a corrupt file showed as no entries and the next save wrote no
+     entries over it. The parse now happens in loadToolJson, which blocks that
+     save instead of letting this decide. */
   if (!Array.isArray(parsed)) return [];
 
   return parsed
@@ -815,8 +813,7 @@ function saveDraft(
 ): void {
   if (draftSaveTimer) clearTimeout(draftSaveTimer);
   draftSaveTimer = window.setTimeout(async () => {
-    await invoke("save_tool_file", { toolId: "time-tracker", kind: "draft",
-      data: JSON.stringify({
+    await saveToolJson("time-tracker", "draft", {
         selectedDate: datePicker.value,
         endDate: endDatePicker.value,
         endDateManuallySet,
@@ -825,9 +822,21 @@ function saveDraft(
         start: startInput.value,
         end: endInput.value,
         notes: notesInput.value,
-      }),
     });
   }, 500);
+}
+
+/** The half-typed entry the draft file holds. Every field is optional: it is
+ *  written whenever a box changes, so it can be saved with any of them empty. */
+interface StoredDraft {
+  selectedDate: string;
+  endDate: string;
+  endDateManuallySet: boolean;
+  project: string;
+  activity: string;
+  start: string;
+  end: string;
+  notes: string;
 }
 
 async function loadDraft(
@@ -841,8 +850,7 @@ async function loadDraft(
   onLoad: () => void,
 ): Promise<void> {
   try {
-    const raw = await invoke<string>("load_tool_file", { toolId: "time-tracker", kind: "draft" });
-    const draft = JSON.parse(raw);
+    const draft = await loadToolJson<Partial<StoredDraft>>("time-tracker", "draft");
     if (draft.selectedDate) datePicker.value = draft.selectedDate;
     if (draft.endDate)      endDatePicker.value = draft.endDate;
     endDateManuallySet = draft.endDateManuallySet === true;
@@ -3171,7 +3179,11 @@ async function refreshTTBackups(): Promise<void> {
       const raw = await readToolBackup("time-tracker", snapshot.name, entry.kind);
       // Written back through the ordinary save path, which captures what it is
       // replacing on the way past. See the header of core/tool-backups.ts.
-      await invoke("save_tool_file", { toolId: "time-tracker", kind: entry.kind, data: raw });
+      // A restore REPLACES the file with bytes that were captured from it, so
+      // it is allowed to land on one that would not read: that is the whole
+      // point of having the snapshot.
+      unblockAfterReplacement("time-tracker", entry.kind);
+      await saveToolText("time-tracker", entry.kind, raw);
       if (entry.kind === "data") {
         await loadFromDisk();
       } else {
