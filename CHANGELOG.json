@@ -36,29 +36,17 @@
         ],
         "Kanban": [
           "Added new tool that gives you Kanban boards for tracking work, with cards you drag between columns.",
-          "Make as many boards as you want, each with its own columns, and give a board a background image with adjustable blur and brightness so you can tell them apart at a glance.",
-          "Columns can be renamed, reordered, collapsed, and given a work-in-progress limit that flags the column when you go over it rather than stopping you.",
-          "Mark a column as meaning done, and cards dropped into it get their Completed date stamped automatically.",
-          "Card descriptions and comments are proper Markdown with a formatting toolbar, and switch between writing and a rendered view.",
           "Attach files to a card or to any individual comment. Images, video and audio play in the card; anything else opens in whatever program owns it. Ctrl+V pastes an image straight from the clipboard.",
-          "Open a card and it shows as something to read, with an edit button in the corner to switch to the fields. If you would rather skip that, there is an Open Cards in Edit Mode preference at both the tool and board level.",
-          "Cards open on a Basic tab, with Subtasks and Comments each getting their own tab so a long conversation does not bury the card itself.",
           "Priority and Effort are both five levels plus unset, and you can rename every level and set its color in the tool's Setup, with a reset back to the defaults.",
           "Tags live in categories, so you can have a Types category holding Bug and Feature, and a Versions category holding your releases, and filter on each independently.",
           "A card's color can come from the card itself, from its tags, or from its priority, set per board and overridable on any single card.",
-          "Filter a board by text, by tags, and by due state. The text filter searches card numbers, titles, descriptions, comments and attachment filenames.",
-          "Stage dates track when a card started, went to testing, and finished. An Advance button stamps the next one with today, and every date stays directly editable, because the honest case is that work started Tuesday and you are filling the card in on Thursday.",
-          "Card Stats and Board Stats read off those dates, giving you lead and cycle times, how much is in flight, what is overdue, and what has been completed in the last week, month and all time.",
           "Rearrange the blocks inside a card with the Card Layout editor, as a default and again per board if one board wants a different shape.",
           "Nearly every board preference can be set once for the tool and then overridden on individual boards.",
+          "Stage dates track when a card started, went to testing, and finished. An Advance button stamps the next one with today, and every date stays directly editable, because the honest case is that work started Tuesday and you are filling the card in on Thursday.",
           "Boards, cards and their attachments are included in the app's snapshots and in the Data tab's export and import.",
           "You can connect a local AI coding agent to a single board so it can read and change cards while you work in it, using Claude Code, OpenAI's Codex, or anything else that speaks MCP.",
           "The agent talks to the app over a local pipe. Nothing is sent over the internet, and the app itself decides every request rather than trusting the agent to check.",
-          "Board Setup > Agents is where you switch it on, and every permission starts off. Grant only creating cards, or add editing, moving, tagging, dates, subtasks, comments, archiving, deleting and column changes as you need them.",
-          "Copy the connection straight into your agent's config with one button, and use Test Connection to confirm the whole thing works before you rely on it.",
-          "Every request an agent makes, allowed or refused, is listed in an activity log, and a refusal names the exact switch that would have allowed it.",
-          "Cards record who made them, and you can set a card's owner to yourself, to an agent, or to External for something somebody else asked you for.",
-          "One switch in the tool's Setup turns off every agent on every board at once."
+          "Board Setup > Agents is where you switch it on, and every permission starts off. Grant only creating cards, or add editing, moving, tagging, dates, subtasks, comments, archiving, deleting and column changes as you need them."
         ],
         "Countdown Timer": [
           "Added a customizable Display View that can run while the timer counts down."
