@@ -8218,22 +8218,30 @@
             <div class="settings-row">
               <span class="kb-label-with-info">Connections
                 <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="Each connection is one key for one agent. Copy it into that agent's config once. Removing it here stops that agent immediately.">&#8505;</button>
+                  data-tooltip="Each connection is one key for one agent. Set the agent up with it once. Revoking it here stops that agent immediately.">&#8505;</button>
               </span>
               <button id="kbAgentNewConnectionBtn" class="settings-action-btn">+ New Connection</button>
             </div>
 
-            <!-- WHICH AGENT, because the config file is not the same for all of
-                 them. Picking one here changes what the copy buttons below
-                 produce, and the line under it says where that goes. A hint
-                 rather than a badge: a badge says how something stands, and
-                 this is an instruction. -->
+            <!-- WHICH AGENT, AND HOW IT GETS THE CONNECTION. Two choices, so two
+                 rows: they used to share one dropdown and four buttons on every
+                 connection. Each connection below has a single copy button that
+                 copies what these say, and the line under them says exactly what
+                 to do with it. A hint rather than a badge: a badge says how
+                 something stands, and this is an instruction. -->
             <div class="settings-row">
-              <span class="kb-label-with-info">Copy For
+              <span class="kb-label-with-info">Agent
                 <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="They all speak the same protocol. What differs is where each one keeps its server list and what that file looks like, so the buttons below give you the right shape for the one you use.">&#8505;</button>
+                  data-tooltip="The AI tool you want to connect to this board. They all speak the same protocol, but each keeps its settings in its own place.">&#8505;</button>
               </span>
               <select id="kbAgentClientSelect" class="settings-select"></select>
+            </div>
+            <div class="settings-row">
+              <span class="kb-label-with-info">Copy As
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Command sets the agent up for you when you paste it into Command Prompt or PowerShell. Config File is the block to add to the agent's settings file yourself, and is the only way for agents without a command.">&#8505;</button>
+              </span>
+              <select id="kbAgentCopyModeSelect" class="settings-select"></select>
             </div>
             <p id="kbAgentClientWhere" class="kb-section-hint"></p>
 

@@ -430,8 +430,8 @@ export interface AgentClient {
    *  `%USERPROFILE%\.codex\config.toml`. clientHint() builds the sentence
    *  around it, so this is a location and never an instruction. */
   where: string;
-  /** Whether it has a CLI that can add a server, and so a Copy as Command
-   *  button. connectionCommand() has a branch for each client marked true. */
+  /** Whether it has a CLI that can add a server, and so a Command option under
+   *  Copy As. srbk-agent's `connect` has to know every client marked true. */
   command: boolean;
   /** True for the terminal agents, false for the editors. Only groups the
    *  list; both kinds work identically. */
@@ -506,35 +506,44 @@ export function agentClient(id: string): AgentClient {
   return AGENT_CLIENTS.find((c) => c.id === id) ?? AGENT_CLIENTS[0];
 }
 
-/** The two copy buttons' labels. Shared with the hint that names them, so the
+/** How a connection is handed to its agent: a command that sets the agent up
+ *  by itself, or the block to add to the agent's settings file by hand. */
+export type AgentCopyMode = "command" | "config";
+
+/** The copy button's two labels. Shared with the hint that names them, so the
  *  instruction can never send someone looking for a button called something
  *  else. */
-export const COPY_COMMAND_LABEL = "Copy as Command";
+export const COPY_COMMAND_LABEL = "Copy Command";
+export const COPY_CONFIG_LABEL = "Copy Config";
 
-export function copyConfigLabel(client: AgentClient): string {
-  return `Copy for ${client.label}`;
+/** What the Copy As dropdown calls each way. */
+export const COPY_MODE_NAMES: Record<AgentCopyMode, string> = {
+  command: "Command",
+  config: "Config File",
+};
+
+/** The ways a client can take a connection, best first. The command comes
+ *  first because it cannot be done half right: it replaces the old entry and
+ *  checks the new one. An editor has no CLI, so its file is the only way. */
+export function copyModesFor(client: AgentClient): AgentCopyMode[] {
+  return client.command ? ["command", "config"] : ["config"];
 }
 
-/**
- * The line under Copy For: which button to press, and exactly what to do with
- * what it copies.
- *
- * PowerShell, and it says NOT Command Prompt, because the command is
- * PowerShell syntax (`2>$null`, `;` between steps, `&` to run the check) and
- * Command Prompt reads all three differently. Windows Terminal opens
- * PowerShell by default, but "paste it into a terminal" is how a paste into
- * cmd happens.
- */
-export function clientHint(client: AgentClient): string {
-  const parts = [
-    `Use "${copyConfigLabel(client)}" and add the block to ${client.where}.`,
-    "If that file already has other servers in it, add just this entry next to them.",
-  ];
-  if (client.command) {
-    parts.push(`Or use "${COPY_COMMAND_LABEL}" and paste it into PowerShell, not Command Prompt.`);
+/** The line under Copy As: which button to press, and exactly what to do with
+ *  what it copies. */
+export function clientHint(client: AgentClient, mode: AgentCopyMode): string {
+  if (mode === "command" && client.command) {
+    return (
+      `Press "${COPY_COMMAND_LABEL}" on a connection below, paste it into Command Prompt or ` +
+      `PowerShell, and press Enter. It sets up ${client.label}, replaces any older connection ` +
+      `for this board, and tells you whether it worked. Then restart ${client.label}.`
+    );
   }
-  parts.push(`Then restart ${client.label}.`);
-  return parts.join(" ");
+  return (
+    `Press "${COPY_CONFIG_LABEL}" on a connection below and add it to ${client.where}. If that ` +
+    `file already has other servers in it, add just this entry next to them. Then restart ` +
+    `${client.label}.`
+  );
 }
 
 /** What the sidecar is launched with, which is the same for every client. */
@@ -597,49 +606,28 @@ export function connectionConfig(info: ConnectionInfo, client: AgentClient): str
  * The same thing as a command, for the clients that have one. Null for the
  * editors, which are configured by editing their file.
  *
- * One line for PowerShell, which is what Windows Terminal opens, built so that
- * pasting it is the whole job however many times it has been done before:
+ * ONE LINE THAT RUNS THE SAME IN COMMAND PROMPT AND POWERSHELL. It used to be
+ * the steps themselves, written in PowerShell syntax (`2>$null`, `;` between
+ * steps, `&` to run the check). Pasted into Command Prompt, which is where a
+ * lot of people paste, the steps ran together into one garbled call, a file
+ * named `$null` appeared, and the check at the end still said the connection
+ * worked. Nobody should have to know which shell they are in.
  *
- *   1. REMOVE, then add. `mcp add` refuses a name that is already saved, and
- *      Revoke cannot reach the agent's settings, so an add-only command failed
- *      for every board that had ever been connected. Nothing on screen said the
- *      fix was to remove the old entry by hand. A remove with nothing to remove
- *      prints an error, which `2>$null` hides.
- *   2. USER SCOPE for Claude Code. The default scope is the folder the command
- *      is run in, and an elevated terminal opens in System32, so the connection
- *      was saved somewhere Claude would never be started from. The local-scope
- *      remove clears an entry an older version of this command left behind.
- *   3. CHECK. srbk-agent runs once with the same token and pipe and prints, in
- *      words, whether the board answered and what to do if it did not. It is
- *      the only feedback a pasted command gives before the agent is restarted.
+ * So the steps moved into srbk-agent itself (`connect`: remove the old entry,
+ * add this one, check it; see src-tauri/agent/src/main.rs), where they run as
+ * processes with real arguments instead of shell text, and this line only
+ * starts it. `cmd /c "<exe>" ...` is run identically by both shells, provided
+ * the line holds exactly ONE pair of quotes: Command Prompt keeps them around
+ * the exe then, and PowerShell passes the quoted path on as one argument.
+ * Everything else is quote-free by construction: a client id, a serverKey (a-z,
+ * 0-9, dashes), a token (`srbk1_` and hex) and a pipe name.
  *
  * Replacing is safe because the key is per board and per build: see serverKey.
  */
 export function connectionCommand(info: ConnectionInfo, client: AgentClient): string | null {
   if (!client.command) return null;
   const key = serverKey(info.boardName, info.pipeName);
-  const env = [`SRBK_AGENT_TOKEN=${info.token}`, `SRBK_AGENT_PIPE=${info.pipeName}`].map(
-    (e) => `--env ${e}`,
-  );
-  const exe = `"${info.sidecarPath}"`;
-  const check = `& ${exe} check --token ${info.token} --pipe ${info.pipeName}`;
-
-  if (client.id === "claude-code") {
-    return [
-      `claude mcp remove ${key} -s local 2>$null`,
-      `claude mcp remove ${key} -s user 2>$null`,
-      ["claude mcp add", key, "-s user", ...env, `-- ${exe} --mcp`].join(" "),
-      check,
-    ].join("; ");
-  }
-  if (client.id === "codex") {
-    return [
-      `codex mcp remove ${key} 2>$null`,
-      ["codex mcp add", key, ...env, `-- ${exe} --mcp`].join(" "),
-      check,
-    ].join("; ");
-  }
-  return null;
+  return `cmd /c "${info.sidecarPath}" connect ${client.id} --name ${key} --token ${info.token} --pipe ${info.pipeName}`;
 }
 
 /* =============================================================================

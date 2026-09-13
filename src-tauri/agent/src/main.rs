@@ -858,8 +858,7 @@ fn describe_success(result: &Value, dev: bool) -> String {
     };
     format!(
         "Connection works.\n\n  App:         Swiss RB Knife ({})\n  Board:       {board}\n  \
-         Connection:  {label}\n  It may:      {may}\n\nRestart your agent so it picks up the \
-         connection.",
+         Connection:  {label}\n  It may:      {may}",
         build_name(dev)
     )
 }
@@ -883,14 +882,253 @@ fn describe_failure(err: &AppError, dev: bool) -> String {
         }
         "unknown_token" => "Connection does not work: Swiss RB Knife does not recognize it.\n\n\
              It was revoked, or replaced by a newer one. In Swiss RB Knife, open Kanban > the \
-             board > Setup > Agents, press Copy as Command on the connection you want, and \
-             paste it into PowerShell. It replaces this one."
+             board > Setup > Agents, press Copy Command on the connection you want, and paste \
+             it into Command Prompt or PowerShell. It replaces this one."
             .to_string(),
         "access_disabled" | "board_disabled" => {
             format!("Connection does not work yet: agent access is off.\n\n{}", err.message)
         }
         _ => format!("Connection does not work: {} ({})", err.message, err.code),
     }
+}
+
+/* =============================================================================
+   CONNECT: saving this connection into an agent's own settings
+   -----------------------------------------------------------------------------
+   `srbk-agent connect claude-code --name <key> --token <t> --pipe <p>`
+
+   What the Agents tab's Copy Command copies, behind `cmd /c "<this exe>"`. The
+   copied line used to BE these steps, written in PowerShell syntax, and pasted
+   into Command Prompt it quietly did nothing: the steps ran together into one
+   garbled call, a file named `$null` appeared, and the check at the end still
+   said the connection worked. Here they are processes started with real
+   arguments rather than shell text, so the copied line is one call that
+   Command Prompt and PowerShell both run the same way.
+
+   THE STEPS, and why each is there:
+
+     1. REMOVE whatever is saved under this name. `mcp add` refuses a name it
+        already has, and Revoke in the app cannot reach the agent's settings, so
+        an add-only command failed for every board that had ever been connected.
+        Claude Code is cleared in the user scope (where this saves) and the
+        local scope (where the older command saved, in whatever folder it ran
+        in). Nothing to remove is the usual case, so a failed remove is fine.
+     2. ADD it. Claude Code at user scope, because the default is the folder the
+        terminal happens to be in, and an elevated terminal opens in System32.
+     3. CHECK it with the same token and pipe, and say in words what happened.
+
+   The agent's CLI is found by name on PATH, exactly as the user's own terminal
+   would find it. This process is not elevated: it is the user running their own
+   tool, which is why a bare name is right here and would not be in the app.
+============================================================================= */
+
+/// The agents `connect` knows how to set up. Their ids match the clients marked
+/// `command: true` in src/tool/kanban-agents.ts, and a check keeps them in step.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum AgentCli {
+    ClaudeCode,
+    Codex,
+}
+
+impl AgentCli {
+    fn parse(id: &str) -> Option<Self> {
+        match id {
+            "claude-code" => Some(Self::ClaudeCode),
+            "codex" => Some(Self::Codex),
+            _ => None,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::ClaudeCode => "Claude Code",
+            Self::Codex => "Codex",
+        }
+    }
+
+    /// Program names to try, in order. The native installers put an .exe on
+    /// PATH; an npm install puts a .cmd shim there instead, and a .cmd has to be
+    /// named in full to be started as a process.
+    fn programs(self) -> &'static [&'static str] {
+        match self {
+            Self::ClaudeCode => &["claude", "claude.cmd"],
+            Self::Codex => &["codex", "codex.cmd"],
+        }
+    }
+
+    fn remove_args(self, name: &str) -> Vec<Vec<String>> {
+        match self {
+            Self::ClaudeCode => ["user", "local"]
+                .iter()
+                .map(|scope| owned(&["mcp", "remove", name, "-s", scope]))
+                .collect(),
+            Self::Codex => vec![owned(&["mcp", "remove", name])],
+        }
+    }
+
+    fn add_args(self, name: &str, token: &str, pipe: &str, exe: &str) -> Vec<String> {
+        let mut args = owned(&["mcp", "add", name]);
+        if self == Self::ClaudeCode {
+            args.extend(owned(&["-s", "user"]));
+        }
+        args.extend([
+            "--env".to_string(),
+            format!("SRBK_AGENT_TOKEN={token}"),
+            "--env".to_string(),
+            format!("SRBK_AGENT_PIPE={pipe}"),
+            // Everything after this is the server's own command line. The exe
+            // path is ONE argument, spaces and all, which is exactly what a line
+            // of shell text kept getting wrong.
+            "--".to_string(),
+            exe.to_string(),
+            "--mcp".to_string(),
+        ]);
+        args
+    }
+}
+
+fn owned(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| item.to_string()).collect()
+}
+
+enum CliRun {
+    Ran(std::process::Output),
+    /// None of the program names exists on PATH.
+    Missing,
+    Failed(String),
+}
+
+fn run_agent_cli(cli: AgentCli, args: &[String]) -> CliRun {
+    for program in cli.programs() {
+        match std::process::Command::new(program)
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .output()
+        {
+            Ok(output) => return CliRun::Ran(output),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) => return CliRun::Failed(err.to_string()),
+        }
+    }
+    CliRun::Missing
+}
+
+/// A server name as serverKey() in the app makes them. Checked because it
+/// becomes an argument to someone else's CLI and a key in their settings.
+fn valid_server_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+fn flag_value(args: &[String], flag: &str) -> Option<String> {
+    let at = args.iter().position(|arg| arg == flag)?;
+    args.get(at + 1).cloned()
+}
+
+fn describe_missing_cli(cli: AgentCli) -> String {
+    let label = cli.label();
+    format!(
+        "Nothing was changed: {label} isn't installed, or this terminal can't find it.\n\n\
+         Install {label}, open a new terminal, and paste the command again. Or, in Swiss RB \
+         Knife, set Copy As to Config File and add the block to {label}'s settings file."
+    )
+}
+
+/// What the agent's CLI printed, for when it refused.
+fn cli_said(output: &std::process::Output) -> String {
+    let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let out = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if err.is_empty() {
+        out
+    } else {
+        err
+    }
+}
+
+/// `srbk-agent connect <agent>`. Everything goes to stdout, because it is a
+/// report written for the person who pasted the command.
+fn run_connect(connection: &Connection, args: &[String]) -> i32 {
+    let Some(cli) = args.get(1).and_then(|id| AgentCli::parse(id)) else {
+        println!(
+            "Nothing was changed: this command does not say which agent to set up. Copy it \
+             from Swiss RB Knife again: Kanban > the board > Setup > Agents."
+        );
+        return 2;
+    };
+    let Some(name) = flag_value(args, "--name").filter(|name| valid_server_name(name)) else {
+        println!(
+            "Nothing was changed: this command is missing its connection name. Copy it from \
+             Swiss RB Knife again: Kanban > the board > Setup > Agents."
+        );
+        return 2;
+    };
+    let exe = match std::env::current_exe() {
+        Ok(path) => path.to_string_lossy().to_string(),
+        Err(err) => {
+            println!("Nothing was changed: could not work out where srbk-agent.exe is ({err}).");
+            return 1;
+        }
+    };
+    let label = cli.label();
+    println!("Connecting {label} to Swiss RB Knife...\n");
+
+    let mut replaced = false;
+    for remove in cli.remove_args(&name) {
+        match run_agent_cli(cli, &remove) {
+            CliRun::Missing => {
+                println!("{}", describe_missing_cli(cli));
+                return 1;
+            }
+            CliRun::Ran(output) if output.status.success() => replaced = true,
+            // Nothing saved under that name, which is the usual case.
+            _ => {}
+        }
+    }
+
+    let add = cli.add_args(&name, &connection.token, &connection.pipe, &exe);
+    match run_agent_cli(cli, &add) {
+        CliRun::Ran(output) if output.status.success() => {
+            if replaced {
+                println!("  Replaced the earlier connection in {label} (\"{name}\").");
+            } else {
+                println!("  Saved the connection in {label} as \"{name}\".");
+            }
+        }
+        CliRun::Ran(output) => {
+            if replaced {
+                println!("The old connection was removed, but {label} would not save the new one. It said:\n");
+            } else {
+                println!("Nothing was saved: {label} would not save the connection. It said:\n");
+            }
+            for line in cli_said(&output).lines() {
+                println!("  {line}");
+            }
+            return 1;
+        }
+        CliRun::Missing => {
+            println!("{}", describe_missing_cli(cli));
+            return 1;
+        }
+        CliRun::Failed(err) => {
+            println!("Nothing was saved: {label} could not be started ({err}).");
+            return 1;
+        }
+    }
+
+    println!();
+    let code = match connection.send("capabilities", &json!({})) {
+        Ok(result) => {
+            println!("{}", describe_success(&result, connection.is_dev()));
+            0
+        }
+        Err(err) => {
+            println!("{}", describe_failure(&err, connection.is_dev()));
+            1
+        }
+    };
+    println!("\nRestart {label} so it picks up the connection.");
+    code
 }
 
 /// `srbk-agent check`: the connection, tried and described in words.
@@ -942,6 +1180,8 @@ fn usage() {
 USAGE
   srbk-agent --mcp                  Speak MCP on stdin/stdout. This is what an
                                     AI agent's config launches.
+  srbk-agent connect <agent>        Save this connection in claude-code or codex, replacing
+                                    an older one, then check it. Needs --name.
   srbk-agent check                  Say whether this connection works, in words.
   srbk-agent capabilities           Print the board and what it allows.
   srbk-agent call <op> [json]       Send one operation and print the result.
@@ -989,6 +1229,7 @@ fn main() {
     match first {
         "--mcp" | "mcp" => run_mcp(connection),
         "check" => std::process::exit(run_check(&connection)),
+        "connect" => std::process::exit(run_connect(&connection, &args)),
         "capabilities" => std::process::exit(run_cli(connection, "capabilities", None)),
         "call" => {
             let Some(op) = args.get(1) else {
@@ -1086,7 +1327,8 @@ mod tests {
     fn a_revoked_connection_says_how_to_replace_it() {
         let text = describe_failure(&failure("unknown_token"), false);
         assert!(text.starts_with("Connection does not work"), "{text}");
-        assert!(text.contains("Copy as Command"), "{text}");
+        assert!(text.contains("Copy Command"), "{text}");
+        assert!(text.contains("Command Prompt or PowerShell"), "{text}");
         assert!(text.contains("replaces"), "{text}");
     }
 
@@ -1124,5 +1366,60 @@ mod tests {
     fn nothing_switched_on_says_where_to_switch_it() {
         let result = json!({ "board": { "name": "SRBK" }, "connection": { "label": "x" }, "allowed": [] });
         assert!(describe_success(&result, false).contains("Kanban > SRBK > Setup > Agents"));
+    }
+
+    fn as_strs(args: &[String]) -> Vec<&str> {
+        args.iter().map(String::as_str).collect()
+    }
+
+    #[test]
+    fn claude_code_is_saved_for_the_user_after_clearing_both_scopes() {
+        let removes = AgentCli::ClaudeCode.remove_args("srbk-dev-kanban-x");
+        let removes: Vec<Vec<&str>> = removes.iter().map(|r| as_strs(r)).collect();
+        assert!(removes.contains(&vec!["mcp", "remove", "srbk-dev-kanban-x", "-s", "user"]));
+        assert!(removes.contains(&vec!["mcp", "remove", "srbk-dev-kanban-x", "-s", "local"]));
+
+        let exe = r"C:\Program Files\Swiss RB Knife\srbk-agent.exe";
+        let add = AgentCli::ClaudeCode.add_args("srbk-dev-kanban-x", "srbk1_ab", r"\\.\pipe\p.dev", exe);
+        let add = as_strs(&add);
+        assert_eq!(&add[..5], &["mcp", "add", "srbk-dev-kanban-x", "-s", "user"]);
+        assert!(add.contains(&"SRBK_AGENT_TOKEN=srbk1_ab"));
+        assert!(add.contains(&r"SRBK_AGENT_PIPE=\\.\pipe\p.dev"));
+        // The exe path is one argument, spaces and all.
+        let sep = add.iter().position(|a| *a == "--").unwrap();
+        assert_eq!(&add[sep + 1..], &[exe, "--mcp"]);
+    }
+
+    #[test]
+    fn codex_has_no_scope_to_pass() {
+        let add = AgentCli::Codex.add_args("srbk-kanban-x", "t", "p", "exe");
+        assert!(!add.iter().any(|a| a == "-s"));
+        assert_eq!(
+            AgentCli::Codex.remove_args("srbk-kanban-x"),
+            vec![owned(&["mcp", "remove", "srbk-kanban-x"])]
+        );
+    }
+
+    #[test]
+    fn only_agents_with_a_cli_can_be_connected() {
+        assert_eq!(AgentCli::parse("claude-code"), Some(AgentCli::ClaudeCode));
+        assert_eq!(AgentCli::parse("codex"), Some(AgentCli::Codex));
+        assert_eq!(AgentCli::parse("cursor"), None);
+    }
+
+    #[test]
+    fn a_connection_name_is_what_serverkey_makes_and_nothing_else() {
+        assert!(valid_server_name("srbk-dev-kanban-srbk"));
+        assert!(!valid_server_name(""));
+        assert!(!valid_server_name("srbk kanban"));
+        assert!(!valid_server_name("srbk&calc"));
+        assert!(!valid_server_name(&"a".repeat(65)));
+    }
+
+    #[test]
+    fn a_missing_agent_says_nothing_changed_and_what_to_do_instead() {
+        let text = describe_missing_cli(AgentCli::ClaudeCode);
+        assert!(text.starts_with("Nothing was changed"), "{text}");
+        assert!(text.contains("Config File"), "{text}");
     }
 }

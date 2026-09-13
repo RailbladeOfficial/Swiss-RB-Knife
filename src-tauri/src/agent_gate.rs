@@ -480,9 +480,9 @@ fn authorize<'a>(
         return Err(Refusal {
             code: "unknown_token",
             message: "This connection is not recognized, so it was revoked or replaced. In Swiss \
-                      RB Knife, open Kanban > the board > Setup > Agents, press Copy as Command, \
-                      and paste it into PowerShell. It replaces the old connection. Then restart \
-                      the agent."
+                      RB Knife, open Kanban > the board > Setup > Agents, press Copy Command, \
+                      and paste it into Command Prompt or PowerShell. It replaces the old \
+                      connection. Then restart the agent."
                 .to_string(),
             logged: false,
         });

@@ -417,22 +417,36 @@ test("Codex gets TOML, with its paths escaped", () => {
 });
 
 test("only the clients with a command offer one", () => {
-  /* An editor is configured by editing its file. A "Copy as Command" button
-     beside one would be an instruction to run something that does not exist,
-     so connectionCommand returns null and the button is not drawn. */
+  /* An editor is configured by editing its file. Offering it a command would
+     be an instruction to run something that does not exist, so
+     connectionCommand returns null for it, Copy As offers only Config File, and
+     the copy button copies the config. */
   const src = read("src/tool/kanban-agents.ts");
   const fn = src.slice(src.indexOf("export function connectionCommand"));
   const body = fn.slice(0, fn.indexOf("\n}"));
-  assert.match(body, /claude mcp add/, "Claude Code has no command");
-  assert.match(body, /codex mcp add/, "Codex has no command");
-  assert.match(body, /return null/, "every client is offered a command, including the editors");
+  assert.match(body, /if \(!client\.command\) return null/, "every client is offered a command, including the editors");
 
-  // The button has to honor that null rather than copying "null".
-  const ui = read("src/tool/kanban.ts");
+  const modes = src.slice(src.indexOf("export function copyModesFor"));
   assert.match(
-    ui,
-    /if \(command\) actions\.append\(copyCmd\)/,
-    "the command button is drawn for clients that have no command",
+    modes.slice(0, modes.indexOf("\n}")),
+    /client\.command \? \["command", "config"\] : \["config"\]/,
+    "Copy As offers a command to an agent that has none",
+  );
+
+  // Every client marked as having a command is one srbk-agent connect can set up.
+  const list = src.slice(src.indexOf("export const AGENT_CLIENTS"), src.indexOf("export function agentClient"));
+  const flagged = [...list.matchAll(/id: "([a-z-]+)"[\s\S]*?command: (true|false)/g)]
+    .filter((m) => m[2] === "true")
+    .map((m) => m[1])
+    .sort();
+  const known = [...sidecar().matchAll(/"([a-z-]+)" => Some\(Self::/g)].map((m) => m[1]).sort();
+  assert.deepEqual(flagged, known, "the app offers a command for an agent srbk-agent connect cannot set up, or the other way round");
+
+  // The button copies a command only when Copy As asks for one AND there is one.
+  assert.match(
+    read("src/tool/kanban.ts"),
+    /const command = agentCopyMode === "command" \? connectionCommand\(info, client\) : null;/,
+    "the copy button can copy a command the client does not have",
   );
 });
 
@@ -555,37 +569,43 @@ test("a permission flipped mid-session reaches the agent's tool list", () => {
   );
 });
 
-test("a copied command replaces the old connection and says whether the new one works", () => {
-  /* Three ways a paste used to quietly fail. `mcp add` refuses a name it
-     already has, and Revoke cannot reach the agent's settings, so the command
-     failed for every board that had ever been connected. Claude Code's default
-     scope is the folder the command runs in, and an elevated terminal opens in
-     System32. And nothing afterwards said whether it had worked. */
+test("a copied command runs the same in Command Prompt and PowerShell, and does the whole job", () => {
+  /* The command used to be the steps themselves, in PowerShell syntax. Pasted
+     into Command Prompt it did nothing useful: the steps ran together, a file
+     named $null appeared, and the check still said the connection worked. Now
+     the copied line is one call to srbk-agent connect behind cmd /c, which both
+     shells run the same way as long as it carries exactly one pair of quotes
+     (around the exe path), and the steps are processes the sidecar starts.
+
+     What connect has to do is what an add-only command got wrong: remove the
+     old entry first (`mcp add` refuses a name it already has, and Revoke cannot
+     reach the agent's settings), save Claude Code at user scope (the default is
+     whatever folder the terminal is in), and check afterwards. */
   const src = read("src/tool/kanban-agents.ts");
   const fn = src.slice(src.indexOf("export function connectionCommand"));
   const body = fn.slice(0, fn.indexOf("\n}"));
-
-  const claude = body.slice(body.indexOf('"claude-code"'), body.indexOf('"codex"'));
-  const remove = claude.indexOf("claude mcp remove");
-  assert.ok(
-    remove !== -1 && remove < claude.indexOf("claude mcp add"),
-    "Claude Code's command adds without removing the old entry first",
-  );
-  assert.match(claude, /"-s user"/, "Claude Code's connection is saved to whatever folder the command ran in");
-
-  const codex = body.slice(body.indexOf('"codex"'));
-  const codexRemove = codex.indexOf("codex mcp remove");
-  assert.ok(
-    codexRemove !== -1 && codexRemove < codex.indexOf("codex mcp add"),
-    "Codex's command adds without removing the old entry first",
-  );
-
-  assert.match(body, /check --token/, "the command does not check the connection it just saved");
+  const line = body.slice(body.indexOf("return `"));
+  const template = line.slice(0, line.indexOf("`;"));
   assert.match(
-    sidecar(),
-    /"check"\s*=>\s*std::process::exit\(run_check/,
-    "the sidecar has no check command for the pasted line to run",
+    template,
+    /^return `cmd \/c "\$\{info\.sidecarPath\}" connect \$\{client\.id\}/,
+    "the copied line is not a single cmd /c call to srbk-agent connect",
   );
+  assert.equal((template.match(/"/g) ?? []).length, 2, "cmd /c only keeps its quotes when the line has exactly one pair");
+  assert.ok(!/2>\$null|; |&/.test(template), "the copied line carries syntax one of the two shells cannot run");
+  assert.match(template, /--name \$\{key\}/, "the command does not say which name to save the connection under");
+
+  const agent = sidecar();
+  assert.match(agent, /"connect" => std::process::exit\(run_connect\(/, "srbk-agent has no connect command");
+  const start = agent.indexOf("fn run_connect(");
+  const connect = agent.slice(start, start + 4000);
+  const removeAt = connect.indexOf("remove_args(");
+  const addAt = connect.indexOf("add_args(");
+  const checkAt = connect.indexOf('send("capabilities"');
+  assert.ok(removeAt !== -1 && removeAt < addAt, "connect adds without removing the old entry first");
+  assert.ok(addAt < checkAt, "connect does not check the connection after saving it");
+  const addStart = agent.indexOf("fn add_args(");
+  assert.match(agent.slice(addStart, addStart + 900), /"-s", "user"/, "Claude Code's connection is saved to whatever folder the terminal is in");
 });
 
 test("a dev build's connection can never replace the installed app's", () => {
@@ -626,35 +646,20 @@ test("the permissions modal knows its board without asking Board Setup", () => {
   assert.match(render.slice(0, 300), /agentBoard\(\)/, "the Agents screens do not redraw while Customize is open");
 });
 
-test("the Copy For hint names the buttons as they are labeled, and the right shell", () => {
-  /* The hint is the instruction ('Use "Copy for Claude Code" and...'), so a
-     button renamed without it sends people looking for something that is not
-     there. Both read the same label helpers. The command is PowerShell syntax
-     that Command Prompt cannot run, so the hint has to say which shell. */
+test("the Copy As hint names the button as it is labeled, whichever way is picked", () => {
+  /* The hint is the instruction ('Press "Copy Command" on a connection
+     below...'), so a button renamed without it sends people looking for
+     something that is not there. Both read the same labels. */
   const agents = read("src/tool/kanban-agents.ts");
   const hintFn = agents.slice(agents.indexOf("export function clientHint"));
   const hint = hintFn.slice(0, hintFn.indexOf("\n}"));
-  assert.match(hint, /copyConfigLabel\(client\)/, "the hint spells out the config button's label itself");
-  assert.match(hint, /COPY_COMMAND_LABEL/, "the hint spells out the command button's label itself");
-  assert.match(hint, /PowerShell, not Command Prompt/, "the hint does not say which shell runs the command");
+  assert.match(hint, /\$\{COPY_COMMAND_LABEL\}/, "the hint spells out the command button's label itself");
+  assert.match(hint, /\$\{COPY_CONFIG_LABEL\}/, "the hint spells out the config button's label itself");
+  assert.match(hint, /Command Prompt or `\s*\+\s*`PowerShell/, "the hint does not say where the command goes");
+  assert.match(hint, /\$\{client\.where\}/, "the config hint does not say which file");
 
   const ui = kanban();
-  assert.match(ui, /copyBtn\.textContent = copyConfigLabel\(client\)/, "the config button has its own label");
-  assert.match(ui, /copyCmd\.textContent = COPY_COMMAND_LABEL/, "the command button has its own label");
-  assert.match(ui, /clientHint\(agentClient\(agentClientId\)\)/, "the line under Copy For is not the hint");
-
-  // The hint offers the command exactly for the clients that have one.
-  const cmdFn = agents.slice(agents.indexOf("export function connectionCommand"));
-  const cmd = cmdFn.slice(0, cmdFn.indexOf("\n}"));
-  assert.match(cmd, /if \(!client\.command\) return null/, "a client without a command can still be handed one");
-  const list = agents.slice(
-    agents.indexOf("export const AGENT_CLIENTS"),
-    agents.indexOf("export function agentClient"),
-  );
-  const flagged = [...list.matchAll(/id: "([a-z-]+)"[\s\S]*?command: (true|false)/g)]
-    .filter((m) => m[2] === "true")
-    .map((m) => m[1])
-    .sort();
-  const branched = [...cmd.matchAll(/client\.id === "([a-z-]+)"/g)].map((m) => m[1]).sort();
-  assert.deepEqual(flagged, branched, "the clients marked as having a command and the commands written differ");
+  assert.match(ui, /copyBtn\.textContent = COPY_COMMAND_LABEL/, "the command button has its own label");
+  assert.match(ui, /copyBtn\.textContent = COPY_CONFIG_LABEL/, "the config button has its own label");
+  assert.match(ui, /clientHint\(client, agentCopyMode\)/, "the line under Copy As is not the hint for the way picked");
 });

@@ -122,7 +122,10 @@ import {
   agentClient,
   clientHint,
   COPY_COMMAND_LABEL,
-  copyConfigLabel,
+  COPY_CONFIG_LABEL,
+  COPY_MODE_NAMES,
+  copyModesFor,
+  type AgentCopyMode,
   connectionCommand,
   connectionConfig,
   loadAgentConfig,
@@ -12002,6 +12005,12 @@ let agentConfig: AgentConfig | null = null;
    client, which is the one this was built against. */
 let agentClientId: string = AGENT_CLIENTS[0].id;
 
+/* HOW THE CONNECTION IS HANDED OVER: the command that sets the agent up, or the
+   block for its settings file. Session state like the agent above, and put back
+   to the agent's best way whenever the agent changes, so picking Claude Code
+   after looking at Cursor lands on the command rather than on Cursor's file. */
+let agentCopyMode: AgentCopyMode = "command";
+
 async function loadAgentConfigForTab(): Promise<AgentConfig> {
   agentConfig = await loadAgentConfig();
   return agentConfig;
@@ -12240,12 +12249,32 @@ function renderAgentClientPicker(): void {
     }
     select.addEventListener("change", () => {
       agentClientId = select.value;
+      agentCopyMode = copyModesFor(agentClient(agentClientId))[0];
       void renderAgentsTab();
     });
   }
 
   select.value = agentClientId;
-  document.getElementById("kbAgentClientWhere")!.textContent = clientHint(agentClient(agentClientId));
+  const client = agentClient(agentClientId);
+
+  /* Copy As, rebuilt per agent. An editor has no command, so its only option is
+     the config file and the dropdown is disabled rather than offering a choice
+     that is not one. */
+  const modes = copyModesFor(client);
+  if (!modes.includes(agentCopyMode)) agentCopyMode = modes[0];
+  const modeSelect = document.getElementById("kbAgentCopyModeSelect") as HTMLSelectElement;
+  modeSelect.replaceChildren(
+    ...modes.map((mode) => {
+      const option = document.createElement("option");
+      option.value = mode;
+      option.textContent = COPY_MODE_NAMES[mode];
+      return option;
+    }),
+  );
+  modeSelect.value = agentCopyMode;
+  modeSelect.disabled = modes.length === 1;
+
+  document.getElementById("kbAgentClientWhere")!.textContent = clientHint(client, agentCopyMode);
 }
 
 function renderAgentConnections(
@@ -12309,28 +12338,35 @@ function renderAgentConnections(
 
     const client = agentClient(agentClientId);
 
+    /* ONE copy button. What it copies is whatever Copy As says above, and its
+       label names exactly that, so the hint and the button always agree. An
+       editor has no command, and Copy As offers it nothing else, so this is
+       always the config there. */
+    const command = agentCopyMode === "command" ? connectionCommand(info, client) : null;
     const copyBtn = document.createElement("button");
     copyBtn.className = "settings-action-btn";
-    copyBtn.textContent = copyConfigLabel(client);
-    copyBtn.addEventListener("click", () => {
-      void copyAgentText(connectionConfig(info, client), `${client.label} connection`);
-    });
-
-    /* Only the agents that HAVE a command get the button for it. An editor is
-       configured by editing its file, and a button that copied a command it
-       has no way to run would be an instruction to do something impossible. */
-    const command = connectionCommand(info, client);
-    const copyCmd = document.createElement("button");
-    copyCmd.className = "settings-action-btn";
-    copyCmd.textContent = COPY_COMMAND_LABEL;
-    copyCmd.title =
-      `For PowerShell. Replaces this board's earlier connection in ${client.label}, ` +
-      "then checks that the new one works.";
-    copyCmd.addEventListener("click", () => {
-      if (command) {
-        void copyAgentText(command, "Command", "Paste it into PowerShell and press Enter.");
-      }
-    });
+    if (command) {
+      copyBtn.textContent = COPY_COMMAND_LABEL;
+      copyBtn.title =
+        `Sets up ${client.label} with this connection, replacing this board's earlier one ` +
+        "there, then checks that it works.";
+      copyBtn.addEventListener("click", () => {
+        void copyAgentText(
+          command,
+          "Command",
+          "Paste it into Command Prompt or PowerShell and press Enter.",
+        );
+      });
+    } else {
+      copyBtn.textContent = COPY_CONFIG_LABEL;
+      copyBtn.addEventListener("click", () => {
+        void copyAgentText(
+          connectionConfig(info, client),
+          `${client.label} config`,
+          `Add it to ${client.where}.`,
+        );
+      });
+    }
 
     /* Runs srbk-agent.exe for real, so a failure names the part that does not
        work: the exe missing, an antivirus blocking it, or a token this board no
@@ -12368,7 +12404,8 @@ function renderAgentConnections(
           } else {
             testResult.textContent =
               "Works in Swiss RB Knife, but no agent has used it since the app started. If " +
-              "your agent can't see this board, copy the command again and paste it.";
+              "your agent can't see this board, copy this connection again and set the agent " +
+              "up with it.";
           }
           // The sidecar's full report is the tooltip rather than the line: the
           // board, the connection and what it may do, or what to do about it.
@@ -12388,8 +12425,8 @@ function renderAgentConnections(
           title: "Revoke this connection?",
           message:
             `"${token.label}" stops working immediately. To reconnect an agent, copy a ` +
-            "connection's command and paste it again, which replaces the old one. Cards it " +
-            "already created keep its name.",
+            "connection and set the agent up with it again; a copied command replaces the old " +
+            "one by itself. Cards it already created keep its name.",
           confirmLabel: "Revoke",
           reopen: () => openBoardSetup(board, "agents"),
         },
@@ -12405,9 +12442,7 @@ function renderAgentConnections(
       );
     });
 
-    actions.append(copyBtn);
-    if (command) actions.append(copyCmd);
-    actions.append(testBtn, remove);
+    actions.append(copyBtn, testBtn, remove);
     row.appendChild(actions);
     row.appendChild(testResult);
     list.appendChild(row);
@@ -12585,6 +12620,11 @@ function wireAgentsTab(): void {
         mine.tokens.push(newConnection("Claude Code"));
       }
     });
+  });
+
+  document.getElementById("kbAgentCopyModeSelect")!.addEventListener("change", (e) => {
+    agentCopyMode = (e.target as HTMLSelectElement).value as AgentCopyMode;
+    void renderAgentsTab();
   });
 
   document.getElementById("kbAgentMasterOnBtn")!.addEventListener("click", () => {
