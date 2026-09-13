@@ -508,7 +508,8 @@ pub fn restore_db_backup(app: AppHandle, tool_id: String, name: String) -> Resul
                     .collect();
                 if shared.is_empty() {
                     return Ok(Err(format!(
-                        "That snapshot's '{table}' shares no column with this version's,                          so there is no safe way to put it back."
+                        "That snapshot's '{table}' shares no column with this \
+                         version's, so there is no safe way to put it back."
                     )));
                 }
                 let cols = shared.join(", ");

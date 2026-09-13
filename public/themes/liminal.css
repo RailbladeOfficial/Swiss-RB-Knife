@@ -278,7 +278,7 @@ body::after {
       rgba(14, 8, 13, 0.09) 2px,
       rgba(14, 8, 13, 0.09) 4px
     ),
-    /* Vignette, centred slightly high so the floor is the darkest part. Held
+    /* Vignette, centered slightly high so the floor is the darkest part. Held
        to 0.22 and starting late, at 55%: the window controls, the clock and
        the sidebar's Exit button all live in corners, and a vignette heavy
        enough to be admired is heavy enough to bury them. */
@@ -374,7 +374,7 @@ body:not(.theme-animations-off)::after {
       rgba(14, 8, 13, 0.09) 4px
     ),
     /* Vignette. Lighter than the window's, and it has to be: on a Display View
-       the card is one big centred object, and the same 0.22 that merely closes
+       the card is one big centered object, and the same 0.22 that merely closes
        the corners of a full app screen would visibly darken the ends of a
        clock or a line of text sitting across the middle of it. */
     radial-gradient(ellipse at 50% 42%, rgba(14, 8, 13, 0) 60%, rgba(14, 8, 13, 0.16) 100%);
@@ -923,7 +923,7 @@ textarea:focus {
    #lockScreen is z-index 9999, above the tape overlay, and paints an opaque
    --color-bg over the room, so neither full-window layer reaches it. It
    repaints the room itself instead: the same three fixtures, arranged around
-   the centred keypad rather than around the window. This is the first thing
+   the centered keypad rather than around the window. This is the first thing
    anyone with app-lock on ever sees of the theme, so it is worth the rule.
 ============================================================================= */
 

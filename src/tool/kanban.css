@@ -2545,7 +2545,7 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   padding: 5px 0;
 }
 
-/* Green rather than the muted grey the other badges use: this one says an agent
+/* Green rather than the muted gray the other badges use: this one says an agent
    is talking to the board RIGHT NOW, which is the one status worth spotting
    without reading it. */
 .kb-agent-live {

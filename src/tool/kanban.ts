@@ -6192,7 +6192,7 @@ function renderCardTags(card: Card): void {
     chip.type = "button";
     chip.className = "kb-tag-chip-btn";
     chip.textContent = tag.name;
-    chip.title = `${tag.name} — click to take it off`;
+    chip.title = `${tag.name}, click to take it off`;
     paintTagChip(chip, tagColor(tag, boardCategories), true);
     chip.addEventListener("click", () => {
       card.tagIds = card.tagIds.filter((id) => id !== tag.id);
