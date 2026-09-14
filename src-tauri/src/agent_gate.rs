@@ -613,7 +613,10 @@ fn handle_request(app: &AppHandle, raw: &[u8]) -> Value {
                 // Filed under the board it was about. The unlogged refusals are
                 // the ones with no board to file them under.
                 if let Some((board_id, token)) = find_token(&config, &request.token) {
-                    append_log(app, board_id, &token.label, &request.op, false, refusal.code);
+                    // The sentence, not the code: the activity list shows it
+                    // behind a refused row's info button, and "permission_denied"
+                    // does not say which switch.
+                    append_log(app, board_id, &token.label, &request.op, false, &refusal.message);
                 }
             }
             return error_response(refusal.code, refusal.message);

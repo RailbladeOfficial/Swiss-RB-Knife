@@ -12543,6 +12543,18 @@ function renderAgentConnections(
   }
 }
 
+/** What a refused row's info button says. Refusals are logged as the sentence
+ *  the agent was shown, which names the switch. Entries from before that were
+ *  logged as a bare code, which is turned into words rather than shown raw. */
+function refusalReason(error: string): string {
+  if (/\s/.test(error)) return error;
+  if (error === "permission_denied") {
+    return "Refused because a switch was off. This entry was logged before the reason was kept, so it cannot say which one.";
+  }
+  if (error === "board_disabled") return "Refused because agent access was switched off for this board.";
+  return `Refused (${error}).`;
+}
+
 /** Takes the entries rather than fetching them: the live badge needs the same
  *  read, and two reads of the same file would be two answers. */
 function renderAgentLog(entries: AgentLogEntry[]): void {
@@ -12566,16 +12578,35 @@ function renderAgentLog(entries: AgentLogEntry[]): void {
     const at = new Date(entry.at);
     when.textContent = Number.isNaN(at.getTime()) ? entry.at : at.toLocaleString();
 
+    // The status sits before what was asked, at a fixed width, so the requests
+    // line up down the list and a run of refusals reads as a column.
+    const outcome = document.createElement("span");
+    outcome.className = entry.ok
+      ? "kb-agent-log-outcome kb-agent-log-passed"
+      : "kb-agent-log-outcome";
+    outcome.textContent = entry.ok ? "Passed" : "Refused";
+
     const what = document.createElement("span");
     what.className = "kb-agent-log-what";
     what.textContent = `${entry.agent}: ${opLabel(entry.op)}`;
 
-    const outcome = document.createElement("span");
-    outcome.className = "kb-agent-log-outcome";
-    outcome.textContent = entry.ok ? "" : "Refused";
-    if (entry.error) outcome.title = entry.error;
+    row.append(when, outcome, what);
 
-    row.append(when, what, outcome);
+    // Why it was refused, on click at the far right, rather than a hover title
+    // nobody finds. The sentence names the switch that would have allowed it.
+    if (!entry.ok && entry.error) {
+      const reason = refusalReason(entry.error);
+      const info = document.createElement("button");
+      info.type = "button";
+      info.className = "info-trigger-btn kb-info-btn kb-agent-log-info";
+      info.textContent = "ℹ";
+      info.title = "Why was this refused?";
+      info.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleInfoTooltip(info, reason, "kb-info-tooltip");
+      });
+      row.appendChild(info);
+    }
     list.appendChild(row);
   }
 }

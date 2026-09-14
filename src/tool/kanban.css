@@ -2822,12 +2822,25 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   color: var(--color-text);
 }
 
-/* A refusal is the row worth finding in a long list, so it is the one that is
-   colored. The label carries the reason as its tooltip. */
+/* Every row says how it went, right after the time: Refused in red, Passed in
+   green. A fixed width keeps the request text starting at the same place on
+   every row. A refusal's label carries the reason as its tooltip. */
 .kb-agent-log-outcome {
   flex-shrink: 0;
+  min-width: 4.5em;
   color: var(--color-danger);
   font-weight: 600;
+}
+
+.kb-agent-log-passed {
+  color: var(--color-success);
+}
+
+/* The "why" button on a refused row. The request text already grows to fill
+   the row, so this lands at the far right on its own. */
+.kb-agent-log-info {
+  flex-shrink: 0;
+  align-self: center;
 }
 
 /* -----------------------------------------------------------------------------
