@@ -49,16 +49,16 @@ I'm not a dev, just a QA guy with a brain that doesn't like to settle or deal wi
 
 ## Philosophy
 
-Swiss RB Knife is open-source for two reasons; 1). I've spent three months working on this and trying to make it look nice while also being functional, so it feels like it'd be a shame to have it just sit on my computer, and 2). I personally believe that more software, especially when coded with AI, should be free and open to the masses. Too many proprietary tools out there, too many subscription-centric softwares that have flooded the market. Software should always be user-centered and user-owned.
+Swiss RB Knife is open-source for two reasons; 1). I started working on this at the end of March 2026 and have been trying to make it look nice while also being functional, so it feels like it'd be a shame to have it just sit on my computer, and 2). I personally believe that more software, especially when coded with AI, should be free and open to the masses. Too many proprietary tools out there, too many subscription-centric softwares that have flooded the market. Software should always be user-centered and user-owned.
 
 ---
 
 ## Tools
 
 ### - **Kanban**
-I've bounced off every board tool on the web. They all want an account, most want a subscription the moment you cross some arbitrary card count, and every one of them decides your data lives on their server instead of yours. So here's one that stays on your machine. Boards, columns, cards you drag around: the bits you'd expect are all here. Where it's different: attachments (video included) live right in the card instead of someone's cloud, tags live in categories so your Bug and Feature types don't get tangled up with your release versions, every card quietly timestamps when work started, hit testing and finished so Board Stats can hand you real lead and cycle times, and nearly every preference is set once and then overridden on whichever board wants its own way.
+Most Kanban tools want an account, more want a subscription the moment you cross some arbitrary card count, and every one of them decides your data lives on their server instead of your device. Other local ones have proven feature-bare for my needs or are slower to receive updates. So here's one that stays on your machine and gives you all the power you could want, and then some. Boards, columns, cards you can drag around: the bits you'd expect are all here. Where it's different: attachments (video included) live right in the card instead of someone's cloud, tags live in categories so your Bug and Feature types don't get tangled up with your release versions, every card quietly timestamps when work started, hit testing and finished so Board Stats can hand you real lead and cycle times, and nearly every preference is set once and then overridden on whichever board wants its own way.
 
-And if you use an AI coding agent, you can hand it one board. Claude Code, Codex, anything that speaks MCP - it reads and changes cards while you work, over a connection that never leaves your computer. Every permission starts off, the app checks every request itself rather than taking the agent's word for it, and everything the agent does gets logged. Setting it up is one button and one paste.
+And if you use an AI coding agent for dev work while you cosplay as a Product Owner, you can hand the agent one board. Claude Code, Codex, anything that speaks MCP - it reads and changes cards while you work, over a connection that stays on your computer. The agent itself is usually a cloud service, though, so whatever it reads from the board goes to that agent's provider, same as anything else you give it. Every permission starts off, the app checks every request itself rather than taking the agent's word for it, and everything the agent does gets logged. Setting it up is one button and one paste.
 
 <p align="center">
   <a href="./screenshots/kanban/kanban-boards.png" target="_blank">
@@ -329,7 +329,7 @@ The only things that ever land outside that folder are the ones you explicitly a
 
 **App Lock is a door, not a safe.** The lock screen keeps casual snoops out of the *UI*. It does not encrypt anything, and it doesn't throttle guesses. If someone has access to your Windows account, they can read the data files directly regardless. This just prevents Grandma from easily getting in and running a backup without your knowledge or adding "made popsicles" to your time tracker entries.
 
-**The Kanban agent bridge is off until you switch it on.** If you connect an AI coding agent to a board, it talks to the app over a named pipe on your own machine that only your Windows account can open. No port, no internet. Every permission starts off, the app checks every request itself, and everything an agent does is logged. The full rundown is in [SECURITY.md](SECURITY.md).
+**The Kanban agent bridge is off until you switch it on.** If you connect an AI coding agent to a board, it talks to the app over a named pipe on your own machine that only your Windows account can open. No port, and the app itself never touches the internet for it. The agent itself is usually a cloud service, though, so whatever it reads from the board goes to that agent's provider, same as anything else you give it. Every permission starts off, the app checks every request itself, and everything an agent does is logged. The full rundown is in [SECURITY.md](SECURITY.md).
 
 **Why does it demand admin rights?** Auto-Backup shells out to robocopy with `/COPYALL`, which preserves file ownership, ACLs, and auditing info: a *complete* mirror rather than a contents-only copy. Windows only grants the backup/restore privileges that requires to elevated processes. The free-space check (`fsutil` fallback) also wants elevation. If the elevation prompt bothers you, that's a healthy instinct. The tradeoff here is full-fidelity backups. For now, as this is a tool primarily for me, this is how it is, but for transparency, I've disclosed it here.
 
@@ -385,7 +385,7 @@ In plain terms:
 - Any modifications or forks must also be released under AGPL-3.0. You **cannot** take this code private or sell it as proprietary software.
 - If you run a modified version as a networked service, you must make the source available.
 - You **can** sell support, host a modified version commercially, or advertise around your fork, as long as the source remains open.
-- Credit to the original author (Railblade) must be preserved in all distributions.
+- Credit to the original author (Railblade), including a link to the original repository ([github.com/RailbladeOfficial/Swiss-RB-Knife](https://github.com/RailbladeOfficial/Swiss-RB-Knife)), must be preserved in all distributions and forks.
 
 See [LICENSE](LICENSE) for the full license text, and [LICENSING.md](LICENSING.md) for a human-readable summary.
 

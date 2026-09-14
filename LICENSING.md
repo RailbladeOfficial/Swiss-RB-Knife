@@ -25,7 +25,7 @@ The full license text is available in the [LICENSE](LICENSE) file included with 
 
 - **Keep it open.** Any modifications or forks you distribute must also be released under AGPL-3.0. You cannot make the code proprietary or sell it as closed-source software.
 - **Network use counts as distribution.** If you run a modified version as a networked service (e.g., a hosted web app), you must make the modified source code publicly available. This is what sets AGPL apart from standard GPL.
-- **Preserve attribution.** All distributions must retain the original copyright notice and credit to Railblade as the original author.
+- **Preserve attribution.** All distributions, forks included, must retain the original copyright notice, credit to Railblade as the original author, and a link to the original repository: https://github.com/RailbladeOfficial/Swiss-RB-Knife
 - **State your changes.** If you modify the software and distribute it, you must clearly indicate what changes were made.
 
 ### You May Not:
