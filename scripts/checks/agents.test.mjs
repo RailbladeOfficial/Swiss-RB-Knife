@@ -88,13 +88,17 @@ function frontEndOps() {
 function sidecarTools() {
   const text = sidecar();
   const block = text.slice(text.indexOf("const TOOLS:"), text.indexOf("\n];", text.indexOf("const TOOLS:")));
-  return [...block.matchAll(/name:\s*"(\w+)",\s*\n\s*op:\s*"(\w+)",\s*\n\s*permissions:\s*&\[([^\]]*)\]/g)].map(
-    (m) => ({
-      name: m[1],
-      op: m[2],
-      permissions: [...m[3].matchAll(/"(\w+)"/g)].map((p) => p[1]),
-    }),
+  return [...block.matchAll(/name:\s*"(\w+)",\s*\n\s*op:\s*"(\w+)",/g)].map((m) => ({ name: m[1], op: m[2] }));
+}
+
+/** The operations the Customize modal draws as always allowed. */
+function readAccessOps() {
+  const text = settings();
+  const block = text.slice(
+    text.indexOf("export const AGENT_READ_ACCESS"),
+    text.indexOf("];", text.indexOf("export const AGENT_READ_ACCESS")),
   );
+  return [...block.matchAll(/op:\s*"(\w+)"/g)].map((m) => m[1]);
 }
 
 /* -----------------------------------------------------------------------------
@@ -170,33 +174,73 @@ test("reading is free and everything that changes something costs a permission",
   assert.deepEqual(wrong, [], "these operations are on the wrong side of the read/write line");
 });
 
-test("every tool the sidecar offers maps to a real operation and real permissions", () => {
+test("every tool the sidecar offers maps to a real operation", () => {
   const ops = new Set(gateOps().map((o) => o.op));
-  const permissions = new Set(gatePermissions().map((p) => p.id));
-  const problems = [];
-  for (const tool of sidecarTools()) {
-    if (!ops.has(tool.op)) problems.push(`${tool.name} calls ${tool.op}, which does not exist`);
-    for (const id of tool.permissions) {
-      if (!permissions.has(id)) problems.push(`${tool.name} names ${id}, which does not exist`);
-    }
-  }
+  const problems = sidecarTools()
+    .filter((tool) => !ops.has(tool.op))
+    .map((tool) => `${tool.name} calls ${tool.op}, which does not exist`);
   assert.deepEqual(problems, []);
 });
 
-test("the sidecar hides a tool on exactly the permissions the gate charges for it", () => {
-  /* The sidecar trims its tool list to what is allowed, purely so a
-     well-behaved agent does not waste a turn discovering what it cannot do. If
-     it hides a tool on a DIFFERENT permission than the gate charges, the tool
-     disappears while still being allowed, or is offered while always failing.
-     Neither is enforcement, and neither is visible without this. */
-  const charged = new Map(gateOps().map((o) => [o.op, [...o.permissions].sort()]));
-  const wrong = sidecarTools()
-    .filter((tool) => {
-      const expected = charged.get(tool.op) ?? [];
-      return JSON.stringify([...tool.permissions].sort()) !== JSON.stringify(expected);
-    })
-    .map((tool) => `${tool.name}: hidden on ${tool.permissions}, charged ${charged.get(tool.op)}`);
-  assert.deepEqual(wrong, []);
+test("the sidecar offers every operation, so a blocked one is refused and logged", () => {
+  /* The tool list used to be trimmed to what the board allowed. An agent then
+     never attempted anything switched off: the gate never saw the request, so
+     nothing was refused and nothing reached the activity log, and a switch doing
+     its job looked exactly like a missing feature. Every operation the gate
+     performs now has a tool, listed unconditionally, and the gate alone decides. */
+  const offered = new Set(sidecarTools().map((tool) => tool.op));
+  const missing = gateOps()
+    .map((o) => o.op)
+    .filter((op) => op !== "capabilities" && !offered.has(op));
+  assert.deepEqual(missing, [], "these operations have no tool, so an agent can never try them");
+
+  const text = sidecar();
+  const at = text.indexOf('"tools/list" =>');
+  assert.match(text.slice(at, text.indexOf("\n", at)), /tool_list\(\)/, "tools/list no longer answers with the full list");
+  const body = slice("src-tauri/agent/src/main.rs", "fn tool_list(", "\n}");
+  assert.ok(!/filter|permission/.test(body), "the tool list is being trimmed to permissions again");
+});
+
+test("the modal's always-allowed list is exactly what the gate lets through for free", () => {
+  /* The Customize modal draws reading as switches locked on. A name there that
+     the gate charges for would promise access the gate refuses; a free
+     operation missing from it would under-report what every connection can do.
+     capabilities is the sidecar asking what it may do rather than anything done
+     to the board, so it is not drawn. */
+  const free = gateOps()
+    .filter((o) => o.permissions.length === 0 && o.op !== "capabilities")
+    .map((o) => o.op)
+    .sort();
+  assert.ok(free.length >= 3, "the gate's free operations did not parse");
+  assert.deepEqual([...readAccessOps()].sort(), free);
+});
+
+test("a refused edit names the exact switch for that card, and asking never changes the board", () => {
+  /* Editing a card is allowed by either of two switches, and which one applies
+     depends on who made the card. The gate cannot see that, so it refused
+     naming the first switch, which was wrong for every card the agent did not
+     make. It now asks the front end for the wording. That question has to be
+     answered before anything else runs (no write-rate charge, no operation) and
+     with words only. */
+  const gateText = gate();
+  const handler = gateText.slice(gateText.indexOf("fn handle_request("), gateText.indexOf("\n}", gateText.indexOf("fn handle_request(")));
+  assert.match(handler, /exact_refusal_message\(/, "a refusal is no longer reworded for whose card it is");
+  const asker = slice("src-tauri/src/agent_gate.rs", "fn exact_refusal_message(", "\n}");
+  assert.match(asker, /"explain":\s*true/, "the gate does not mark its question as a question");
+  assert.match(asker, /fallback/, "a failed question could lose the refusal's wording");
+
+  const text = kanban();
+  const run = text.slice(text.indexOf("async function runAgentRequest("), text.indexOf("switch (req.op)", text.indexOf("async function runAgentRequest(")));
+  const explainAt = run.indexOf("if (req.explain)");
+  assert.ok(explainAt > -1, "the front end does not answer the gate's question");
+  assert.ok(explainAt < run.indexOf("checkAgentWriteRate"), "asking for wording is charged as a write");
+
+  const explain = slice("src/tool/kanban.ts", "function explainEditRefusal(", "\n}");
+  for (const write of ["stampCard", "touchBoard", "flushSave", "renderAll", "saveBoard"]) {
+    assert.ok(!explain.includes(write), `explaining a refusal calls ${write}, so it can change the board`);
+  }
+  assert.match(explain, /"editCard"/);
+  assert.match(explain, /"editOthersCards"/);
 });
 
 test("a new board starts with nothing that can lose anything", () => {
@@ -540,36 +584,14 @@ test("no running agent can block a dev build", () => {
   assert.ok(!/target|exists\(\)/.test(devCode), "a dev app can still fall back to handing out an exe inside target/");
 });
 
-test("a permission flipped mid-session reaches the agent's tool list", () => {
-  /* The tool list is trimmed to what the board allows, and tools/list re-asks
-     the app every time so its answer is always current. But an MCP client asks
-     ONCE, at startup, and caches. Without a listChanged capability and a
-     notification to go with it, turning a permission ON changed nothing the
-     agent could see until the whole session was restarted, which reads to
-     everyone involved as the feature not existing. That is exactly how the
-     column tools went missing while their switch was on.
-
-     The two halves have to ship together: the capability is the promise, the
-     notification is the promise being kept, and declaring one without the
-     other is worse than declaring neither. */
+test("the tool list does not promise changes it never makes", () => {
+  /* While the list was trimmed to the board's permissions it had to change
+     mid-session, so it declared listChanged and a watcher polled for flips. The
+     list is fixed now, and declaring listChanged would have clients waiting on
+     notifications that never come. */
   const text = sidecar();
-  assert.match(
-    text,
-    /"listChanged":\s*true/,
-    "the sidecar tells clients its tool list never changes, so they will not re-ask",
-  );
-  assert.match(
-    text,
-    /notifications\/tools\/list_changed/,
-    "nothing ever tells the client to re-ask, so listChanged is a promise not kept",
-  );
-  // The notification is only meaningful if something recomputes the list off
-  // fresh permissions rather than the snapshot taken at startup.
-  assert.match(
-    text,
-    /fn spawn_permission_watcher/,
-    "no watcher, so the notification can never fire",
-  );
+  assert.match(text, /"listChanged":\s*false/, "the sidecar still tells clients its tool list changes");
+  assert.ok(!/notifications\/tools\/list_changed/.test(text), "a list-changed notification is still being sent");
 });
 
 test("a copied command runs the same in Command Prompt and PowerShell, and does the whole job", () => {

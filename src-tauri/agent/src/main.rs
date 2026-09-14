@@ -37,12 +37,10 @@
    connection.
 ============================================================================= */
 
-use std::collections::BTreeMap;
 use std::io::{BufRead, Read, Write};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 /// Matches agent_gate::pipe_name(). Overridable, because a dev build of the app
 /// listens on a different name and the connection block says which.
@@ -55,11 +53,6 @@ const ERROR_FILE_NOT_FOUND: i32 = 2;
 const ERROR_PIPE_BUSY: i32 = 231;
 
 const MAX_FRAME: u32 = 8 * 1024 * 1024;
-
-/// How often the tool list is re-derived from the board's permissions while an
-/// MCP session is open. See spawn_permission_watcher() for why this is a poll
-/// rather than something the app pushes.
-const PERMISSION_POLL: Duration = Duration::from_secs(5);
 
 /* =============================================================================
    TALKING TO THE APP
@@ -210,21 +203,21 @@ struct AppError {
 /* =============================================================================
    THE TOOLS THE AGENT SEES
    -----------------------------------------------------------------------------
-   One row per tool: the MCP name, the operation the app knows it by, the
-   permission that has to be on for it to be worth offering, and the schema.
+   One row per tool: the MCP name, the operation the app knows it by, and the
+   schema.
 
-   The permission is used ONLY to decide whether to LIST the tool. It is not a
-   check: the app checks, on every call, and would refuse a call to a tool this
-   program listed by mistake. Filtering the list exists so a well-behaved agent
-   does not spend its turn discovering what it cannot do.
+   EVERY TOOL IS ALWAYS LISTED, whatever the board's switches say. This program
+   decides nothing, so it does not decide what to show either. A tool that is
+   switched off is still offered; calling it reaches the app, which refuses it,
+   names the switch that would allow it, and writes the attempt to the board's
+   activity log. The list used to be trimmed to what was allowed, and a blocked
+   action was then never attempted at all: nothing was refused, nothing was
+   logged, and a switch doing its job looked exactly like a missing feature.
 ============================================================================= */
 
 struct ToolSpec {
     name: &'static str,
     op: &'static str,
-    /// Any one of these permissions is enough for the tool to be worth listing.
-    /// Empty means reading, which needs none.
-    permissions: &'static [&'static str],
     description: &'static str,
     schema: fn() -> Value,
 }
@@ -249,7 +242,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_get_board",
         op: "get_board",
-        permissions: &[],
         description: "The board itself: its columns in order, how many cards are in each, its \
                       WIP limits, and the tags it knows about. Start here.",
         schema: || schema(json!({}), &[]),
@@ -257,7 +249,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_list_cards",
         op: "list_cards",
-        permissions: &[],
         description: "Cards on the board, newest first, with optional filters. Returns a summary \
                       of each card rather than its full contents.",
         schema: || {
@@ -279,7 +270,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_get_card",
         op: "get_card",
-        permissions: &[],
         description: "One card in full: description, subtasks, comments, tags, dates and who \
                       created it.",
         schema: || schema(json!({ "card": card_ref() }), &["card"]),
@@ -287,7 +277,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_create_card",
         op: "create_card",
-        permissions: &["createCard"],
         description: "Adds a card to a column. Returns the new card, including the number the \
                       board gave it.",
         schema: || {
@@ -310,7 +299,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_update_card",
         op: "update_card",
-        permissions: &["editCard", "editOthersCards"],
         description: "Changes a card's title, description, priority or effort. Leave a field \
                       out to leave it alone.",
         schema: || {
@@ -329,7 +317,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_move_card",
         op: "move_card",
-        permissions: &["moveCard"],
         description: "Moves a card to another column, or to the top or bottom of the one it is \
                       already in.",
         schema: || {
@@ -346,7 +333,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_set_card_dates",
         op: "set_card_dates",
-        permissions: &["setDates"],
         description: "Sets or clears a card's due date and its work-stage stamps. Pass null to \
                       clear one. The due date is a day, YYYY-MM-DD. The three stage stamps \
                       record when something happened and take YYYY-MM-DDTHH:MM, or a bare \
@@ -367,7 +353,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_archive_card",
         op: "archive_card",
-        permissions: &["archiveCard"],
         description: "Takes a card off the board without destroying it, or puts an archived card \
                       back.",
         schema: || {
@@ -383,7 +368,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_delete_card",
         op: "delete_card",
-        permissions: &["deleteCard"],
         description: "Deletes a card permanently. Prefer archiving unless the user asked for it \
                       to be deleted.",
         schema: || schema(json!({ "card": card_ref() }), &["card"]),
@@ -391,7 +375,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_add_comment",
         op: "add_comment",
-        permissions: &["createComment"],
         description: "Adds a comment to a card. Comments are the right place for progress notes; \
                       the description is what the card is.",
         schema: || {
@@ -407,7 +390,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_delete_comment",
         op: "delete_comment",
-        permissions: &["deleteComment"],
         description: "Deletes one comment from a card.",
         schema: || {
             schema(
@@ -419,7 +401,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_add_subtask",
         op: "add_subtask",
-        permissions: &["manageSubtasks"],
         description: "Adds a subtask to a card's checklist.",
         schema: || {
             schema(json!({ "card": card_ref(), "text": { "type": "string" } }), &["card", "text"])
@@ -428,7 +409,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_set_subtask",
         op: "set_subtask",
-        permissions: &["manageSubtasks"],
         description: "Ticks, unticks or rewords one subtask.",
         schema: || {
             schema(
@@ -445,7 +425,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_remove_subtask",
         op: "remove_subtask",
-        permissions: &["manageSubtasks"],
         description: "Removes one subtask from a card.",
         schema: || {
             schema(
@@ -457,7 +436,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_set_card_tags",
         op: "set_card_tags",
-        permissions: &["assignTags"],
         description: "Replaces the tags on a card. The tags must already exist on the board; use \
                       kanban_get_board to see them.",
         schema: || {
@@ -473,7 +451,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_create_tag",
         op: "create_tag",
-        permissions: &["createTags"],
         description: "Adds a new tag to the board's vocabulary.",
         schema: || {
             schema(
@@ -489,7 +466,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_create_column",
         op: "create_column",
-        permissions: &["manageColumns"],
         description: "Adds a column to the board.",
         schema: || {
             schema(
@@ -506,7 +482,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_move_column",
         op: "move_column",
-        permissions: &["manageColumns"],
         description: "Moves a column to another place in the board's order.",
         schema: || {
             schema(
@@ -524,7 +499,6 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_update_column",
         op: "update_column",
-        permissions: &["manageColumns"],
         description: "Renames a column or changes its WIP limit or done flag.",
         schema: || {
             schema(
@@ -544,22 +518,16 @@ fn tool_by_name(name: &str) -> Option<&'static ToolSpec> {
     TOOLS.iter().find(|tool| tool.name == name)
 }
 
-/// Which tools to advertise, given what the board allows.
-///
-/// When the permission set cannot be fetched (the app is closed, most likely)
-/// EVERYTHING is listed. A short list cached by the agent's client while the app
-/// happened to be shut is worse than a long one: the calls would fail with a
-/// clear message either way, but a missing tool looks like a missing feature.
-fn visible_tools(permissions: Option<&Map<String, Value>>) -> Vec<&'static ToolSpec> {
+/// The tools/list answer: every tool, in list order. See the note above TOOLS
+/// for why nothing is filtered out.
+fn tool_list() -> Vec<Value> {
     TOOLS
         .iter()
-        .filter(|tool| {
-            if tool.permissions.is_empty() {
-                return true;
-            }
-            let Some(permissions) = permissions else { return true };
-            tool.permissions.iter().any(|id| {
-                permissions.get(*id).and_then(Value::as_bool).unwrap_or(false)
+        .map(|tool| {
+            json!({
+                "name": tool.name,
+                "description": tool.description,
+                "inputSchema": (tool.schema)()
             })
         })
         .collect()
@@ -579,67 +547,12 @@ fn visible_tools(permissions: Option<&Map<String, Value>>) -> Vec<&'static ToolS
 const KNOWN_PROTOCOLS: &[&str] = &["2024-11-05", "2025-03-26", "2025-06-18"];
 const DEFAULT_PROTOCOL: &str = "2025-06-18";
 
-/// The names of the tools currently worth listing, in list order.
-fn visible_tool_names(permissions: Option<&Map<String, Value>>) -> Vec<&'static str> {
-    visible_tools(permissions).into_iter().map(|tool| tool.name).collect()
-}
-
-/// Watches the board's permissions and tells the client when the tool list has
-/// changed underneath it.
-///
-/// WHY THIS EXISTS. tools/list re-asks the app for permissions every time, so
-/// the answer is always current. But a client asks once, at startup, and then
-/// caches. Flipping a switch in the Agents tab mid-session therefore changed
-/// nothing the agent could see: a permission turned ON left the tool invisible
-/// until the session was restarted, which reads as the feature not existing.
-///
-/// WHY IT POLLS. The wire is one request per connection, opened by this end.
-/// The app has no way to call out to a sidecar it did not spawn and holds no
-/// handle to, so "tell me when this changes" is not available and asking on an
-/// interval is what is left. The cost is one pipe round trip every few seconds
-/// for as long as an agent is connected.
-fn spawn_permission_watcher(
-    connection: Arc<Connection>,
-    stdout: Arc<Mutex<std::io::Stdout>>,
-    initial: Vec<&'static str>,
-) {
-    std::thread::spawn(move || {
-        let mut known = initial;
-        loop {
-            std::thread::sleep(PERMISSION_POLL);
-
-            // A failed fetch is the app being closed, not the permissions being
-            // empty. Holding the last known list keeps a shutdown from reading
-            // as a permission change and firing a pointless notification.
-            let Ok(fresh) = connection.send("capabilities", &json!({})) else { continue };
-            let current = visible_tool_names(
-                fresh.get("permissions").and_then(Value::as_object),
-            );
-            if current == known {
-                continue;
-            }
-            known = current;
-
-            let notification = json!({
-                "jsonrpc": "2.0",
-                "method": "notifications/tools/list_changed"
-            });
-            let Ok(mut out) = stdout.lock() else { break };
-            if writeln!(out, "{notification}").is_err() || out.flush().is_err() {
-                break;
-            }
-        }
-    });
-}
-
 fn run_mcp(connection: Connection) {
     let stdin = std::io::stdin();
-    let stdout = Arc::new(Mutex::new(std::io::stdout()));
-    let connection = Arc::new(connection);
+    let mut stdout = std::io::stdout();
 
-    // Asked once at startup so the board's name can go in the instructions and
-    // the tool list can be trimmed to what is allowed. A failure here is not
-    // fatal: the app may simply not be open yet.
+    // Asked once at startup so the board's name can go in the instructions. A
+    // failure here is not fatal: the app may simply not be open yet.
     //
     // Said on stderr either way, which is where an MCP client keeps a server's
     // log. A connection that silently does nothing is the failure people cannot
@@ -657,17 +570,6 @@ fn run_mcp(connection: Connection) {
             None
         }
     };
-
-    spawn_permission_watcher(
-        Arc::clone(&connection),
-        Arc::clone(&stdout),
-        visible_tool_names(
-            capabilities
-                .as_ref()
-                .and_then(|c| c.get("permissions"))
-                .and_then(Value::as_object),
-        ),
-    );
 
     for line in stdin.lock().lines() {
         let Ok(line) = line else { break };
@@ -689,28 +591,7 @@ fn run_mcp(connection: Connection) {
 
         let response = match method {
             "initialize" => Some(initialize_result(&params, capabilities.as_ref())),
-            "tools/list" => {
-                // Re-asked rather than reused: the user may have changed the
-                // permissions since this process started, and the tool list is
-                // the one place that shows.
-                let fresh = connection.send("capabilities", &json!({})).ok();
-                let permissions = fresh
-                    .as_ref()
-                    .or(capabilities.as_ref())
-                    .and_then(|c| c.get("permissions"))
-                    .and_then(Value::as_object);
-                let tools: Vec<Value> = visible_tools(permissions)
-                    .into_iter()
-                    .map(|tool| {
-                        json!({
-                            "name": tool.name,
-                            "description": tool.description,
-                            "inputSchema": (tool.schema)()
-                        })
-                    })
-                    .collect();
-                Some(Ok(json!({ "tools": tools })))
-            }
+            "tools/list" => Some(Ok(json!({ "tools": tool_list() }))),
             "tools/call" => Some(call_tool(&connection, &params)),
             "ping" => Some(Ok(json!({}))),
             // Declared as unsupported in initialize, but some clients ask
@@ -735,8 +616,7 @@ fn run_mcp(connection: Connection) {
             }
         };
         let Ok(text) = serde_json::to_string(&body) else { continue };
-        let Ok(mut out) = stdout.lock() else { break };
-        if writeln!(out, "{text}").is_err() || out.flush().is_err() {
+        if writeln!(stdout, "{text}").is_err() || stdout.flush().is_err() {
             break;
         }
     }
@@ -758,8 +638,10 @@ fn initialize_result(params: &Value, capabilities: Option<&Value>) -> RpcResult 
             "These tools act on one Kanban board in Swiss RB Knife: \"{name}\". Every tool is a \
              REQUEST. Swiss RB Knife checks that board's own permissions and performs the \
              operation or refuses it, so a refusal is the app's decision and is not something to \
-             work around. If a tool is refused, tell the user which switch would allow it rather \
-             than trying another route. Swiss RB Knife must be open for any of this to work."
+             work around. Every tool is listed whether or not the board allows it, so a tool \
+             being listed says nothing about whether it will work. If a tool is refused, tell the \
+             user which switch would allow it rather than trying another route. Swiss RB Knife \
+             must be open for any of this to work."
         ),
         None => "These tools act on one Kanban board in Swiss RB Knife. Swiss RB Knife is not \
                  currently running, so calls will fail until the user opens it. Every tool is a \
@@ -769,7 +651,7 @@ fn initialize_result(params: &Value, capabilities: Option<&Value>) -> RpcResult 
 
     Ok(json!({
         "protocolVersion": protocol,
-        "capabilities": { "tools": { "listChanged": true } },
+        "capabilities": { "tools": { "listChanged": false } },
         "serverInfo": { "name": "swiss-rb-knife-kanban", "version": env!("CARGO_PKG_VERSION") },
         "instructions": instructions
     }))
@@ -1202,13 +1084,10 @@ fn main() {
     let first = args.first().map(String::as_str).unwrap_or("");
 
     if first == "tools" {
-        let mut by_permission: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        // Every tool and the operation behind it. What each one costs is the
+        // app's to say, so it is not repeated here: `capabilities` prints that.
         for tool in TOOLS {
-            let key = tool.permissions.first().copied().unwrap_or("(reading)");
-            by_permission.entry(key).or_default().push(tool.name);
-        }
-        for (permission, names) in by_permission {
-            println!("{permission}: {}", names.join(", "));
+            println!("{}  ({})", tool.name, tool.op);
         }
         return;
     }
@@ -1291,39 +1170,24 @@ mod tests {
     }
 
     #[test]
-    fn reading_tools_are_listed_even_with_nothing_granted() {
-        let permissions = serde_json::from_str::<Value>(r#"{"createCard":false}"#).unwrap();
-        let visible = visible_tools(permissions.as_object());
-        let names: Vec<&str> = visible.iter().map(|t| t.name).collect();
-        assert!(names.contains(&"kanban_get_board"));
-        assert!(names.contains(&"kanban_list_cards"));
-        assert!(!names.contains(&"kanban_create_card"));
-        assert!(!names.contains(&"kanban_delete_card"));
+    fn every_tool_is_listed_whatever_the_board_allows() {
+        // Nothing is filtered, so a switched-off action is still attempted and
+        // the app gets to refuse it and log it.
+        let names: Vec<String> = tool_list()
+            .iter()
+            .filter_map(|tool| tool["name"].as_str().map(str::to_string))
+            .collect();
+        assert_eq!(names.len(), TOOLS.len());
+        for expected in ["kanban_get_board", "kanban_delete_card", "kanban_update_column"] {
+            assert!(names.iter().any(|n| n == expected), "{expected} is not listed");
+        }
     }
 
     #[test]
-    fn a_granted_permission_shows_its_tool() {
-        let permissions =
-            serde_json::from_str::<Value>(r#"{"createCard":true,"deleteCard":false}"#).unwrap();
-        let names: Vec<&str> =
-            visible_tools(permissions.as_object()).iter().map(|t| t.name).collect();
-        assert!(names.contains(&"kanban_create_card"));
-        assert!(!names.contains(&"kanban_delete_card"));
-    }
-
-    #[test]
-    fn an_unreachable_app_lists_everything() {
-        // The app being shut must not look like a build with fewer features.
-        assert_eq!(visible_tools(None).len(), TOOLS.len());
-    }
-
-    #[test]
-    fn editing_is_listed_when_either_edit_permission_is_on() {
-        let only_others =
-            serde_json::from_str::<Value>(r#"{"editCard":false,"editOthersCards":true}"#).unwrap();
-        let names: Vec<&str> =
-            visible_tools(only_others.as_object()).iter().map(|t| t.name).collect();
-        assert!(names.contains(&"kanban_update_card"));
+    fn the_tool_list_is_declared_as_never_changing() {
+        // A list that never changes must not promise change notifications.
+        let result = initialize_result(&json!({}), None).unwrap();
+        assert_eq!(result["capabilities"]["tools"]["listChanged"], json!(false));
     }
 
     fn failure(code: &str) -> AppError {

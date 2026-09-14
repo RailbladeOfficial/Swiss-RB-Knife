@@ -518,21 +518,81 @@ fn authorize<'a>(
             .iter()
             .any(|id| board.permissions.get(*id).copied().unwrap_or(false));
         if !granted {
-            // Named after the FIRST alternative, which is always the ordinary
-            // one. The front end names the other where it matters.
-            let label = permission_label(spec.permissions[0]);
-            return Err(Refusal {
-                code: "permission_denied",
-                message: format!(
+            // With alternatives, which one applies depends on whose card it is,
+            // which this function cannot see. Both are named here, and
+            // handle_request asks the front end for the exact one before the
+            // refusal goes back.
+            let message = if spec.permissions.len() > 1 {
+                let labels: Vec<String> = spec
+                    .permissions
+                    .iter()
+                    .map(|id| format!("\"{}\"", permission_label(id)))
+                    .collect();
+                format!(
+                    "Permission denied. This needs {}, depending on who made the card, and \
+                     neither is allowed on the board \"{name}\". To allow it: Swiss RB Knife > \
+                     Kanban > {name} > Setup > Agents.",
+                    labels.join(" or ")
+                )
+            } else {
+                let label = permission_label(spec.permissions[0]);
+                format!(
                     "Permission denied. \"{label}\" is not allowed on the board \"{name}\". \
                      To allow it: Swiss RB Knife > Kanban > {name} > Setup > Agents > \"{label}\"."
-                ),
-                logged: true,
-            });
+                )
+            };
+            return Err(Refusal { code: "permission_denied", message, logged: true });
         }
     }
 
     Ok(Authorized { board_id, token, board, spec, name })
+}
+
+/// A refusal reworded to name the one switch that applies, when that depends
+/// on whose card it is.
+///
+/// Only an operation with alternative switches needs this (editing a card:
+/// "Edit cards it created" or "Edit cards created by anyone else"). authorize()
+/// cannot see who made the card, so it names both; this asks the front end,
+/// which reads the card and answers with a sentence naming the exact one. The
+/// request stays refused whatever comes back: this changes the wording, never
+/// the decision, and any trouble asking keeps authorize()'s own sentence.
+fn exact_refusal_message(
+    app: &AppHandle,
+    config: &AgentConfig,
+    request: &AgentRequest,
+    refusal: &Refusal,
+) -> String {
+    let fallback = || refusal.message.clone();
+    if refusal.code != "permission_denied" {
+        return fallback();
+    }
+    let Some(spec) = op_spec(&request.op) else { return fallback() };
+    if spec.permissions.len() < 2 {
+        return fallback();
+    }
+    let Some((board_id, token)) = find_token(config, &request.token) else { return fallback() };
+
+    // "explain" is set here and nowhere else. The front end answers it with
+    // words only, and nothing an agent sends can set it.
+    let payload = json!({
+        "boardId": board_id,
+        "connectionId": token.id,
+        "connectionLabel": token.label,
+        "op": request.op,
+        "params": request.params,
+        "permissions": {},
+        "ownershipChecked": spec.owned,
+        "explain": true,
+    });
+    match ask_frontend(app, payload) {
+        Ok(answer) => answer
+            .get("message")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_else(fallback),
+        Err(_) => fallback(),
+    }
 }
 
 /// The whole decision, for one request. Returns the JSON to send back.
@@ -547,7 +607,8 @@ fn handle_request(app: &AppHandle, raw: &[u8]) -> Value {
     let config = load_config(app);
     let allowed = match authorize(&config, &request.token, &request.op, |id| board_name(app, id)) {
         Ok(allowed) => allowed,
-        Err(refusal) => {
+        Err(mut refusal) => {
+            refusal.message = exact_refusal_message(app, &config, &request, &refusal);
             if refusal.logged {
                 // Filed under the board it was about. The unlogged refusals are
                 // the ones with no board to file them under.
@@ -1354,6 +1415,22 @@ mod tests {
         assert!(decide(&config_with(&["editCard"]), "srbk1_secret", "update_card").is_ok());
         assert!(decide(&config_with(&["editOthersCards"]), "srbk1_secret", "update_card").is_ok());
         assert!(decide(&config_with(&["moveCard"]), "srbk1_secret", "update_card").is_err());
+    }
+
+    #[test]
+    fn an_edit_with_neither_switch_names_both_until_the_card_is_known() {
+        // Whose card it is decides which switch applies, and the gate cannot see
+        // that. Its own sentence names both; handle_request then asks the front
+        // end for the exact one.
+        let (code, message) = decide(&config_with(&[]), "srbk1_secret", "update_card").unwrap_err();
+        assert_eq!(code, "permission_denied");
+        assert!(message.contains("Edit cards it created"), "{message}");
+        assert!(message.contains("Edit cards created by anyone else"), "{message}");
+
+        // A refusal with one switch still names only that one.
+        let (_, single) = decide(&config_with(&[]), "srbk1_secret", "move_card").unwrap_err();
+        assert!(single.contains("\"Move cards between columns\""), "{single}");
+        assert!(!single.contains("depending on who made the card"), "{single}");
     }
 
     #[test]

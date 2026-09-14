@@ -2884,6 +2884,18 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   padding: 5px 0;
 }
 
+/* Reading has no switch to flip, but is drawn as switches locked on so the
+   modal is the complete list of what an agent can do. Dimmed and uncursored
+   like the other locked toggles in the app, so nobody reads them as broken. */
+.kb-agent-perm-locked .toggle-switch input:disabled + .toggle-slider {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.kb-agent-perm-locked .toggle-with-label > span {
+  color: var(--color-text-muted);
+}
+
 /* Green rather than the muted gray the other badges use: this one says an agent
    is talking to the board RIGHT NOW, which is the one status worth spotting
    without reading it. */

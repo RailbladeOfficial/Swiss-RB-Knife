@@ -174,6 +174,44 @@ export function groupPermissions(group: AgentPermissionGroup): AgentPermission[]
     .filter((p): p is AgentPermission => p !== undefined);
 }
 
+/* =============================================================================
+   READING
+   -----------------------------------------------------------------------------
+   What every connection may do the moment agent access is on, with no switch
+   of its own. Drawn in the Customize modal as switches locked on, so the modal
+   lists everything an agent can do rather than leaving "nothing allowed" to be
+   misread as "it cannot see anything".
+
+   NOT PERMISSIONS. These are operations, not switches: agent_gate.rs charges
+   them nothing, they are never saved, and they do not count toward the "3 of
+   13 allowed" summary. agents.test.mjs fails if this list and the gate's free
+   operations ever disagree.
+============================================================================= */
+
+export interface AgentReadAccess {
+  op: string;
+  label: string;
+  help: string;
+}
+
+export const AGENT_READ_ACCESS: readonly AgentReadAccess[] = [
+  {
+    op: "get_board",
+    label: "See the board",
+    help: "Read the board's name, its columns in order, their WIP limits, and the tags it has.",
+  },
+  {
+    op: "list_cards",
+    label: "List cards",
+    help: "List the cards on this board, archived ones included, filtered by column, tag, priority, effort or text.",
+  },
+  {
+    op: "get_card",
+    label: "Read any card in full",
+    help: "Read a card's description, subtasks, comments, tags, dates, attachments and who created it.",
+  },
+];
+
 /** "3 of 13 allowed", for the row that replaced the inline list. Somebody who
  *  never opens the modal should still know whether they granted anything. */
 export function permissionSummary(permissions: Record<string, boolean>): string {
@@ -716,6 +754,7 @@ const OP_LABELS: Record<string, string> = {
   set_card_tags: "Changed a card's tags",
   create_tag: "Created a tag",
   create_column: "Created a column",
+  move_column: "Moved a column",
   update_column: "Edited a column",
 };
 

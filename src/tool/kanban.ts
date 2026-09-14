@@ -112,6 +112,7 @@ import { formatStoredDate, today } from "../core/timestamp";
 import {
   AGENT_PERMISSIONS,
   AGENT_PERMISSION_GROUPS,
+  AGENT_READ_ACCESS,
   agentStatus,
   groupPermissions,
   permissionSummary,
@@ -12183,6 +12184,8 @@ function renderAgentPermissions(board: Board, permissions: Record<string, boolea
   const grid = document.getElementById("kbAgentPermissionList")!;
   grid.replaceChildren();
 
+  grid.appendChild(readAccessGroup());
+
   for (const group of AGENT_PERMISSION_GROUPS) {
     const members = groupPermissions(group);
     if (members.length === 0) continue;
@@ -12205,6 +12208,67 @@ function renderAgentPermissions(board: Board, permissions: Record<string, boolea
     }
     grid.appendChild(box);
   }
+}
+
+/** Reading, drawn first as switches locked on, so the modal is the whole list
+ *  of what an agent can do. Nothing here is saved or counted in the summary:
+ *  these are what agent access means, not choices within it. */
+function readAccessGroup(): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "kb-agent-perm-group kb-agent-perm-locked";
+
+  const title = document.createElement("div");
+  title.className = "kb-agent-perm-group-title";
+  title.textContent = "Reading";
+
+  const blurb = document.createElement("p");
+  blurb.className = "kb-agent-perm-group-blurb";
+  blurb.textContent =
+    "Always allowed while agent access is on. To stop it, turn agent access off or revoke the connection.";
+
+  box.append(title, blurb);
+  for (const access of AGENT_READ_ACCESS) box.appendChild(lockedAccessRow(access.label, access.help));
+  return box;
+}
+
+/** A switch that shows On and cannot be flipped, with the same label and info
+ *  button as a real one. */
+function lockedAccessRow(text: string, help: string): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "settings-row";
+
+  const label = document.createElement("span");
+  label.className = "kb-label-with-info";
+  label.textContent = text;
+  const info = document.createElement("button");
+  info.type = "button";
+  info.className = "info-trigger-btn kb-info-btn";
+  info.textContent = "ℹ";
+  info.title = help;
+  info.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleInfoTooltip(info, help, "kb-info-tooltip");
+  });
+  label.appendChild(info);
+  row.appendChild(label);
+
+  const wrap = document.createElement("div");
+  wrap.className = "toggle-with-label";
+  wrap.title = "Reading cannot be switched off";
+  const state = document.createElement("span");
+  state.textContent = "Always On";
+  const switchLabel = document.createElement("label");
+  switchLabel.className = "toggle-switch";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = true;
+  input.disabled = true;
+  const slider = document.createElement("span");
+  slider.className = "toggle-slider";
+  switchLabel.append(input, slider);
+  wrap.append(state, switchLabel);
+  row.appendChild(wrap);
+  return row;
 }
 
 /** One switch and its label. Unchanged in behavior from the flat list this
@@ -12785,6 +12849,9 @@ interface AgentRequest {
   params: Record<string, unknown>;
   permissions: Record<string, boolean>;
   ownershipChecked: boolean;
+  /** Set only by the gate, for an edit it has already refused: answer with the
+   *  wording that names the exact switch, and perform nothing. */
+  explain?: boolean;
 }
 
 /** A refusal, or a failure the agent can do something about. Its message is
@@ -12994,6 +13061,38 @@ function assertMayEditCard(card: Card, req: AgentRequest): void {
         "To allow it: Swiss RB Knife > Kanban > this board > Setup > Agents.",
     );
   }
+}
+
+/** The wording for an edit the gate has ALREADY refused because neither edit
+ *  switch is on. Which of the two would have allowed it depends on whose card
+ *  it is, and only this side can see that, so the gate asks here before it
+ *  answers the agent. It reads the card and returns a sentence; it never
+ *  changes anything, and the request stays refused whatever it says. An empty
+ *  answer (no such card) leaves the gate's own sentence naming both. */
+function explainEditRefusal(
+  board: Board,
+  req: AgentRequest,
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  let card: Card;
+  try {
+    card = agentCard(board, params);
+  } catch {
+    return {};
+  }
+  const own = agentOwns(card, req);
+  const label = permissionLabel(own ? "editCard" : "editOthersCards");
+  const whose = own
+    ? "by this agent"
+    : card.createdBy && card.createdBy.kind !== "user"
+      ? `by ${authorLabel(card.createdBy)}, not by this agent`
+      : "in Swiss RB Knife, not by this agent";
+  return {
+    message:
+      `Permission denied. Card #${card.number} was created ${whose}, so editing it needs ` +
+      `"${label}", which is not allowed on the board "${board.name}". ` +
+      `To allow it: Swiss RB Knife > Kanban > ${board.name} > Setup > Agents > "${label}".`,
+  };
 }
 
 /** A permission the OPERATION did not need but this particular request does:
@@ -13625,6 +13724,10 @@ async function runAgentRequest(req: AgentRequest): Promise<Record<string, unknow
       "That board no longer exists in Swiss RB Knife. Ask the user for a new connection.",
     );
   }
+  // The gate's question about an edit it has already refused. Answered with
+  // words before anything that counts as work, and never reaches the switch.
+  if (req.explain) return explainEditRefusal(board, req, req.params ?? {});
+
   const writing = AGENT_WRITE_OPS.has(req.op);
   if (writing) checkAgentWriteRate();
 
