@@ -1645,7 +1645,14 @@ pub fn run() {
                from an import that turned out to be the wrong one. */
             let import_result = data_archive::take_pending_import(app.handle());
             if let Some(result) = &import_result {
-                eprintln!("[data] staged import {}: {}", result.state, result.message);
+                if result.state == "applied" {
+                    match &result.replaced {
+                        Some(kept) => eprintln!("[data] Import applied. The previous data folder is kept at {kept}"),
+                        None => eprintln!("[data] Import applied."),
+                    }
+                } else {
+                    eprintln!("[data] Import NOT applied: {}", result.message);
+                }
             }
             // Held for the front end, which says it once the window is up. The
             // swap runs before there is a window, so a log line was the only

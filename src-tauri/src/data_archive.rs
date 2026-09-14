@@ -535,6 +535,14 @@ pub fn restart_for_import(app: AppHandle) -> Result<(), String> {
        says so before this is pressed. */
     #[cfg(debug_assertions)]
     {
+        // Said in the dev terminal, because the last thing printed there on the
+        // way out is otherwise WebView2's own shutdown noise, which reads like
+        // the import crashing the app.
+        eprintln!(
+            "[data] Import armed. The dev app is closing on purpose: run `npm run tauri dev` \
+             again to apply it. A \"Failed to unregister class Chrome_WidgetWin_0\" line from \
+             WebView2 as it closes is harmless."
+        );
         app.exit(0);
         return Ok(());
     }
