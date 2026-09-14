@@ -2050,12 +2050,17 @@ test("a stage stamp made before times existed still opens", () => {
   assert.match(parse, /hasTime \? Number\(m\[4\]\) : 12/, "a bare day is no longer pinned to noon");
 });
 
-test("the stage order warning compares instants, not days", () => {
-  // With a time on each stamp, "completed 09:00, work started 14:00" is out of
-  // order on one day, and rounding to whole days would say nothing at all.
+test("the stage order warning compares instants when both have a time, and days otherwise", () => {
+  /* With a time on both stamps, "completed 09:00, work started 14:00" is out of
+     order on one day, and rounding to whole days would say nothing at all. But
+     created is only ever a bare day, and parseDay pins a bare day to noon, so
+     comparing it as an instant made a 09:00 start on the creation day read as
+     "work started is before created". */
   const fn = slice("src/tool/kanban.ts", "export function stageOrderWarning(", "\n}");
-  assert.ok(!fn.includes("dayDiff("), "the ordering check still rounds to whole days");
-  assert.match(fn, /parseDay\(set\[i - 1\]\.value\)\?\.getTime\(\)/, "the check does not compare instants");
+  assert.ok(!fn.includes("dayDiff("), "the ordering check still rounds timed stamps to whole days");
+  assert.match(fn, /hasTimeOfDay\(prev\) && hasTimeOfDay\(cur\)/, "a bare day is compared as an instant again, so a morning stamp on the creation day is flagged");
+  assert.match(fn, /parseDay\(prev\)\?\.getTime\(\)/, "two timed stamps are no longer compared as instants");
+  assert.match(fn, /cur\.slice\(0, 10\) < prev\.slice\(0, 10\)/, "a bare day is no longer compared by its day");
 });
 
 test("changing the shape of a stored field bumps the data-folder version", () => {

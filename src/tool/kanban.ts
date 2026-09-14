@@ -6136,18 +6136,30 @@ export function stageOrderWarning(card: Card): string | null {
     { label: "testing started", value: card.dates.testing },
     { label: "completed", value: card.dates.completed },
   ];
-  const set = chain.filter((s) => s.value !== null);
+  const set = chain.filter((s): s is { label: string; value: string } => s.value !== null);
   for (let i = 1; i < set.length; i++) {
-    /* Compared as INSTANTS, not rounded to whole days. Now that a stage stamp
-       carries a time, "completed at 09:00, work started at 14:00" is out of
-       order on the same day, and dayDiff would round that to zero and say
-       nothing. Created is still a bare day and parses to noon, so a stamp
-       earlier on the creation day does not read as an error. */
-    const a = parseDay(set[i - 1].value)?.getTime();
-    const b = parseDay(set[i].value)?.getTime();
-    if (a !== undefined && b !== undefined && b < a) {
-      return `${set[i].label} is before ${set[i - 1].label}`;
+    const prev = set[i - 1].value;
+    const cur = set[i].value;
+    /* Compared as INSTANTS when both carry a time, not rounded to whole days:
+       "completed at 09:00, work started at 14:00" is out of order on the same
+       day, and dayDiff would round that to zero and say nothing.
+
+       Compared as DAYS when either is a bare day. Created always is, and so is
+       any stamp saved before stamps had times. A bare day covers the whole day,
+       so the only thing it can be out of order with is an earlier day. It used
+       to be compared as an instant too, and parseDay pins a bare day to noon,
+       so a card created at 00:04 and started at 09:00 the same morning read as
+       "work started is before created". */
+    let outOfOrder: boolean;
+    if (hasTimeOfDay(prev) && hasTimeOfDay(cur)) {
+      const a = parseDay(prev)?.getTime();
+      const b = parseDay(cur)?.getTime();
+      outOfOrder = a !== undefined && b !== undefined && b < a;
+    } else {
+      // Stored as YYYY-MM-DD first, which sorts correctly as text.
+      outOfOrder = cur.slice(0, 10) < prev.slice(0, 10);
     }
+    if (outOfOrder) return `${set[i].label} is before ${set[i - 1].label}`;
   }
   return null;
 }
