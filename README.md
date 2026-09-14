@@ -27,8 +27,17 @@ Swiss RB Knife is highly customizable, so you can make the software feel comfy. 
 Right-click pretty much anything to see what you can do to it. Hit F11 to cycle View Modes when you want more screen and less chrome. Give buttons and modals their own little sound cues if you're into that. And when you want a backup you can actually hold, App Settings > Data exports your entire data folder as one plain .zip you can open in Explorer, and puts one back when you need it (the app restarts to swap it in, and keeps your old folder right beside it, just in case).
 
 <p align="center">
-  <a href="./screenshots/general/general-settings.png" target="_blank">
-    <img class="md-img" src="./screenshots/general/general-settings.png" width="100%" alt="App Settings Modal" />
+  <a href="./screenshots/general/general-settings-display.png" target="_blank">
+    <img class="md-img" src="./screenshots/general/general-settings-display.png" width="49%" alt="App Settings: Display" />
+  </a>
+  <a href="./screenshots/general/general-settings-audio.png" target="_blank">
+    <img class="md-img" src="./screenshots/general/general-settings-audio.png" width="49%" alt="App Settings: Audio" />
+  </a>
+  <a href="./screenshots/general/general-settings-preferences.png" target="_blank">
+    <img class="md-img" src="./screenshots/general/general-settings-preferences.png" width="49%" alt="App Settings: Preferences" />
+  </a>
+  <a href="./screenshots/general/general-settings-data.png" target="_blank">
+    <img class="md-img" src="./screenshots/general/general-settings-data.png" width="49%" alt="App Settings: Data" />
   </a>
 </p>
 
@@ -113,7 +122,7 @@ Input Income earned and Expenses incurred. Yeah, your bank statement may tell yo
     <img class="md-img" src="./screenshots/budget-tracker/budget-setup-edit-expense-category.png" width="24%" alt="Budget Tracker: Setup Modal - Edit Expense Category" />
   </a>
   <a href="./screenshots/budget-tracker/budget-setup-settings.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-settings.png" width="24%" alt="Budget Tracker: Setup Modal - Settings" />
+    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-settings.png" width="24%" alt="Budget Tracker: Setup Modal - Preferences" />
   </a>
   <a href="./screenshots/budget-tracker/budget-annual-stats-1.png" target="_blank">
     <img class="md-img" src="./screenshots/budget-tracker/budget-annual-stats-1.png" width="24%" alt="Budget Tracker: Annual Stats, Part 1" />
@@ -137,13 +146,13 @@ Log and track time entries with pay period summaries, running totals, and CSV ex
     <img class="md-img" src="./screenshots/time-tracker/time-tracker-base.png" width="49%" alt="Time Tracker: Main View" />
   </a>
   <a href="./screenshots/time-tracker/time-tracker-settings.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-settings.png" width="49%" alt="Time Tracker: Settings Modal" />
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-settings.png" width="49%" alt="Time Tracker: Setup Modal - Preferences" />
   </a>
   <a href="./screenshots/time-tracker/time-tracker-data-entry-1.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-data-entry-1.png" width="49%" alt="Time Tracker: Data Entry, Part 1" />
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-data-entry-1.png" width="49%" alt="Time Tracker: Data Entry" />
   </a>
   <a href="./screenshots/time-tracker/time-tracker-data-entry-2.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-data-entry-2.png" width="49%" alt="Time Tracker: Data Entry, Part 2" />
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-data-entry-2.png" width="49%" alt="Time Tracker: Setup Modal - Activities" />
   </a>
   <a href="./screenshots/time-tracker/time-tracker-view-entries-1.png" target="_blank">
     <img class="md-img" src="./screenshots/time-tracker/time-tracker-view-entries-1.png" width="49%" alt="Time Tracker: View Entries, Part 1" />
@@ -152,7 +161,7 @@ Log and track time entries with pay period summaries, running totals, and CSV ex
     <img class="md-img" src="./screenshots/time-tracker/time-tracker-view-entries-2.png" width="49%" alt="Time Tracker: View Entries, Part 2" />
   </a>
   <a href="./screenshots/time-tracker/time-tracker-summary-panel.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-summary-panel.png" width="49%" alt="Time Tracker: Summary Panel by View" />
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-summary-panel.png" width="49%" alt="Time Tracker: Stats Panel" />
   </a>
 </p>
 
