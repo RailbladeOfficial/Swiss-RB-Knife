@@ -412,7 +412,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [rustc_version](https://github.com/djc/rustc-version-rs) | 0.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustc-hash](https://github.com/rust-lang/rustc-hash) | 2.1.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustix](https://github.com/bytecodealliance/rustix) | 1.1.4 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [rustls](https://github.com/rustls/rustls) | 0.23.44 | [Apache-2.0 OR ISC OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [rustls](https://github.com/rustls/rustls) | 0.23.45 | [Apache-2.0 OR ISC OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustls-pki-types](https://github.com/rustls/pki-types) | 1.15.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustls-webpki](https://github.com/rustls/webpki) | 0.103.15 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [rustversion](https://github.com/dtolnay/rustversion) | 1.0.23 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -489,8 +489,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [time-core](https://github.com/time-rs/time) | 0.1.9 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [time-macros](https://github.com/time-rs/time) | 0.2.32 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tinystr](https://github.com/unicode-org/icu4x) | 0.8.4 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
-| [tinyvec](https://github.com/Lokathor/tinyvec) | 1.13.2 | [Apache-2.0 OR MIT OR Zlib](https://spdx.org/licenses/Apache-2.0.html) |
-| [tinyvec_macros](https://github.com/Soveu/tinyvec_macros) | 0.1.1 | [Apache-2.0 OR MIT OR Zlib](https://spdx.org/licenses/Apache-2.0.html) |
+| [tinyvec](https://github.com/Lokathor/tinyvec) | 1.13.3 | [Apache-2.0 OR MIT OR Zlib](https://spdx.org/licenses/Apache-2.0.html) |
 | [tokio](https://github.com/tokio-rs/tokio) | 1.53.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [tokio-util](https://github.com/tokio-rs/tokio) | 0.7.19 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [toml](https://github.com/toml-rs/toml) | 0.8.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
