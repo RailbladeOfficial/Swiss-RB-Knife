@@ -13076,7 +13076,7 @@ function assertMayTouchCard(card: Card, req: AgentRequest): void {
       : "in Swiss RB Knife";
   throw new AgentError(
     `Permission denied. Card #${card.number} was created ${whose}, not by this agent. ` +
-      "To allow this: Swiss RB Knife > Kanban > this board > Setup > Agents > " +
+      "To allow this: Swiss RB Knife > Kanban > this board > Setup > Agents > What It May Do > " +
       '"Edit cards created by anyone else".',
   );
 }
@@ -13089,7 +13089,7 @@ function assertMayEditCard(card: Card, req: AgentRequest): void {
   if (!req.permissions.editCard) {
     throw new AgentError(
       'Permission denied. "Edit cards it created" is not allowed on this board. ' +
-        "To allow it: Swiss RB Knife > Kanban > this board > Setup > Agents.",
+        'To allow it: Swiss RB Knife > Kanban > this board > Setup > Agents > What It May Do > "Edit cards it created".',
     );
   }
 }
@@ -13122,7 +13122,7 @@ function explainEditRefusal(
     message:
       `Permission denied. Card #${card.number} was created ${whose}, so editing it needs ` +
       `"${label}", which is not allowed on the board "${board.name}". ` +
-      `To allow it: Swiss RB Knife > Kanban > ${board.name} > Setup > Agents > "${label}".`,
+      `To allow it: Swiss RB Knife > Kanban > ${board.name} > Setup > Agents > What It May Do > "${label}".`,
   };
 }
 
@@ -13135,7 +13135,7 @@ function assertExtra(req: AgentRequest, permission: string, what: string): void 
   const label = permissionLabel(permission);
   throw new AgentError(
     `Permission denied. ${what} needs "${label}", which is not allowed on this board. ` +
-      `To allow it: Swiss RB Knife > Kanban > this board > Setup > Agents > "${label}".`,
+      `To allow it: Swiss RB Knife > Kanban > this board > Setup > Agents > What It May Do > "${label}".`,
   );
 }
 
@@ -13500,7 +13500,7 @@ function agentDeleteComment(
   if (!req.permissions.editOthersCards && !agentOwns(comment, req)) {
     throw new AgentError(
       "Permission denied. That comment was not written by this agent. To allow this: " +
-        "Swiss RB Knife > Kanban > this board > Setup > Agents > " +
+        "Swiss RB Knife > Kanban > this board > Setup > Agents > What It May Do > " +
         '"Edit cards created by anyone else".',
     );
   }

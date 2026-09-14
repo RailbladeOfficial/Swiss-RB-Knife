@@ -733,7 +733,7 @@ fn describe_success(result: &Value, dev: bool) -> String {
     let may = if allowed.is_empty() {
         format!(
             "read the board, and nothing else yet. Switch on what it may change in \
-             Kanban > {board} > Setup > Agents."
+             Kanban > {board} > Setup > Agents > What It May Do."
         )
     } else {
         format!("read the board, {}", allowed.join(", "))

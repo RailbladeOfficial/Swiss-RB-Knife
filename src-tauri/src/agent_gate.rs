@@ -531,14 +531,14 @@ fn authorize<'a>(
                 format!(
                     "Permission denied. This needs {}, depending on who made the card, and \
                      neither is allowed on the board \"{name}\". To allow it: Swiss RB Knife > \
-                     Kanban > {name} > Setup > Agents.",
+                     Kanban > {name} > Setup > Agents > What It May Do.",
                     labels.join(" or ")
                 )
             } else {
                 let label = permission_label(spec.permissions[0]);
                 format!(
                     "Permission denied. \"{label}\" is not allowed on the board \"{name}\". \
-                     To allow it: Swiss RB Knife > Kanban > {name} > Setup > Agents > \"{label}\"."
+                     To allow it: Swiss RB Knife > Kanban > {name} > Setup > Agents > What It May Do > \"{label}\"."
                 )
             };
             return Err(Refusal { code: "permission_denied", message, logged: true });
@@ -1684,7 +1684,7 @@ mod tests {
         // that allows creating cards and not deleting them.
         let message = "Permission denied. \"Delete cards\" is not allowed on the board \
                        \"Release 0.7\". To allow it: Swiss RB Knife > Kanban > Release 0.7 > \
-                       Setup > Agents > \"Delete cards\".";
+                       Setup > Agents > What It May Do > \"Delete cards\".";
         let server = serve_one(
             &pipe,
             json!({ "ok": false, "error": { "code": "permission_denied", "message": message } }),
