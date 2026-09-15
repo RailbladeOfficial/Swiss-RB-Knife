@@ -3975,6 +3975,12 @@ function reopenQuickAdd(board: Board, column: Column, position: NewCardPosition)
    into a different column starts a fresh range there rather than selecting a
    rectangle nobody asked for.
 
+   A BULK ACTION KEEPS THE SELECTION. Setting a priority and then a tag on the
+   same eleven cards is two right-clicks, not two rounds of selecting them. The
+   selection goes when you say so: a plain click on a card, a right-click on a
+   card outside it, a drag of an unselected card, Escape, or leaving the board.
+   The only cards an action drops are the ones it took off the screen.
+
    The selection is BY ID and lives only as long as the board is on screen. It
    is not saved, it is dropped when the board changes, and every action taken on
    it re-reads the cards, so a card deleted by an agent mid-selection is simply
@@ -3995,6 +4001,20 @@ function clearCardSelection(redraw = true): void {
   selectedCardIds.clear();
   selectionAnchorId = null;
   if (redraw) renderBoardView();
+}
+
+/** After a bulk action: the cards still on screen stay selected, and the ones
+ *  the action took off it (archived, deleted, moved to another board, or now
+ *  hidden by a filter) leave the selection. Doesn't redraw; the caller does. */
+function pruneCardSelection(): void {
+  const todayStr = today();
+  for (const id of selectedCardIds) {
+    const card = getCard(id);
+    const onScreen =
+      !!card && !card.archived && card.boardId === currentBoardId && cardMatchesFilters(card, todayStr);
+    if (!onScreen) selectedCardIds.delete(id);
+  }
+  if (selectionAnchorId && !selectedCardIds.has(selectionAnchorId)) selectionAnchorId = null;
 }
 
 /** Ctrl+click: this card joins or leaves the selection, and becomes the anchor
@@ -4498,11 +4518,12 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
 
   /** Runs `apply` over everything still selected, then redraws once. Once,
    *  because redrawing per card on a selection of forty is forty full rebuilds
-   *  of every column. */
+   *  of every column. The selection stays, so a second change to the same
+   *  cards is one right-click rather than re-selecting them all. */
   const overSelection = (apply: (card: Card) => void, done: (n: number) => void): void => {
     const live = selectedCards();
     for (const card of live) apply(card);
-    clearCardSelection(false);
+    pruneCardSelection();
     renderAll();
     done(live.length);
   };
@@ -4662,7 +4683,8 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
         const live = selectedCards();
         let made = 0;
         for (const card of live) if (duplicateCard(card)) made += 1;
-        clearCardSelection(false);
+        // The originals stay selected, not the copies.
+        pruneCardSelection();
         renderAll();
         flash(made === live.length ? `Duplicated ${made} cards.` : `Duplicated ${made} of ${live.length} cards.`);
       },
@@ -4695,7 +4717,7 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
         const live = selectedCards();
         const remove = (): void => {
           for (const card of live) deleteCard(card);
-          clearCardSelection(false);
+          pruneCardSelection();
           renderAll();
           flash(`${live.length} cards deleted.`);
         };
