@@ -7787,9 +7787,9 @@
             </div>
 
             <div class="settings-row">
-              <span class="kb-label-with-info">Stamp Complete on Drop into a Done Column
+              <span class="kb-label-with-info">Stamp Stage Dates When Cards Move In
                 <button type="button" class="info-trigger-btn kb-info-btn"
-                  data-tooltip="Dropping a card into the column marked 'means done' stamps its Complete date. Editable afterwards, and dragging back out never clears it.">&#8505;</button>
+                  data-tooltip="A card moved into a column that stamps a stage date gets that date and the current time, if it does not have one yet. Columns that mean done stamp Completed, and any other column can stamp Work Started or Testing Started from its own settings. Editable afterwards, and moving a card back out never clears a date.">&#8505;</button>
               </span>
               <div class="toggle-with-label">
                 <span id="kbAutoCompleteLabel">On</span>
@@ -8577,7 +8577,7 @@
           <div class="settings-row">
             <span class="kb-label-with-info">This Column Means Done
               <button type="button" class="info-trigger-btn kb-info-btn"
-                data-tooltip="Cards dropped here can be stamped complete automatically, and board stats count throughput from this column.">&#8505;</button>
+                data-tooltip="Board stats count throughput from this column, and cards moved here are stamped Completed.">&#8505;</button>
             </span>
             <div class="toggle-with-label">
               <span id="kbColumnDoneLabel">No</span>
@@ -8586,6 +8586,22 @@
                 <span class="toggle-slider"></span>
               </label>
             </div>
+          </div>
+
+          <!-- Which stage date a card gets on arriving here. Completed is not a
+               choice of its own: it follows This Column Means Done, and the
+               select shows it locked while that is on. -->
+          <div class="settings-row">
+            <span class="kb-label-with-info">Stamps a Stage Date
+              <button type="button" class="info-trigger-btn kb-info-btn"
+                data-tooltip="A card moved into this column gets this stage date, with the current time, if it does not have one yet. A column that means done always stamps Completed. Stamp Stage Dates When Cards Move In has to be on, which it is by default.">&#8505;</button>
+            </span>
+            <select id="kbColumnStageSelect" class="settings-select">
+              <option value="">None</option>
+              <option value="started">Work Started</option>
+              <option value="testing">Testing Started</option>
+              <option value="completed">Completed</option>
+            </select>
           </div>
 
           <!-- Same shape as every other "opens its own editor" row in the app:

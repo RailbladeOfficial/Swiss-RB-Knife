@@ -1998,8 +1998,11 @@ test("a stage stamp carries a time, and a due date does not", () => {
   // Both stamping paths record the moment, not the day.
   const advance = slice("src/tool/kanban.ts", "function advanceStage(", "\n}");
   assert.match(advance, /nowStamp\(\)/, "the stage button still stamps a bare day");
+  // A move stamps through the one arrival stamper, which every column change shares.
   const move = slice("src/tool/kanban.ts", "function moveCardToColumn(", "\n}");
-  assert.match(move, /card\.dates\.completed = nowStamp\(\)/, "the drop-into-Done stamp is still a bare day");
+  assert.match(move, /stampOnArrival\(board, column, card\)/, "moving a card into a column no longer goes through the stamper");
+  const arrival = slice("src/tool/kanban.ts", "function stampOnArrival(", "\n}");
+  assert.match(arrival, /card\.dates\[stage\] = nowStamp\(\)/, "a stage stamped on arrival is still a bare day");
 
   // And the input can actually hold a time.
   assert.match(src, /input\.type = "datetime-local"/, "the stage editor is still a date-only input");
@@ -2239,4 +2242,29 @@ test("arriving at a board by any route counts toward Most Recent and Most Used",
   );
   const gallery = slice("src/tool/kanban.ts", "function openBoardFromGallery(", "\n}");
   assert.ok(!gallery.includes("recordBoardUsage"), "opening a board from the gallery is counted twice");
+});
+
+test("a column stamps its own stage date on arrival, with the time, however the card gets there", () => {
+  /* Only a done column stamped anything, and a DRAG stamped a bare day while
+     every other stage stamp carries the moment. A column can now stamp Work
+     Started or Testing Started too, a done column still stamps Completed, and
+     dragging and moving from the card both go through the one stamper. */
+  const stamp = slice("src/tool/kanban.ts", "function stampOnArrival(", "\n}");
+  assert.match(stamp, /effective\(board\)\.autoCompleteOnDone/, "arrival stamps ignore the board's preference");
+  assert.match(stamp, /card\.dates\[stage\]\) return null/, "an arrival overwrites a stage date that was already set");
+  assert.match(stamp, /nowStamp\(\)/, "an arrival stamps a bare day instead of the moment");
+  const arrival = slice("src/tool/kanban.ts", "function arrivalStage(", "\n}");
+  assert.match(arrival, /column\.isDone \? "completed"/, "a done column no longer stamps Completed");
+
+  const drag = slice("src/tool/kanban.ts", "function commitCardOrderFromDom(", "\n}");
+  assert.match(drag, /stampOnArrival\(board, column, card\)/, "a drag into a column stamps nothing");
+  assert.doesNotMatch(drag, /today\(\)/, "a drag still stamps a bare day");
+  const move = slice("src/tool/kanban.ts", "function moveCardToColumn(", "\n}");
+  assert.match(move, /stampOnArrival\(board, column, card\)/, "moving from the card or its menu stamps nothing");
+
+  const norm = slice("src/tool/kanban.ts", "function normalizeColumn(", "\n}");
+  assert.match(norm, /stage:/, "a column's stage is dropped when the board loads");
+  const save = slice("src/tool/kanban.ts", "function saveColumnEditor(", "\n}");
+  assert.match(save, /stageSelect/, "the column editor never saves the stage");
+  assert.match(read("index.html"), /id="kbColumnStageSelect"/, "the column editor has no stage choice");
 });

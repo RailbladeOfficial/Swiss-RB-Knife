@@ -522,8 +522,13 @@ export interface Column {
   /** Kanban's one non-negotiable practice. null means unlimited. */
   wipLimit: number | null;
   /** Cards here count as finished: throughput is measured from this column,
-   *  and (with the preference on) a drop here stamps the Complete date. */
+   *  and (with the preference on) a card moved here is stamped Completed. */
   isDone: boolean;
+  /** The stage date a card moved into this column is stamped with, when it has
+   *  none yet and the board's preference is on. Only Work Started or Testing
+   *  Started: a done column stamps Completed, so a column never holds both.
+   *  null (or absent) stamps nothing. */
+  stage?: "started" | "testing" | null;
   collapsed: boolean;
   /** How this column is sorted, as a VIEW over the hand-made order.
    *
@@ -673,6 +678,9 @@ export const CARD_SECTION_LABELS: Record<CardSection, string> = {
  */
 export interface BoardScopedSettings {
   confirmDelete: boolean;
+  /** Stamp a card's stage date when it moves into a column that stamps one.
+   *  Named for the only column it used to cover, and kept, because boards and
+   *  settings files already store it under this key. */
   autoCompleteOnDone: boolean;
   showTags: boolean;
   showSubtasks: boolean;
@@ -1916,6 +1924,8 @@ function normalizeColumn(raw: unknown): Column | null {
     title: trimTo(c.title, 80) || "Untitled",
     wipLimit: limit,
     isDone: c.isDone === true,
+    // A done column stamps Completed, so it keeps no stage of its own.
+    stage: c.isDone !== true && (c.stage === "started" || c.stage === "testing") ? c.stage : null,
     collapsed: c.collapsed === true,
     // null, not [], for a column that has never been sorted: absent means
     // "follow the board", and an empty list means "manual, and I meant it".
@@ -5008,12 +5018,11 @@ function attachCardDropTarget(body: HTMLElement): void {
 }
 
 /** Reads the board's live DOM order back into the cards. Also applies the
- *  one side effect a move is allowed to have: stamping the Complete date when
- *  a card lands in a column that means done. */
+ *  one side effect a move is allowed to have: stamping the stage date that
+ *  the column a card lands in stamps. */
 function commitCardOrderFromDom(board: Board): void {
-  const todayStr = today();
   let changed = false;
-  let autoStamped = 0;
+  const stamped: Stage[] = [];
   /** Columns whose sort a drop just turned off, named so the toast can say so. */
   const unsorted: string[] = [];
 
@@ -5047,14 +5056,9 @@ function commitCardOrderFromDom(board: Board): void {
       card.order = index;
       card.updatedAt = Date.now();
 
-      if (
-        movedColumn &&
-        column?.isDone &&
-        effective(board).autoCompleteOnDone &&
-        !card.dates.completed
-      ) {
-        card.dates.completed = todayStr;
-        autoStamped += 1;
+      if (movedColumn && column) {
+        const stage = stampOnArrival(board, column, card);
+        if (stage) stamped.push(stage);
       }
     });
   }
@@ -5067,12 +5071,10 @@ function commitCardOrderFromDom(board: Board): void {
   if (!changed) return;
   resequence(board.id);
   touchBoard(board);
-  if (autoStamped > 0) {
-    flash(
-      autoStamped === 1
-        ? "Stamped the card's Complete date."
-        : `Stamped ${autoStamped} cards' Complete dates.`,
-    );
+  if (stamped.length === 1) {
+    flash(`Stamped the card's ${STAGE_LABELS[stamped[0]]} date.`);
+  } else if (stamped.length > 1) {
+    flash(`Stamped ${stamped.length} cards' stage dates.`);
   }
   // Re-render rather than trusting the dragged DOM: the WIP badges, the
   // "nothing here yet" lines and the stage chips all changed underneath.
@@ -6104,14 +6106,31 @@ function moveCardToColumn(card: Card, columnId: string): void {
 
   card.columnId = column.id;
   card.order = -1; // to the top of its new column, then resequenced
-  if (column.isDone && effective(board).autoCompleteOnDone && !card.dates.completed) {
-    // The moment, like every other stage stamp. Dropping a card into Done is
-    // the app watching something happen, so it knows the time as well as the day.
-    card.dates.completed = nowStamp();
-    flash("Stamped the card's Complete date.");
-  }
+  const stage = stampOnArrival(board, column, card);
+  if (stage) flash(`Stamped the card's ${STAGE_LABELS[stage]} date.`);
   resequence(board.id);
   stampCard(card);
+}
+
+/** The stage date a column stamps on a card arriving in it: Completed for a
+ *  column that means done, the column's own choice otherwise, or null. */
+function arrivalStage(column: Column): Stage | null {
+  return column.isDone ? "completed" : (column.stage ?? null);
+}
+
+/** Stamps the stage date a card moving into `column` earns, when the board's
+ *  preference is on and that date is still empty. Returns the stage stamped.
+ *  The one stamper for every way a card changes column, so a drag and a move
+ *  from the card or its menu cannot disagree about what is stamped, or how
+ *  precisely. */
+function stampOnArrival(board: Board, column: Column, card: Card): Stage | null {
+  if (!effective(board).autoCompleteOnDone) return null;
+  const stage = arrivalStage(column);
+  if (!stage || card.dates[stage]) return null;
+  // The moment, like every other stage stamp: a move is the app watching
+  // something happen, so it knows the time as well as the day.
+  card.dates[stage] = nowStamp();
+  return stage;
 }
 
 function moveCardToBoard(card: Card, boardId: string): void {
@@ -9163,8 +9182,8 @@ const BOARD_OVERRIDE_GROUPS: OverrideRow[][] = [
     },
     {
     key: "autoCompleteOnDone",
-    label: "Stamp Complete on Drop into a Done Column",
-    info: "Only does anything when this board has a column marked as meaning done.",
+    label: "Stamp Stage Dates When Cards Move In",
+    info: "Only does anything when a column on this board means done or stamps a stage date of its own.",
     },
   ],
   // What else a card face shows.
@@ -9960,6 +9979,12 @@ function getColumnEditModal(): Modal {
   const wipLabel = document.getElementById("kbColumnWipLabel")!;
   const doneToggle = document.getElementById("kbColumnDoneToggle") as HTMLInputElement;
   const doneLabel = document.getElementById("kbColumnDoneLabel")!;
+  const stageSelect = document.getElementById("kbColumnStageSelect") as HTMLSelectElement;
+  // Followed while Done is being flipped, not only when the editor opens.
+  doneToggle.addEventListener("change", () => syncColumnStageSelect(stageSelect, doneToggle.checked));
+  stageSelect.addEventListener("change", () => {
+    stageSelect.dataset.kbPicked = stageSelect.value;
+  });
 
   _columnEditModal = new Modal(document.getElementById("kbColumnEditBackdrop")!, {
     closeOnEsc: true,
@@ -10036,6 +10061,18 @@ function getColumnEditModal(): Modal {
   return _columnEditModal;
 }
 
+/** Puts the column editor's stage choice in step with its Done switch. A done
+ *  column always stamps Completed, so the choice shows that and is locked;
+ *  switching Done back off returns to whatever was picked before. `stage` is
+ *  passed when the editor opens, and left out when only Done changed. */
+function syncColumnStageSelect(select: HTMLSelectElement, isDone: boolean, stage?: string | null): void {
+  if (stage !== undefined) select.dataset.kbPicked = stage ?? "";
+  const completed = select.querySelector<HTMLOptionElement>('option[value="completed"]');
+  if (completed) completed.hidden = !isDone;
+  select.disabled = isDone;
+  select.value = isDone ? "completed" : (select.dataset.kbPicked ?? "");
+}
+
 function openColumnEditor(board: Board, column: Column | null): void {
   if (!column && board.columns.length >= MAX_COLUMNS_PER_BOARD) {
     flash(`A board holds at most ${MAX_COLUMNS_PER_BOARD} columns.`, "error");
@@ -10063,6 +10100,11 @@ function openColumnEditor(board: Board, column: Column | null): void {
   const doneToggle = document.getElementById("kbColumnDoneToggle") as HTMLInputElement;
   doneToggle.checked = column?.isDone === true;
   document.getElementById("kbColumnDoneLabel")!.textContent = doneToggle.checked ? "Yes" : "No";
+  syncColumnStageSelect(
+    document.getElementById("kbColumnStageSelect") as HTMLSelectElement,
+    doneToggle.checked,
+    column?.stage ?? null,
+  );
 
   (document.getElementById("kbColumnEditDelete") as HTMLElement).style.display = column
     ? ""
@@ -10100,19 +10142,25 @@ function saveColumnEditor(): void {
   const wipToggle = document.getElementById("kbColumnWipToggle") as HTMLInputElement;
   const wipInput = document.getElementById("kbColumnWipInput") as HTMLInputElement;
   const doneToggle = document.getElementById("kbColumnDoneToggle") as HTMLInputElement;
+  const stageSelect = document.getElementById("kbColumnStageSelect") as HTMLSelectElement;
   const limit = wipToggle.checked ? clampInt(wipInput.value, 1, 999, 3) : null;
+  // A done column stamps Completed, so it keeps no stage of its own.
+  const picked = stageSelect.value;
+  const stage = !doneToggle.checked && (picked === "started" || picked === "testing") ? picked : null;
 
   const existing = columnEditId ? getColumn(board, columnEditId) : null;
   if (existing) {
     existing.title = title.slice(0, 80);
     existing.wipLimit = limit;
     existing.isDone = doneToggle.checked;
+    existing.stage = stage;
   } else {
     board.columns.push({
       id: newId(),
       title: title.slice(0, 80),
       wipLimit: limit,
       isDone: doneToggle.checked,
+      stage,
       collapsed: false,
     });
   }
