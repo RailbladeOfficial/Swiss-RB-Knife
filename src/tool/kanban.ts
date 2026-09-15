@@ -2998,11 +2998,16 @@ function renderBoardCounts(board: Board): void {
   const shown = live.filter((c) => cardMatchesFilters(c, todayStr)).length;
   const archived = archivedCardsOnBoard(board.id).length;
 
+  // Said beside the total rather than as its own piece, because it is a part
+  // of that number, and only while there is a selection to count.
+  const selected = selectedCards().filter((c) => c.boardId === board.id).length;
+
   const bits: string[] = [];
   bits.push(
-    anyFilterActive()
+    (anyFilterActive()
       ? `${shown} of ${live.length} cards`
-      : `${live.length} ${live.length === 1 ? "card" : "cards"}`,
+      : `${live.length} ${live.length === 1 ? "card" : "cards"}`) +
+      (selected > 0 ? ` (${selected} selected)` : ""),
   );
   if (archived > 0) bits.push(`${archived} archived`);
   boardCountsEl.textContent = bits.join(" · ");
