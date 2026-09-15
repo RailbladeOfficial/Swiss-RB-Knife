@@ -4357,17 +4357,27 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
  * look, and this menu is opened rarely enough that the read costs nothing.
  */
 function cardOwnerMenu(card: Card): MenuItem[] {
+  return ownerChoices(card.boardId, currentExternalLabel(card), (owner) => setCardOwner(card, owner));
+}
+
+/** The owner choices themselves, shared by one card and by a selection, so the
+ *  two can never offer different people. `apply` is what picking one does. */
+function ownerChoices(
+  boardId: string,
+  externalDefault: string,
+  apply: (owner: CardAuthor | undefined) => void,
+): MenuItem[] {
   const items: MenuItem[] = [
     {
       label: "You",
-      onClick: () => setCardOwner(card, undefined),
+      onClick: () => apply(undefined),
     },
   ];
 
-  for (const token of agentConnectionsForBoard(card.boardId)) {
+  for (const token of agentConnectionsForBoard(boardId)) {
     items.push({
       label: token.label,
-      onClick: () => setCardOwner(card, { kind: "agent", by: token.id, label: token.label }),
+      onClick: () => apply({ kind: "agent", by: token.id, label: token.label }),
     });
   }
 
@@ -4378,9 +4388,9 @@ function cardOwnerMenu(card: Card): MenuItem[] {
          there is no list to pick them from. Prompt rather than a modal of its
          own: it is one short string, and a modal would be a screen to say a
          name on. */
-      const who = window.prompt("Who asked for this card?", currentExternalLabel(card));
+      const who = window.prompt("Who asked for this card?", externalDefault);
       if (who === null) return;
-      setCardOwner(card, { kind: "external", label: trimTo(who, 80) });
+      apply({ kind: "external", label: trimTo(who, 80) });
     },
   });
 
@@ -4613,12 +4623,26 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
     }
   }
 
+  /* The External prompt is prefilled only when every selected card already
+     names the same outside person; otherwise there is no one name to offer. */
+  const externals = new Set(selection.map((c) => currentExternalLabel(c)));
+  const ownerItems = ownerChoices(boardId, externals.size === 1 ? [...externals][0] : "", (owner) =>
+    overSelection(
+      (card) => {
+        card.createdBy = owner;
+        stampCard(card);
+      },
+      (n) => flash(`${n} cards set to ${authorLabel(owner)}.`),
+    ),
+  );
+
   return [
     // Not clickable: a heading, so the menu says what it is about to act on.
     { label: `${count} cards selected`, disabled: true },
     { label: "Priority", submenu: priorityItems },
     { label: "Effort", submenu: effortItems },
     ...(tagItems.length > 0 ? [{ label: "Tags", submenu: tagItems }] : []),
+    { label: "Owner", submenu: ownerItems },
     ...(columnItems.length > 1 ? [{ label: "Move to Column", submenu: columnItems }] : []),
     ...(boardItems.length > 0 ? [{ label: "Move to Board", submenu: boardItems }] : []),
     {
@@ -4762,6 +4786,7 @@ function boardCardMenu(card: Card): MenuItem[] {
     { label: "Priority", submenu: priorityItems },
     { label: "Effort", submenu: effortItems },
     ...(tagItems.length > 0 ? [{ label: "Tags", submenu: tagItems }] : []),
+    { label: "Owner", submenu: cardOwnerMenu(card) },
     // A one-column board has nowhere to move a card to, and a board with no
     // other boards beside it has nowhere to send one.
     ...(columnItems.length > 1

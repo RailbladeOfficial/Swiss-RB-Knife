@@ -1934,6 +1934,22 @@ test("a bulk selection can be tagged, the same way one card can", () => {
   assert.match(menu, /"Clear All Tags"/, "there is no way to take every tag off a selection");
 });
 
+test("the owner can be set from a right-click, on one card or a selection", () => {
+  /* Owner was only in the open card's three-dot menu, so handing 16 cards back
+     meant opening 16 cards. Both right-click menus offer it now, from the same
+     list of choices, so they cannot drift apart. */
+  const single = slice("src/tool/kanban.ts", "function boardCardMenu(", "\nfunction ");
+  assert.match(single, /label: "Owner", submenu: cardOwnerMenu\(card\)/, "the card's right-click menu has no Owner");
+
+  const bulk = slice("src/tool/kanban.ts", "function bulkCardMenu(", "\nfunction ");
+  assert.match(bulk, /label: "Owner", submenu: ownerItems/, "the selection menu has no Owner");
+  assert.match(bulk, /ownerChoices\(/, "the selection builds its own owner list instead of sharing one");
+  assert.match(bulk, /card\.createdBy = owner;/, "picking an owner for a selection changes nothing");
+
+  const shared = slice("src/tool/kanban.ts", "function cardOwnerMenu(", "\n}");
+  assert.match(shared, /ownerChoices\(/, "the card modal's Owner menu no longer uses the shared list");
+});
+
 test("the card's tag search can reach a tag that does not exist yet", () => {
   /* The moment you find a tag missing is the moment you were going to add it,
      and until now that meant leaving the card for Board Setup and finding your
