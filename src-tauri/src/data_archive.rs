@@ -518,6 +518,11 @@ pub fn staged_import_waiting(app: AppHandle) -> bool {
 ///
 /// Refuses when nothing is staged, so a stray call cannot bounce the app for
 /// no reason. NOT an async command: restarting is the main thread's job.
+///
+/// The `return` in the dev-build block below only looks needless in a debug
+/// build, where the release line after it is compiled out. Clippy lints the
+/// debug build; without the `return` the function would not compile at all.
+#[allow(clippy::needless_return)]
 #[tauri::command]
 pub fn restart_for_import(app: AppHandle) -> Result<(), String> {
     let staging = incoming_dir(&app);

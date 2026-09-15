@@ -340,6 +340,11 @@ static BACKUP_RUNNING: AtomicBool = AtomicBool::new(false);
 /// cancel_backup kill every active child DIRECTLY instead of waiting for
 /// output: robocopy prints nothing while it's deep inside one huge file, so a
 /// flag alone can leave "Cancel" unresponsive for however long that file takes.
+///
+/// Locked with `unwrap_or_else(PoisonError::into_inner)`, never `unwrap()`. A
+/// list of pids is still correct after a panic elsewhere, and unwrapping a
+/// poisoned lock would turn every later backup start and every Cancel into a
+/// panic too, for the rest of the session.
 static ACTIVE_ROBOCOPY_PIDS: Mutex<Vec<u32>> = Mutex::new(Vec::new());
 
 /// Monotonic generation counter for estimate scans. Every new estimate (and
@@ -672,7 +677,7 @@ pub fn cancel_backup() {
     // here: each copy loop removes its own pid once it has reaped its child
     // (see the retain() calls below), which is the only place that knows the
     // process has actually been waited on.
-    let pids: Vec<u32> = ACTIVE_ROBOCOPY_PIDS.lock().unwrap().clone();
+    let pids: Vec<u32> = ACTIVE_ROBOCOPY_PIDS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
     for pid in pids {
         // Kill by PID, but ONLY if that PID is still a robocopy.exe. A bare
         // "/PID n /F" is racy: robocopy may have already exited and the OS
@@ -1328,7 +1333,7 @@ fn run_destination(
         };
 
         let child_pid = child.id();
-        ACTIVE_ROBOCOPY_PIDS.lock().unwrap().push(child_pid);
+        ACTIVE_ROBOCOPY_PIDS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(child_pid);
 
         let stdout = child.stdout.take().expect("stdout was piped");
         let mut reader = BufReader::new(stdout);
@@ -1605,7 +1610,7 @@ fn run_destination(
         if CANCEL_REQUESTED.load(Ordering::SeqCst) {
             let _ = child.kill();
             let _ = child.wait();
-            ACTIVE_ROBOCOPY_PIDS.lock().unwrap().retain(|&p| p != child_pid);
+            ACTIVE_ROBOCOPY_PIDS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).retain(|&p| p != child_pid);
 
             // Everything this folder produced has already been streamed to the
             // log; just close it out with the reason it stopped and flush, so
@@ -1678,7 +1683,7 @@ fn run_destination(
             Ok(status) => status.code().unwrap_or(16) as u32,
             Err(_) => 16,
         };
-        ACTIVE_ROBOCOPY_PIDS.lock().unwrap().retain(|&p| p != child_pid);
+        ACTIVE_ROBOCOPY_PIDS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).retain(|&p| p != child_pid);
 
         let elapsed = folder_start.elapsed().as_secs_f64();
 

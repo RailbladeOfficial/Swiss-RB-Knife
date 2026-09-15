@@ -400,7 +400,7 @@ fn composite_streaming(
             let row = y as usize * stride;
             let from = (row + border_px as usize) * 4;
             let to = (row + (plan.canvas_w - border_px) as usize) * 4;
-            for px in buf[from..to].chunks_exact_mut(4) {
+            for px in buf[from..to].as_chunks_mut::<4>().0 {
                 px.copy_from_slice(&canvas_rgba);
             }
         }
@@ -1070,7 +1070,7 @@ fn resize_images_thread(
                         cancelled.store(true, Ordering::SeqCst);
                         return;
                     }
-                    if aborted.lock().unwrap().is_some() {
+                    if aborted.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_some() {
                         return;
                     }
 
@@ -1154,7 +1154,7 @@ fn resize_images_thread(
                         .and_then(|s| s.to_str())
                         .unwrap_or("image");
                     let out_path = {
-                        let mut names = used_names.lock().unwrap();
+                        let mut names = used_names.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                         let mut out_name = format!("{stem}.{out_ext}");
                         let mut suffix = 2u32;
                         while names.contains(&out_name.to_lowercase()) {
@@ -1166,7 +1166,7 @@ fn resize_images_thread(
                     };
 
                     if let Err(e) = final_img.save_with_format(&out_path, out_fmt) {
-                        let mut err = aborted.lock().unwrap();
+                        let mut err = aborted.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                         if err.is_none() {
                             *err = Some(format!("Failed to save {}: {e}", out_path.display()));
                         }
@@ -1197,7 +1197,7 @@ fn resize_images_thread(
         return;
     }
 
-    if let Some(message) = aborted.into_inner().unwrap() {
+    if let Some(message) = aborted.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner) {
         let _ = app.emit("resize-complete", ResizeCompleteEvent {
             success: false,
             message,

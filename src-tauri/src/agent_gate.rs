@@ -396,8 +396,11 @@ fn listen_error() -> String {
         .unwrap_or_default()
 }
 
+/// One reply channel per request still waiting on the front end.
+type PendingReplies = Mutex<HashMap<u64, Sender<Result<Value, String>>>>;
+
 /// Answers waiting to come back from the front end, keyed by request id.
-static PENDING: OnceLock<Mutex<HashMap<u64, Sender<Result<Value, String>>>>> = OnceLock::new();
+static PENDING: OnceLock<PendingReplies> = OnceLock::new();
 static NEXT_REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
 /// When each connection last reached this app, by connection id, in epoch ms.
@@ -865,6 +868,10 @@ pub fn kanban_agent_status(app: AppHandle) -> AgentStatus {
 /// Where srbk-agent.exe is, which is the one thing the copied connection block
 /// cannot guess: the installer is per-machine but the user may have chosen a
 /// different folder, and a dev build has it somewhere else entirely.
+// The `return` in the dev block only looks needless in a debug build, where the
+// release block after it is compiled out. Clippy lints the debug build; without
+// the `return` this would not compile.
+#[allow(clippy::needless_return)]
 fn sidecar_path(_app: &AppHandle) -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
@@ -1154,7 +1161,7 @@ fn create_instance(
 fn serve_connection(app: &AppHandle, handle: HANDLE) {
     let mut stream = unsafe {
         use std::os::windows::io::FromRawHandle;
-        fs::File::from_raw_handle(handle.0 as *mut std::ffi::c_void)
+        fs::File::from_raw_handle(handle.0)
     };
     if let Ok(raw) = read_frame(&mut stream) {
         let response = {
@@ -1483,7 +1490,7 @@ mod tests {
             };
             assert!(connected, "the server never saw the client connect");
             let mut stream = unsafe {
-                fs::File::from_raw_handle(handle.0 as *mut std::ffi::c_void)
+                fs::File::from_raw_handle(handle.0)
             };
             let request = read_frame(&mut stream).expect("the server should read the request");
             // Echoed, so the assertion below covers both directions.
@@ -1626,7 +1633,7 @@ mod tests {
                 Err(err) => err.code().0 as u32 == 0x8007_0000 | ERROR_PIPE_CONNECTED.0,
             };
             assert!(connected, "the client never connected");
-            let mut stream = unsafe { fs::File::from_raw_handle(handle.0 as *mut std::ffi::c_void) };
+            let mut stream = unsafe { fs::File::from_raw_handle(handle.0) };
             let raw_request = read_frame(&mut stream).expect("read the request");
             let bytes = serde_json::to_vec(&response).unwrap();
             write_frame(&mut stream, &bytes).expect("write the response");

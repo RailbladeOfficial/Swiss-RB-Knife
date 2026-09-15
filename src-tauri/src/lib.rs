@@ -1140,13 +1140,10 @@ pub struct DataFolderVerdict(pub DataFolderStatus);
 /// round trip between the app starting and the decision, and every tool loads
 /// in that gap.
 pub(crate) fn judge_data_folder(app: &tauri::AppHandle) -> DataFolderStatus {
-    let text = match fs::read_to_string(get_data_path(app, DATA_STAMP_FILE)) {
-        Ok(t) => Some(t),
-        // No stamp is not a problem. It is either a first run or an install
-        // from before stamping existed, and both are folders this build wrote
-        // or can write: every migration is keyed on what it finds, not on this.
-        Err(_) => None,
-    };
+    // No stamp is not a problem. It is either a first run or an install from
+    // before stamping existed, and both are folders this build wrote or can
+    // write: every migration is keyed on what it finds, not on this.
+    let text = fs::read_to_string(get_data_path(app, DATA_STAMP_FILE)).ok();
     judge_stamp(text.as_deref(), DATA_SCHEMA_VERSION)
 }
 
