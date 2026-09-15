@@ -36,7 +36,7 @@
           "Stage dates track when a card started, went to testing, and finished. An Advance button stamps the next one with the current date/time, and every date (except created) stays directly editable.",
           "Boards, cards and their attachments are included in the app's snapshots and in the Data tab's export and import.",
           "You can connect a local AI coding agent to a single board so it can read and change cards while you work in it, using Claude Code, OpenAI's Codex, or anything else that speaks MCP.",
-          "The agent talks to the app over a local pipe. Nothing is sent over the internet, and the app itself decides every request rather than trusting the agent to check.",
+          "The agent talks to the app over a local pipe, so that connection never leaves your computer, and the app itself decides every request rather than trusting the agent to check. Most agents run on their provider's servers though, so whatever the agent reads from your board goes to that provider.",
           "Board Setup > Agents is where you switch it on, and every permission starts off. Grant only creating cards, or add editing, moving, tagging, etc. as you need them.",
           "Connecting an agent is one paste: pick your agent, press Copy Command, and paste it into Command Prompt or PowerShell. It sets the agent up, replaces any older connection for that board, and reports whether it worked. Editors like Cursor and VS Code get a config block for their settings file instead.",
           "Each connection shows when an agent last used it, and the board shows when an agent is active on it right now."
