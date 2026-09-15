@@ -3658,10 +3658,8 @@ function buildColumn(board: Board, column: Column, todayStr: string): HTMLElemen
   if (column.isDone) el.classList.add("kb-column-done");
 
   const all = cardsInColumn(board.id, column.id);
-  // Filtered first, then sorted: sorting cards that are not on screen would
-  // only cost time, and the order of what IS shown is the same either way.
+  const visible = visibleCardsInColumn(board, column, todayStr);
   const rules = rulesForColumn(board, column);
-  const visible = sortCards(all.filter((c) => cardMatchesFilters(c, todayStr)), rules, board);
   // The WIP number counts every card in the column, not the filtered subset:
   // a limit that moved when you typed in a search box would be worthless.
   const over = column.wipLimit !== null && all.length > column.wipLimit;
@@ -4017,7 +4015,13 @@ function extendCardSelection(card: Card): void {
     toggleCardSelection(card);
     return;
   }
-  const column = visibleCardsInColumn(card.boardId, card.columnId);
+  const board = getBoard(card.boardId);
+  const col = board ? getColumn(board, card.columnId) : null;
+  if (!board || !col) {
+    toggleCardSelection(card);
+    return;
+  }
+  const column = visibleCardsInColumn(board, col, today());
   const from = column.findIndex((c) => c.id === anchor.id);
   const to = column.findIndex((c) => c.id === card.id);
   if (from === -1 || to === -1) {
@@ -4036,12 +4040,16 @@ function extendCardSelection(card: Card): void {
   renderBoardView();
 }
 
-/** The cards a column is SHOWING, filters included, which is the order a range
- *  is measured in. Selecting through a card you cannot see would be a selection
- *  you cannot check. */
-function visibleCardsInColumn(boardId: string, columnId: string): Card[] {
-  const todayStr = today();
-  return cardsInColumn(boardId, columnId).filter((c) => cardMatchesFilters(c, todayStr));
+/** The cards a column is SHOWING, filters and sort included, in the order they
+ *  are drawn. A range is measured in this order, and buildColumn draws from it,
+ *  so the cards between two clicks are always the cards between them on screen.
+ *  Selecting through a card you cannot see would be a selection you cannot
+ *  check. */
+function visibleCardsInColumn(board: Board, column: Column, todayStr: string): Card[] {
+  // Filtered first, then sorted: sorting cards that are not on screen would
+  // only cost time, and the order of what IS shown is the same either way.
+  const shown = cardsInColumn(board.id, column.id).filter((c) => cardMatchesFilters(c, todayStr));
+  return sortCards(shown, rulesForColumn(board, column), board);
 }
 
 /**
