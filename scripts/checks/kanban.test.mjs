@@ -2268,3 +2268,32 @@ test("a column stamps its own stage date on arrival, with the time, however the 
   assert.match(save, /stageSelect/, "the column editor never saves the stage");
   assert.match(read("index.html"), /id="kbColumnStageSelect"/, "the column editor has no stage choice");
 });
+
+test("an agent can set the stage date a column stamps, and never on a done column", () => {
+  /* Column Settings gained Stamps a Stage Date, and an agent allowed to add and
+     edit columns could set everything else about a column but not that.
+     Completed is not a stage an agent sets: it follows isDone, as in the editor. */
+  const sidecarText = read("src-tauri/agent/src/main.rs");
+  for (const tool of ["kanban_create_column", "kanban_update_column"]) {
+    const at = sidecarText.indexOf(`name: "${tool}"`);
+    const next = sidecarText.indexOf("ToolSpec {", at + 1);
+    const spec = sidecarText.slice(at, next === -1 ? undefined : next);
+    assert.match(spec, /"stage":/, `${tool} does not offer a stage`);
+  }
+
+  const parse = slice("src/tool/kanban.ts", "function agentColumnStage(", "\n}");
+  assert.match(parse, /raw === "completed"/, "an agent can set Completed as a stage instead of marking the column done");
+  for (const fn of ["agentCreateColumn", "agentUpdateColumn"]) {
+    const body = slice("src/tool/kanban.ts", `function ${fn}(`, "\n}");
+    assert.match(body, /agentColumnStage\(params\)/, `${fn} ignores the stage`);
+    assert.match(body, /isDone(?: \?\? column\.isDone\))? && stage\)/, `${fn} lets a done column stamp another stage`);
+  }
+  const update = slice("src/tool/kanban.ts", "function agentUpdateColumn(", "\n}");
+  assert.ok(
+    update.indexOf("agentColumnStage(params)") < update.indexOf("column.title = trimmed"),
+    "a refused stage can leave the column half changed",
+  );
+
+  const board = slice("src/tool/kanban.ts", "function agentGetBoard(", "\n}");
+  assert.match(board, /stage: arrivalStage\(column\)/, "an agent cannot see which stage a column stamps");
+});

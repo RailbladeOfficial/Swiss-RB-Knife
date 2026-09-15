@@ -473,6 +473,11 @@ const TOOLS: &[ToolSpec] = &[
                     "title": { "type": "string" },
                     "wipLimit": { "type": ["integer", "null"], "description": "Work-in-progress limit, or null for unlimited." },
                     "isDone": { "type": "boolean", "description": "Cards here count as finished." },
+                    "stage": {
+                        "type": ["string", "null"],
+                        "enum": ["started", "testing", null],
+                        "description": "The stage date a card moved into this column is stamped with, if it has none: started (Work Started) or testing (Testing Started). null for none. A done column always stamps Completed and cannot take a stage."
+                    },
                     "position": { "type": "integer", "description": "Where in the column order. Default last." }
                 }),
                 &["title"],
@@ -499,14 +504,20 @@ const TOOLS: &[ToolSpec] = &[
     ToolSpec {
         name: "kanban_update_column",
         op: "update_column",
-        description: "Renames a column or changes its WIP limit or done flag.",
+        description: "Renames a column or changes its WIP limit, its done flag, or the stage date it \
+                      stamps. Leave a field out to leave it alone.",
         schema: || {
             schema(
                 json!({
                     "column": { "type": "string", "description": "Column title or id." },
                     "title": { "type": "string" },
                     "wipLimit": { "type": ["integer", "null"] },
-                    "isDone": { "type": "boolean" }
+                    "isDone": { "type": "boolean" },
+                    "stage": {
+                        "type": ["string", "null"],
+                        "enum": ["started", "testing", null],
+                        "description": "The stage date a card moved into this column is stamped with, if it has none: started (Work Started) or testing (Testing Started). null for none. A done column always stamps Completed; to give one a stage, send isDone: false as well."
+                    }
                 }),
                 &["column"],
             )

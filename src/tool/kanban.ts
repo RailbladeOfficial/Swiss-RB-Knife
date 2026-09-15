@@ -13343,6 +13343,8 @@ function agentGetBoard(board: Board): Record<string, unknown> {
       title: column.title,
       wipLimit: column.wipLimit,
       isDone: column.isDone,
+      // "completed" for a done column, the column's own stage, or null.
+      stage: arrivalStage(column),
       cards: cardsInColumn(board.id, column.id).filter((c) => !c.archived).length,
     })),
     tags: board.tags
@@ -13747,6 +13749,20 @@ function agentWipLimit(params: Record<string, unknown>): number | null {
   return clampInt(raw, 1, 999, 1);
 }
 
+/** The stage date a column stamps, as an agent sent it: undefined when not
+ *  given, null for none. Completed is refused rather than accepted, because a
+ *  column stamps Completed by meaning done, the same as in Column Settings. */
+function agentColumnStage(params: Record<string, unknown>): "started" | "testing" | null | undefined {
+  if (!("stage" in params)) return undefined;
+  const raw = params.stage;
+  if (raw === null || raw === "none" || raw === "") return null;
+  if (raw === "started" || raw === "testing") return raw;
+  if (raw === "completed") {
+    throw new AgentError("A column stamps Completed by meaning done. Set isDone to true instead of stage.");
+  }
+  throw new AgentError('stage must be "started", "testing" or null.');
+}
+
 function agentCreateColumn(board: Board, params: Record<string, unknown>): Record<string, unknown> {
   if (board.columns.length >= MAX_COLUMNS_PER_BOARD) {
     throw new AgentError(`This board already has the maximum of ${MAX_COLUMNS_PER_BOARD} columns.`);
@@ -13755,11 +13771,17 @@ function agentCreateColumn(board: Board, params: Record<string, unknown>): Recor
   if (board.columns.some((c) => c.title.toLowerCase() === title.toLowerCase())) {
     throw new AgentError(`This board already has a column called "${title}".`);
   }
+  const isDone = agentBool(params, "isDone") ?? false;
+  const stage = agentColumnStage(params) ?? null;
+  if (isDone && stage) {
+    throw new AgentError("A done column always stamps Completed, so it cannot stamp another stage as well.");
+  }
   const column: Column = {
     id: newId(),
     title,
     wipLimit: agentWipLimit(params),
-    isDone: agentBool(params, "isDone") ?? false,
+    isDone,
+    stage,
     collapsed: false,
   };
   const rawPosition = params.position;
@@ -13769,7 +13791,7 @@ function agentCreateColumn(board: Board, params: Record<string, unknown>): Recor
       : board.columns.length;
   board.columns.splice(at, 0, column);
   touchBoard(board);
-  return { created: { id: column.id, title: column.title, position: at } };
+  return { created: { id: column.id, title: column.title, position: at, stage: arrivalStage(column) } };
 }
 
 /**
@@ -13805,6 +13827,15 @@ function agentMoveColumn(board: Board, params: Record<string, unknown>): Record<
 
 function agentUpdateColumn(board: Board, params: Record<string, unknown>): Record<string, unknown> {
   const column = agentColumn(board, agentRequiredString(params, "column"));
+  // Checked before anything changes, so a refused stage leaves the column as it was.
+  const stage = agentColumnStage(params);
+  const isDone = agentBool(params, "isDone");
+  if ((isDone ?? column.isDone) && stage) {
+    throw new AgentError(
+      `"${column.title}" means done, so it always stamps Completed and cannot stamp another stage. ` +
+        "Send isDone: false in the same request to change that.",
+    );
+  }
   const title = agentString(params, "title");
   if (title !== undefined) {
     const trimmed = title.trim().slice(0, 60);
@@ -13816,11 +13847,19 @@ function agentUpdateColumn(board: Board, params: Record<string, unknown>): Recor
     column.title = trimmed;
   }
   if ("wipLimit" in params) column.wipLimit = agentWipLimit(params);
-  const isDone = agentBool(params, "isDone");
   if (isDone !== undefined) column.isDone = isDone;
+  // A done column stamps Completed, so it keeps no stage of its own.
+  if (column.isDone) column.stage = null;
+  else if (stage !== undefined) column.stage = stage;
   touchBoard(board);
   return {
-    column: { id: column.id, title: column.title, wipLimit: column.wipLimit, isDone: column.isDone },
+    column: {
+      id: column.id,
+      title: column.title,
+      wipLimit: column.wipLimit,
+      isDone: column.isDone,
+      stage: arrivalStage(column),
+    },
   };
 }
 

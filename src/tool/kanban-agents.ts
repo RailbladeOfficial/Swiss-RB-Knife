@@ -114,7 +114,7 @@ export const AGENT_PERMISSIONS: readonly AgentPermission[] = [
   {
     id: "manageColumns",
     label: "Add and edit columns",
-    help: "Add columns, rename them, and change their WIP limits.",
+    help: "Add columns, rename them, move them, and change their WIP limits, whether they mean done, and which stage date they stamp.",
   },
 ];
 
