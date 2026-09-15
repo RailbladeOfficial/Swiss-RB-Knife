@@ -1930,6 +1930,7 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 #kbCardModal[data-kb-editing="false"] #kbCardCancelBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardAttachAddBtn,
 #kbCardModal[data-kb-editing="false"] #kbCardDueClearBtn,
+#kbCardModal[data-kb-editing="false"] .kb-due-shortcut,
 #kbCardModal[data-kb-editing="false"] #kbCardDueInput,
 #kbCardModal[data-kb-editing="false"] .kb-section-hint,
 /* The description's own chrome. Nothing to format and nothing to switch to

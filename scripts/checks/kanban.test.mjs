@@ -2208,3 +2208,22 @@ test("a card with a description says so on its face", () => {
   assert.match(face, /if \(hasDescription\) \{\s*\/\/[^\n]*\n\s*item\(/, "the description never adds its icon");
   assert.match(face, /if \(count !== null\)/, "the notepad is drawn with a count beside it");
 });
+
+test("the due date shortcuts set the day they name, and hide while a card is read", () => {
+  const html = read("index.html");
+  const row = html.slice(html.indexOf('id="kbCardDueInput"'), html.indexOf('id="kbCardDueClearBtn"'));
+  for (const which of ["today", "tomorrow", "friday"]) {
+    assert.match(row, new RegExp(`data-kb-due-shortcut="${which}"`), `the ${which} shortcut is missing or not before Clear`);
+  }
+
+  const src = ts();
+  const at = src.indexOf('querySelectorAll<HTMLButtonElement>("[data-kb-due-shortcut]")');
+  assert.ok(at > -1, "nothing wires the due date shortcuts");
+  const wiring = src.slice(at, src.indexOf("\n  }\n", at));
+  assert.match(wiring, /localDay\(day\)/, "a shortcut stores something other than a local YYYY-MM-DD day");
+  assert.match(wiring, /\(5 - day\.getDay\(\) \+ 7\) % 7/, "End of Week is not the coming Friday");
+  assert.match(wiring, /which === "tomorrow"\) day\.setDate\(day\.getDate\(\) \+ 1\)/, "Tomorrow is not the next day");
+
+  // Reading a card hides every control that changes it.
+  assert.match(read("src/tool/kanban.css"), /\[data-kb-editing="false"\] \.kb-due-shortcut/, "the shortcuts still show on a card being read");
+});

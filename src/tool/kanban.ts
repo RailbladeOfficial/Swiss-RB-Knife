@@ -108,7 +108,7 @@ import { formatBytes } from "../core/format";
 import { newId } from "../core/ids";
 import { bindInfoTooltips, toggleInfoTooltip } from "../core/info-tooltip";
 import { loadToolJson, saveToolJson, writesFrozen } from "../core/tool-store";
-import { formatStoredDate, today } from "../core/timestamp";
+import { formatStoredDate, localDay, today } from "../core/timestamp";
 import {
   AGENT_PERMISSIONS,
   AGENT_PERMISSION_GROUPS,
@@ -5606,6 +5606,26 @@ function getCardModal(): Modal {
       renderCardDue(card);
     }),
   );
+
+  /* Today, Tomorrow and End of Week. End of week is the coming Friday, and
+     today on a Friday: a due date is a work target, and "by the end of the
+     week" means before the weekend. Worked out at the click, in local time, so
+     a card modal left open overnight still means the day it is pressed. */
+  for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-kb-due-shortcut]")) {
+    btn.addEventListener(
+      "click",
+      withCard((card) => {
+        const day = new Date();
+        const which = btn.dataset.kbDueShortcut;
+        if (which === "tomorrow") day.setDate(day.getDate() + 1);
+        else if (which === "friday") day.setDate(day.getDate() + ((5 - day.getDay() + 7) % 7));
+        card.dates.due = localDay(day);
+        dueInput.value = card.dates.due;
+        stampCard(card);
+        renderCardDue(card);
+      }),
+    );
+  }
 
   document.getElementById("kbCardAdvanceBtn")!.addEventListener(
     "click",
