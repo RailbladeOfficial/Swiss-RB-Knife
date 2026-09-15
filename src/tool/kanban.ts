@@ -4235,26 +4235,30 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
     el.appendChild(wrap);
   }
 
-  /* How many files and how many comments the card is carrying. Shown whenever
-     there are any, with no preference behind it: unlike tags or subtasks, these
-     say nothing about the work itself, they say there is something inside this
-     card you cannot see from here, which is the one thing a card face cannot
-     afford to keep quiet about. */
+  /* What the card is carrying that its face cannot show: a description, files,
+     comments. Shown whenever there are any, with no preference behind it:
+     unlike tags or subtasks, these say nothing about the work itself, they say
+     there is something inside this card you cannot see from here, which is the
+     one thing a card face cannot afford to keep quiet about. */
+  const hasDescription = card.description.trim().length > 0;
   const attachmentCount = allAttachments(card).length;
-  if (attachmentCount > 0 || card.comments.length > 0) {
+  if (hasDescription || attachmentCount > 0 || card.comments.length > 0) {
     const meta = document.createElement("div");
     meta.className = "kb-card-meta";
-    /* `tab` is what makes an item clickable. Attachments do not pass one,
-       because they have no tab of their own: they are a block on Basic, which
-       is where the card opens anyway. */
-    const item = (svg: string, count: number, title: string, tab?: KbCardTab): void => {
+    /* `tab` is what makes an item clickable. The description and attachments
+       do not pass one, because they have no tab of their own: they are blocks
+       on Basic, which is where the card opens anyway. A null `count` draws the
+       icon alone, for a thing a card has one of or none. */
+    const item = (svg: string, count: number | null, title: string, tab?: KbCardTab): void => {
       const span = document.createElement("span");
       span.className = tab ? "kb-card-meta-item kb-card-count-link" : "kb-card-meta-item";
       span.title = title;
       span.innerHTML = svg;
-      const label = document.createElement("span");
-      label.textContent = String(count);
-      span.appendChild(label);
+      if (count !== null) {
+        const label = document.createElement("span");
+        label.textContent = String(count);
+        span.appendChild(label);
+      }
       if (tab) {
         span.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -4263,6 +4267,18 @@ function buildCardEl(board: Board, card: Card, todayStr: string): HTMLElement {
       }
       meta.appendChild(span);
     };
+    if (hasDescription) {
+      // A notepad: a page with two binder rings and three lines of writing.
+      item(
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+          'stroke-linecap="round" stroke-linejoin="round">' +
+          '<rect x="5" y="4" width="14" height="18" rx="2" />' +
+          '<path d="M9 2v4M15 2v4M9 11h6M9 15h6M9 19h3" />' +
+          "</svg>",
+        null,
+        "This card has a description",
+      );
+    }
     if (attachmentCount > 0) {
       item(
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +

@@ -2197,3 +2197,14 @@ test("the Subtasks and Comments tab counts follow every change, not just opening
   const comments = slice("src/tool/kanban.ts", "function renderCardComments(", "\n}");
   assert.match(comments, /renderCardTabCounts\(card\)/, "adding a comment leaves the Comments tab count stale");
 });
+
+test("a card with a description says so on its face", () => {
+  /* The title's hover summary was the only sign, and it needs the pointer on
+     the card to find. The notepad sits with the file and comment counts, and
+     like them it has no preference behind it. */
+  const face = slice("src/tool/kanban.ts", "const hasDescription = ", "el.appendChild(meta);");
+  assert.match(face, /card\.description\.trim\(\)\.length > 0/, "an empty or blank description would still show the notepad");
+  assert.match(face, /if \(hasDescription \|\| attachmentCount > 0 \|\| card\.comments\.length > 0\)/, "a card with only a description draws no meta row");
+  assert.match(face, /if \(hasDescription\) \{\s*\/\/[^\n]*\n\s*item\(/, "the description never adds its icon");
+  assert.match(face, /if \(count !== null\)/, "the notepad is drawn with a count beside it");
+});
