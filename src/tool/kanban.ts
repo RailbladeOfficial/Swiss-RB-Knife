@@ -2562,7 +2562,15 @@ function showKbView(view: KbView, boardId?: string): void {
     }
     // A selection belongs to the board it was made on. Carrying ids across
     // would mean a bulk action reaching cards that are not on screen.
-    if (currentBoardId !== board.id) clearCardSelection(false);
+    /* Arriving at a board is opening it, by whichever way you came: the
+       gallery, making it, copying it, or the back button. It used to be
+       counted by the gallery alone, so a board you made and then worked in
+       never counted as recent. Only on an ARRIVAL, so redrawing the board
+       already on screen is not another visit. */
+    if (currentBoardId !== board.id) {
+      clearCardSelection(false);
+      recordBoardUsage(board);
+    }
     currentBoardId = board.id;
     // Tags are per board, so "which vocabulary is in play" has to move with the
     // view. One place sets it, so it cannot drift out of step with the board on
@@ -2939,7 +2947,7 @@ function attachBoardTileDrag(tile: HTMLElement, board: Board): void {
 function openBoardFromGallery(boardId: string): void {
   const board = getBoard(boardId);
   if (!board) return;
-  recordBoardUsage(board);
+  // showKbView records the visit, as it does for every way into a board.
   showKbView("board", board.id);
 }
 

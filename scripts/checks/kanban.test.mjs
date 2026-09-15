@@ -2227,3 +2227,16 @@ test("the due date shortcuts set the day they name, and hide while a card is rea
   // Reading a card hides every control that changes it.
   assert.match(read("src/tool/kanban.css"), /\[data-kb-editing="false"\] \.kb-due-shortcut/, "the shortcuts still show on a card being read");
 });
+
+test("arriving at a board by any route counts toward Most Recent and Most Used", () => {
+  /* Only a click in the gallery used to count, so a board you created and
+     worked in straight away sorted as though it had never been opened. */
+  const view = slice("src/tool/kanban.ts", "function showKbView(", "\n}");
+  assert.match(
+    view,
+    /if \(currentBoardId !== board\.id\) \{[\s\S]*?recordBoardUsage\(board\);[\s\S]*?\}\s*currentBoardId = board\.id;/,
+    "only some ways into a board are recorded, or a redraw counts as another visit",
+  );
+  const gallery = slice("src/tool/kanban.ts", "function openBoardFromGallery(", "\n}");
+  assert.ok(!gallery.includes("recordBoardUsage"), "opening a board from the gallery is counted twice");
+});
