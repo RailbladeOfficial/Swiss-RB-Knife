@@ -4805,12 +4805,12 @@ function beginStatDetailPageJump(): void {
   input.select();
 }
 
-function commitStatDetailPageJump(cancelled = false): void {
+function commitStatDetailPageJump(canceled = false): void {
   const input = document.getElementById("gsStatDetailPageInput") as HTMLInputElement;
   const raw = input.value.trim();
   input.style.display = "none";
   document.getElementById("gsStatDetailPageLabel")!.style.display = "";
-  if (cancelled || !raw) return;
+  if (canceled || !raw) return;
 
   const totalPages = Math.ceil(gsStatDetailRows.length / GS_DETAIL_PAGE_SIZE);
   const page = Number(raw);

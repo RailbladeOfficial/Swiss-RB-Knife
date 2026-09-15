@@ -4792,7 +4792,7 @@ function boardCardMenu(card: Card): MenuItem[] {
     {
       label: "Delete Card",
       danger: true,
-      // No reopen: the card was never opened, so cancelling the confirm has
+      // No reopen: the card was never opened, so canceling the confirm has
       // nothing to go back to but the board it is already sitting on.
       onClick: () => requestDeleteCard(card),
     },

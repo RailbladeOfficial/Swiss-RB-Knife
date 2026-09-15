@@ -828,7 +828,7 @@ function remainingMs(s: CountdownSession): number {
 
 /** The span the progress figures measure against. Derived rather than stored
  *  so it stays right through both pauses (which push endsAt AND pausedMs by
- *  the same amount, cancelling out) and extensions (which push only endsAt,
+ *  the same amount, canceling out) and extensions (which push only endsAt,
  *  correctly growing the span). */
 function spanMs(s: CountdownSession): number {
   return Math.max(1, s.endsAt - s.startedAt - s.pausedMs);

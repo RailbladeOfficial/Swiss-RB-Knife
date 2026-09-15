@@ -253,7 +253,7 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
   // A menu never takes focus. Pressing a <button> focuses it, which blurs
   // whatever had focus before, and the text-field menu (edit-menu.ts) acts on
   // the field's live selection: losing it between the right-click and the
-  // click on Copy would leave nothing to copy. Cancelling mousedown is the
+  // click on Copy would leave nothing to copy. Canceling mousedown is the
   // one thing that suppresses the focus shift while still letting the click
   // through. Nothing in the app drives a menu by keyboard, so there is
   // nothing here that wanted the focus.

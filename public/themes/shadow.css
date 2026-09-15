@@ -1,12 +1,12 @@
 /* =============================================================================
    SHADOW
    -----------------------------------------------------------------------------
-   Purple, red, black, silver, grey, and nothing else. Near-black surfaces with
+   Purple, red, black, silver, gray, and nothing else. Near-black surfaces with
    a violet cast, brushed-silver text, and the red carried right through the
    interface rather than parked on the danger button: it takes every second
    panel rail, the active sidebar row's edge, card and tab hovers, and the
    tail of the header gradient, so purple and red read as a duotone the way
-   the silver and grey read as the ground between them.
+   the silver and gray read as the ground between them.
 
    Note --color-success is violet, not green: a green would be the only hue in
    the app outside the stated palette. Success and error stay legible apart
@@ -53,7 +53,7 @@
   --color-toast-error-border:  #d62246;
   --color-toast-error-text:    #ffd4dc;
 
-  /* ── Budget chart palette ── Purple / red / silver / deep-red / light-violet / rose / deep-purple / pale-grey */
+  /* ── Budget chart palette ── Purple / red / silver / deep-red / light-violet / rose / deep-purple / pale-gray */
   --color-chart-1:             #7b2ff7;
   --color-chart-2:             #d62246;
   --color-chart-3:             #c9c4d4;
@@ -74,7 +74,7 @@
 }
 
 /* ── Panel accent slots, purple / red / purple / red, with the silver and
-   grey left to the borders so the duotone stays the loud part ── */
+   gray left to the borders so the duotone stays the loud part ── */
 .panel-accent-input    { border-color: rgba(123, 47, 247, 0.32); border-left: 4px solid #7b2ff7; }
 .panel-accent-view     { border-color: rgba(214, 34, 70, 0.3); border-left: 4px solid #d62246; }
 .panel-accent-totals   { border-color: rgba(123, 47, 247, 0.32); border-left: 4px solid #7b2ff7; }
@@ -156,7 +156,7 @@ button:hover {
   box-shadow: 0 0 16px rgba(214, 34, 70, 0.3);
 }
 
-/* The quiet half of a two-button modal, grey ghost so the violet confirm
+/* The quiet half of a two-button modal, gray ghost so the violet confirm
    button beside it clearly reads as the primary action. */
 .modal-cancel-btn {
   background: transparent;

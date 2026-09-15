@@ -365,7 +365,7 @@ body {
 }
 
 /* Every tool's icon wears its own blade even at rest, so the collapsed
-   sidebar is a legible column of colors rather than nine grey glyphs. */
+   sidebar is a legible column of colors rather than nine gray glyphs. */
 .nav-item[data-tool] .nav-icon {
   color: var(--bl-rail);
 }
@@ -494,7 +494,7 @@ body {
 
 /* The base 0.6 opacity is tuned for dark themes; on these light cards it
    drops the description into the gradient. Lifted just enough to stay
-   quieter than the card name without going grey. */
+   quieter than the card name without going gray. */
 .tool-card-desc {
   opacity: 0.8;
 }
@@ -561,7 +561,7 @@ body {
   color: var(--bl-1);
 }
 
-/* ── Modal, solid: a card pulled to the centre of the screen. Modals take the
+/* ── Modal, solid: a card pulled to the center of the screen. Modals take the
    blade of whichever tool is open, via body[data-active-tool] above, and fall
    back to the default green on Home. ── */
 body.solid-modals .modal {

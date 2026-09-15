@@ -37,7 +37,7 @@
   --color-toast-error-bg:      #2a1a2a;
   --color-toast-error-border:  #ff44ff;
   --color-toast-error-text:    #ffe2ff;
-  /* ── Budget chart palette ── Blue / green / magenta / amber / teal / crimson / sky / orange, flat palette on dark purple-grey */
+  /* ── Budget chart palette ── Blue / green / magenta / amber / teal / crimson / sky / orange, flat palette on dark purple-gray */
   --color-chart-1:             #3498db;
   --color-chart-2:             #2ecc71;
   --color-chart-3:             #ff44ff;
@@ -54,7 +54,7 @@
 .panel-accent-totals   { border-left: 4px solid #f0a500; }
 .panel-accent-entries  { border-left: 4px solid #ff44ff; }
 
-/* ── Tool / section header, flat blue-grey, no glow ── */
+/* ── Tool / section header, flat blue-gray, no glow ── */
 .tool-view-header,
 .section-header {
   background: #2a2a3b;

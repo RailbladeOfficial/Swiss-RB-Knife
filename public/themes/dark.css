@@ -134,11 +134,11 @@ body:not(.solid-modals) .modal {
 .preview-card.drag-target  { border-color: #0d9488; }
 
 /* ── Attention-signal accents ──
-   This theme's --color-btn is a neutral grey (its buttons are deliberately
+   This theme's --color-btn is a neutral gray (its buttons are deliberately
    understated), but an update/reminder signal needs to actually catch the eye,
    so the sidebar pulses, the Home "Update Available" line, the tool-header
    notices, the tool-card icons, and modal links are routed to the theme's
-   indigo accent instead, leaving the grey buttons untouched. The pulses are
+   indigo accent instead, leaving the gray buttons untouched. The pulses are
    redirected by redefining --color-btn locally on the pulsing element, which
    the shared keyframes read. */
 #aboutBtn.update-available,
@@ -219,8 +219,8 @@ body:not(.solid-modals) .modal {
 .budget-summary-tab.active,
 .modal-tab.active { color: #c4b5fd; background: rgba(99, 102, 241, 0.12); border-bottom-color: #6366f1; }
 
-/* View-mode toggle active, indigo accent (was missing; a grey fill wouldn't
-   read as "selected" in an all-grey theme). */
+/* View-mode toggle active, indigo accent (was missing; a gray fill wouldn't
+   read as "selected" in an all-gray theme). */
 .budget-view-mode-btn.active {
   background: #6366f1;
   color: #ffffff;

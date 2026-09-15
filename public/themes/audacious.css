@@ -30,7 +30,7 @@
      blue  #5188f6    violet #bb63ee    white   #ffffff
 
    These are the screenshot's HUES, not its literal pixels. Sampled straight,
-   they ran 14-54% saturation, because clips on a grey timeline never have to
+   they ran 14-54% saturation, because clips on a gray timeline never have to
    fight a black background. Dropped onto this theme they read as dull and
    muddy next to magenta at 100% and lime at 66%. Each hue is therefore
    re-rendered at this theme's own strength (72-92% saturation), which is the
@@ -145,7 +145,7 @@ textarea,
    THE SELECTION BAR
    -----------------------------------------------------------------------------
    Layer 1 is the diagonal hatch, layer 2 is the band itself. The band's stops
-   are asymmetric on purpose: the blow-out sits left of centre, the way a
+   are asymmetric on purpose: the blow-out sits left of center, the way a
    light source raking across the row would put it, rather than in a tidy
    symmetric bloom.
 ============================================================================= */

@@ -778,6 +778,9 @@ pub struct ResizeCompleteEvent {
     pub message:       String,
     pub output_folder: String,
     pub count:         u32,
+    /// True when the run stopped because the user pressed Cancel. That is not a
+    /// failure, and the front end says so differently.
+    pub canceled:      bool,
 }
 
 static RESIZE_CANCEL: AtomicBool = AtomicBool::new(false);
@@ -983,6 +986,7 @@ fn resize_images_thread(
 
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
         let _ = app.emit("resize-complete", ResizeCompleteEvent {
+            canceled: false,
             success: false,
             message: format!("Cannot create output folder: {e}"),
             output_folder: out_dir.to_string_lossy().to_string(),
@@ -1037,7 +1041,7 @@ fn resize_images_thread(
     let next_index = AtomicU32::new(0);   // work-claim cursor into image_paths
     let processed  = AtomicU32::new(0);   // attempted (saved or skipped) (drives the progress bar
     let saved      = AtomicU32::new(0);   // actually written) drives the final count
-    let cancelled  = AtomicBool::new(false);
+    let canceled  = AtomicBool::new(false);
     let aborted: Mutex<Option<String>> = Mutex::new(None); // first fatal save error, if any
 
     // std::thread::scope lets each worker borrow the function's local state
@@ -1056,18 +1060,18 @@ fn resize_images_thread(
             let next_index  = &next_index;
             let processed   = &processed;
             let saved       = &saved;
-            let cancelled   = &cancelled;
+            let canceled   = &canceled;
             let aborted     = &aborted;
             let out_dir     = &out_dir;
             let gravity_str = gravity_str.as_str();
 
             scope.spawn(move || {
                 loop {
-                    // Stop claiming new work once cancelled or another worker
+                    // Stop claiming new work once canceled or another worker
                     // hit a fatal save error; anything already in flight still
                     // finishes naturally rather than being torn down mid-write.
                     if RESIZE_CANCEL.load(Ordering::SeqCst) {
-                        cancelled.store(true, Ordering::SeqCst);
+                        canceled.store(true, Ordering::SeqCst);
                         return;
                     }
                     if aborted.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_some() {
@@ -1187,10 +1191,11 @@ fn resize_images_thread(
 
     let final_count = saved.load(Ordering::SeqCst);
 
-    if cancelled.load(Ordering::SeqCst) {
+    if canceled.load(Ordering::SeqCst) {
         let _ = app.emit("resize-complete", ResizeCompleteEvent {
+            canceled: true,
             success: false,
-            message: "Cancelled by user.".to_string(),
+            message: "Canceled by user.".to_string(),
             output_folder: out_dir.to_string_lossy().to_string(),
             count: final_count,
         });
@@ -1199,6 +1204,7 @@ fn resize_images_thread(
 
     if let Some(message) = aborted.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner) {
         let _ = app.emit("resize-complete", ResizeCompleteEvent {
+            canceled: false,
             success: false,
             message,
             output_folder: out_dir.to_string_lossy().to_string(),
@@ -1208,6 +1214,7 @@ fn resize_images_thread(
     }
 
     let _ = app.emit("resize-complete", ResizeCompleteEvent {
+        canceled: false,
         success: true,
         message: String::new(),
         output_folder: out_dir.to_string_lossy().to_string(),

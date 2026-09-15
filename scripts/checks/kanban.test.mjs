@@ -853,9 +853,9 @@ test("the reading face cannot be clicked into an editor", () => {
   );
 });
 
-test("cancelling an edit puts back what was there", () => {
+test("canceling an edit puts back what was there", () => {
   /* Cancel restores from a snapshot taken on the way in. A SHALLOW copy would
-     hand back the same nested arrays that were just edited, so cancelling a
+     hand back the same nested arrays that were just edited, so canceling a
      subtask change would restore nothing. */
   const src = ts();
   const at = src.indexOf("function setCardEditing(");
@@ -1650,7 +1650,7 @@ test("the sort rows read their value from a badge, not from their own button", (
 
   // Board Setup > Preferences.
   const prefs = slice("src/tool/kanban.ts", "function renderBoardPrefs(", "\n}");
-  assert.match(prefs, /btn\.textContent = "Customize";/, "the board's list-valued rows are labelled with their own value");
+  assert.match(prefs, /btn\.textContent = "Customize";/, "the board's list-valued rows are labeled with their own value");
   assert.match(prefs, /badge\.textContent = setting\.badge;/, "the board's list-valued rows have no badge");
   /* BOTH of them, on the same row shape. Card Layout used to render its drag
      list inline under the row instead, which is why it never matched its

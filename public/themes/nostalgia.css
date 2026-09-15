@@ -1,9 +1,9 @@
 /* =============================================================================
    NOSTALGIA
    -----------------------------------------------------------------------------
-   Windows 2000. The #3a6ea5 desktop blue behind everything, #d4d0c8 grey
+   Windows 2000. The #3a6ea5 desktop blue behind everything, #d4d0c8 gray
    chrome on top of it, square corners, and the four-tone raised bevel (white /
-   light grey / grey / near-black) that every 9x-era control was built from.
+   light gray / gray / near-black) that every 9x-era control was built from.
    Title bars take the navy-to-pale-blue gradient; Tahoma carries the whole
    thing.
 
@@ -229,7 +229,7 @@ textarea:focus {
 }
 
 /* ── Recessed list surfaces, painted white ──
-   The rows and tiles that sit INSIDE a grey panel. The shell paints every one
+   The rows and tiles that sit INSIDE a gray panel. The shell paints every one
    of them from --color-bg, and a 9x list body was white in its #d4d0c8 frame,
    not tinted, so they are repainted here.
 
@@ -263,7 +263,7 @@ textarea:focus {
   background: #ffffff;
 }
 
-/* ── Buttons, grey face, black label, and a genuine press on :active ── */
+/* ── Buttons, gray face, black label, and a genuine press on :active ── */
 button {
   background: #d4d0c8;
   color: #000000;
@@ -344,7 +344,7 @@ button:active {
   shape-rendering: crispEdges;
 }
 
-/* ── Title bar and sidebar, the grey chrome ── */
+/* ── Title bar and sidebar, the gray chrome ── */
 #titleBar {
   background: #d4d0c8;
   border-bottom: 2px solid;
@@ -360,7 +360,7 @@ button:active {
 }
 
 /* Selected menu row: navy fill, white label, exactly like a 9x menu
-   highlight. Set explicitly because --color-hover is grey and the base rule
+   highlight. Set explicitly because --color-hover is gray and the base rule
    would leave black text on it. */
 .nav-item.active,
 .nav-item.active:hover {
@@ -432,7 +432,7 @@ input[type="checkbox"]:not(.toggle-switch input)::before {
   content: none;
 }
 
-/* ── Panel accent slots, flat grey with a single VGA rail each ── */
+/* ── Panel accent slots, flat gray with a single VGA rail each ── */
 .panel-accent-input    { border-left: 4px solid #000080; }
 .panel-accent-view     { border-left: 4px solid #008080; }
 .panel-accent-totals   { border-left: 4px solid #808000; }
@@ -465,17 +465,17 @@ input[type="checkbox"]:not(.toggle-switch input)::before {
    Same problem as the back-arrow above, one level out. --color-text-muted
    (#4d4d4d) is tuned for the #d4d0c8 panel, where it reads at 5.5:1. A handful
    of things render straight onto body's #3a6ea5 with nothing beneath them, and
-   against that blue the same grey collapses to 1.6:1. White is both the
+   against that blue the same gray collapses to 1.6:1. White is both the
    readable answer (5.3:1, the most the blue allows) and the period-correct
    one: 9x painted desktop labels white over exactly this color.
 
    Every selector here has been checked to have NO background of its own.
    Anything on a panel, card, tile or title bar stays on the muted token, which
-   is correct against grey, so this list stays deliberately short.
+   is correct against gray, so this list stays deliberately short.
 
    .gs-empty is why the two Game Stats entries are id-scoped: the same class
    also renders inside the Players and Tables lists, the Win Chart panel and
-   the stat-detail modal, all of which are grey. Only the two that land in a
+   the stat-detail modal, all of which are gray. Only the two that land in a
    bare results container may go white, and both are appended as DIRECT
    children of it, hence the child combinator. ── */
 .lock-icon,
@@ -513,7 +513,7 @@ input[type="checkbox"]:not(.toggle-switch input)::before {
 }
 
 /* Exit App is a transparent button with a #808080 outline, which on the blue
-   is a grey label in a grey box on blue. Give it a real 9x face instead, which
+   is a gray label in a gray box on blue. Give it a real 9x face instead, which
    fixes the contrast by putting a surface under the text rather than by
    recoloring it. The hover matches .danger-btn's. */
 .lock-exit-btn {
@@ -541,7 +541,7 @@ input[type="checkbox"]:not(.toggle-switch input)::before {
 }
 
 /* Not on the desktop, on the sticky history header's lighter #8fb3d4, where
-   muted grey is 3.9:1. Near-black is 6.5:1 and stays subordinate to the navy
+   muted gray is 3.9:1. Near-black is 6.5:1 and stays subordinate to the navy
    section title beside it. */
 .gs-hist-section-count {
   color: #2a2a2a;
@@ -628,7 +628,7 @@ body:not(.solid-modals) .modal {
 .preview-card.anchor-card { border-color: #808000; }
 .preview-card.drag-target { border-color: #008080; }
 
-/* ── Slider, a grey grip ── */
+/* ── Slider, a gray grip ── */
 .img-slider::-webkit-slider-thumb {
   background: #d4d0c8;
   border: 2px solid;
@@ -720,7 +720,7 @@ body:not(.solid-modals) .modal {
    restating a selector per component.
 
    --gs-accent-soft is used as TEXT throughout the tool (tile values, section
-   titles, card labels). The teal it used to hold sat at about 3:1 on the grey
+   titles, card labels). The teal it used to hold sat at about 3:1 on the gray
    chrome; navy, the same color the fills use, is the readable answer and
    costs nothing since the two are never adjacent. --gs-win is likewise a
    darker green than the VGA #008000 for the same reason: it is read as text

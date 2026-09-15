@@ -1084,7 +1084,7 @@ export async function initImageCCR(): Promise<void> {
       }
     );
 
-    const unlistenComplete = await listen<{ success: boolean; message: string; output_folder: string; count: number }>(
+    const unlistenComplete = await listen<{ success: boolean; canceled: boolean; message: string; output_folder: string; count: number }>(
       "resize-complete",
       ({ payload }) => {
         setResizeRunning(false);
@@ -1099,6 +1099,15 @@ export async function initImageCCR(): Promise<void> {
             `${payload.count} image${payload.count !== 1 ? "s" : ""} saved to ${payload.output_folder}`;
           document.getElementById("resize-result-inline")!.style.display = "";
           flash(`${payload.count} images resized`, "success");
+        } else if (payload.canceled) {
+          // A Cancel you pressed is not a failure, so it is not said as one.
+          document.getElementById("resize-progress-file")!.textContent = "";
+          flash(
+            payload.count > 0
+              ? `Resize canceled. ${payload.count} image${payload.count !== 1 ? "s were" : " was"} already saved to ${payload.output_folder}`
+              : "Resize canceled.",
+            "success",
+          );
         } else {
           document.getElementById("resize-progress-file")!.textContent = "";
           flash(`Resize failed: ${payload.message}`, "error");

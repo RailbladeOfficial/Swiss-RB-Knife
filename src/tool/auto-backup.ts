@@ -2844,7 +2844,7 @@ export async function initAutoBackup(): Promise<void> {
   cancelBtn.addEventListener("click", async () => {
     try {
       await invoke("cancel_backup");
-      flash("Cancelling, stopping the current copy…", "error", 4000);
+      flash("Canceling, stopping the current copy…", "error", 4000);
     } catch (e) {
       devError("Cancel failed:", e);
     }

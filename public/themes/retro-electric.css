@@ -126,7 +126,7 @@ button:hover {
 }
 
 /* Cancel / secondary button in two-button modals (exit, ignore, enable…),
-   deliberately a quiet grey ghost with no glow, so the glowing cyan confirm
+   deliberately a quiet gray ghost with no glow, so the glowing cyan confirm
    button next to it clearly reads as the primary action. */
 .modal-cancel-btn {
   background: transparent;

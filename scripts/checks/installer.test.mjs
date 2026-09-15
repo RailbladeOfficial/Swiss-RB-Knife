@@ -139,7 +139,7 @@ test("the theme survived whatever last touched the template", () => {
   assert.match(
     src,
     /!define MUI_CUSTOMFUNCTION_UNGUIINIT un\.SrbkGuiInit/,
-    "only the installer gets a frame painter; the uninstaller's pages will sit in system grey",
+    "only the installer gets a frame painter; the uninstaller's pages will sit in system gray",
   );
 });
 
