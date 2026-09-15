@@ -544,6 +544,19 @@ export function agentClient(id: string): AgentClient {
   return AGENT_CLIENTS.find((c) => c.id === id) ?? AGENT_CLIENTS[0];
 }
 
+/** Clients run end to end against a real install. Every other one is labeled
+ *  beta in the Agent picker: it ships, and its config follows that client's
+ *  documentation, but nobody has watched it connect yet. Add an id here once
+ *  someone has. */
+export const FULLY_TESTED_CLIENTS: ReadonlySet<string> = new Set(["claude-code"]);
+
+/** The name a client gets in the Agent picker, with " (beta)" on any client not
+ *  yet tested end to end. The picker only: hints and messages keep the plain
+ *  name, so an instruction never tells someone to start "Codex (beta)". */
+export function agentClientOptionLabel(client: AgentClient): string {
+  return FULLY_TESTED_CLIENTS.has(client.id) ? client.label : `${client.label} (beta)`;
+}
+
 /** How a connection is handed to its agent: a command that sets the agent up
  *  by itself, or the block to add to the agent's settings file by hand. */
 export type AgentCopyMode = "command" | "config";

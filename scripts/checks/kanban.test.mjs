@@ -2297,3 +2297,21 @@ test("an agent can set the stage date a column stamps, and never on a done colum
   const board = slice("src/tool/kanban.ts", "function agentGetBoard(", "\n}");
   assert.match(board, /stage: arrivalStage\(column\)/, "an agent cannot see which stage a column stamps");
 });
+
+test("every agent except Claude Code is labeled beta in the Agent picker", () => {
+  /* Only Claude Code has been run end to end against a real install. The others
+     ship, but say so, until each one has been. */
+  const agents = read("src/tool/kanban-agents.ts");
+  const tested = agents.match(/FULLY_TESTED_CLIENTS[^=]*= new Set\(\[([^\]]*)\]\)/);
+  assert.ok(tested, "the list of fully tested agents is gone");
+  assert.deepEqual(
+    [...tested[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]),
+    ["claude-code"],
+    "an agent other than Claude Code is marked fully tested; drop this line only once it really has been",
+  );
+  const helper = slice("src/tool/kanban-agents.ts", "export function agentClientOptionLabel(", "\n}");
+  assert.match(helper, /\(beta\)/, "untested agents are not labeled beta");
+
+  const picker = slice("src/tool/kanban.ts", "function renderAgentClientPicker(", "\n}");
+  assert.match(picker, /option\.textContent = agentClientOptionLabel\(client\)/, "the Agent picker shows the bare name");
+});

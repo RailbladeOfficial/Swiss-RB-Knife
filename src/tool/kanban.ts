@@ -120,6 +120,7 @@ import {
   boardConfig,
   clearAgentLog,
   AGENT_CLIENTS,
+  agentClientOptionLabel,
   agentClient,
   clientHint,
   COPY_COMMAND_LABEL,
@@ -12440,7 +12441,7 @@ function renderAgentClientPicker(): void {
       for (const client of AGENT_CLIENTS.filter((c) => c.cli === cli)) {
         const option = document.createElement("option");
         option.value = client.id;
-        option.textContent = client.label;
+        option.textContent = agentClientOptionLabel(client);
         group.appendChild(option);
       }
       select.appendChild(group);
