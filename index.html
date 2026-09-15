@@ -8437,13 +8437,13 @@
       </div>
       <div class="modal-body setup-body">
         <p id="kbSortIntro" class="kb-agent-note"></p>
-        <!-- Only when the board's default is what is being edited: whether this
-             board has an answer of its own at all. On the row it would be a
-             second button competing with Customize; here it sits with the thing
-             it decides. -->
+        <!-- Whether the thing being edited has an answer of its own at all: a
+             board following the tool default, or a column following its board.
+             On the row it would be a second button competing with Customize;
+             here it sits with the thing it decides. -->
         <div class="settings-row" id="kbSortFollowRow" style="display:none;">
           <div class="settings-label-col">
-            <span>This board</span>
+            <span id="kbSortFollowLabel">This board</span>
             <span id="kbSortFollowBadge" class="settings-status-badge"></span>
           </div>
           <button type="button" id="kbSortFollowBtn" class="settings-action-btn">Set for this board</button>

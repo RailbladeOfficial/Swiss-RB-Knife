@@ -3452,12 +3452,18 @@ function getSortModal(): Modal {
   document.getElementById("kbSortClose")!.addEventListener("click", goBack);
   document.getElementById("kbSortClearBtn")!.addEventListener("click", () => setSortEditRules([]));
 
-  /* Whether this BOARD has an answer of its own. Only shown for the board's
-     default, because a column always has one: its own rules, or the board's. */
+  /* Whether the board, or the column, has an answer of its own or follows the
+     level above it. Turning one on starts from what it was already following,
+     so nothing on screen moves until a level is actually added or removed. */
   document.getElementById("kbSortFollowBtn")!.addEventListener("click", () => {
     const board = sortEditBoard();
-    if (!board) return;
-    if (board.overrides.defaultSort === undefined) {
+    if (!board || !sortEditTarget) return;
+    if (sortEditTarget.kind === "column") {
+      const column = getColumn(board, sortEditTarget.columnId);
+      if (!column) return;
+      column.sort =
+        column.sort === null || column.sort === undefined ? [...rulesForColumn(board, column)] : null;
+    } else if (board.overrides.defaultSort === undefined) {
       // Starts from what it was already following, so turning the override on
       // changes nothing until a level is actually added or removed.
       board.overrides.defaultSort = [...effective(null).defaultSort];
@@ -3512,23 +3518,33 @@ function renderSortEditor(): void {
   const column =
     sortEditTarget.kind === "column" ? getColumn(board, sortEditTarget.columnId) : null;
   title.textContent = column ? `Sort: ${column.title}` : "Default Column Sort";
+  const following = !!column && (column.sort === null || column.sort === undefined);
   intro.textContent = column
-    ? `How ${column.title} orders its cards, whatever the board's default says. ` +
+    ? (following
+        ? `${column.title} is following the board's default, shown below. Changing a level gives it its own. `
+        : `How ${column.title} orders its cards, whatever the board's default says. `) +
       "Levels apply in order, and each one only decides the order when the ones above it tie."
     : "How every column on this board orders its cards unless that column says otherwise. " +
       "Levels apply in order, and each one only decides the order when the ones above it tie.";
 
-  /* The override row, for the board default only. A column is never "following
-     nothing": it has its own rules or it has the board's, and the Follow-the-
-     board entry on its menu is where that is decided. */
+  /* The override row: does this board follow the tool, or this column follow
+     its board? Same row for both, so going back to following is never only on
+     a right-click menu. */
   const followRow = document.getElementById("kbSortFollowRow") as HTMLElement;
-  followRow.style.display = column ? "none" : "";
-  if (!column) {
+  followRow.style.display = "";
+  const followLabel = document.getElementById("kbSortFollowLabel")!;
+  const followBadge = document.getElementById("kbSortFollowBadge")!;
+  const followBtn = document.getElementById("kbSortFollowBtn")!;
+  if (column) {
+    const custom = column.sort !== null && column.sort !== undefined;
+    followLabel.textContent = "This column";
+    followBadge.textContent = describeSortBadge(column);
+    followBtn.textContent = custom ? "Follow the board default" : "Set for this column";
+  } else {
     const custom = board.overrides.defaultSort !== undefined;
-    document.getElementById("kbSortFollowBadge")!.textContent = describeBoardSortBadge(board);
-    document.getElementById("kbSortFollowBtn")!.textContent = custom
-      ? "Follow the tool default"
-      : "Set for this board";
+    followLabel.textContent = "This board";
+    followBadge.textContent = describeBoardSortBadge(board);
+    followBtn.textContent = custom ? "Follow the tool default" : "Set for this board";
   }
 
   const rules = sortEditRules();
