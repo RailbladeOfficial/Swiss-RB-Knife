@@ -68,7 +68,7 @@ const APPLY_BY_CLOSING = import.meta.env.DEV;
 let wired = false;
 let flashFn: (msg: string, kind?: "success" | "error", ms?: number) => void = () => {};
 let confirmFn: (
-  opts: { title: string; message: string; confirmLabel: string; reopen?: () => void },
+  opts: { title: string; message: string; confirmLabel: string; reopen?: () => void; notice?: boolean },
   onConfirm: () => void,
 ) => void = (_o, run) => run();
 
@@ -119,7 +119,9 @@ export async function showImportResult(): Promise<void> {
         title: "Your import was not applied",
         message: result.message,
         confirmLabel: "OK",
-        // Dismissing is as good an answer as OK: there is nothing to decide.
+        // Nothing to decide, so one button and no Cancel, and dismissing is
+        // as good an answer as OK.
+        notice: true,
         reopen: resolve,
       },
       resolve,

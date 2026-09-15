@@ -2311,7 +2311,11 @@ const settingsTabs = new ModalTabs<SettingsTab>({
    loop of exactly the kind module-init.test.mjs exists to catch. */
 initDataTransfer({
   flash: (msg, kind, ms) => flash(msg, kind ?? "success", ms),
-  confirm: (opts, run) => appConfirm({ ...opts, reopen: () => openSettingsOnTab("data") }, run),
+  // Back to the Data tab unless the caller says where. The startup import notice
+  // does: it is shown before there is a Data tab to go back to, and its reopen is
+  // what lets startup carry on, so replacing it stalled every gate behind it.
+  confirm: (opts, run) =>
+    appConfirm({ ...opts, reopen: opts.reopen ?? (() => openSettingsOnTab("data")) }, run),
 });
 
 /* Same reason, for the file store: every tool imports it, and it needs to be
@@ -2370,7 +2374,14 @@ function getAppConfirmModal(): Modal {
  *  action, because unlike a delete these actions leave you somewhere you were
  *  looking at. */
 export function appConfirm(
-  opts: { title: string; message: string; confirmLabel: string; reopen?: () => void },
+  opts: {
+    title: string;
+    message: string;
+    confirmLabel: string;
+    reopen?: () => void;
+    /** Nothing to decide, only something to read: one plain button, no Cancel. */
+    notice?: boolean;
+  },
   onConfirm: () => void,
 ): void {
   // Handoff, so the parent keeps its tab and its scroll position.
@@ -2379,7 +2390,12 @@ export function appConfirm(
   const modal = getAppConfirmModal();
   document.getElementById("appConfirmTitle")!.textContent = opts.title;
   document.getElementById("appConfirmMessage")!.textContent = opts.message;
-  document.getElementById("appConfirmOkBtn")!.textContent = opts.confirmLabel;
+  const okBtn = document.getElementById("appConfirmOkBtn")!;
+  okBtn.textContent = opts.confirmLabel;
+  // Set on every open, not only when asked: the dialog is shared, and a notice
+  // must not leave the next real confirm without its Cancel or its warning color.
+  okBtn.classList.toggle("danger-btn", !opts.notice);
+  document.getElementById("appConfirmCancelBtn")!.style.display = opts.notice ? "none" : "";
   appConfirmAction = onConfirm;
   appConfirmReturn = opts.reopen ?? null;
   modal.open();

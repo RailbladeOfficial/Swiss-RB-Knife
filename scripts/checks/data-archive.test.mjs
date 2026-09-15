@@ -143,6 +143,30 @@ test("an import that could not be applied says so, in the app", () => {
   assert.match(read("src-tauri/src/data_archive.rs"), /fn rename_patiently\(/, "a single refused rename fails the import");
 });
 
+test("the startup import notice has one button, and dismissing it lets startup carry on", () => {
+  /* It reuses the shared confirm, which drew a red OK beside a Cancel that did
+     the same thing. Worse, shell.ts replaced every Data tab confirm's way back
+     with "open the Data tab", and for this notice its own way back was the only
+     thing that let startup continue: dismissed with Escape, it stalled the app
+     lock and every other startup gate behind it. */
+  const notice = slice("src/core/data-transfer.ts", "export async function showImportResult(", "\n}");
+  assert.match(notice, /notice: true/, "the import notice still offers a Cancel");
+  assert.match(notice, /reopen: resolve/, "dismissing the notice does not let startup carry on");
+
+  const shell = read("src/core/shell.ts");
+  assert.match(
+    shell,
+    /reopen: opts\.reopen \?\? \(\(\) => openSettingsOnTab\("data"\)\)/,
+    "the Data tab's confirm replaces the caller's own way back",
+  );
+
+  // Reset on every open: the dialog is shared, and a notice must not leave the
+  // next real confirm without its Cancel or its warning color.
+  const confirm = slice("src/core/shell.ts", "export function appConfirm(", "\n}");
+  assert.match(confirm, /classList\.toggle\("danger-btn", !opts\.notice\)/, "a notice changes the OK button for good");
+  assert.match(confirm, /"appConfirmCancelBtn"\)!\.style\.display = opts\.notice \? "none" : ""/, "Cancel is not put back after a notice");
+});
+
 test("the dev server does not watch the folders an import renames", () => {
   /* On Windows a watched folder cannot be renamed. A dev build keeps its data
      at <repo>/data, and Vite watched the whole repo, so every import in dev was
