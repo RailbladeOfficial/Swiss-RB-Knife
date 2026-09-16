@@ -93,6 +93,45 @@ test("snapshot bucket names are read back on the local clock", () => {
   }
 });
 
+test("a build script never stamps a date a person reads out of UTC", () => {
+  /* THIRD_PARTY_LICENSES.md carried "Generated automatically on <date>", built
+     from toISOString(). That is UTC, so from 20:00 Eastern onward every
+     generated copy was dated tomorrow, and the copy that shipped in 0.7.0
+     nearly went out that way.
+
+     Section 6 of the standards doc already said a generated date is local. It
+     named a helper for Rust and one for TypeScript and nothing for the build
+     scripts, which is the whole reason this one drifted: there was no wrong
+     thing to do, only no right one. scripts/_timestamp.mjs is that helper. */
+  for (const file of filesUnder("scripts", ".mjs")) {
+    if (file.includes("checks")) continue; // tests read source, they do not stamp it
+    // Code only. A comment is allowed to name the thing it is warning about,
+    // and the one in generate-licenses.mjs does.
+    const code = read(file)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    assert.doesNotMatch(
+      code,
+      /toISOString\(\)/,
+      `${file} builds a date out of UTC; import localDay from _timestamp.mjs`,
+    );
+  }
+});
+
+test("the build scripts' timestamp helper still exists", () => {
+  // Same reason as the check below: renaming it would make the one above pass
+  // by checking nothing.
+  const src = read("scripts/_timestamp.mjs");
+  for (const fn of ["localDay", "fileTimestamp"]) {
+    assert.ok(src.includes(`export function ${fn}(`), `${fn} missing`);
+  }
+  assert.match(
+    read("scripts/generate-licenses.mjs"),
+    /import \{ localDay \} from "\.\/_timestamp\.mjs"/,
+    "the license generator stopped using the shared helper",
+  );
+});
+
 test("the format constant and the shared helpers still exist", () => {
   // Without this, renaming any of them would make every check above pass by
   // checking nothing.

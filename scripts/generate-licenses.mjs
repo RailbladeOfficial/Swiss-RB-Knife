@@ -11,6 +11,8 @@ import { writeFileSync, mkdirSync } from "fs";
 import { resolve, dirname, join } from "path";
 import { fileURLToPath } from "url";
 
+import { localDay } from "./_timestamp.mjs";
+
 /* =============================================================================
    PATHS
 ============================================================================= */
@@ -239,7 +241,9 @@ console.log("======================================");
 
 const npmPackages = getNpmPackages();
 const cargoPackages = getCargoPackages();
-const now = new Date().toISOString().split("T")[0];
+// LOCAL, not toISOString(). This date is read by a person, and a UTC one
+// stamped the file with tomorrow's date for the last hours of every day.
+const now = localDay();
 
 const output = `# Third-Party Licenses
 
