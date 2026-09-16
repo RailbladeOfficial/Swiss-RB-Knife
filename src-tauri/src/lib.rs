@@ -1618,8 +1618,56 @@ fn check_for_updates() -> Result<UpdateInfo, String> {
    APP ENTRY POINT
 ============================================================================= */
 
+/// A DEV BUILD KEEPS ITS OWN WEBVIEW2 USER DATA FOLDER.
+///
+/// WebView2 picks that folder from the EXE NAME when nothing names one, and a
+/// dev build and the installed app are both swiss-rb-knife.exe, so both landed
+/// in %LOCALAPPDATA%\swiss-rb-knife\EBWebView. One folder is one browser
+/// process, shared by every WebView2 instance using it, and a browser process
+/// serves exactly one runtime version: the folder records it in `Last Version`
+/// and holds it with `lockfile` for as long as an app is up.
+///
+/// That is fine until the WebView2 Runtime updates underneath a running app.
+/// The installed app stays on the version it started with and keeps the folder
+/// locked; a dev build launched afterwards resolves the NEW runtime, cannot
+/// join the old browser process and cannot take the folder from it, and
+/// environment creation simply never returns. Tauri then never finishes
+/// building the window, so `tauri dev` prints its usual "Running" line and
+/// leaves a live process with no window at all: no error, nothing on screen,
+/// and the frontend's own startup backstop never runs because there is no
+/// webview to run it in. Closing the installed app "fixed" it, which is what
+/// made this look like the two builds simply cannot run side by side.
+///
+/// They are meant to run side by side. They already keep separate data folders
+/// and separate agent pipes to make that work, and this is the last thing they
+/// shared. A debug-only folder of its own costs a second WebView2 cache and
+/// buys a dev build that starts whatever the installed app is doing.
+///
+/// An explicitly set WEBVIEW2_USER_DATA_FOLDER is left alone, so pointing a dev
+/// run somewhere else by hand still works.
+#[cfg(all(debug_assertions, windows))]
+fn use_dev_webview_data_folder() {
+    if std::env::var_os("WEBVIEW2_USER_DATA_FOLDER").is_some() {
+        return;
+    }
+    let Some(base) = dirs::data_local_dir() else {
+        return;
+    };
+    let folder = base.join("swiss-rb-knife-dev").join("EBWebView");
+    if std::fs::create_dir_all(&folder).is_ok() {
+        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &folder);
+    }
+}
+
+#[cfg(not(all(debug_assertions, windows)))]
+fn use_dev_webview_data_folder() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Before the builder, because the folder is read when the window's webview
+    // environment is created and that happens inside the run below.
+    use_dev_webview_data_folder();
+
     tauri::Builder::default()
         .manage(db::Db::default())
         .plugin(tauri_plugin_opener::init())
