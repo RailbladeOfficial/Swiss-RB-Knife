@@ -1,7 +1,7 @@
 [
   {
     "version": "0.7.0",
-    "date": "2026-09-15",
+    "date": "2026-09-18",
     "changes": {
       "features": {
         "App Overall": [
@@ -27,20 +27,25 @@
           "Rearrange the blocks inside a card with the Card Layout editor, as a default and again per board if one board wants a different shape.",
           "Nearly every board preference can be set once for the tool and then overridden on individual boards.",
           "Kanban Setup has a Defaults tab for what every board follows unless it says otherwise, and Board Setup's Overrides tab lists a board's own answers grouped the same way. Overdue warnings can be switched off per board.",
-          "Select several cards at once with Ctrl+click or Shift+click, then set their priority, effort, tags or column in one go from the right-click menu, or drag them all together.",
+          "Select several cards at once with Ctrl+click or Shift+click, then set their priority, effort, tags, owner or column in one go from the right-click menu, or drag them all together. The board's card count tells you how many are selected, and the selection stays put after an action so a second change to the same cards is one more right-click.",
           "Sort any column by priority, effort, due date and more without losing the order you dragged it into, as a board default or per column.",
           "Sort the board gallery by newest, oldest, name, most recently opened or most used, or just drag the boards into your own order.",
           "Search a board's tags right from the card, create a new one on the spot when it doesn't exist yet, and drag tags and tag categories into whatever order you want.",
           "Archive cards one at a time, in bulk, or a whole column at once, and restore them whenever.",
           "Reset a board's card numbering, so deleting a pile of test cards doesn't leave your first real card stuck as #4. It never hands out a number a card still has.",
+          "Set a card's owner straight from its right-click menu, or from a whole selection's, whether that is you, a connected agent, or someone outside the app. No opening the card to do it.",
+          "Today, Tomorrow and End of Week buttons sit beside a card's due date, so the ones you actually pick are one click instead of a trip through the date picker.",
+          "A card carrying a description shows a notepad on its face, so you can tell there is more inside it without opening it.",
           "Stage dates track when a card started, went to testing, and finished. An Advance button stamps the next one with the current date/time, and every date (except created) stays directly editable.",
+          "A column can stamp a stage date by itself. Set it to Work Started or Testing Started in Column Settings, or mark the column as meaning done to stamp Completed, and a card moved in gets that date and the time it happened, if it doesn't have one already. The board preference that switches this on is now Stamp Stage Dates When Cards Move In.",
           "Boards, cards and their attachments are included in the app's snapshots and in the Data tab's export and import.",
           "You can connect a local AI coding agent to a single board so it can read and change cards while you work in it, using Claude Code, OpenAI's Codex, or anything else that speaks MCP.",
           "The agent talks to the app over a local pipe, so that connection never leaves your computer, and the app itself decides every request rather than trusting the agent to check. Most agents run on their provider's servers though, so whatever the agent reads from your board goes to that provider.",
           "Board Setup > Agents is where you switch it on, and every permission starts off. Grant only creating cards, or add editing, moving, tagging, etc. as you need them.",
           "Connecting an agent is one paste: pick your agent, press Copy Command, and paste it into Command Prompt or PowerShell. It sets the agent up, replaces any older connection for that board, and reports whether it worked. Editors like Cursor and VS Code get a config block for their settings file instead.",
           "Each connection shows when an agent last used it, and the board shows when an agent is active on it right now.",
-          "Every request an agent makes, passed or refused, is logged in Board Setup > Agents, and a refused one says which switch would have allowed it."
+          "Every request an agent makes, passed or refused, is logged in Board Setup > Agents, and a refused one says which switch would have allowed it.",
+          "Claude Code is the one agent run end to end against a real install, so every other client in the picker is labeled beta. They ship, and their setup follows each client's own documentation, but nobody has watched them connect yet."
         ],
         "Budget Tracker": [
           "Added ability to Clone Entries.",
@@ -114,6 +119,9 @@
         "Game Stats": [
           "Fixed an issue where the tool liked to resurrect deleted history.",
           "Fixed an issue where adding a profile, a game or an import could say it saved before it actually had."
+        ],
+        "Image CCR": [
+          "Fixed an issue where canceling a resize came back as a red Resize failed message, when canceling was exactly what you asked it to do. It now says the resize was canceled, and how many images were already saved."
         ]
       }
     }
