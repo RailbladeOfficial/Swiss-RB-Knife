@@ -13,22 +13,22 @@ All credit and gratitude to their respective authors and maintainers.
 | Package | Version | License |
 |---------|---------|---------|
 | [@esbuild/win32-x64](https://github.com/evanw/esbuild) | 0.25.12 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [@rollup/rollup-win32-x64-gnu](https://github.com/rollup/rollup) | 4.63.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [@rollup/rollup-win32-x64-msvc](https://github.com/rollup/rollup) | 4.63.2 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@rollup/rollup-win32-x64-gnu](https://github.com/rollup/rollup) | 4.63.3 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@rollup/rollup-win32-x64-msvc](https://github.com/rollup/rollup) | 4.63.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [@tauri-apps/api](https://github.com/tauri-apps/tauri) | 2.11.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [@tauri-apps/cli](https://github.com/tauri-apps/tauri) | 2.11.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [@tauri-apps/cli-win32-x64-msvc](https://github.com/tauri-apps/tauri) | 2.11.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [@tauri-apps/plugin-dialog](https://github.com/tauri-apps/plugins-workspace) | 2.7.3 | [MIT OR Apache-2.0](https://spdx.org/licenses/MIT.html) |
 | [@tauri-apps/plugin-opener](https://github.com/tauri-apps/plugins-workspace) | 2.5.5 | [MIT OR Apache-2.0](https://spdx.org/licenses/MIT.html) |
 | [@types/estree](https://github.com/DefinitelyTyped/DefinitelyTyped) | 1.0.9 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped) | 25.9.6 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped) | 25.9.7 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [esbuild](https://github.com/evanw/esbuild) | 0.25.12 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [fdir](https://github.com/thecodrr/fdir) | 6.5.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [nanoid](https://github.com/ai/nanoid) | 3.3.19 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [picocolors](https://github.com/alexeyraspopov/picocolors) | 1.1.1 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [picomatch](https://github.com/micromatch/picomatch) | 4.0.7 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [postcss](https://github.com/postcss/postcss) | 8.5.28 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [rollup](https://github.com/rollup/rollup) | 4.63.2 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [rollup](https://github.com/rollup/rollup) | 4.63.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [source-map-js](https://github.com/7rulnik/source-map-js) | 1.2.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
 | [tinyglobby](https://github.com/SuperchupuDev/tinyglobby) | 0.2.17 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [typescript](https://github.com/microsoft/TypeScript) | 5.6.3 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
@@ -100,7 +100,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [bytes](https://github.com/tokio-rs/bytes) | 1.12.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cairo-rs](https://github.com/gtk-rs/gtk-rs-core) | 0.18.5 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cairo-sys-rs](https://github.com/gtk-rs/gtk-rs-core) | 0.18.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [camino](https://github.com/camino-rs/camino) | 1.2.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [camino](https://github.com/camino-rs/camino) | 1.2.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cargo_metadata](https://github.com/oli-obk/cargo_metadata) | 0.19.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cargo_toml](https://gitlab.com/lib.rs/cargo_toml) | 0.22.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cargo-platform](https://github.com/rust-lang/cargo) | 0.1.9 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -461,7 +461,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [syn](https://github.com/dtolnay/syn) | 2.0.119 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [syn](https://github.com/dtolnay/syn) | 3.0.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [sync_wrapper](https://github.com/Actyx/sync_wrapper) | 1.0.2 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
-| [synstructure](https://github.com/mystor/synstructure) | 0.13.2 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [synstructure](https://github.com/mystor/synstructure) | 0.14.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [system-deps](https://github.com/gdesmott/system-deps) | 6.2.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tao](https://github.com/tauri-apps/tao) | 0.35.3 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [tao-macros](https://github.com/tauri-apps/tao) | 0.1.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -627,7 +627,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [x11-dl](https://github.com/AltF02/x11-rs.git) | 2.21.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [y4m](https://github.com/image-rs/y4m.git) | 0.8.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [yoke](https://github.com/unicode-org/icu4x) | 0.8.3 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
-| [yoke-derive](https://github.com/unicode-org/icu4x) | 0.8.2 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
+| [yoke-derive](https://github.com/unicode-org/icu4x) | 0.8.3 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
 | [zbus](https://github.com/z-galaxy/zbus/) | 5.19.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [zbus_macros](https://github.com/z-galaxy/zbus/) | 5.19.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [zbus_names](https://github.com/z-galaxy/zbus/) | 4.3.4 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -635,13 +635,13 @@ All credit and gratitude to their respective authors and maintainers.
 | [zerocopy](https://github.com/google/zerocopy) | 0.8.57 | [Apache-2.0 OR BSD-2-Clause OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [zerocopy-derive](https://github.com/google/zerocopy) | 0.8.57 | [Apache-2.0 OR BSD-2-Clause OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [zerofrom](https://github.com/unicode-org/icu4x) | 0.1.8 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
-| [zerofrom-derive](https://github.com/unicode-org/icu4x) | 0.1.7 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
+| [zerofrom-derive](https://github.com/unicode-org/icu4x) | 0.1.8 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
 | [zeroize](https://github.com/RustCrypto/utils) | 1.9.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [zerotrie](https://github.com/unicode-org/icu4x) | 0.2.5 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
 | [zerovec](https://github.com/unicode-org/icu4x) | 0.11.8 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
 | [zerovec-derive](https://github.com/unicode-org/icu4x) | 0.11.6 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
 | [zip](https://github.com/zip-rs/zip2.git) | 2.4.2 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) | 0.6.7 | [Zlib](https://spdx.org/licenses/Zlib.html) |
+| [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) | 0.6.8 | [Zlib](https://spdx.org/licenses/Zlib.html) |
 | [zmij](https://github.com/dtolnay/zmij) | 1.0.23 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [zopfli](https://github.com/zopfli-rs/zopfli) | 0.8.3 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [zune-core](https://github.com/etemesi254/zune-image) | 0.5.3 | [Apache-2.0 OR MIT OR Zlib](https://spdx.org/licenses/Apache-2.0.html) |
