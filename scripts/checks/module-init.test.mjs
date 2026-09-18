@@ -249,6 +249,7 @@ test("the import loops this project has are the ones we know about", () => {
       "src/tool/rng",
       "src/tool/time-tracker",
       "src/tool/tts-repeater",
+      "src/tool/whiteboard",
     ],
     "the set of files importing each other in a loop has changed",
   );

@@ -942,6 +942,11 @@ const NO_SNAPSHOT: &[&str] = &[];
 /// so restoring it beside a board file would be restoring two unrelated things.
 const KANBAN_AGENTS_GROUP: &[&str] = &["kanban/kanban-agents.json"];
 
+/// The Whiteboard is one file and is the only copy of what was written on it,
+/// so it is snapshotted even though it behaves like a draft: nothing on it is
+/// ever "saved" by hand, and Clear is one click away.
+const WHITEBOARD_GROUP: &[&str] = &["whiteboard/whiteboard.json"];
+
 fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
     let (name, empty, group) = match (tool_id, kind) {
         ("time-tracker", "settings") => {
@@ -992,6 +997,11 @@ fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
             NO_SNAPSHOT,
         ),
         ("auto-backup", "presets") => ("auto-backup/auto-backup-presets.json", "[]", NO_SNAPSHOT),
+        ("whiteboard", "data") => (
+            "whiteboard/whiteboard.json",
+            r#"{"strokes":[],"texts":[]}"#,
+            WHITEBOARD_GROUP,
+        ),
         // An allowlist, not a filename built from the arguments. Both of these
         // arrive from the front end and would otherwise be joined onto a path.
         _ => return Err(format!("Unknown tool file '{tool_id}/{kind}'")),

@@ -1,0 +1,334 @@
+/* =============================================================================
+   WHITEBOARD
+   -----------------------------------------------------------------------------
+   A toolbar, and under it a board that fills the rest of the window. Every
+   color here is a theme variable: the board is the theme's input surface, its
+   dot grid is the theme's dashed border color, and the six pens are the theme's
+   text color and first five chart colors (see the header of whiteboard.ts).
+============================================================================= */
+
+/* =============================================================================
+   TOOL VIEW SHELL
+   -----------------------------------------------------------------------------
+   The board needs a HEIGHT to scroll inside, and nothing above this tool gives
+   it one: #mainContent scrolls the page, and its children are content-height
+   all the way down. Same arrangement as Kanban's, scoped to this tool's visit
+   by the data-active-tool attribute shell.ts puts on <body>, so no other tool's
+   layout is touched and it stops applying the moment you leave.
+============================================================================= */
+
+body[data-active-tool="productivity/whiteboard"] #mainContent {
+  overflow: hidden;
+}
+
+body[data-active-tool="productivity/whiteboard"] #section-productivity,
+body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
+  flex: 1;
+  /* Without this a flex child refuses to shrink below its content, which is
+     the overflow this block exists to prevent. */
+  min-height: 0;
+}
+
+/* =============================================================================
+   TOOLBAR
+============================================================================= */
+
+.wb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+
+.wb-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.wb-group-end {
+  margin-left: auto;
+  gap: 6px;
+}
+
+.wb-group .toggle-btn {
+  padding: 5px 12px;
+  font-size: 0.82rem;
+}
+
+.wb-toolbar button:disabled,
+.wb-send-modal button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* A pen swatch. Painted with currentColor, so the same wb-ink-* class that
+   colors a text box colors the swatch that made it. */
+.wb-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  background: currentColor;
+  border: 2px solid var(--color-border);
+  transition:
+    border-color var(--hover-transition),
+    box-shadow var(--hover-transition);
+}
+
+/* The base button hover repaints the background, which on a swatch would
+   swap the color it is offering for the button color. */
+.wb-swatch:hover {
+  background: currentColor;
+  border-color: var(--color-text-muted);
+}
+
+.wb-swatch.active {
+  border-color: var(--color-panel);
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.wb-ink-ink { color: var(--color-text); }
+.wb-ink-c1 { color: var(--color-chart-1); }
+.wb-ink-c2 { color: var(--color-chart-2); }
+.wb-ink-c3 { color: var(--color-chart-3); }
+.wb-ink-c4 { color: var(--color-chart-4); }
+.wb-ink-c5 { color: var(--color-chart-5); }
+
+/* =============================================================================
+   THE BOARD
+   -----------------------------------------------------------------------------
+   Three layers in one box: the stage paints the surface and the dot grid, the
+   canvas over it holds the ink, and the scroller over that holds the text
+   boxes and takes every click. The canvas never takes a pointer event; the
+   surface works out where on the board a press landed.
+============================================================================= */
+
+.wb-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-input-bg);
+  /* The dot grid is what makes scrolling a plain surface visible at all.
+     whiteboard.ts moves it with the scroll. */
+  background-image: radial-gradient(circle, var(--color-border-dashed) 1px, transparent 1.6px);
+  background-size: 24px 24px;
+  transition:
+    background-color var(--hover-transition),
+    border-color var(--hover-transition);
+}
+
+.wb-ink {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.wb-scroller {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+/* Sized in whiteboard.ts from SURFACE_W and SURFACE_H, the one place they live. */
+.wb-surface {
+  position: relative;
+  /* Stops a drag from selecting text boxes as it goes, and stops a touchpad or
+     pen from scrolling instead of drawing. */
+  user-select: none;
+  touch-action: none;
+}
+
+.wb-surface.wb-mode-type {
+  cursor: text;
+}
+
+.wb-surface.wb-mode-draw {
+  cursor: crosshair;
+}
+
+.wb-surface.wb-mode-erase {
+  cursor: cell;
+}
+
+.wb-empty-hint {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  max-width: 80%;
+  margin: 0;
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* =============================================================================
+   TEXT BOXES
+   -----------------------------------------------------------------------------
+   No border unless you are in one. A faint dashed edge on hover in Type mode is
+   the only sign an idle box is something you can grab.
+============================================================================= */
+
+.wb-text {
+  position: absolute;
+  box-sizing: content-box;
+  min-width: 2ch;
+  min-height: 1.4em;
+  max-width: 560px;
+  padding: 2px 4px;
+  border: 1px dashed transparent;
+  border-radius: 4px;
+  font-size: 1rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  transition: border-color var(--hover-transition);
+}
+
+/* Drawing and erasing go straight through text, so a stroke can start on top
+   of a box without grabbing it. */
+.wb-mode-draw .wb-text,
+.wb-mode-erase .wb-text {
+  pointer-events: none;
+}
+
+.wb-mode-type .wb-text:hover {
+  border-color: var(--color-border-dashed);
+}
+
+.wb-text.wb-text-editing {
+  border-color: var(--color-accent);
+  border-style: solid;
+  background: color-mix(in srgb, var(--color-input-bg) 75%, transparent);
+  user-select: text;
+}
+
+.wb-text.wb-text-dragging {
+  border-color: var(--color-accent);
+  cursor: grabbing;
+}
+
+/* =============================================================================
+   SEND TO KANBAN
+============================================================================= */
+
+.wb-send-modal {
+  width: min(560px, 94vw);
+}
+
+/* Sized by the modal, not the viewport, so two pickers side by side fold to
+   one above the other when the panel is narrow. */
+.wb-send-target {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.wb-send-empty {
+  margin: 12px 0 6px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.wb-send-list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wb-send-list-title {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.wb-send-count {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.wb-send-all-btn {
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+}
+
+.wb-send-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.wb-send-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--hover-transition);
+}
+
+.wb-send-row:hover {
+  background: var(--color-hover);
+}
+
+.wb-send-row input {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--color-btn);
+}
+
+.wb-send-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wb-send-title {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.wb-send-more,
+.wb-send-hint,
+.wb-history-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.wb-send-hint {
+  margin: 10px 0;
+}
+
+/* =============================================================================
+   HISTORY
+============================================================================= */
+
+.wb-history-modal {
+  width: min(520px, 94vw);
+}
+
+.wb-history-hint {
+  margin: 0 0 6px;
+  line-height: 1.45;
+}

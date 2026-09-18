@@ -831,7 +831,7 @@ const MAX_CARDS_PER_BOARD = 5000;
 const MAX_COLUMNS_PER_BOARD = 24;
 const MAX_SUBTASKS_PER_CARD = 100;
 
-const MAX_TITLE_LEN = 200;
+export const MAX_TITLE_LEN = 200;
 const MAX_DESC_LEN = 8000;
 
 /** Ceilings on the two things a card can now accumulate without bound. A
@@ -14088,6 +14088,100 @@ function listenForAgentRequests(): void {
       }
     })();
   });
+}
+
+/* =============================================================================
+   CARDS FROM ANOTHER TOOL
+   -----------------------------------------------------------------------------
+   The Whiteboard sends lines of text here to become bare cards. It is the same
+   arrangement the agent bridge has, for the same reason: createCard is what the
+   buttons call, so a card sent from elsewhere gets a real number, lands where a
+   person adding it would have put it, and appears on the board at once.
+
+   ALL OR NOTHING, DECIDED BEFORE ANYTHING IS MADE. Every reason the batch
+   cannot land (still loading, a folder from a newer build, a board file that
+   would not read, no room) is checked first, so a refusal leaves no half of a
+   batch behind on the board.
+
+   "SAVED" MEANS ON DISK. The answer is given after flushSave(), and says
+   whether the board actually left the dirty set. The caller clears its own copy
+   of the text only on a yes, because a batch that is in memory and has not
+   been written yet is still one crash away from existing nowhere.
+============================================================================= */
+
+/** A board as another tool needs to see it: enough to offer it in a picker. */
+export interface KanbanTarget {
+  id: string;
+  name: string;
+  columns: { id: string; title: string }[];
+}
+
+/** Every board, in the order the gallery shows them, or null while Kanban is
+ *  still loading and has nothing trustworthy to offer. */
+export function kanbanTargets(): KanbanTarget[] | null {
+  if (!storeLoaded) return null;
+  return boards.map((b) => ({
+    id: b.id,
+    name: b.name,
+    columns: b.columns.map((c) => ({ id: c.id, title: c.title })),
+  }));
+}
+
+export interface IncomingCard {
+  title: string;
+  description: string;
+}
+
+export type IncomingCardsResult =
+  | { ok: true; numbers: number[]; saved: boolean }
+  | { ok: false; error: string };
+
+/** Adds the cards to the bottom of one column, in the order given, and writes
+ *  the board before answering. */
+export async function addCardsFromElsewhere(
+  boardId: string,
+  columnId: string,
+  incoming: IncomingCard[],
+): Promise<IncomingCardsResult> {
+  if (!storeLoaded) return { ok: false, error: "Kanban is still loading. Try again in a moment." };
+  const frozen = writesFrozen();
+  if (frozen) return { ok: false, error: `Kanban is not saving: ${frozen}` };
+  const board = getBoard(boardId);
+  if (!board) return { ok: false, error: "That board no longer exists." };
+  if (unreadableFiles.has(board.id) || unreadableFiles.has("index")) {
+    return {
+      ok: false,
+      error: `Kanban could not read the file for "${board.name}" when the app started, so nothing is added to it.`,
+    };
+  }
+  const column = getColumn(board, columnId);
+  if (!column) return { ok: false, error: `That column is no longer on "${board.name}".` };
+  const room = MAX_CARDS_PER_BOARD - liveCardsOnBoard(board.id).length;
+  if (incoming.length > room) {
+    return {
+      ok: false,
+      error:
+        `"${board.name}" has room for ${room.toLocaleString()} more ` +
+        `${room === 1 ? "card" : "cards"}, and this is ${incoming.length}. ` +
+        "Archiving finished work frees room without deleting anything.",
+    };
+  }
+
+  const numbers: number[] = [];
+  for (const item of incoming) {
+    const title = item.title.trim();
+    if (!title) continue;
+    // Room was checked above, so this cannot come back null.
+    const card = createCard(board, column.id, title, "bottom");
+    if (!card) break;
+    card.description = trimTo(item.description, MAX_DESC_LEN);
+    stampCard(card);
+    numbers.push(card.number);
+  }
+
+  renderAll();
+  await flushSave();
+  return { ok: true, numbers, saved: !dirtyBoards.has(board.id) };
 }
 
 export function initKanban(): void {

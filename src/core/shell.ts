@@ -68,6 +68,11 @@ import {
   onKanbanIconClicked,
 } from "../tool/kanban";
 import {
+  initWhiteboard,
+  onWhiteboardToolEntry,
+  onWhiteboardToolExit,
+} from "../tool/whiteboard";
+import {
   RANDOM_VARS,
   PERSISTENT_RANDOM_KEY,
   maybeRegenerateRandom,
@@ -436,6 +441,7 @@ export const ALL_TOOLS: ToolMeta[] = [
   { key: "tracking/time-tracker", section: "tracking", tool: "time-tracker", label: "Time Tracker" },
   { key: "files/auto-backup", section: "files", tool: "auto-backup", label: "Auto-Backup" },
   { key: "productivity/countdown", section: "productivity", tool: "countdown", label: "Countdown Timer" },
+  { key: "productivity/whiteboard", section: "productivity", tool: "whiteboard", label: "Whiteboard" },
   { key: "files/image-ccr", section: "files", tool: "image-ccr", label: "Image CCR" },
   { key: "tracking/game-stats", section: "tracking", tool: "game-stats", label: "Game Stats" },
   { key: "productivity/tts-repeater", section: "productivity", tool: "tts-repeater", label: "TTS Repeater" },
@@ -861,6 +867,11 @@ function switchSection(sectionKey: string, toolKey?: string): void {
   if (_activeViewKey === "productivity/kanban" && nextViewKey !== "productivity/kanban") {
     void onKanbanToolExit();
   }
+  // The Whiteboard debounces too, and a text box still being typed in is only
+  // kept once the edit ends, which leaving the tool has to do for it.
+  if (_activeViewKey === "productivity/whiteboard" && nextViewKey !== "productivity/whiteboard") {
+    void onWhiteboardToolExit();
+  }
   // Bank the outgoing view's scroll position. Guarded on the key actually
   // changing because activateSection() routes through here twice for one
   // navigation (once itself, then again via activateTool/activateLanding);
@@ -1059,6 +1070,7 @@ function activateTool(section: string, tool: string): void {
   if (section === "tracking" && tool === "game-stats") onGameStatsToolEntry();
   if (section === "files" && tool === "auto-backup") onAutoBackupToolEntry();
   if (section === "productivity" && tool === "kanban") onKanbanToolEntry();
+  if (section === "productivity" && tool === "whiteboard") onWhiteboardToolEntry();
 
   saveShellState(section, tool);
   pushNavHistory(section, tool);
@@ -2927,6 +2939,13 @@ export async function quitApp(): Promise<void> {
     // Quitting must never be blocked by a failed flush. The debounce window
     // is 400 ms, so in the overwhelmingly common case there's nothing queued.
   }
+  // Same for the Whiteboard, where the thing most likely to be waiting is the
+  // line somebody was typing when they closed the app.
+  try {
+    await onWhiteboardToolExit();
+  } catch {
+    // As above: never blocks the quit.
+  }
   allowAppClose = true;
   unlistenCloseRequest?.();
   unlistenCloseRequest = null;
@@ -3362,6 +3381,7 @@ async function init(): Promise<void> {
   initDaysBetween();
   initRNG();
   initKanban();
+  initWhiteboard();
 
   let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
   getCurrentWindow().onResized(() => {

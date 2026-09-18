@@ -46,6 +46,7 @@ const TOOL_LABELS: Record<string, string> = {
   rng: "RNGesus",
   "time-tracker": "Time Tracker",
   "tts-repeater": "TTS Repeater",
+  whiteboard: "Whiteboard",
 };
 
 /** Files that failed to load this session, keyed "toolId:kind", holding the

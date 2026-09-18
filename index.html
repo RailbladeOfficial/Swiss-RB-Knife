@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="src/tool/tts-repeater.css" />
   <link rel="stylesheet" href="src/tool/days-between.css" />
   <link rel="stylesheet" href="src/tool/countdown.css" />
+  <link rel="stylesheet" href="src/tool/whiteboard.css" />
   <link rel="stylesheet" href="src/tool/rng.css" />
   <link rel="stylesheet" href="src/tool/kanban.css" />
   <!-- Boot-time palette only. applyTheme() swaps this href as soon as settings
@@ -278,6 +279,20 @@
           <span class="nav-label">Countdown Timer</span>
         </li>
 
+        <li class="nav-item" data-section="productivity" data-tool="whiteboard" title="Whiteboard">
+          <span class="nav-icon">
+            <!-- A board on an easel with a scribble on it. -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="13" rx="2" ry="2" />
+              <path d="M7 11.5c1.3-3 2.7-3 3.7 0s2.4 3 3.6 0 2.1-2 2.7-.8" />
+              <line x1="12" y1="16" x2="8.5" y2="21" />
+              <line x1="12" y1="16" x2="15.5" y2="21" />
+            </svg>
+          </span>
+          <span class="nav-label">Whiteboard</span>
+        </li>
+
         <li class="nav-item" data-section="calculators" data-tool="days-between" title="Days Between Dates">
           <span class="nav-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -518,6 +533,21 @@
             <div class="tool-card-name">Countdown Timer</div>
             <div class="tool-card-desc">A big, screen-shareable countdown that keeps ticking while the window is
               unfocused, with memos and a loggable history.</div>
+          </div>
+
+          <div class="tool-card" data-section="productivity" data-tool="whiteboard">
+            <div class="tool-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="13" rx="2" ry="2" />
+                <path d="M7 11.5c1.3-3 2.7-3 3.7 0s2.4 3 3.6 0 2.1-2 2.7-.8" />
+                <line x1="12" y1="16" x2="8.5" y2="21" />
+                <line x1="12" y1="16" x2="15.5" y2="21" />
+              </svg>
+            </div>
+            <div class="tool-card-name">Whiteboard</div>
+            <div class="tool-card-desc">An open board to type and scribble on in a meeting, then send the lines worth
+              keeping to Kanban as cards.</div>
           </div>
 
           <div class="tool-card" data-section="calculators" data-tool="days-between">
@@ -1682,6 +1712,66 @@
 
           </div>
         </div><!-- /productivity-tool-countdown -->
+
+        <div id="productivity-tool-whiteboard" class="tool-view" style="display:none;">
+          <div class="tool-view-header">
+            <button class="tool-back-btn" data-section="home" title="Back to Home">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span class="tool-view-title">Whiteboard</span>
+            <div class="tool-header-notice-wrap" id="wbHeaderNoticeWrap" style="display:none;">
+              <span id="wbHeaderNotice" class="tool-header-notice"
+                title="The file could not be read when the app started, so nothing is written over it. Close the app, then repair or move that file, or restore a snapshot from History."></span>
+            </div>
+            <nav class="tool-view-header-actions">
+              <button id="wbHistoryBtn" title="Hourly snapshots of the whiteboard, and a way to put one back">History</button>
+            </nav>
+          </div>
+
+          <div class="wb-toolbar panel panel-accent-input">
+            <div class="wb-group" role="group" aria-label="Mode">
+              <button class="toggle-btn wb-mode-btn" data-mode="type"
+                title="Type: click anywhere on the board to start typing">Type</button>
+              <button class="toggle-btn wb-mode-btn" data-mode="draw" title="Draw: drag to scribble">Draw</button>
+              <button class="toggle-btn wb-mode-btn" data-mode="erase"
+                title="Erase: drag over ink to rub it out. Text boxes are not erased.">Erase</button>
+            </div>
+            <div class="wb-group" role="group" aria-label="Pen color">
+              <button class="wb-swatch wb-ink-ink" data-ink="ink" title="Ink (the theme's text color)"></button>
+              <button class="wb-swatch wb-ink-c1" data-ink="c1" title="Theme color 1"></button>
+              <button class="wb-swatch wb-ink-c2" data-ink="c2" title="Theme color 2"></button>
+              <button class="wb-swatch wb-ink-c3" data-ink="c3" title="Theme color 3"></button>
+              <button class="wb-swatch wb-ink-c4" data-ink="c4" title="Theme color 4"></button>
+              <button class="wb-swatch wb-ink-c5" data-ink="c5" title="Theme color 5"></button>
+            </div>
+            <div class="wb-group" role="group" aria-label="Pen size">
+              <button class="toggle-btn wb-size-btn" data-size="fine" title="Fine pen, and a narrow eraser">Fine</button>
+              <button class="toggle-btn wb-size-btn" data-size="medium" title="Medium pen and eraser">Medium</button>
+              <button class="toggle-btn wb-size-btn" data-size="bold" title="Bold pen, and a wide eraser">Bold</button>
+            </div>
+            <div class="wb-group wb-group-end">
+              <button id="wbUndoBtn" class="modal-cancel-btn" title="Undo (Ctrl+Z)">Undo</button>
+              <button id="wbRedoBtn" class="modal-cancel-btn" title="Redo (Ctrl+Y)">Redo</button>
+              <button id="wbSendOpenBtn" title="Turn text boxes into Kanban cards">Send to Kanban</button>
+              <button id="wbClearBtn" class="danger-btn" title="Remove everything on the whiteboard">Clear</button>
+            </div>
+          </div>
+
+          <!-- The canvas is the size of the view, not the board, and sits UNDER
+               the scroller: the strokes are redrawn for whatever is in view as it
+               scrolls, and the text boxes scroll natively inside the surface.
+               See the header of whiteboard.ts. -->
+          <div id="wbStage" class="wb-stage">
+            <canvas id="wbInk" class="wb-ink"></canvas>
+            <div id="wbScroller" class="wb-scroller">
+              <div id="wbSurface" class="wb-surface wb-mode-type"></div>
+            </div>
+            <p id="wbEmptyHint" class="wb-empty-hint" style="display:none;"></p>
+          </div>
+        </div><!-- /productivity-tool-whiteboard -->
 
         <div id="productivity-tool-tts-repeater" class="tool-view" style="display:none;">
           <div class="tool-view-header">
@@ -3100,6 +3190,7 @@
                   <option value="productivity:kanban">Kanban</option>
                   <option value="files:auto-backup">Auto-Backup</option>
                   <option value="productivity:countdown">Countdown Timer</option>
+                  <option value="productivity:whiteboard">Whiteboard</option>
                   <option value="tracking:game-stats">Game Stats</option>
                   <option value="files:image-ccr">Image CCR</option>
                   <option value="calculators:days-between">Days Between Dates</option>
@@ -9055,6 +9146,88 @@
       </div>
       <div class="kb-lightbox-actions">
         <button id="kbLightboxOpenBtn" class="modal-cancel-btn">Open in Default App</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       WHITEBOARD: SEND TO KANBAN
+       Every text box on the board, ticked, in reading order. Send leaves the
+       whiteboard as it is; Send and Clear takes the sent boxes off it once
+       Kanban has written them.
+  ====================================================================== -->
+  <div id="wbSendBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="wbSendModal" class="modal modal-scrollable wb-send-modal">
+      <div class="modal-header">
+        <span>Send to Kanban</span>
+        <button id="wbSendClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="wb-send-target">
+          <div class="setup-field">
+            <label for="wbSendBoard">Board</label>
+            <select id="wbSendBoard"></select>
+          </div>
+          <div class="setup-field">
+            <label for="wbSendColumn">Column</label>
+            <select id="wbSendColumn"></select>
+          </div>
+        </div>
+        <div id="wbSendEmpty" class="wb-send-empty" style="display:none;"></div>
+        <button id="wbSendOpenKanbanBtn" type="button" class="modal-cancel-btn" style="display:none;">Open
+          Kanban</button>
+
+        <div class="wb-send-list-head">
+          <span class="wb-send-list-title">Text Boxes</span>
+          <span id="wbSendCount" class="wb-send-count"></span>
+          <button id="wbSendAllBtn" type="button" class="modal-cancel-btn wb-send-all-btn">Select None</button>
+        </div>
+        <div id="wbSendList" class="wb-send-list"></div>
+        <p class="wb-send-hint">Each text box becomes one card, titled with its first line.</p>
+
+        <div class="setup-actions">
+          <button id="wbSendBtn" type="button">Send</button>
+          <button id="wbSendClearBtn" type="button">Send and Clear</button>
+          <button id="wbSendCancelBtn" type="button" class="modal-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       WHITEBOARD: HISTORY
+       The hourly snapshots of whiteboard.json, drawn by the shared list in
+       core/tool-backups.ts.
+  ====================================================================== -->
+  <div id="wbHistoryBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="wbHistoryModal" class="modal modal-scrollable wb-history-modal">
+      <div class="modal-header">
+        <span>Whiteboard History</span>
+        <button id="wbHistoryClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="setup-preferences-list">
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span>Snapshots</span>
+              <span id="wbHistorySummary" class="settings-status-badge"></span>
+            </div>
+            <button id="wbHistoryRefreshBtn" class="settings-action-btn">Refresh</button>
+          </div>
+          <p class="wb-history-hint">A snapshot is taken each hour the whiteboard changes, holding the board as it was
+            just before the last change in that hour. The newest 30 are kept.</p>
+          <div id="wbHistoryList" class="tool-backup-list"></div>
+        </div>
       </div>
     </div>
   </div>
