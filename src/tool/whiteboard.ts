@@ -703,6 +703,7 @@ function applyBoardLook(): void {
   }
   stage.classList.toggle("wb-no-grid", !settings.grid);
   resolveInkColors();
+  updateCursor();
   requestRedraw();
 }
 
@@ -1481,6 +1482,7 @@ function applyZoomLayout(): void {
   surface.style.width = `${SURFACE_W * zoom}px`;
   surface.style.height = `${SURFACE_H * zoom}px`;
   layer.style.transform = `scale(${zoom})`;
+  updateCursor();
   zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
   surface.classList.toggle("wb-overview", overview);
   overviewBtn.classList.toggle("active", overview);
@@ -1614,7 +1616,38 @@ function isEmpty(): boolean {
 
 /** Everything on screen that reflects state: which mode, pen and size are
  *  picked, and which actions have anything to act on. */
+/* The pointer in Draw and Erase is the stroke it will make: a dot the pen's
+   size and color, or a ring the eraser's size, at the current zoom. Ringed
+   dark then light, so it shows on any board. Chromium drops a cursor image
+   past 128px, hence the ceiling; the crosshair in the stylesheet is what is
+   left if an image is ever refused. */
+const CURSOR_MAX = 120;
+const CURSOR_MIN_DOT = 4;
+
+function updateCursor(): void {
+  const mode = settings.mode;
+  if (overview || (mode !== "draw" && mode !== "erase")) {
+    surface.style.removeProperty("cursor");
+    return;
+  }
+  const erase = mode === "erase";
+  const width = (erase ? ERASER_WIDTH : PEN_WIDTH)[settings.size] * zoom;
+  const d = Math.min(CURSOR_MAX - 4, Math.max(erase ? 6 : CURSOR_MIN_DOT, width));
+  const size = Math.ceil(d + 4);
+  const c = size / 2;
+  const r = d / 2;
+  const fill = erase ? "none" : penColor(settings.ink);
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">` +
+    `<circle cx="${c}" cy="${c}" r="${r + 1}" fill="none" stroke="#ffffff" stroke-width="1"/>` +
+    `<circle cx="${c}" cy="${c}" r="${r}" fill="${fill}" stroke="#000000" stroke-width="1"/>` +
+    `</svg>`;
+  const hot = Math.round(c);
+  surface.style.cursor = `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hot} ${hot}, crosshair`;
+}
+
 function updateChrome(): void {
+  updateCursor();
   for (const m of MODES) surface.classList.toggle(`wb-mode-${m}`, settings.mode === m);
   document.querySelectorAll<HTMLButtonElement>(".wb-mode-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.mode === settings.mode);
@@ -2466,6 +2499,7 @@ export function initWhiteboard(): void {
 
   window.addEventListener("themechange", () => {
     resolveInkColors();
+    updateCursor();
     requestRedraw();
   });
 
