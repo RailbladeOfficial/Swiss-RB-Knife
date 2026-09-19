@@ -1739,7 +1739,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L9 19H5v-4z" /><line x1="13" y1="7" x2="17" y2="11" /></svg>
               </button>
               <div class="wb-pop-anchor">
-                <button class="wb-icon-btn wb-mode-btn" data-mode="shape" title="Shapes (L, again for the next shape)">
+                <button class="wb-icon-btn wb-mode-btn" data-mode="shape" title="Shapes (Q, again for the next shape)">
                   <svg hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-kind-icon="line"><line x1="5" y1="19" x2="19" y2="5" /></svg>
                   <svg hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-kind-icon="arrow"><line x1="5" y1="19" x2="19" y2="5" /><polyline points="10 5 19 5 19 14" /></svg>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-kind-icon="box"><rect x="4" y="6" width="16" height="12" rx="1" /></svg>
@@ -7911,6 +7911,16 @@
               </div>
             </div>
             <div class="settings-row">
+              <span>Selection Restyles Text Boxes:</span>
+              <div class="toggle-with-label">
+                <span id="wbSelTextLabel">Enabled</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="wbSelTextToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="settings-row">
               <span>Board Color:</span>
               <select id="wbBoardColorSelect" class="settings-select">
                 <option value="theme">Theme</option>
@@ -7945,7 +7955,7 @@
               <div class="wb-key-heading">Modes</div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>T</kbd></span><span>Type</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>D</kbd></span><span>Draw</span></div>
-              <div class="wb-key-row"><span class="wb-key-keys"><kbd>L</kbd></span><span>Shapes, and again for the next shape</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Q</kbd></span><span>Shapes, and again for the next shape</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>E</kbd></span><span>Erase, and again for the other eraser</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>S</kbd></span><span>Select</span></div>
             </div>

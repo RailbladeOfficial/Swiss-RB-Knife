@@ -168,6 +168,9 @@ interface WhiteboardSettings {
   /** After Send and Clear, go back to the top-left corner at actual size, where
    *  a new board starts. */
   homeAfterSend: boolean;
+  /** A color or size picked with a selection also restyles the text boxes in
+   *  it, not only the ink. */
+  selectionStylesText: boolean;
   boardColor: BoardColor;
   /** The Custom board color, kept while another choice is in use so switching
    *  back does not lose it. */
@@ -217,13 +220,14 @@ const SHAPES: readonly ShapeKind[] = ["line", "arrow", "box", "ellipse"];
 const ERASERS: readonly EraserKind[] = ["rub", "stroke"];
 
 /** The single keys that switch mode, while not typing in a box. */
-const MODE_KEYS: Record<string, Mode> = { t: "type", d: "draw", l: "shape", e: "erase", s: "select" };
+const MODE_KEYS: Record<string, Mode> = { t: "type", d: "draw", q: "shape", e: "erase", s: "select" };
 const SIZES: readonly SizeId[] = ["fine", "medium", "bold"];
 const BOARD_COLORS: readonly BoardColor[] = ["theme", "black", "white", "custom"];
 
 const DEFAULT_SETTINGS: WhiteboardSettings = {
   grid: true,
   homeAfterSend: true,
+  selectionStylesText: true,
   boardColor: "theme",
   boardCustom: "#fdf6e3",
   mode: "type",
@@ -608,6 +612,7 @@ function normalizeSettings(raw: unknown): WhiteboardSettings {
   return {
     grid: r.grid !== false,
     homeAfterSend: r.homeAfterSend !== false,
+    selectionStylesText: r.selectionStylesText !== false,
     boardColor: BOARD_COLORS.includes(r.boardColor as BoardColor)
       ? (r.boardColor as BoardColor)
       : DEFAULT_SETTINGS.boardColor,
@@ -2565,8 +2570,9 @@ function setSize(next: SizeId): void {
 }
 
 /** A toolbar color or size, applied to everything wholly inside the selection:
- *  its ink and its text boxes. A stroke crossing the edge is left as it is,
- *  since a line cannot be half one color. One Undo step. */
+ *  its ink, and its text boxes unless the preference says ink only. A stroke
+ *  crossing the edge is left as it is, since a line cannot be half one color.
+ *  One Undo step. */
 function restyleSelection(patch: { ink?: Pen; size?: SizeId }): void {
   const area = selection;
   if (!area || editingId) return;
@@ -2580,7 +2586,7 @@ function restyleSelection(patch: { ink?: Pen; size?: SizeId }): void {
     // A new object, not an edit: Undo's snapshots hold the old one.
     return next;
   });
-  for (const note of texts) {
+  for (const note of settings.selectionStylesText ? texts : []) {
     if (!inside(noteArea(note), area)) continue;
     const before = JSON.stringify(note);
     styleWholeNote(note, patch);
@@ -3317,6 +3323,8 @@ let gridToggle: HTMLInputElement;
 let gridLabel: HTMLElement;
 let homeToggle: HTMLInputElement;
 let homeLabel: HTMLElement;
+let selTextToggle: HTMLInputElement;
+let selTextLabel: HTMLElement;
 let boardColorSel: HTMLSelectElement;
 let boardColorInput: HTMLInputElement;
 let boardCustomRow: HTMLElement;
@@ -3328,6 +3336,8 @@ function applySettingsToForm(): void {
   gridLabel.textContent = settings.grid ? "Enabled" : "Disabled";
   homeToggle.checked = settings.homeAfterSend;
   homeLabel.textContent = settings.homeAfterSend ? "Enabled" : "Disabled";
+  selTextToggle.checked = settings.selectionStylesText;
+  selTextLabel.textContent = settings.selectionStylesText ? "Enabled" : "Disabled";
   boardColorSel.value = settings.boardColor;
   boardColorInput.value = settings.boardCustom;
   boardCustomRow.style.display = settings.boardColor === "custom" ? "" : "none";
@@ -3402,6 +3412,8 @@ function wireSetup(): void {
   gridLabel = document.getElementById("wbGridLabel")!;
   homeToggle = document.getElementById("wbHomeToggle") as HTMLInputElement;
   homeLabel = document.getElementById("wbHomeLabel")!;
+  selTextToggle = document.getElementById("wbSelTextToggle") as HTMLInputElement;
+  selTextLabel = document.getElementById("wbSelTextLabel")!;
   boardColorSel = document.getElementById("wbBoardColorSelect") as HTMLSelectElement;
   boardColorInput = document.getElementById("wbBoardColorInput") as HTMLInputElement;
   boardCustomRow = document.getElementById("wbBoardCustomRow")!;
@@ -3424,6 +3436,11 @@ function wireSetup(): void {
   });
   homeToggle.addEventListener("change", () => {
     settings.homeAfterSend = homeToggle.checked;
+    saveSettings();
+    applySettingsToForm();
+  });
+  selTextToggle.addEventListener("change", () => {
+    settings.selectionStylesText = selTextToggle.checked;
     saveSettings();
     applySettingsToForm();
   });
