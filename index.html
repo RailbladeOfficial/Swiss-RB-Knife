@@ -1723,41 +1723,72 @@
             </button>
             <span class="tool-view-title">Whiteboard</span>
             <div class="tool-header-notice-wrap" id="wbHeaderNoticeWrap" style="display:none;">
-              <span id="wbHeaderNotice" class="tool-header-notice"
-                title="The file could not be read when the app started, so nothing is written over it. Close the app, then repair or move that file, or restore a snapshot from History."></span>
+              <span id="wbHeaderNotice" class="tool-header-notice"></span>
             </div>
             <nav class="tool-view-header-actions">
-              <button id="wbHistoryBtn" title="Hourly snapshots of the whiteboard, and a way to put one back">History</button>
+              <button id="wbSetupBtn" title="Whiteboard setup: preferences and data">Setup</button>
             </nav>
           </div>
 
           <div class="wb-toolbar panel panel-accent-input">
             <div class="wb-group" role="group" aria-label="Mode">
-              <button class="toggle-btn wb-mode-btn" data-mode="type"
-                title="Type: click anywhere on the board to start typing">Type</button>
-              <button class="toggle-btn wb-mode-btn" data-mode="draw" title="Draw: drag to scribble">Draw</button>
-              <button class="toggle-btn wb-mode-btn" data-mode="erase"
-                title="Erase: drag over ink to rub it out. Text boxes are not erased.">Erase</button>
+              <button class="wb-icon-btn wb-mode-btn" data-mode="type" title="Type">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7V5h14v2" /><line x1="12" y1="5" x2="12" y2="19" /><line x1="9" y1="19" x2="15" y2="19" /></svg>
+              </button>
+              <button class="wb-icon-btn wb-mode-btn" data-mode="draw" title="Draw">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L9 19H5v-4z" /><line x1="13" y1="7" x2="17" y2="11" /></svg>
+              </button>
+              <button class="wb-icon-btn wb-mode-btn" data-mode="erase" title="Erase">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19.5 4.5 16a1.5 1.5 0 0 1 0-2.1L13 5.4a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L12 19.5z" /><line x1="8.5" y1="9.9" x2="14.1" y2="15.5" /><line x1="12" y1="19.5" x2="20" y2="19.5" /></svg>
+              </button>
+              <button class="wb-icon-btn wb-mode-btn" data-mode="select" title="Select">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.6" /></svg>
+              </button>
             </div>
-            <div class="wb-group" role="group" aria-label="Pen color">
-              <button class="wb-swatch wb-ink-ink" data-ink="ink" title="Ink (the theme's text color)"></button>
-              <button class="wb-swatch wb-ink-c1" data-ink="c1" title="Theme color 1"></button>
-              <button class="wb-swatch wb-ink-c2" data-ink="c2" title="Theme color 2"></button>
-              <button class="wb-swatch wb-ink-c3" data-ink="c3" title="Theme color 3"></button>
-              <button class="wb-swatch wb-ink-c4" data-ink="c4" title="Theme color 4"></button>
-              <button class="wb-swatch wb-ink-c5" data-ink="c5" title="Theme color 5"></button>
+
+            <div class="wb-group wb-color-group">
+              <button id="wbColorBtn" class="wb-color-btn" title="Pen color">
+                <span id="wbColorChip" class="wb-color-chip"></span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+              </button>
+              <div id="wbColorPop" class="wb-color-pop" hidden>
+                <button class="wb-swatch wb-ink-ink" data-ink="ink" title="Ink"></button>
+                <button class="wb-swatch wb-ink-c1" data-ink="c1" title="Theme color 1"></button>
+                <button class="wb-swatch wb-ink-c2" data-ink="c2" title="Theme color 2"></button>
+                <button class="wb-swatch wb-ink-c3" data-ink="c3" title="Theme color 3"></button>
+                <button class="wb-swatch wb-ink-c4" data-ink="c4" title="Theme color 4"></button>
+                <button class="wb-swatch wb-ink-c5" data-ink="c5" title="Theme color 5"></button>
+                <button id="wbColorRecent" class="wb-swatch" data-ink="" hidden></button>
+                <button id="wbColorPickBtn" class="wb-swatch wb-swatch-pick" title="Custom color"></button>
+                <input id="wbColorInput" type="color" class="wb-color-input" tabindex="-1" aria-hidden="true" />
+              </div>
             </div>
+
             <div class="wb-group" role="group" aria-label="Pen size">
-              <button class="toggle-btn wb-size-btn" data-size="fine" title="Fine pen, and a narrow eraser">Fine</button>
-              <button class="toggle-btn wb-size-btn" data-size="medium" title="Medium pen and eraser">Medium</button>
-              <button class="toggle-btn wb-size-btn" data-size="bold" title="Bold pen, and a wide eraser">Bold</button>
+              <button class="wb-icon-btn wb-size-btn" data-size="fine" title="Fine">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" /></svg>
+              </button>
+              <button class="wb-icon-btn wb-size-btn" data-size="medium" title="Medium">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" /></svg>
+              </button>
+              <button class="wb-icon-btn wb-size-btn" data-size="bold" title="Bold">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6.5" fill="currentColor" stroke="none" /></svg>
+              </button>
             </div>
-            <div class="wb-group wb-group-end">
-              <button id="wbUndoBtn" class="modal-cancel-btn" title="Undo (Ctrl+Z)">Undo</button>
-              <button id="wbRedoBtn" class="modal-cancel-btn" title="Redo (Ctrl+Y)">Redo</button>
-              <button id="wbSendOpenBtn" title="Turn text boxes into Kanban cards">Send to Kanban</button>
-              <button id="wbClearBtn" class="danger-btn" title="Remove everything on the whiteboard">Clear</button>
+
+            <div class="wb-group">
+              <button id="wbUndoBtn" class="wb-icon-btn" title="Undo (Ctrl+Z)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H10" /></svg>
+              </button>
+              <button id="wbRedoBtn" class="wb-icon-btn" title="Redo (Ctrl+Y)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H14" /></svg>
+              </button>
+              <button id="wbClearBtn" class="wb-icon-btn wb-icon-danger" title="Clear">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+              </button>
             </div>
+
+            <button id="wbSendOpenBtn" class="wb-send-open-btn">Send to Kanban</button>
           </div>
 
           <!-- The canvas is the size of the view, not the board, and sits UNDER
@@ -1769,7 +1800,6 @@
             <div id="wbScroller" class="wb-scroller">
               <div id="wbSurface" class="wb-surface wb-mode-type"></div>
             </div>
-            <p id="wbEmptyHint" class="wb-empty-hint" style="display:none;"></p>
           </div>
         </div><!-- /productivity-tool-whiteboard -->
 
@@ -7700,6 +7730,145 @@
     </div>
   </div>
   <!-- =====================================================================
+       WHITEBOARD: SEND TO KANBAN
+       Text boxes as bare cards, or an area of the board as a picture on one
+       card. Send leaves the whiteboard as it is; Send and Clear takes what was
+       sent off it once Kanban has written it.
+  ====================================================================== -->
+  <div id="wbSendBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="wbSendModal" class="modal modal-scrollable wb-send-modal">
+      <div class="modal-header">
+        <span>Send to Kanban</span>
+        <button id="wbSendClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="wb-send-target">
+          <div class="setup-field">
+            <label for="wbSendBoard">Board</label>
+            <select id="wbSendBoard"></select>
+          </div>
+          <div class="setup-field">
+            <label for="wbSendColumn">Column</label>
+            <select id="wbSendColumn"></select>
+          </div>
+        </div>
+        <div id="wbSendEmpty" class="wb-send-empty" style="display:none;"></div>
+        <button id="wbSendOpenKanbanBtn" type="button" class="modal-cancel-btn" style="display:none;">Open
+          Kanban</button>
+
+        <div class="modal-tabs wb-send-tabs">
+          <button class="modal-tab active" data-wb-send-tab="text">Text as Cards</button>
+          <button class="modal-tab" data-wb-send-tab="image">Image</button>
+        </div>
+
+        <div id="wbSendTabText" class="modal-tab-pane">
+          <div class="wb-send-list-head">
+            <span id="wbSendCount" class="wb-send-count"></span>
+            <button id="wbSendAllBtn" type="button" class="modal-cancel-btn wb-send-all-btn">Select None</button>
+          </div>
+          <div id="wbSendList" class="wb-send-list"></div>
+        </div>
+
+        <div id="wbSendTabImage" class="modal-tab-pane" style="display:none;">
+          <div class="wb-send-image-controls">
+            <div class="wb-area-group" role="group" aria-label="Area">
+              <button type="button" class="toggle-btn wb-area-btn" data-area="selection">Selection</button>
+              <button type="button" class="toggle-btn wb-area-btn" data-area="board">Whole Board</button>
+            </div>
+            <label class="wb-send-check"><input type="checkbox" id="wbSendIncludeText" checked /> Include text
+              boxes</label>
+          </div>
+          <div class="setup-field">
+            <label for="wbSendImageTitle">Card Title</label>
+            <input id="wbSendImageTitle" type="text" maxlength="200" autocomplete="off" />
+          </div>
+          <div class="wb-send-preview-wrap">
+            <img id="wbSendPreview" class="wb-send-preview" alt="" />
+            <p id="wbSendAreaEmpty" class="wb-send-empty" style="display:none;">Nothing to send.</p>
+          </div>
+        </div>
+
+        <div class="wb-send-actions">
+          <button id="wbSendCancelBtn" type="button" class="modal-cancel-btn">Cancel</button>
+          <button id="wbSendClearBtn" type="button">Send and Clear</button>
+          <button id="wbSendBtn" type="button">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       WHITEBOARD: SETUP
+       Preferences, and Data: the hourly snapshots of whiteboard.json, drawn by
+       the shared list in core/tool-backups.ts.
+  ====================================================================== -->
+  <div id="wbSetupBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="wbSetupModal" class="modal setup-modal wb-setup-modal">
+      <div class="modal-header">
+        <span>Whiteboard Setup</span>
+        <button id="wbSetupClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-wb-tab="preferences">Preferences</button>
+          <button class="modal-tab" data-wb-tab="data">Data</button>
+        </div>
+
+        <div id="wbTabPreferences" class="modal-tab-pane">
+          <div class="setup-preferences-list">
+            <div class="settings-row">
+              <span>Whiteboard Grid:</span>
+              <div class="toggle-with-label">
+                <span id="wbGridLabel">Enabled</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="wbGridToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="settings-row">
+              <span>Board Color:</span>
+              <select id="wbBoardColorSelect" class="settings-select">
+                <option value="theme">Theme</option>
+                <option value="black">Black</option>
+                <option value="white">White</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div id="wbBoardCustomRow" class="settings-row" style="display:none;">
+              <span>Custom Color:</span>
+              <input id="wbBoardColorInput" type="color" class="wb-board-color-input" value="#fdf6e3" />
+            </div>
+          </div>
+        </div>
+
+        <div id="wbTabData" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>Snapshots</span>
+                <span id="wbHistorySummary" class="settings-status-badge"></span>
+              </div>
+              <button id="wbHistoryRefreshBtn" class="settings-action-btn">Refresh</button>
+            </div>
+            <div id="wbHistoryList" class="tool-backup-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
        KANBAN: SETUP MODAL
        Tabs: Boards, Tags, Preferences, Security, Data.
 
@@ -9146,88 +9315,6 @@
       </div>
       <div class="kb-lightbox-actions">
         <button id="kbLightboxOpenBtn" class="modal-cancel-btn">Open in Default App</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- =====================================================================
-       WHITEBOARD: SEND TO KANBAN
-       Every text box on the board, ticked, in reading order. Send leaves the
-       whiteboard as it is; Send and Clear takes the sent boxes off it once
-       Kanban has written them.
-  ====================================================================== -->
-  <div id="wbSendBackdrop" class="modal-backdrop" style="display: none;">
-    <div id="wbSendModal" class="modal modal-scrollable wb-send-modal">
-      <div class="modal-header">
-        <span>Send to Kanban</span>
-        <button id="wbSendClose" class="modal-close-btn modal-header-right" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-      <div class="modal-body setup-body">
-        <div class="wb-send-target">
-          <div class="setup-field">
-            <label for="wbSendBoard">Board</label>
-            <select id="wbSendBoard"></select>
-          </div>
-          <div class="setup-field">
-            <label for="wbSendColumn">Column</label>
-            <select id="wbSendColumn"></select>
-          </div>
-        </div>
-        <div id="wbSendEmpty" class="wb-send-empty" style="display:none;"></div>
-        <button id="wbSendOpenKanbanBtn" type="button" class="modal-cancel-btn" style="display:none;">Open
-          Kanban</button>
-
-        <div class="wb-send-list-head">
-          <span class="wb-send-list-title">Text Boxes</span>
-          <span id="wbSendCount" class="wb-send-count"></span>
-          <button id="wbSendAllBtn" type="button" class="modal-cancel-btn wb-send-all-btn">Select None</button>
-        </div>
-        <div id="wbSendList" class="wb-send-list"></div>
-        <p class="wb-send-hint">Each text box becomes one card, titled with its first line.</p>
-
-        <div class="setup-actions">
-          <button id="wbSendBtn" type="button">Send</button>
-          <button id="wbSendClearBtn" type="button">Send and Clear</button>
-          <button id="wbSendCancelBtn" type="button" class="modal-cancel-btn">Cancel</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- =====================================================================
-       WHITEBOARD: HISTORY
-       The hourly snapshots of whiteboard.json, drawn by the shared list in
-       core/tool-backups.ts.
-  ====================================================================== -->
-  <div id="wbHistoryBackdrop" class="modal-backdrop" style="display: none;">
-    <div id="wbHistoryModal" class="modal modal-scrollable wb-history-modal">
-      <div class="modal-header">
-        <span>Whiteboard History</span>
-        <button id="wbHistoryClose" class="modal-close-btn modal-header-right" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-      <div class="modal-body setup-body">
-        <div class="setup-preferences-list">
-          <div class="settings-row">
-            <div class="settings-label-col">
-              <span>Snapshots</span>
-              <span id="wbHistorySummary" class="settings-status-badge"></span>
-            </div>
-            <button id="wbHistoryRefreshBtn" class="settings-action-btn">Refresh</button>
-          </div>
-          <p class="wb-history-hint">A snapshot is taken each hour the whiteboard changes, holding the board as it was
-            just before the last change in that hour. The newest 30 are kept.</p>
-          <div id="wbHistoryList" class="tool-backup-list"></div>
-        </div>
       </div>
     </div>
   </div>

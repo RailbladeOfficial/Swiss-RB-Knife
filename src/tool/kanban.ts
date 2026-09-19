@@ -14093,7 +14093,8 @@ function listenForAgentRequests(): void {
 /* =============================================================================
    CARDS FROM ANOTHER TOOL
    -----------------------------------------------------------------------------
-   The Whiteboard sends lines of text here to become bare cards. It is the same
+   The Whiteboard sends lines of text here to become bare cards, and pictures
+   of the board to become a card carrying one. It is the same
    arrangement the agent bridge has, for the same reason: createCard is what the
    buttons call, so a card sent from elsewhere gets a real number, lands where a
    person adding it would have put it, and appears on the board at once.
@@ -14143,29 +14144,11 @@ export async function addCardsFromElsewhere(
   columnId: string,
   incoming: IncomingCard[],
 ): Promise<IncomingCardsResult> {
-  if (!storeLoaded) return { ok: false, error: "Kanban is still loading. Try again in a moment." };
-  const frozen = writesFrozen();
-  if (frozen) return { ok: false, error: `Kanban is not saving: ${frozen}` };
-  const board = getBoard(boardId);
-  if (!board) return { ok: false, error: "That board no longer exists." };
-  if (unreadableFiles.has(board.id) || unreadableFiles.has("index")) {
-    return {
-      ok: false,
-      error: `Kanban could not read the file for "${board.name}" when the app started, so nothing is added to it.`,
-    };
-  }
-  const column = getColumn(board, columnId);
-  if (!column) return { ok: false, error: `That column is no longer on "${board.name}".` };
-  const room = MAX_CARDS_PER_BOARD - liveCardsOnBoard(board.id).length;
-  if (incoming.length > room) {
-    return {
-      ok: false,
-      error:
-        `"${board.name}" has room for ${room.toLocaleString()} more ` +
-        `${room === 1 ? "card" : "cards"}, and this is ${incoming.length}. ` +
-        "Archiving finished work frees room without deleting anything.",
-    };
-  }
+  const refusal = incomingRefusal(boardId, columnId, incoming.length);
+  if (refusal) return { ok: false, error: refusal };
+  // The refusal above has already found both.
+  const board = getBoard(boardId)!;
+  const column = getColumn(board, columnId)!;
 
   const numbers: number[] = [];
   for (const item of incoming) {
@@ -14182,6 +14165,81 @@ export async function addCardsFromElsewhere(
   renderAll();
   await flushSave();
   return { ok: true, numbers, saved: !dirtyBoards.has(board.id) };
+}
+
+/** Everything that stops a batch landing on a board, asked before anything is
+ *  made. Null when it can land. */
+function incomingRefusal(boardId: string, columnId: string, count: number): string | null {
+  if (!storeLoaded) return "Kanban is still loading. Try again in a moment.";
+  const frozen = writesFrozen();
+  if (frozen) return `Kanban is not saving: ${frozen}`;
+  const board = getBoard(boardId);
+  if (!board) return "That board no longer exists.";
+  if (unreadableFiles.has(board.id) || unreadableFiles.has("index")) {
+    return `Kanban could not read the file for "${board.name}" when the app started, so nothing is added to it.`;
+  }
+  if (!getColumn(board, columnId)) return `That column is no longer on "${board.name}".`;
+  const room = MAX_CARDS_PER_BOARD - liveCardsOnBoard(board.id).length;
+  if (count > room) {
+    return `"${board.name}" has room for ${room.toLocaleString()} more ${room === 1 ? "card" : "cards"}.`;
+  }
+  return null;
+}
+
+export type IncomingImageResult =
+  | { ok: true; number: number; saved: boolean }
+  | { ok: false; error: string };
+
+/** One card at the bottom of a column, carrying a PNG as its attachment. The
+ *  image goes into the attachment store first, so a store that refuses it
+ *  leaves no card behind pointing at nothing. */
+export async function addImageCardFromElsewhere(
+  boardId: string,
+  columnId: string,
+  title: string,
+  fileName: string,
+  pngBase64: string,
+): Promise<IncomingImageResult> {
+  const refusal = incomingRefusal(boardId, columnId, 1);
+  if (refusal) return { ok: false, error: refusal };
+  if (pngBase64.length > (MAX_ATTACHMENT_BYTES / 3) * 4) {
+    return {
+      ok: false,
+      error: `That image is over the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB limit for one attachment.`,
+    };
+  }
+
+  let stored: { id: string; name: string; size: number; file: string };
+  try {
+    stored = await invoke("paste_kanban_attachment", {
+      boardId,
+      attachmentId: newId(),
+      name: fileName,
+      dataBase64: pngBase64,
+    });
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+
+  // Asked again: the board could have gone while the image was being written.
+  const board = getBoard(boardId);
+  const column = board ? getColumn(board, columnId) : null;
+  const card = board && column ? createCard(board, column.id, title.trim() || fileName, "bottom") : null;
+  if (!card) {
+    void invoke("delete_kanban_attachment", { boardId, attachmentId: stored.id }).catch(() => {});
+    return { ok: false, error: "That board or column no longer exists." };
+  }
+  card.attachments.push({
+    id: stored.id,
+    name: stored.name,
+    size: stored.size,
+    file: stored.file,
+    addedAt: Date.now(),
+  });
+  stampCard(card);
+  renderAll();
+  await flushSave();
+  return { ok: true, number: card.number, saved: !dirtyBoards.has(boardId) };
 }
 
 export function initKanban(): void {

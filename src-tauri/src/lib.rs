@@ -1002,6 +1002,7 @@ fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
             r#"{"strokes":[],"texts":[]}"#,
             WHITEBOARD_GROUP,
         ),
+        ("whiteboard", "settings") => ("whiteboard/whiteboard-settings.json", "{}", NO_SNAPSHOT),
         // An allowlist, not a filename built from the arguments. Both of these
         // arrive from the front end and would otherwise be joined onto a path.
         _ => return Err(format!("Unknown tool file '{tool_id}/{kind}'")),

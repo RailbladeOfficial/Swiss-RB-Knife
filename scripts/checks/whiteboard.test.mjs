@@ -42,11 +42,11 @@ test("every pen has a swatch, and a CSS class reading the same variable", () => 
   const problems = [];
   for (const { id, cssVar } of inks()) {
     if (!html.includes(`data-ink="${id}"`)) problems.push(`${id}: no swatch button`);
-    const rule = css.match(new RegExp(String.raw`\.wb-ink-${id}\s*\{\s*color:\s*var\((--[a-z0-9-]+)\)`));
+    const rule = css.match(new RegExp(String.raw`\.wb-ink-${id}\s*\{\s*--wb-c:\s*([^;]+);`));
     if (!rule) problems.push(`${id}: no .wb-ink-${id} rule`);
     // The text box and the canvas have to agree, or a line typed in a color is
     // a different color from a line drawn in it.
-    else if (rule[1] !== cssVar) problems.push(`${id}: CSS reads ${rule[1]}, canvas reads ${cssVar}`);
+    else if (!rule[1].includes(`var(${cssVar})`)) problems.push(`${id}: CSS reads ${rule[1]}, canvas reads ${cssVar}`);
   }
   assert.deepEqual(problems, []);
 });
@@ -71,20 +71,28 @@ test("a card title from the whiteboard is cut to Kanban's own limit, not a copy 
   assert.doesNotMatch(ts, /const MAX_TITLE_LEN\b/, "whiteboard.ts keeps its own title limit, which can drift");
 });
 
-test("Send and Clear lets go of the text only after Kanban has written it", () => {
-  // Keyed on the line that actually removes the text, not on the branch around
+test("Send and Clear lets go of what it sent only after Kanban has written it", () => {
+  // Keyed on the line that actually removes things, not on the branch around
   // it: an if moved or duplicated elsewhere proves nothing about the removal.
-  const body = slice(TS, "async function send(", "\nfunction wireSendModal");
-  const guard = body.match(/if \(!result\.saved\) \{[\s\S]*?\n {2}\}/);
-  const removal = body.indexOf("texts = texts.filter(");
-  assert.ok(guard && removal !== -1, "send() no longer has the guard or the removal this checks");
-  assert.ok(guard.index < removal, "the whiteboard can clear text before Kanban has confirmed the write");
-  assert.match(guard[0], /\breturn;/, "an unsaved send falls through into the clear");
-  assert.equal(
-    body.split("texts = texts.filter(").length,
-    2,
-    "send() removes text in more than one place, and only one of them is checked",
-  );
+  // Both ways over are checked, the text cards and the picture.
+  for (const [fn, removalCall] of [
+    ["async function sendText(", "texts = texts.filter("],
+    ["async function sendImage(", "removeInside("],
+  ]) {
+    const start = read(TS).indexOf(fn);
+    assert.notEqual(start, -1, `${fn} is missing`);
+    const body = read(TS).slice(start, read(TS).indexOf("\n}\n", start));
+    const guard = body.match(/if \(!result\.saved\) \{[\s\S]*?\n {2}\}/);
+    const removal = body.indexOf(removalCall);
+    assert.ok(guard && removal !== -1, `${fn} no longer has the guard or the removal this checks`);
+    assert.ok(guard.index < removal, `${fn} can clear before Kanban has confirmed the write`);
+    assert.match(guard[0], /\breturn;/, `${fn} falls through into the clear when the write failed`);
+    assert.equal(
+      body.split(removalCall).length,
+      2,
+      `${fn} removes things in more than one place, and only one of them is checked`,
+    );
+  }
 });
 
 test("leaving the tool and quitting both write what is waiting", () => {

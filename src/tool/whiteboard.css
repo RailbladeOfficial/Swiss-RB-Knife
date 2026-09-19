@@ -1,10 +1,19 @@
 /* =============================================================================
    WHITEBOARD
    -----------------------------------------------------------------------------
-   A toolbar, and under it a board that fills the rest of the window. Every
-   color here is a theme variable: the board is the theme's input surface, its
-   dot grid is the theme's dashed border color, and the six pens are the theme's
-   text color and first five chart colors (see the header of whiteboard.ts).
+   A toolbar, and under it a board that fills the rest of the window. Colors
+   are theme variables, with three of the tool's own laid over them by
+   applyBoardLook() in whiteboard.ts when the board is not the theme's:
+
+     --wb-board   the board's color          (default: the theme's input surface)
+     --wb-ink     the "Ink" pen, readable on it (default: the theme's text)
+     --wb-dot     the grid's dots            (default: the theme's dashed border)
+
+   Every pen color is --wb-c, set by a wb-ink-* class for a theme slot or inline
+   for a color picked by hand, so a swatch, the color button and a text box all
+   read the same variable. Nothing here paints with currentColor: several
+   themes recolor a button's text on hover, which turned the swatches into
+   different colors under the mouse.
 ============================================================================= */
 
 /* =============================================================================
@@ -29,6 +38,13 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   min-height: 0;
 }
 
+.wb-ink-ink { --wb-c: var(--wb-ink, var(--color-text)); }
+.wb-ink-c1 { --wb-c: var(--color-chart-1); }
+.wb-ink-c2 { --wb-c: var(--color-chart-2); }
+.wb-ink-c3 { --wb-c: var(--color-chart-3); }
+.wb-ink-c4 { --wb-c: var(--color-chart-4); }
+.wb-ink-c5 { --wb-c: var(--color-chart-5); }
+
 /* =============================================================================
    TOOLBAR
 ============================================================================= */
@@ -49,16 +65,6 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   gap: 4px;
 }
 
-.wb-group-end {
-  margin-left: auto;
-  gap: 6px;
-}
-
-.wb-group .toggle-btn {
-  padding: 5px 12px;
-  font-size: 0.82rem;
-}
-
 .wb-toolbar button:disabled,
 .wb-send-modal button:disabled {
   opacity: 0.45;
@@ -66,38 +72,155 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   pointer-events: none;
 }
 
-/* A pen swatch. Painted with currentColor, so the same wb-ink-* class that
-   colors a text box colors the swatch that made it. */
+.wb-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.wb-icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.wb-icon-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.wb-icon-btn.active,
+.wb-icon-btn.active:hover {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
+}
+
+.wb-icon-danger:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+.wb-send-open-btn {
+  margin-left: auto;
+}
+
+/* ── Pen color: a button showing the pen, and the list it opens ── */
+
+.wb-color-group {
+  position: relative;
+}
+
+.wb-color-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 6px 0 7px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.wb-color-btn:hover,
+.wb-color-btn.active {
+  background: var(--color-hover);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.wb-color-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.wb-color-chip {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--wb-c);
+  border: 1px solid var(--color-border);
+}
+
+.wb-color-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: repeat(4, 24px);
+  gap: 8px;
+  padding: 10px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--color-bg) 60%, transparent);
+}
+
+.wb-color-pop[hidden],
+.wb-swatch[hidden] {
+  display: none;
+}
+
 .wb-swatch {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--wb-c);
   border: 2px solid var(--color-border);
-  transition:
-    border-color var(--hover-transition),
-    box-shadow var(--hover-transition);
+  box-shadow: none;
 }
 
-/* The base button hover repaints the background, which on a swatch would
-   swap the color it is offering for the button color. */
+/* Every part of the swatch restated, so a theme's own button hover (a new
+   background, a new border, a glow) cannot change the color on offer. */
 .wb-swatch:hover {
-  background: currentColor;
+  background: var(--wb-c);
   border-color: var(--color-text-muted);
+  box-shadow: none;
 }
 
-.wb-swatch.active {
+.wb-swatch.active,
+.wb-swatch.active:hover {
   border-color: var(--color-panel);
   box-shadow: 0 0 0 2px var(--color-accent);
 }
 
-.wb-ink-ink { color: var(--color-text); }
-.wb-ink-c1 { color: var(--color-chart-1); }
-.wb-ink-c2 { color: var(--color-chart-2); }
-.wb-ink-c3 { color: var(--color-chart-3); }
-.wb-ink-c4 { color: var(--color-chart-4); }
-.wb-ink-c5 { color: var(--color-chart-5); }
+/* The standard sign for "any color": a color wheel. The one place in the tool
+   that is deliberately not the theme's. */
+.wb-swatch-pick,
+.wb-swatch-pick:hover {
+  background: conic-gradient(
+    hsl(0 85% 55%),
+    hsl(60 85% 55%),
+    hsl(120 85% 45%),
+    hsl(180 85% 45%),
+    hsl(240 85% 60%),
+    hsl(300 85% 55%),
+    hsl(360 85% 55%)
+  );
+}
+
+/* Opened by the wheel's click, never seen. Kept in the layout (not display:
+   none) because a hidden color input will not open its picker. */
+.wb-color-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* =============================================================================
    THE BOARD
@@ -115,14 +238,17 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  background-color: var(--color-input-bg);
-  /* The dot grid is what makes scrolling a plain surface visible at all.
-     whiteboard.ts moves it with the scroll. */
-  background-image: radial-gradient(circle, var(--color-border-dashed) 1px, transparent 1.6px);
+  background-color: var(--wb-board, var(--color-input-bg));
+  /* whiteboard.ts moves the grid with the scroll. */
+  background-image: radial-gradient(circle, var(--wb-dot, var(--color-border-dashed)) 1px, transparent 1.6px);
   background-size: 24px 24px;
   transition:
     background-color var(--hover-transition),
     border-color var(--hover-transition);
+}
+
+.wb-stage.wb-no-grid {
+  background-image: none;
 }
 
 .wb-ink {
@@ -151,7 +277,8 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   cursor: text;
 }
 
-.wb-surface.wb-mode-draw {
+.wb-surface.wb-mode-draw,
+.wb-surface.wb-mode-select {
   cursor: crosshair;
 }
 
@@ -159,16 +286,10 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   cursor: cell;
 }
 
-.wb-empty-hint {
+.wb-selection {
   position: absolute;
-  left: 50%;
-  top: 42%;
-  transform: translate(-50%, -50%);
-  max-width: 80%;
-  margin: 0;
-  text-align: center;
-  font-size: 0.95rem;
-  color: var(--color-text-muted);
+  border: 1.5px dashed var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
   pointer-events: none;
 }
 
@@ -176,7 +297,9 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
    TEXT BOXES
    -----------------------------------------------------------------------------
    No border unless you are in one. A faint dashed edge on hover in Type mode is
-   the only sign an idle box is something you can grab.
+   the only sign an idle box is something you can grab. The padding, border and
+   max-width are mirrored in whiteboard.ts (TEXT_INSET_X, TEXT_INSET_Y,
+   TEXT_MAX_WIDTH), which lays the text out again for a picture of the board.
 ============================================================================= */
 
 .wb-text {
@@ -188,6 +311,7 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   padding: 2px 4px;
   border: 1px dashed transparent;
   border-radius: 4px;
+  color: var(--wb-c, var(--wb-ink, var(--color-text)));
   font-size: 1rem;
   line-height: 1.4;
   white-space: pre-wrap;
@@ -196,10 +320,11 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   transition: border-color var(--hover-transition);
 }
 
-/* Drawing and erasing go straight through text, so a stroke can start on top
-   of a box without grabbing it. */
+/* Drawing, erasing and selecting go straight through text, so a stroke or a
+   selection can start on top of a box without grabbing it. */
 .wb-mode-draw .wb-text,
-.wb-mode-erase .wb-text {
+.wb-mode-erase .wb-text,
+.wb-mode-select .wb-text {
   pointer-events: none;
 }
 
@@ -210,7 +335,7 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 .wb-text.wb-text-editing {
   border-color: var(--color-accent);
   border-style: solid;
-  background: color-mix(in srgb, var(--color-input-bg) 75%, transparent);
+  background: color-mix(in srgb, var(--wb-board, var(--color-input-bg)) 75%, transparent);
   user-select: text;
 }
 
@@ -235,8 +360,12 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   gap: 10px;
 }
 
+.wb-send-tabs {
+  margin-top: 14px;
+}
+
 .wb-send-empty {
-  margin: 12px 0 6px;
+  margin: 10px 0 4px;
   font-size: 0.85rem;
   color: var(--color-text-muted);
 }
@@ -245,17 +374,9 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 16px 0 6px;
+  margin: 4px 0 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--color-border);
-}
-
-.wb-send-list-title {
-  font-size: 0.72rem;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
 }
 
 .wb-send-count {
@@ -273,7 +394,7 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 320px;
+  max-height: 300px;
   overflow-y: auto;
 }
 
@@ -291,17 +412,14 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   background: var(--color-hover);
 }
 
-.wb-send-row input {
-  margin-top: 3px;
+.wb-send-row input,
+.wb-send-check input {
   flex-shrink: 0;
   accent-color: var(--color-btn);
 }
 
-.wb-send-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+.wb-send-row input {
+  margin-top: 3px;
 }
 
 .wb-send-title {
@@ -309,26 +427,73 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   overflow-wrap: anywhere;
 }
 
-.wb-send-more,
-.wb-send-hint,
-.wb-history-hint {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
+.wb-send-image-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 4px 0 12px;
 }
 
-.wb-send-hint {
-  margin: 10px 0;
+.wb-area-group {
+  display: flex;
+  gap: 4px;
+}
+
+.wb-area-group .toggle-btn {
+  padding: 5px 12px;
+  font-size: 0.82rem;
+}
+
+.wb-send-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.wb-send-preview-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.wb-send-preview {
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+}
+
+/* Cancel on its own at the left, the two sends together at the right. */
+.wb-send-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.wb-send-actions .modal-cancel-btn {
+  margin-right: auto;
 }
 
 /* =============================================================================
-   HISTORY
+   SETUP
 ============================================================================= */
 
-.wb-history-modal {
-  width: min(520px, 94vw);
+.wb-setup-modal {
+  width: min(480px, 94vw);
 }
 
-.wb-history-hint {
-  margin: 0 0 6px;
-  line-height: 1.45;
+.wb-board-color-input {
+  width: 44px;
+  height: 28px;
+  padding: 0 2px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
 }

@@ -3,43 +3,52 @@
    -----------------------------------------------------------------------------
    For the moment in a meeting when something needs writing down and filling in
    a Kanban card would take too long. Click and type, or switch to Draw and
-   scribble, and sort it out later. Later is the Send to Kanban button: every
-   text box becomes one bare card, and the board can drop what it sent.
+   scribble, and sort it out later. Later is Send to Kanban: every text box can
+   become one bare card, and any area of the board can go over as a picture on
+   a card of its own.
 
-   ONE BOARD, ONE FILE. There is no naming, saving or loading. Everything on the
-   board is written to whiteboard/whiteboard.json a moment after it changes, and
-   that file is snapshotted once an hour like any record you would miss (see
-   WHITEBOARD_GROUP in lib.rs). Clear is one click, so it confirms, and Undo
-   reaches back over it for the rest of the session.
+   ONE BOARD, TWO FILES. whiteboard.json is what is ON the board and is
+   snapshotted once an hour like any record you would miss (see
+   WHITEBOARD_GROUP in lib.rs). whiteboard-settings.json is how you like it:
+   the grid, the board color, the pen last picked. There is no naming, saving
+   or loading; the board is written a moment after it changes. Clear is one
+   click, so it confirms, and Undo reaches back over it for the session.
 
    -----------------------------------------------------------------------------
    TWO LAYERS, AND WHY TEXT IS NEVER PAINTED
 
    Ink is drawn on a canvas. Typed text is real DOM text boxes floating over it.
    That split is the whole Kanban feature: text baked into pixels is gone as
-   text forever, and there would be nothing left to send.
+   text forever, and there would be nothing left to send as a card.
 
    The canvas is only the size of the window onto the board, not the board. A
    board this big as one canvas is hundreds of megabytes of pixels, so the
    strokes are kept as points and redrawn for whatever is in view whenever the
    view moves. The text boxes live inside the scrolling surface and scroll
-   natively.
+   natively. Sending an area as a picture draws both into a canvas of its own,
+   sized to the area.
 
    -----------------------------------------------------------------------------
-   COLORS COME FROM THE THEME
+   COLORS
 
-   The six pens are the theme's text color and its first five chart colors,
-   stored by slot rather than by value. Named colors would lie (Christmas's
-   "red" slot is green), and a fixed hex would vanish on a theme whose surface
-   happens to match it. A theme change redraws the ink in the new palette.
+   The six pens are the board's ink and the theme's first five chart colors,
+   stored by slot rather than by value, plus any color picked by hand, stored
+   as #rrggbb. Named theme colors would lie (Christmas's "red" slot is green),
+   so the slots are shown, never named.
+
+   "Ink" is the one pen that is not simply a theme color. On the theme's own
+   board it is the theme's text color; on a black, white or custom board it is
+   whichever of dark or light reads on that board, or a light theme's ink would
+   vanish on a black board. A theme change redraws the ink in the new palette.
 
    Rust commands used: save_tool_file / load_tool_file (toolId "whiteboard",
-   kind "data"), through core/tool-store.ts, and list_tool_backups /
-   read_tool_backup through core/tool-backups.ts.
+   kinds "data" and "settings"), through core/tool-store.ts, and
+   list_tool_backups / read_tool_backup through core/tool-backups.ts.
 ============================================================================= */
 
 import { devError } from "../core/dev-log";
 import { newId } from "../core/ids";
+import { fileTimestamp } from "../core/timestamp";
 import {
   isToolFileBlocked,
   loadToolJson,
@@ -47,13 +56,16 @@ import {
   unblockAfterReplacement,
 } from "../core/tool-store";
 import { formatBackupName, readToolBackup, renderToolBackups } from "../core/tool-backups";
-import { Modal } from "../modal/modal";
+import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, isTextEntry, type MenuItem } from "../menu/menu";
 import { appConfirm, backgroundMenu, flash, navigateToTool } from "../core/shell";
 import {
   MAX_TITLE_LEN,
   addCardsFromElsewhere,
+  addImageCardFromElsewhere,
+  isHexColor,
   kanbanTargets,
+  readableTextOn,
   type IncomingCard,
   type KanbanTarget,
 } from "./kanban";
@@ -62,16 +74,21 @@ import {
    TYPES AND LIMITS
 ============================================================================= */
 
-type Mode = "type" | "draw" | "erase";
+type Mode = "type" | "draw" | "erase" | "select";
 
-/** A pen, by its slot in the theme rather than by value. See the header. */
+/** A pen slot in the theme. See COLORS in the header. */
 type InkId = "ink" | "c1" | "c2" | "c3" | "c4" | "c5";
+
+/** A pen: a theme slot, or a color picked by hand as #rrggbb. */
+type Pen = InkId | string;
 
 type SizeId = "fine" | "medium" | "bold";
 
+type BoardColor = "theme" | "black" | "white" | "custom";
+
 interface Stroke {
   id: string;
-  ink: InkId;
+  ink: Pen;
   size: SizeId;
   /** Rubs out ink under it instead of laying any down. */
   erase: boolean;
@@ -83,7 +100,7 @@ interface TextNote {
   id: string;
   x: number;
   y: number;
-  ink: InkId;
+  ink: Pen;
   text: string;
 }
 
@@ -92,14 +109,32 @@ interface SendTarget {
   columnId: string;
 }
 
+/** A rectangle on the board, in board coordinates. */
+interface Area {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 interface WhiteboardFile {
   version: 1;
   strokes: Stroke[];
   texts: TextNote[];
-  mode: Mode;
-  ink: InkId;
-  size: SizeId;
   scroll: { x: number; y: number };
+}
+
+interface WhiteboardSettings {
+  grid: boolean;
+  boardColor: BoardColor;
+  /** The Custom board color, kept while another choice is in use so switching
+   *  back does not lose it. */
+  boardCustom: string;
+  mode: Mode;
+  ink: Pen;
+  size: SizeId;
+  /** The last color picked by hand, offered again in the color list. */
+  customInk: string | null;
   /** Where Send to Kanban last sent to, offered first next time. */
   target: SendTarget | null;
 }
@@ -118,7 +153,7 @@ const SURFACE_W = 12000;
 const SURFACE_H = 8000;
 
 const INKS: readonly { id: InkId; cssVar: string; label: string }[] = [
-  { id: "ink", cssVar: "--color-text", label: "Ink (the theme's text color)" },
+  { id: "ink", cssVar: "--color-text", label: "Ink" },
   { id: "c1", cssVar: "--color-chart-1", label: "Theme color 1" },
   { id: "c2", cssVar: "--color-chart-2", label: "Theme color 2" },
   { id: "c3", cssVar: "--color-chart-3", label: "Theme color 3" },
@@ -126,13 +161,27 @@ const INKS: readonly { id: InkId; cssVar: string; label: string }[] = [
   { id: "c5", cssVar: "--color-chart-5", label: "Theme color 5" },
 ];
 
+const BOARD_FIXED: Record<"black" | "white", string> = { black: "#000000", white: "#ffffff" };
+
 /** Pen widths in board pixels. The eraser is wider than the pen at every size,
  *  because rubbing out a fine line with a fine eraser takes several passes. */
 const PEN_WIDTH: Record<SizeId, number> = { fine: 2, medium: 4, bold: 8 };
 const ERASER_WIDTH: Record<SizeId, number> = { fine: 10, medium: 20, bold: 40 };
 
-const MODES: readonly Mode[] = ["type", "draw", "erase"];
+const MODES: readonly Mode[] = ["type", "draw", "erase", "select"];
 const SIZES: readonly SizeId[] = ["fine", "medium", "bold"];
+const BOARD_COLORS: readonly BoardColor[] = ["theme", "black", "white", "custom"];
+
+const DEFAULT_SETTINGS: WhiteboardSettings = {
+  grid: true,
+  boardColor: "theme",
+  boardCustom: "#fdf6e3",
+  mode: "type",
+  ink: "ink",
+  size: "medium",
+  customInk: null,
+  target: null,
+};
 
 /* Ceilings, so the file stays one a person could open and the board stays one
    that redraws without stuttering. Erasing ADDS ink (it is a stroke that rubs
@@ -146,8 +195,8 @@ const MAX_UNDO = 100;
 /** Points closer than this to the last one add nothing a mouse can draw. */
 const MIN_POINT_GAP = 1.5;
 
-/** How far a text box has to travel before a press on it is a drag. Anything
- *  shorter is a click, which starts editing it. */
+/** How far a press has to travel before it is a drag. Anything shorter is a
+ *  click: on a text box it starts editing, in Select it clears the selection. */
 const DRAG_THRESHOLD = 4;
 
 /** Gap between a text box and the one Enter opens below it. */
@@ -160,16 +209,29 @@ const SAVE_DEBOUNCE_MS = 500;
 const NEW_BOX_NUDGE_X = 5;
 const NEW_BOX_NUDGE_Y = 13;
 
+/* A text box's box model, as whiteboard.css draws it, for drawing its text
+   into a picture at the same place: padding plus the border, and the widest
+   its text runs before it wraps. Kept in step with .wb-text by hand. */
+const TEXT_INSET_X = 5;
+const TEXT_INSET_Y = 3;
+const TEXT_MAX_WIDTH = 560;
+
+/* A picture of an area is drawn at twice the board's scale so it stays sharp
+   on the card, and scaled down for an area too big to hold at that size. */
+const IMAGE_SCALE = 2;
+const IMAGE_MAX_PIXELS = 16_000_000;
+const IMAGE_MAX_SIDE = 8192;
+/** Margin around everything on the board when the whole board is sent. */
+const BOARD_IMAGE_MARGIN = 24;
+const PREVIEW_WIDTH = 480;
+
 /* =============================================================================
    STATE
 ============================================================================= */
 
 let strokes: Stroke[] = [];
 let texts: TextNote[] = [];
-let mode: Mode = "type";
-let ink: InkId = "ink";
-let size: SizeId = "medium";
-let target: SendTarget | null = null;
+let settings: WhiteboardSettings = { ...DEFAULT_SETTINGS };
 
 let undoStack: Snapshot[] = [];
 let redoStack: Snapshot[] = [];
@@ -177,8 +239,8 @@ let redoStack: Snapshot[] = [];
 /** False until the file has been read. Nothing is drawn, taken or written
  *  before then, so an early click cannot save an empty board over a full one. */
 let loaded = false;
-/** The file would not read. The store refuses every save to it this session;
- *  this flag is what keeps a debounced save from saying so every half second. */
+/** The board's file would not read. The store refuses every save to it this
+ *  session; this flag is what keeps a debounced save quiet about it. */
 let blocked = false;
 
 let dirty = false;
@@ -187,6 +249,7 @@ let dirty = false;
 let scrollDirty = false;
 let saveTimer: number | null = null;
 let saveChain: Promise<boolean> = Promise.resolve(true);
+let settingsChain: Promise<void> = Promise.resolve();
 /** One error toast per run of failed saves, not one every half second. */
 let saveErrorShown = false;
 
@@ -225,6 +288,10 @@ let boxDrag: {
 
 let pan: { pointerId: number; x: number; y: number; left: number; top: number } | null = null;
 
+/** The area picked in Select, which Send to Kanban offers as a picture. */
+let selection: Area | null = null;
+let selectDrag: { pointerId: number; x: number; y: number; moved: boolean } | null = null;
+
 /** Where the last right-click on the board landed, for "Type Here". */
 let menuPoint: { x: number; y: number } | null = null;
 
@@ -235,16 +302,22 @@ let totalPoints = 0;
 let redrawQueued = false;
 
 /* ── Elements, set in initWhiteboard ── */
+let toolView: HTMLElement;
 let stage: HTMLElement;
 let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D;
 let scroller: HTMLElement;
 let surface: HTMLElement;
-let emptyHint: HTMLElement;
+let selectionEl: HTMLElement;
 let undoBtn: HTMLButtonElement;
 let redoBtn: HTMLButtonElement;
 let sendOpenBtn: HTMLButtonElement;
 let clearBtn: HTMLButtonElement;
+let colorBtn: HTMLButtonElement;
+let colorChip: HTMLElement;
+let colorPop: HTMLElement;
+let colorRecent: HTMLButtonElement;
+let colorInput: HTMLInputElement;
 let noticeWrap: HTMLElement;
 let notice: HTMLElement;
 
@@ -259,6 +332,10 @@ let notice: HTMLElement;
 
 function isInk(v: unknown): v is InkId {
   return INKS.some((i) => i.id === v);
+}
+
+function isPen(v: unknown): v is Pen {
+  return isInk(v) || (isHexColor(v) && /^#[0-9a-f]{6}$/i.test(v));
 }
 
 function clampX(v: number): number {
@@ -288,7 +365,7 @@ function normalizeStroke(raw: unknown): Stroke | null {
   if (pts.length < 2) return null;
   return {
     id: typeof r.id === "string" && r.id ? r.id : newId(),
-    ink: isInk(r.ink) ? r.ink : "ink",
+    ink: isPen(r.ink) ? r.ink : "ink",
     size: SIZES.includes(r.size as SizeId) ? (r.size as SizeId) : "medium",
     erase: r.erase === true,
     pts,
@@ -307,7 +384,7 @@ function normalizeNote(raw: unknown): TextNote | null {
     id: typeof r.id === "string" && r.id ? r.id : newId(),
     x: Number.isFinite(x) ? clampX(x) : 0,
     y: Number.isFinite(y) ? clampY(y) : 0,
-    ink: isInk(r.ink) ? r.ink : "ink",
+    ink: isPen(r.ink) ? r.ink : "ink",
     text,
   };
 }
@@ -339,24 +416,35 @@ function normalizeFile(raw: unknown): WhiteboardFile | null {
   const sx = Number(scrollRaw.x);
   const sy = Number(scrollRaw.y);
 
-  let outTarget: SendTarget | null = null;
-  const t = r.target as Record<string, unknown> | null | undefined;
-  if (t && typeof t.boardId === "string" && typeof t.columnId === "string") {
-    outTarget = { boardId: t.boardId, columnId: t.columnId };
-  }
-
   return {
     version: 1,
     strokes: outStrokes,
     texts: outTexts,
-    mode: MODES.includes(r.mode as Mode) ? (r.mode as Mode) : "type",
-    ink: isInk(r.ink) ? r.ink : "ink",
-    size: SIZES.includes(r.size as SizeId) ? (r.size as SizeId) : "medium",
     scroll: {
       x: Number.isFinite(sx) ? clampX(sx) : 0,
       y: Number.isFinite(sy) ? clampY(sy) : 0,
     },
-    target: outTarget,
+  };
+}
+
+function normalizeSettings(raw: unknown): WhiteboardSettings {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const t = r.target as Record<string, unknown> | null | undefined;
+  const hex = (v: unknown): v is string => isHexColor(v) && /^#[0-9a-f]{6}$/i.test(v as string);
+  return {
+    grid: r.grid !== false,
+    boardColor: BOARD_COLORS.includes(r.boardColor as BoardColor)
+      ? (r.boardColor as BoardColor)
+      : DEFAULT_SETTINGS.boardColor,
+    boardCustom: hex(r.boardCustom) ? r.boardCustom : DEFAULT_SETTINGS.boardCustom,
+    mode: MODES.includes(r.mode as Mode) ? (r.mode as Mode) : DEFAULT_SETTINGS.mode,
+    ink: isPen(r.ink) ? r.ink : DEFAULT_SETTINGS.ink,
+    size: SIZES.includes(r.size as SizeId) ? (r.size as SizeId) : DEFAULT_SETTINGS.size,
+    customInk: hex(r.customInk) ? r.customInk : null,
+    target:
+      t && typeof t.boardId === "string" && typeof t.columnId === "string"
+        ? { boardId: t.boardId, columnId: t.columnId }
+        : null,
   };
 }
 
@@ -365,17 +453,24 @@ function normalizeFile(raw: unknown): WhiteboardFile | null {
 function applyFile(file: WhiteboardFile): void {
   strokes = file.strokes;
   texts = file.texts;
-  mode = file.mode;
-  ink = file.ink;
-  size = file.size;
-  target = file.target;
   viewScroll = { ...file.scroll };
   writtenScroll = { ...file.scroll };
   pendingScroll = { ...file.scroll };
   recountPoints();
 }
 
+async function loadSettings(): Promise<void> {
+  try {
+    settings = normalizeSettings(await loadToolJson<unknown>("whiteboard", "settings"));
+  } catch (err) {
+    // Preferences, so the defaults are a usable board. The store has said so.
+    devError("[whiteboard] settings load failed", err);
+    settings = { ...DEFAULT_SETTINGS };
+  }
+}
+
 async function load(): Promise<void> {
+  await loadSettings();
   try {
     const parsed = normalizeFile(await loadToolJson<unknown>("whiteboard", "data"));
     if (parsed) {
@@ -385,12 +480,7 @@ async function load(): Promise<void> {
          file it is: the store only blocks a file it could not parse, and this
          one it could, so the block is this tool's to keep. */
       blocked = true;
-      flash(
-        "The Whiteboard's file is not in a shape this version understands. Nothing will be " +
-          "saved over it this session. Close the app, then repair or move that file.",
-        "error",
-        12000,
-      );
+      flash("Couldn't read the Whiteboard's file. It won't be saved over.", "error", 12000);
     }
   } catch (err) {
     // The store has already said so out loud and blocked the file.
@@ -400,8 +490,7 @@ async function load(): Promise<void> {
   if (!blocked) blocked = isToolFileBlocked("whiteboard", "data");
   loaded = true;
   rebuildTexts();
-  resolveInkColors();
-  requestRedraw();
+  applyBoardLook();
   applyPendingScroll();
   updateChrome();
 }
@@ -411,16 +500,7 @@ async function load(): Promise<void> {
 ============================================================================= */
 
 function buildFile(): WhiteboardFile {
-  return {
-    version: 1,
-    strokes,
-    texts,
-    mode,
-    ink,
-    size,
-    scroll: { ...viewScroll },
-    target,
-  };
+  return { version: 1, strokes, texts, scroll: { ...viewScroll } };
 }
 
 function markDirty(): void {
@@ -471,6 +551,22 @@ function flushSave(): Promise<boolean> {
     saveTimer = null;
   }
   return saveNow();
+}
+
+/** Preferences are small and change on a click, so they are written at once
+ *  rather than debounced. A file that would not read at startup is left alone
+ *  without a word each time: the store has already said so. */
+function saveSettings(): void {
+  if (!loaded || isToolFileBlocked("whiteboard", "settings")) return;
+  const snapshotOfSettings = { ...settings };
+  settingsChain = settingsChain.then(async () => {
+    try {
+      await saveToolJson("whiteboard", "settings", snapshotOfSettings);
+    } catch (err) {
+      devError("[whiteboard] settings save failed", err);
+      flash(`Couldn't save Whiteboard preferences: ${String(err)}`, "error");
+    }
+  });
 }
 
 /* =============================================================================
@@ -536,20 +632,69 @@ function sameBoard(a: Snapshot, b: Snapshot): boolean {
 }
 
 /* =============================================================================
-   DRAWING
+   BOARD LOOK AND COLORS
 ============================================================================= */
 
-function recountPoints(): void {
-  totalPoints = strokes.reduce((n, s) => n + s.pts.length / 2, 0);
+/** The board's color as #rrggbb, or null when it is the theme's own surface. */
+function boardHex(): string | null {
+  if (settings.boardColor === "theme") return null;
+  if (settings.boardColor === "custom") return settings.boardCustom;
+  return BOARD_FIXED[settings.boardColor];
 }
 
-/** Reads the six pens out of the live theme. Called at load, on every theme
+/** Paints the board in its chosen color and grid, and gives "Ink" a color
+ *  that reads on it. Set on the tool view rather than the board, so the Ink
+ *  swatch in the toolbar shows the same ink the board uses. */
+function applyBoardLook(): void {
+  const hex = boardHex();
+  if (hex) {
+    const ink = readableTextOn(hex);
+    toolView.style.setProperty("--wb-board", hex);
+    toolView.style.setProperty("--wb-ink", ink);
+    toolView.style.setProperty("--wb-dot", `color-mix(in srgb, ${ink} 22%, transparent)`);
+  } else {
+    toolView.style.removeProperty("--wb-board");
+    toolView.style.removeProperty("--wb-ink");
+    toolView.style.removeProperty("--wb-dot");
+  }
+  stage.classList.toggle("wb-no-grid", !settings.grid);
+  resolveInkColors();
+  requestRedraw();
+}
+
+/** Reads the pens out of the live theme. Called at load, on every theme
  *  change, and on entry, since a custom palette can change under the tool. */
 function resolveInkColors(): void {
   const style = getComputedStyle(document.documentElement);
   for (const i of INKS) {
     inkColors.set(i.id, style.getPropertyValue(i.cssVar).trim() || "#888888");
   }
+  const hex = boardHex();
+  if (hex) inkColors.set("ink", readableTextOn(hex));
+}
+
+function penColor(pen: Pen): string {
+  return isInk(pen) ? inkColors.get(pen) ?? "#888888" : pen;
+}
+
+/** Colors an element the way a pen colors ink: a theme slot by its class, so
+ *  it follows the theme live, and a picked color by value. */
+function paintWithPen(el: HTMLElement, pen: Pen): void {
+  for (const i of INKS) el.classList.remove(`wb-ink-${i.id}`);
+  if (isInk(pen)) {
+    el.classList.add(`wb-ink-${pen}`);
+    el.style.removeProperty("--wb-c");
+  } else {
+    el.style.setProperty("--wb-c", pen);
+  }
+}
+
+/* =============================================================================
+   DRAWING
+============================================================================= */
+
+function recountPoints(): void {
+  totalPoints = strokes.reduce((n, s) => n + s.pts.length / 2, 0);
 }
 
 function strokeWidth(s: Stroke): number {
@@ -575,35 +720,35 @@ function boundsOf(s: Stroke): [number, number, number, number] {
   return b;
 }
 
-function styleFor(s: Stroke): void {
-  ctx.globalCompositeOperation = s.erase ? "destination-out" : "source-over";
-  ctx.strokeStyle = s.erase ? "#000000" : inkColors.get(s.ink) ?? "#888888";
-  ctx.fillStyle = ctx.strokeStyle;
-  ctx.lineWidth = strokeWidth(s);
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
+function styleFor(c: CanvasRenderingContext2D, s: Stroke): void {
+  c.globalCompositeOperation = s.erase ? "destination-out" : "source-over";
+  c.strokeStyle = s.erase ? "#000000" : penColor(s.ink);
+  c.fillStyle = c.strokeStyle;
+  c.lineWidth = strokeWidth(s);
+  c.lineCap = "round";
+  c.lineJoin = "round";
 }
 
 /** A finished stroke, smoothed through the midpoints between its samples so a
  *  mouse's straight hops read as a curve. */
-function drawStroke(s: Stroke): void {
-  styleFor(s);
+function drawStroke(c: CanvasRenderingContext2D, s: Stroke): void {
+  styleFor(c, s);
   const p = s.pts;
   if (p.length === 2) {
-    ctx.beginPath();
-    ctx.arc(p[0], p[1], strokeWidth(s) / 2, 0, Math.PI * 2);
-    ctx.fill();
+    c.beginPath();
+    c.arc(p[0], p[1], strokeWidth(s) / 2, 0, Math.PI * 2);
+    c.fill();
     return;
   }
-  ctx.beginPath();
-  ctx.moveTo(p[0], p[1]);
+  c.beginPath();
+  c.moveTo(p[0], p[1]);
   for (let i = 2; i < p.length - 2; i += 2) {
     const mx = (p[i] + p[i + 2]) / 2;
     const my = (p[i + 1] + p[i + 3]) / 2;
-    ctx.quadraticCurveTo(p[i], p[i + 1], mx, my);
+    c.quadraticCurveTo(p[i], p[i + 1], mx, my);
   }
-  ctx.lineTo(p[p.length - 2], p[p.length - 1]);
-  ctx.stroke();
+  c.lineTo(p[p.length - 2], p[p.length - 1]);
+  c.stroke();
 }
 
 /** The canvas's transform: backing pixels to CSS pixels, then the board
@@ -611,6 +756,10 @@ function drawStroke(s: Stroke): void {
 function applyViewTransform(): void {
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, -scroller.scrollLeft * dpr, -scroller.scrollTop * dpr);
+}
+
+function overlaps(b: [number, number, number, number], a: Area): boolean {
+  return !(b[2] < a.x || b[0] > a.x + a.w || b[3] < a.y || b[1] > a.y + a.h);
 }
 
 function redraw(): void {
@@ -635,16 +784,11 @@ function redraw(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   applyViewTransform();
 
-  const left = scroller.scrollLeft;
-  const top = scroller.scrollTop;
-  const right = left + w;
-  const bottom = top + h;
+  const view: Area = { x: scroller.scrollLeft, y: scroller.scrollTop, w, h };
   for (const s of strokes) {
-    const [x0, y0, x1, y1] = boundsOf(s);
-    if (x1 < left || x0 > right || y1 < top || y0 > bottom) continue;
-    drawStroke(s);
+    if (overlaps(boundsOf(s), view)) drawStroke(ctx, s);
   }
-  if (liveStroke) drawStroke(liveStroke);
+  if (liveStroke) drawStroke(ctx, liveStroke);
 }
 
 function requestRedraw(): void {
@@ -661,24 +805,21 @@ function boardPoint(e: { clientX: number; clientY: number }): { x: number; y: nu
 
 function startStroke(e: PointerEvent): void {
   if (totalPoints >= MAX_TOTAL_POINTS) {
-    flash(
-      "The Whiteboard has reached its limit for ink. Clear it, or undo recent strokes, to make room.",
-      "error",
-    );
+    flash("The Whiteboard is full.", "error");
     return;
   }
   const { x, y } = boardPoint(e);
   livePre = snapshot();
   liveStroke = {
     id: newId(),
-    ink,
-    size,
-    erase: mode === "erase",
+    ink: settings.ink,
+    size: settings.size,
+    erase: settings.mode === "erase",
     pts: [round1(x), round1(y)],
   };
   surface.setPointerCapture(e.pointerId);
   applyViewTransform();
-  drawStroke(liveStroke);
+  drawStroke(ctx, liveStroke);
 }
 
 function extendStroke(e: PointerEvent): void {
@@ -690,7 +831,7 @@ function extendStroke(e: PointerEvent): void {
   const samples = e.getCoalescedEvents?.() ?? [];
   const events = samples.length > 0 ? samples : [e];
   applyViewTransform();
-  styleFor(stroke);
+  styleFor(ctx, stroke);
   for (const ev of events) {
     if (stroke.pts.length >= MAX_POINTS_PER_STROKE * 2) return;
     const { x, y } = boardPoint(ev);
@@ -740,7 +881,8 @@ function noteById(id: string | null): TextNote | null {
 
 function buildNoteEl(note: TextNote): HTMLElement {
   const el = document.createElement("div");
-  el.className = `wb-text wb-ink-${note.ink}`;
+  el.className = "wb-text";
+  paintWithPen(el, note.ink);
   el.dataset.id = note.id;
   el.style.left = `${note.x}px`;
   el.style.top = `${note.y}px`;
@@ -776,6 +918,8 @@ function rebuildTexts(): void {
     noteEls.set(note.id, el);
     surface.appendChild(el);
   }
+  // Last, so the selection outline sits above the text it is picking.
+  surface.appendChild(selectionEl);
 }
 
 /** The text a box holds, as it would be saved. */
@@ -862,10 +1006,7 @@ function endEditing(): void {
 /** A new, empty box at a board point, ready to type in. */
 function createNoteAt(x: number, y: number): void {
   if (texts.length >= MAX_TEXTS) {
-    flash(
-      `The Whiteboard holds up to ${MAX_TEXTS.toLocaleString()} text boxes. Send some to Kanban, or remove some, to make room.`,
-      "error",
-    );
+    flash("The Whiteboard can't hold more text boxes.", "error");
     return;
   }
   const pre = snapshot();
@@ -873,13 +1014,13 @@ function createNoteAt(x: number, y: number): void {
     id: newId(),
     x: clampX(Math.min(x, SURFACE_W - 40)),
     y: clampY(Math.min(y, SURFACE_H - 30)),
-    ink,
+    ink: settings.ink,
     text: "",
   };
   texts.push(note);
   const el = buildNoteEl(note);
   noteEls.set(note.id, el);
-  surface.appendChild(el);
+  surface.insertBefore(el, selectionEl);
   beginEditing(note.id, { pre });
   updateChrome();
 }
@@ -918,6 +1059,160 @@ function deleteNote(id: string): void {
   updateChrome();
 }
 
+/** A text box's footprint on the board, measured off the box as drawn. */
+function noteArea(note: TextNote): Area {
+  const el = noteEls.get(note.id);
+  return { x: note.x, y: note.y, w: el?.offsetWidth ?? 0, h: el?.offsetHeight ?? 0 };
+}
+
+/* =============================================================================
+   SELECT
+   -----------------------------------------------------------------------------
+   A rectangle dragged out in Select mode, for sending that part of the board
+   to Kanban as a picture. A click without a drag clears it, and so does
+   leaving Select.
+============================================================================= */
+
+function showSelection(): void {
+  if (!selection) {
+    selectionEl.style.display = "none";
+    return;
+  }
+  selectionEl.style.display = "";
+  selectionEl.style.left = `${selection.x}px`;
+  selectionEl.style.top = `${selection.y}px`;
+  selectionEl.style.width = `${selection.w}px`;
+  selectionEl.style.height = `${selection.h}px`;
+}
+
+function clearSelection(): void {
+  if (!selection) return;
+  selection = null;
+  showSelection();
+  updateChrome();
+}
+
+function inside(a: Area, outer: Area): boolean {
+  return a.x >= outer.x && a.y >= outer.y && a.x + a.w <= outer.x + outer.w && a.y + a.h <= outer.y + outer.h;
+}
+
+function boundsArea(b: [number, number, number, number]): Area {
+  return { x: b[0], y: b[1], w: b[2] - b[0], h: b[3] - b[1] };
+}
+
+/** Everything on the board, with a margin, or null for an empty board. */
+function contentArea(includeText: boolean): Area | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const take = (a: Area): void => {
+    minX = Math.min(minX, a.x);
+    minY = Math.min(minY, a.y);
+    maxX = Math.max(maxX, a.x + a.w);
+    maxY = Math.max(maxY, a.y + a.h);
+  };
+  for (const s of strokes) if (!s.erase) take(boundsArea(boundsOf(s)));
+  if (includeText) for (const t of texts) take(noteArea(t));
+  if (minX === Infinity) return null;
+  const x = Math.max(0, minX - BOARD_IMAGE_MARGIN);
+  const y = Math.max(0, minY - BOARD_IMAGE_MARGIN);
+  return {
+    x,
+    y,
+    w: Math.min(SURFACE_W, maxX + BOARD_IMAGE_MARGIN) - x,
+    h: Math.min(SURFACE_H, maxY + BOARD_IMAGE_MARGIN) - y,
+  };
+}
+
+/* =============================================================================
+   PICTURES OF THE BOARD
+   -----------------------------------------------------------------------------
+   An area drawn into a canvas of its own: the board's color, then the ink on a
+   layer of its own (so the eraser rubs out ink and not the board), then the
+   text boxes on top if they were asked for. The text is laid out again here
+   with the same font, width and wrapping the box uses on screen.
+============================================================================= */
+
+function renderArea(area: Area, includeText: boolean, maxWidth?: number): HTMLCanvasElement {
+  let scale = Math.min(
+    IMAGE_SCALE,
+    Math.sqrt(IMAGE_MAX_PIXELS / Math.max(1, area.w * area.h)),
+    IMAGE_MAX_SIDE / Math.max(1, area.w),
+    IMAGE_MAX_SIDE / Math.max(1, area.h),
+  );
+  if (maxWidth) scale = Math.min(scale, maxWidth / Math.max(1, area.w));
+  const w = Math.max(1, Math.round(area.w * scale));
+  const h = Math.max(1, Math.round(area.h * scale));
+  const toArea = (c: CanvasRenderingContext2D): void =>
+    c.setTransform(scale, 0, 0, scale, -area.x * scale, -area.y * scale);
+
+  const inkLayer = document.createElement("canvas");
+  inkLayer.width = w;
+  inkLayer.height = h;
+  const ictx = inkLayer.getContext("2d")!;
+  toArea(ictx);
+  for (const s of strokes) if (overlaps(boundsOf(s), area)) drawStroke(ictx, s);
+
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const octx = out.getContext("2d")!;
+  // The board as it is painted right now, resolved to a real color.
+  octx.fillStyle = getComputedStyle(stage).backgroundColor;
+  octx.fillRect(0, 0, w, h);
+  octx.drawImage(inkLayer, 0, 0);
+
+  if (includeText) {
+    toArea(octx);
+    for (const note of texts) {
+      const b = noteArea(note);
+      if (overlaps([b.x, b.y, b.x + b.w, b.y + b.h], area)) drawNoteText(octx, note);
+    }
+  }
+  return out;
+}
+
+function drawNoteText(c: CanvasRenderingContext2D, note: TextNote): void {
+  const el = noteEls.get(note.id);
+  if (!el) return;
+  const cs = getComputedStyle(el);
+  const fontSize = parseFloat(cs.fontSize) || 16;
+  const lineHeight = parseFloat(cs.lineHeight) || fontSize * 1.4;
+  c.font = `${cs.fontStyle} ${cs.fontWeight} ${fontSize}px ${cs.fontFamily}`;
+  c.fillStyle = penColor(note.ink);
+  c.textBaseline = "middle";
+  const lines = wrapLines(c, note.text, TEXT_MAX_WIDTH);
+  lines.forEach((line, i) => {
+    c.fillText(line, note.x + TEXT_INSET_X, note.y + TEXT_INSET_Y + i * lineHeight + lineHeight / 2);
+  });
+}
+
+/** The text split the way the box wraps it: at its own line breaks, then at
+ *  word breaks past the width, then anywhere in a word too long for a line. */
+function wrapLines(c: CanvasRenderingContext2D, text: string, width: number): string[] {
+  const out: string[] = [];
+  for (const para of text.split("\n")) {
+    let line = "";
+    for (const word of para.split(/(\s+)/)) {
+      if (c.measureText(line + word).width <= width) {
+        line += word;
+        continue;
+      }
+      if (line.trim()) out.push(line.trimEnd());
+      line = word.trimStart();
+      while (c.measureText(line).width > width && line.length > 1) {
+        let cut = line.length - 1;
+        while (cut > 1 && c.measureText(line.slice(0, cut)).width > width) cut--;
+        out.push(line.slice(0, cut));
+        line = line.slice(cut);
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 /* =============================================================================
    POINTER INPUT
 ============================================================================= */
@@ -940,9 +1235,18 @@ function onSurfacePointerDown(e: PointerEvent): void {
   }
   if (e.button !== 0) return;
 
+  const mode = settings.mode;
   if (mode === "draw" || mode === "erase") {
     e.preventDefault();
     startStroke(e);
+    return;
+  }
+
+  if (mode === "select") {
+    e.preventDefault();
+    const { x, y } = boardPoint(e);
+    selectDrag = { pointerId: e.pointerId, x, y, moved: false };
+    surface.setPointerCapture(e.pointerId);
     return;
   }
 
@@ -991,6 +1295,20 @@ function onSurfacePointerMove(e: PointerEvent): void {
     extendStroke(e);
     return;
   }
+  const sel = selectDrag;
+  if (sel && e.pointerId === sel.pointerId) {
+    const { x, y } = boardPoint(e);
+    if (!sel.moved && Math.hypot(x - sel.x, y - sel.y) < DRAG_THRESHOLD) return;
+    sel.moved = true;
+    selection = {
+      x: Math.min(x, sel.x),
+      y: Math.min(y, sel.y),
+      w: Math.abs(x - sel.x),
+      h: Math.abs(y - sel.y),
+    };
+    showSelection();
+    return;
+  }
   const drag = boxDrag;
   if (drag && e.pointerId === drag.pointerId) {
     const dx = e.clientX - drag.startX;
@@ -1015,6 +1333,14 @@ function onSurfacePointerUp(e: PointerEvent): void {
   }
   if (liveStroke) {
     endStroke();
+    return;
+  }
+  const sel = selectDrag;
+  if (sel && e.pointerId === sel.pointerId) {
+    selectDrag = null;
+    if (!sel.moved) selection = null;
+    showSelection();
+    updateChrome();
     return;
   }
   const drag = boxDrag;
@@ -1064,6 +1390,11 @@ function onKeydown(e: KeyboardEvent): void {
   if (document.body.classList.contains("modal-open")) return;
   // Inside a text box, Ctrl+Z is that box's own typing undo.
   if (isTextEntry(e.target)) return;
+  if (e.key === "Escape") {
+    if (!colorPop.hidden) closeColorPop();
+    else clearSelection();
+    return;
+  }
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
   const key = e.key.toLowerCase();
   if (key === "z" && !e.shiftKey) {
@@ -1080,22 +1411,23 @@ function onKeydown(e: KeyboardEvent): void {
 ============================================================================= */
 
 function setMode(next: Mode): void {
-  if (mode === next) return;
+  if (settings.mode === next) return;
   endEditing();
-  mode = next;
-  markDirty();
+  if (next !== "select") clearSelection();
+  settings.mode = next;
+  saveSettings();
   updateChrome();
 }
 
-function setInk(next: InkId): void {
-  ink = next;
-  markDirty();
+function setInk(next: Pen): void {
+  settings.ink = next;
+  saveSettings();
   updateChrome();
 }
 
 function setSize(next: SizeId): void {
-  size = next;
-  markDirty();
+  settings.size = next;
+  saveSettings();
   updateChrome();
 }
 
@@ -1106,32 +1438,30 @@ function isEmpty(): boolean {
 /** Everything on screen that reflects state: which mode, pen and size are
  *  picked, and which actions have anything to act on. */
 function updateChrome(): void {
-  surface.classList.toggle("wb-mode-type", mode === "type");
-  surface.classList.toggle("wb-mode-draw", mode === "draw");
-  surface.classList.toggle("wb-mode-erase", mode === "erase");
+  for (const m of MODES) surface.classList.toggle(`wb-mode-${m}`, settings.mode === m);
   document.querySelectorAll<HTMLButtonElement>(".wb-mode-btn").forEach((b) => {
-    b.classList.toggle("active", b.dataset.mode === mode);
-  });
-  document.querySelectorAll<HTMLButtonElement>(".wb-swatch").forEach((b) => {
-    b.classList.toggle("active", b.dataset.ink === ink);
+    b.classList.toggle("active", b.dataset.mode === settings.mode);
   });
   document.querySelectorAll<HTMLButtonElement>(".wb-size-btn").forEach((b) => {
-    b.classList.toggle("active", b.dataset.size === size);
+    b.classList.toggle("active", b.dataset.size === settings.size);
   });
+  paintWithPen(colorChip, settings.ink);
+  colorPop.querySelectorAll<HTMLButtonElement>(".wb-swatch[data-ink]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.ink === settings.ink);
+  });
+  if (settings.customInk) {
+    colorRecent.hidden = false;
+    colorRecent.dataset.ink = settings.customInk;
+    paintWithPen(colorRecent, settings.customInk);
+    colorRecent.title = settings.customInk;
+  } else {
+    colorRecent.hidden = true;
+  }
   undoBtn.disabled = undoStack.length === 0;
   redoBtn.disabled = redoStack.length === 0;
   clearBtn.disabled = isEmpty();
-  sendOpenBtn.disabled = texts.length === 0;
-  emptyHint.style.display = loaded && isEmpty() && !editingId ? "" : "none";
-  emptyHint.textContent =
-    mode === "type"
-      ? "Click anywhere to start typing. Enter starts the next line as its own box."
-      : mode === "draw"
-        ? "Drag to draw. Hold the middle mouse button to move around the board."
-        : "Drag over ink to rub it out. Text boxes are not erased.";
-
+  sendOpenBtn.disabled = isEmpty();
   noticeWrap.style.display = blocked ? "" : "none";
-  notice.textContent = blocked ? "Not saving: the Whiteboard's file could not be read" : "";
 }
 
 function requestClear(): void {
@@ -1140,8 +1470,7 @@ function requestClear(): void {
   appConfirm(
     {
       title: "Clear the Whiteboard?",
-      message:
-        "Everything on the whiteboard is removed, typed and drawn. Undo brings it back until the app is closed.",
+      message: "Everything on the whiteboard will be removed.",
       confirmLabel: "Clear",
     },
     () => void clearBoard(),
@@ -1152,29 +1481,85 @@ async function clearBoard(): Promise<void> {
   checkpoint();
   strokes = [];
   texts = [];
+  selection = null;
   recountPoints();
   rebuildTexts();
+  showSelection();
   requestRedraw();
   markDirty();
   updateChrome();
-  if (await flushSave()) flash("Whiteboard cleared. Undo brings it back.", "success");
+  if (await flushSave()) flash("Whiteboard cleared.", "success");
+}
+
+/* ── The pen color list ── */
+
+function openColorPop(): void {
+  colorPop.hidden = false;
+  colorBtn.classList.add("active");
+}
+
+function closeColorPop(): void {
+  colorPop.hidden = true;
+  colorBtn.classList.remove("active");
+}
+
+function wireColorPop(): void {
+  colorBtn.addEventListener("click", () => {
+    if (colorPop.hidden) openColorPop();
+    else closeColorPop();
+  });
+  colorPop.querySelectorAll<HTMLButtonElement>(".wb-swatch[data-ink]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const pen = b.dataset.ink;
+      if (isPen(pen)) setInk(pen);
+      closeColorPop();
+    });
+  });
+  document.getElementById("wbColorPickBtn")!.addEventListener("click", () => {
+    colorInput.value = settings.customInk ?? (isInk(settings.ink) ? "#ff4f81" : settings.ink);
+    colorInput.click();
+  });
+  colorInput.addEventListener("change", () => {
+    const hex = colorInput.value.toLowerCase();
+    if (!isPen(hex)) return;
+    settings.customInk = hex;
+    setInk(hex);
+    closeColorPop();
+  });
+  // Anywhere else closes it, the way a dropdown does.
+  document.addEventListener("pointerdown", (e) => {
+    if (colorPop.hidden) return;
+    const t = e.target as Node;
+    if (colorPop.contains(t) || colorBtn.contains(t)) return;
+    closeColorPop();
+  });
 }
 
 /* =============================================================================
    SEND TO KANBAN
    -----------------------------------------------------------------------------
-   Every text box is offered, ticked, in reading order. Each one becomes a bare
-   card titled with its first line; a box whose text does not fit in a title
-   (a second line, or a first line past Kanban's limit) keeps the whole of it
-   in the card's description, so nothing typed is lost on the way over.
+   Two ways over, one tab each, sharing the board and column.
+
+   TEXT AS CARDS: every text box, ticked, in reading order. Each one becomes a
+   bare card titled with its first line; a box whose text does not fit in a
+   title (a second line, or a first line past Kanban's limit) keeps the whole
+   of it in the card's description, so nothing typed is lost on the way over.
+
+   IMAGE: the selection, or everything on the board, as a picture on one new
+   card, with or without the text boxes in it.
 
    SEND AND CLEAR ONLY CLEARS WHAT LANDED. Kanban answers once the board is on
-   disk, and the whiteboard lets go of the text only then. Cards that were made
-   but not yet written are one crash from existing nowhere, and the whiteboard
-   is the other copy.
+   disk, and the whiteboard lets go only then. Cards that were made but not yet
+   written are one crash from existing nowhere, and the whiteboard is the other
+   copy. For a picture, what is cleared is what lies wholly inside the area:
+   a stroke that runs out past its edge stays, since only part of it went.
 ============================================================================= */
 
+type SendTab = "text" | "image";
+type ImageArea = "selection" | "board";
+
 let sendModal: Modal;
+let sendTabs: ModalTabs<SendTab>;
 let sendBoardSel: HTMLSelectElement;
 let sendColumnSel: HTMLSelectElement;
 let sendList: HTMLElement;
@@ -1184,8 +1569,13 @@ let sendEmpty: HTMLElement;
 let sendOpenKanbanBtn: HTMLButtonElement;
 let sendBtn: HTMLButtonElement;
 let sendClearBtn: HTMLButtonElement;
+let sendIncludeText: HTMLInputElement;
+let sendImageTitle: HTMLInputElement;
+let sendPreview: HTMLImageElement;
+let sendAreaNote: HTMLElement;
 let sendTargets: KanbanTarget[] = [];
 let sendChecked = new Set<string>();
+let sendArea: ImageArea = "board";
 let sendBusy = false;
 
 /** Top to bottom, then left to right, the order a person reads a board in. */
@@ -1212,11 +1602,15 @@ function noteToCard(note: TextNote): IncomingCard {
   return { title, description: title === full ? "" : full };
 }
 
-function openSend(only?: string): void {
+function openSend(tab?: SendTab, onlyNote?: string): void {
   endEditing();
+  closeColorPop();
+  if (isEmpty()) return;
   const notes = notesInReadingOrder();
-  if (notes.length === 0) return;
-  sendChecked = new Set(only ? [only] : notes.map((n) => n.id));
+  sendChecked = new Set(onlyNote ? [onlyNote] : notes.map((n) => n.id));
+  sendArea = selection ? "selection" : "board";
+  sendImageTitle.value = "Whiteboard";
+  sendTabs.select(tab ?? (selection || texts.length === 0 ? "image" : "text"));
   fillSendTargets();
   renderSendList();
   sendModal.open();
@@ -1230,10 +1624,7 @@ function fillSendTargets(): void {
 
   if (targets === null || targets.length === 0) {
     sendEmpty.style.display = "";
-    sendEmpty.textContent =
-      targets === null
-        ? "Kanban is still loading. Try again in a moment."
-        : "There are no Kanban boards yet. Make one in Kanban, then come back.";
+    sendEmpty.textContent = targets === null ? "Kanban is still loading." : "There are no Kanban boards yet.";
     if (targets !== null) sendOpenKanbanBtn.style.display = "";
     sendBoardSel.disabled = true;
     fillSendColumns();
@@ -1248,9 +1639,8 @@ function fillSendTargets(): void {
     opt.textContent = t.name;
     sendBoardSel.appendChild(opt);
   }
-  sendBoardSel.value = targets.some((t) => t.id === target?.boardId)
-    ? target!.boardId
-    : targets[0].id;
+  const target = settings.target;
+  sendBoardSel.value = targets.some((t) => t.id === target?.boardId) ? target!.boardId : targets[0].id;
   fillSendColumns();
 }
 
@@ -1260,7 +1650,7 @@ function fillSendColumns(): void {
   if (!board || board.columns.length === 0) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = board ? "This board has no columns" : "";
+    opt.textContent = board ? "No columns" : "";
     sendColumnSel.appendChild(opt);
     sendColumnSel.disabled = true;
     updateSendButtons();
@@ -1273,6 +1663,7 @@ function fillSendColumns(): void {
     opt.textContent = c.title;
     sendColumnSel.appendChild(opt);
   }
+  const target = settings.target;
   const remembered =
     target?.boardId === board.id && board.columns.some((c) => c.id === target?.columnId);
   sendColumnSel.value = remembered ? target!.columnId : board.columns[0].id;
@@ -1295,22 +1686,36 @@ function renderSendList(): void {
     });
     row.appendChild(box);
 
-    const body = document.createElement("span");
-    body.className = "wb-send-text";
-    const card = noteToCard(note);
     const title = document.createElement("span");
     title.className = "wb-send-title";
-    title.textContent = card.title;
-    body.appendChild(title);
-    if (card.description) {
-      const more = document.createElement("span");
-      more.className = "wb-send-more";
-      more.textContent = "The full text goes in the card's description.";
-      body.appendChild(more);
-    }
+    title.textContent = noteToCard(note).title;
     row.title = note.text;
-    row.appendChild(body);
+    row.appendChild(title);
     sendList.appendChild(row);
+  }
+  updateSendButtons();
+}
+
+/** The area the Image tab would send right now, or null if there is none. */
+function chosenArea(): Area | null {
+  if (sendArea === "selection" && selection) return selection;
+  return contentArea(sendIncludeText.checked);
+}
+
+function renderImageTab(): void {
+  document.querySelectorAll<HTMLButtonElement>(".wb-area-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.area === sendArea);
+    if (b.dataset.area === "selection") b.disabled = !selection;
+  });
+  const area = chosenArea();
+  if (area) {
+    sendPreview.src = renderArea(area, sendIncludeText.checked, PREVIEW_WIDTH).toDataURL("image/png");
+    sendPreview.style.display = "";
+    sendAreaNote.style.display = "none";
+  } else {
+    sendPreview.removeAttribute("src");
+    sendPreview.style.display = "none";
+    sendAreaNote.style.display = "";
   }
   updateSendButtons();
 }
@@ -1318,9 +1723,11 @@ function renderSendList(): void {
 function updateSendButtons(): void {
   const total = texts.length;
   const picked = texts.filter((t) => sendChecked.has(t.id)).length;
-  sendCount.textContent = `${picked} of ${total} selected`;
+  sendCount.textContent = `${picked} of ${total}`;
   sendAllBtn.textContent = picked === total ? "Select None" : "Select All";
-  const ready = picked > 0 && !sendBoardSel.disabled && !sendColumnSel.disabled && !sendBusy;
+  const hasTarget = !sendBoardSel.disabled && !sendColumnSel.disabled && !sendBusy;
+  const ready =
+    hasTarget && (sendTabs.active === "text" ? picked > 0 : chosenArea() !== null);
   sendBtn.disabled = !ready;
   sendClearBtn.disabled = !ready;
 }
@@ -1331,37 +1738,37 @@ function toggleSendAll(): void {
   renderSendList();
 }
 
-async function send(clearAfter: boolean): Promise<void> {
+/** The picked board and column, remembered for next time. */
+function sendDestination(): { board: KanbanTarget; column: { id: string; title: string } } | null {
   const board = sendTargets.find((t) => t.id === sendBoardSel.value);
   const column = board?.columns.find((c) => c.id === sendColumnSel.value);
+  if (!board || !column) return null;
+  settings.target = { boardId: board.id, columnId: column.id };
+  saveSettings();
+  return { board, column };
+}
+
+function setSendBusy(busy: boolean): void {
+  sendBusy = busy;
+  updateSendButtons();
+}
+
+async function sendText(clearAfter: boolean): Promise<void> {
   const chosen = notesInReadingOrder().filter((n) => sendChecked.has(n.id));
-  if (!board || !column || chosen.length === 0 || sendBusy) return;
+  const dest = sendDestination();
+  if (!dest || chosen.length === 0 || sendBusy) return;
 
-  sendBusy = true;
-  updateSendButtons();
-  target = { boardId: board.id, columnId: column.id };
-  markDirty();
-  const result = await addCardsFromElsewhere(board.id, column.id, chosen.map(noteToCard));
-  sendBusy = false;
-  updateSendButtons();
-
+  setSendBusy(true);
+  const result = await addCardsFromElsewhere(dest.board.id, dest.column.id, chosen.map(noteToCard));
+  setSendBusy(false);
   if (!result.ok) {
     flash(result.error, "error", 8000);
     return;
   }
   sendModal.close();
-
-  const n = result.numbers;
-  const what =
-    n.length === 1 ? `card #${n[0]}` : `${n.length} cards, #${n[0]} to #${n[n.length - 1]},`;
-  const where = `to ${column.title} on "${board.name}"`;
   if (!result.saved) {
-    // Kanban has already said why its write failed. This says what it means here.
-    flash(
-      `Added ${what} ${where}, but Kanban could not save them yet. The whiteboard kept its text.`,
-      "error",
-      10000,
-    );
+    // Kanban has already said why its write failed.
+    flash("Kanban couldn't save the new cards.", "error", 8000);
     return;
   }
 
@@ -1373,14 +1780,75 @@ async function send(clearAfter: boolean): Promise<void> {
     markDirty();
     updateChrome();
     await flushSave();
-    flash(`Sent ${what} ${where}, and cleared them from the whiteboard.`, "success");
-  } else {
-    flash(`Sent ${what} ${where}.`, "success");
   }
+  const n = result.numbers.length;
+  flash(`Sent ${n} ${n === 1 ? "card" : "cards"} to "${dest.board.name}".`, "success");
+}
+
+async function sendImage(clearAfter: boolean): Promise<void> {
+  const area = chosenArea();
+  const includeText = sendIncludeText.checked;
+  const dest = sendDestination();
+  if (!dest || !area || sendBusy) return;
+
+  setSendBusy(true);
+  const png = renderArea(area, includeText).toDataURL("image/png").split(",")[1] ?? "";
+  const result = await addImageCardFromElsewhere(
+    dest.board.id,
+    dest.column.id,
+    sendImageTitle.value.trim().slice(0, MAX_TITLE_LEN) || "Whiteboard",
+    `whiteboard-${fileTimestamp()}.png`,
+    png,
+  );
+  setSendBusy(false);
+  if (!result.ok) {
+    flash(result.error, "error", 8000);
+    return;
+  }
+  sendModal.close();
+  if (!result.saved) {
+    flash("Kanban couldn't save the new card.", "error", 8000);
+    return;
+  }
+
+  if (clearAfter) {
+    checkpoint();
+    removeInside(area, includeText);
+    markDirty();
+    updateChrome();
+    await flushSave();
+  }
+  flash(`Sent to "${dest.board.name}".`, "success");
+}
+
+/** Takes off the board everything lying wholly inside an area: ink, and text
+ *  boxes when they went too. */
+function removeInside(area: Area, includeText: boolean): void {
+  strokes = strokes.filter((s) => !inside(boundsArea(boundsOf(s)), area));
+  if (includeText) texts = texts.filter((t) => !inside(noteArea(t), area));
+  selection = null;
+  recountPoints();
+  rebuildTexts();
+  showSelection();
+  requestRedraw();
+}
+
+function send(clearAfter: boolean): void {
+  if (sendTabs.active === "text") void sendText(clearAfter);
+  else void sendImage(clearAfter);
 }
 
 function wireSendModal(): void {
-  sendModal = new Modal(document.getElementById("wbSendBackdrop")!);
+  sendTabs = new ModalTabs<SendTab>({
+    scope: "#wbSendModal",
+    key: "wbSendTab",
+    panes: { text: "wbSendTabText", image: "wbSendTabImage" },
+    onActivate: (tab) => {
+      if (tab === "image") renderImageTab();
+      else updateSendButtons();
+    },
+  });
+  sendModal = new Modal(document.getElementById("wbSendBackdrop")!, { tabs: sendTabs });
   sendBoardSel = document.getElementById("wbSendBoard") as HTMLSelectElement;
   sendColumnSel = document.getElementById("wbSendColumn") as HTMLSelectElement;
   sendList = document.getElementById("wbSendList")!;
@@ -1390,14 +1858,25 @@ function wireSendModal(): void {
   sendOpenKanbanBtn = document.getElementById("wbSendOpenKanbanBtn") as HTMLButtonElement;
   sendBtn = document.getElementById("wbSendBtn") as HTMLButtonElement;
   sendClearBtn = document.getElementById("wbSendClearBtn") as HTMLButtonElement;
+  sendIncludeText = document.getElementById("wbSendIncludeText") as HTMLInputElement;
+  sendImageTitle = document.getElementById("wbSendImageTitle") as HTMLInputElement;
+  sendPreview = document.getElementById("wbSendPreview") as HTMLImageElement;
+  sendAreaNote = document.getElementById("wbSendAreaEmpty")!;
 
   document.getElementById("wbSendClose")!.addEventListener("click", () => sendModal.close());
   document.getElementById("wbSendCancelBtn")!.addEventListener("click", () => sendModal.close());
   sendBoardSel.addEventListener("change", fillSendColumns);
   sendColumnSel.addEventListener("change", updateSendButtons);
   sendAllBtn.addEventListener("click", toggleSendAll);
-  sendBtn.addEventListener("click", () => void send(false));
-  sendClearBtn.addEventListener("click", () => void send(true));
+  sendBtn.addEventListener("click", () => send(false));
+  sendClearBtn.addEventListener("click", () => send(true));
+  sendIncludeText.addEventListener("change", renderImageTab);
+  document.querySelectorAll<HTMLButtonElement>(".wb-area-btn").forEach((b) => {
+    b.addEventListener("click", () => {
+      sendArea = b.dataset.area === "selection" ? "selection" : "board";
+      renderImageTab();
+    });
+  });
   sendOpenKanbanBtn.addEventListener("click", () => {
     sendModal.close();
     navigateToTool("productivity", "kanban");
@@ -1405,14 +1884,32 @@ function wireSendModal(): void {
 }
 
 /* =============================================================================
-   HISTORY
+   SETUP
    -----------------------------------------------------------------------------
-   The hourly snapshots, through the shared list every tool uses. A restore is
-   an ordinary save, so what it replaces is captured on the way past, and it is
+   Preferences (the grid and the board's color) and Data (the hourly
+   snapshots, through the shared list every tool uses). A restore is an
+   ordinary save, so what it replaces is captured on the way past, and it is
    also an ordinary Undo step for the rest of the session.
 ============================================================================= */
 
-let historyModal: Modal;
+type SetupTab = "preferences" | "data";
+
+let setupModal: Modal;
+let gridToggle: HTMLInputElement;
+let gridLabel: HTMLElement;
+let boardColorSel: HTMLSelectElement;
+let boardColorInput: HTMLInputElement;
+let boardCustomRow: HTMLElement;
+
+/** Every control in Setup, put back to what the settings say. Run on every
+ *  open, so a control can never show a value that is not the one in use. */
+function applySettingsToForm(): void {
+  gridToggle.checked = settings.grid;
+  gridLabel.textContent = settings.grid ? "Enabled" : "Disabled";
+  boardColorSel.value = settings.boardColor;
+  boardColorInput.value = settings.boardCustom;
+  boardCustomRow.style.display = settings.boardColor === "custom" ? "" : "none";
+}
 
 function refreshHistory(): Promise<void> {
   return renderToolBackups({
@@ -1424,9 +1921,7 @@ function refreshHistory(): Promise<void> {
       appConfirm(
         {
           title: "Restore This Snapshot?",
-          message:
-            `The whiteboard goes back to how it was at ${formatBackupName(snap.name)}. ` +
-            "What is on it now is captured first, and Undo also brings it back.",
+          message: `The whiteboard goes back to ${formatBackupName(snap.name)}.`,
           confirmLabel: "Restore",
         },
         () => void restoreFromHistory(snap.name),
@@ -1443,7 +1938,7 @@ async function restoreFromHistory(name: string): Promise<void> {
     devError("[whiteboard] snapshot read failed", err);
   }
   if (!parsed) {
-    flash("That snapshot could not be read as a whiteboard.", "error");
+    flash("Couldn't read that snapshot.", "error");
     return;
   }
 
@@ -1451,6 +1946,7 @@ async function restoreFromHistory(name: string): Promise<void> {
   checkpoint();
   strokes = parsed.strokes;
   texts = parsed.texts;
+  selection = null;
   recountPoints();
   if (blocked) {
     // A restore REPLACES the file, so it may land on one that would not read.
@@ -1458,12 +1954,70 @@ async function restoreFromHistory(name: string): Promise<void> {
     blocked = false;
   }
   rebuildTexts();
+  showSelection();
   requestRedraw();
   markDirty();
   updateChrome();
   const saved = await flushSave();
-  historyModal.close();
-  if (saved) flash(`Whiteboard restored to ${formatBackupName(name)}.`, "success");
+  setupModal.close();
+  if (saved) flash("Whiteboard restored.", "success");
+}
+
+function wireSetup(): void {
+  const tabs = new ModalTabs<SetupTab>({
+    scope: "#wbSetupModal",
+    key: "wbTab",
+    panes: { preferences: "wbTabPreferences", data: "wbTabData" },
+    onActivate: (tab) => {
+      if (tab === "data") void refreshHistory();
+    },
+  });
+  setupModal = new Modal(document.getElementById("wbSetupBackdrop")!, {
+    tabs,
+    onOpen: applySettingsToForm,
+  });
+  gridToggle = document.getElementById("wbGridToggle") as HTMLInputElement;
+  gridLabel = document.getElementById("wbGridLabel")!;
+  boardColorSel = document.getElementById("wbBoardColorSelect") as HTMLSelectElement;
+  boardColorInput = document.getElementById("wbBoardColorInput") as HTMLInputElement;
+  boardCustomRow = document.getElementById("wbBoardCustomRow")!;
+
+  document.getElementById("wbSetupBtn")!.addEventListener("click", () => {
+    endEditing();
+    closeColorPop();
+    setupModal.open();
+  });
+  document.getElementById("wbSetupClose")!.addEventListener("click", () => setupModal.close());
+  document
+    .getElementById("wbHistoryRefreshBtn")!
+    .addEventListener("click", () => void refreshHistory());
+
+  gridToggle.addEventListener("change", () => {
+    settings.grid = gridToggle.checked;
+    saveSettings();
+    applySettingsToForm();
+    applyBoardLook();
+  });
+  boardColorSel.addEventListener("change", () => {
+    const next = boardColorSel.value as BoardColor;
+    if (!BOARD_COLORS.includes(next)) return;
+    settings.boardColor = next;
+    saveSettings();
+    applySettingsToForm();
+    applyBoardLook();
+  });
+  // "input" as well as "change": the board follows the picker while it is open.
+  const takeCustom = (): void => {
+    const hex = boardColorInput.value.toLowerCase();
+    if (!/^#[0-9a-f]{6}$/.test(hex)) return;
+    settings.boardCustom = hex;
+    applyBoardLook();
+  };
+  boardColorInput.addEventListener("input", takeCustom);
+  boardColorInput.addEventListener("change", () => {
+    takeCustom();
+    saveSettings();
+  });
 }
 
 /* =============================================================================
@@ -1477,7 +2031,7 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
   if (id && id !== editingId) {
     return [
       { label: "Edit", onClick: () => beginEditing(id) },
-      { label: "Send to Kanban…", onClick: () => openSend(id) },
+      { label: "Send to Kanban…", onClick: () => openSend("text", id) },
       { separator: true },
       { label: "Delete", danger: true, onClick: () => deleteNote(id) },
     ];
@@ -1488,7 +2042,8 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
     { label: "Undo", disabled: undoStack.length === 0, onClick: undo },
     { label: "Redo", disabled: redoStack.length === 0, onClick: redo },
     { separator: true },
-    { label: "Send to Kanban…", disabled: texts.length === 0, onClick: () => openSend() },
+    { label: "Send to Kanban…", disabled: isEmpty(), onClick: () => openSend() },
+    { label: "Send Selection to Kanban…", disabled: !selection, onClick: () => openSend("image") },
     { label: "Clear Whiteboard…", danger: true, disabled: isEmpty(), onClick: requestClear },
     // A menu on a background carries the app-wide rows, or it has removed them.
     { separator: true },
@@ -1522,24 +2077,36 @@ export function onWhiteboardToolEntry(): void {
 export async function onWhiteboardToolExit(): Promise<void> {
   if (!stage) return;
   endEditing();
+  closeColorPop();
   // Put back on the way in: the scroller is about to be hidden, which loses it.
   if (loaded) pendingScroll = { ...viewScroll };
   await flushSave();
 }
 
 export function initWhiteboard(): void {
+  toolView = document.getElementById("productivity-tool-whiteboard")!;
   stage = document.getElementById("wbStage")!;
   canvas = document.getElementById("wbInk") as HTMLCanvasElement;
   ctx = canvas.getContext("2d")!;
   scroller = document.getElementById("wbScroller")!;
   surface = document.getElementById("wbSurface")!;
-  emptyHint = document.getElementById("wbEmptyHint")!;
   undoBtn = document.getElementById("wbUndoBtn") as HTMLButtonElement;
   redoBtn = document.getElementById("wbRedoBtn") as HTMLButtonElement;
   sendOpenBtn = document.getElementById("wbSendOpenBtn") as HTMLButtonElement;
   clearBtn = document.getElementById("wbClearBtn") as HTMLButtonElement;
+  colorBtn = document.getElementById("wbColorBtn") as HTMLButtonElement;
+  colorChip = document.getElementById("wbColorChip")!;
+  colorPop = document.getElementById("wbColorPop")!;
+  colorRecent = document.getElementById("wbColorRecent") as HTMLButtonElement;
+  colorInput = document.getElementById("wbColorInput") as HTMLInputElement;
   noticeWrap = document.getElementById("wbHeaderNoticeWrap")!;
   notice = document.getElementById("wbHeaderNotice")!;
+  notice.textContent = "Not saving";
+
+  selectionEl = document.createElement("div");
+  selectionEl.className = "wb-selection";
+  selectionEl.style.display = "none";
+  surface.appendChild(selectionEl);
 
   surface.style.width = `${SURFACE_W}px`;
   surface.style.height = `${SURFACE_H}px`;
@@ -1560,9 +2127,6 @@ export function initWhiteboard(): void {
   document.querySelectorAll<HTMLButtonElement>(".wb-mode-btn").forEach((b) => {
     b.addEventListener("click", () => setMode(b.dataset.mode as Mode));
   });
-  document.querySelectorAll<HTMLButtonElement>(".wb-swatch").forEach((b) => {
-    b.addEventListener("click", () => setInk(b.dataset.ink as InkId));
-  });
   document.querySelectorAll<HTMLButtonElement>(".wb-size-btn").forEach((b) => {
     b.addEventListener("click", () => setSize(b.dataset.size as SizeId));
   });
@@ -1571,21 +2135,12 @@ export function initWhiteboard(): void {
   sendOpenBtn.addEventListener("click", () => openSend());
   clearBtn.addEventListener("click", requestClear);
   document.addEventListener("keydown", onKeydown);
+  wireColorPop();
 
   attachMenu(surface, surfaceMenu);
 
   wireSendModal();
-  historyModal = new Modal(document.getElementById("wbHistoryBackdrop")!, {
-    onOpen: () => void refreshHistory(),
-  });
-  document.getElementById("wbHistoryBtn")!.addEventListener("click", () => {
-    endEditing();
-    historyModal.open();
-  });
-  document.getElementById("wbHistoryClose")!.addEventListener("click", () => historyModal.close());
-  document
-    .getElementById("wbHistoryRefreshBtn")!
-    .addEventListener("click", () => void refreshHistory());
+  wireSetup();
 
   window.addEventListener("themechange", () => {
     resolveInkColors();
