@@ -1283,8 +1283,7 @@ function blockKanbanFile(id: string, describe: string, err: unknown): void {
   unreadableFiles.add(id);
   devError(`[kanban] ${describe} could not be read`, err);
   flash(
-    `Kanban could not read ${describe}. It will not be written over this session. ` +
-      `Close the app, then repair or move that file.`,
+    `Kanban could not read ${describe}. It will not be written over this session.`,
     "error",
     12000,
   );
@@ -5334,8 +5333,7 @@ function createCard(
 ): Card | null {
   if (liveCardsOnBoard(board.id).length >= MAX_CARDS_PER_BOARD) {
     flash(
-      `This board is at its limit of ${MAX_CARDS_PER_BOARD.toLocaleString()} cards on the board at once. ` +
-        "Archiving finished work frees room without deleting anything.",
+      `This board is at its limit of ${MAX_CARDS_PER_BOARD.toLocaleString()} cards on the board at once.`,
       "error",
       8000,
     );
@@ -12664,10 +12662,12 @@ function renderAgentConnections(
       kbConfirm(
         {
           title: "Revoke this connection?",
+          /* States the cost of revoking, which is what there is to weigh
+             here. The steps for reconnecting used to follow it; a confirm is
+             a decision, not a runbook. */
           message:
-            `"${token.label}" stops working immediately. To reconnect an agent, copy a ` +
-            "connection and set the agent up with it again; a copied command replaces the old " +
-            "one by itself. Cards it already created keep its name.",
+            `"${token.label}" stops working immediately, and the agent has to be set up ` +
+            "again with a new connection. Cards it already created keep its name.",
           confirmLabel: "Revoke",
           reopen: () => openBoardSetup(board, "agents"),
         },

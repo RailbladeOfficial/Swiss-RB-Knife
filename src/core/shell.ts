@@ -2284,10 +2284,14 @@ async function loadSettings(): Promise<void> {
        silent reset to defaults reads as the app losing its mind. */
     devError("[shell] settings load failed", err);
     setSettings({ ...DEFAULT_SETTINGS, sidebarItems: freshSidebarItems() });
+    /* Both sentences are state, not advice: what the app is running on now,
+       and what has happened to the file. The instruction that used to follow
+       them ("close the app, then repair or move it") is gone; a toast is the
+       alert, not the runbook. The path stays, because it is the one thing
+       here you cannot work out for yourself. */
     flash(
-      "Your settings file could not be read, so this session is running on defaults. " +
-        "Nothing has been written over it. Close the app, then repair or move " +
-        "app/settings.json.",
+      "app/settings.json could not be read, so this session is running on defaults. " +
+        "Nothing has been written over it.",
       "error",
       12000,
     );

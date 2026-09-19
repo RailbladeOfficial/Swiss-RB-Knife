@@ -2222,7 +2222,7 @@ function makeEditable(
       // comparison that's actually fine across the date boundary.
       if (entryDurationSeconds(entry) < 0) {
         entry[field] = prevValue;
-        flash("End time can't be before start time. Use the calendar icon to edit dates if this should span multiple days.", "error");
+        flash("End time can't be before start time.", "error");
         render(entriesDiv, dayTotalDiv, groupTotalsDiv, statsDiv);
         return;
       }
@@ -2303,7 +2303,7 @@ async function addEntry(
     return false;
   }
   if (entryDurationSeconds({ date: startDate, start, endDate, end }) < 0) {
-    flash("End time must be after Start time. Check the dates.", "error");
+    flash("End time must be after Start time.", "error");
     return false;
   }
 
@@ -4562,7 +4562,7 @@ function getDateEditModal(): Modal {
       if (!newStart || !newEnd) { flash("Both dates are required", "error"); return; }
       if (newEnd < newStart) { flash("End date cannot be before Start date", "error"); return; }
       if (entryDurationSeconds({ date: newStart, start: dateEditStagedStart, endDate: newEnd, end: dateEditStagedEnd }) < 0) {
-        flash("End time must be after Start time. Check the dates.", "error");
+        flash("End time must be after Start time.", "error");
         return;
       }
       dateEditEntry.date = newStart;
@@ -4894,7 +4894,7 @@ export function initTimeTracker(): void {
           dateToDayIndex(today()) * 86400 + parseTime(normalizeTime(nowTimeString()))
           - (dateToDayIndex(datePicker.value || today()) * 86400 + parseTime(runningStart));
         if (elapsed >= 60) {
-          flash("Name what you're on now so it gets logged, or Clear the form", "error");
+          flash("Nothing was logged: the running entry has no name.", "error");
           activityInput.focus();
           return;
         }

@@ -72,9 +72,11 @@ export class ToolFileUnreadable extends Error {
     readonly filename: string,
     readonly reason: unknown,
   ) {
+    /* Reaches the user as an error toast, so it stops at what is now true.
+       What to do about it is not a toast's job. */
     super(
       `${TOOL_LABELS[toolId] ?? toolId} could not read ${filename}. Nothing will be ` +
-        `saved over it this session. Close the app, then repair or move that file.`,
+        `saved over it this session.`,
     );
     this.name = "ToolFileUnreadable";
   }
@@ -200,8 +202,7 @@ export async function saveToolText(toolId: string, kind: string, data: string): 
        in front of this ("Couldn't save Countdown Timer data: ..."), and saying
        it twice in one toast reads like two different problems. */
     throw new Error(
-      `${name} could not be read when the app started, so nothing is written over it. ` +
-        `Close the app, then repair or move that file.`,
+      `${name} could not be read when the app started, so nothing is written over it.`,
     );
   }
   await invoke("save_tool_file", { toolId, kind, data });

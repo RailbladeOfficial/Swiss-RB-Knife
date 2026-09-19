@@ -367,7 +367,7 @@ function generate(): void {
   // contains none, and silently handing back 2 (or 1) would be a lie about
   // what was asked for.
   if (places === 0 && Math.floor(hi) < Math.ceil(lo)) {
-    flash("No whole number lies in that range. Widen it, or turn on decimals.", "error");
+    flash("No whole number lies in that range.", "error");
     return;
   }
 

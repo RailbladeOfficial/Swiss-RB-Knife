@@ -1718,7 +1718,7 @@ async function attachBackupListeners(): Promise<void> {
           progressCurrentLabel.textContent =
             `⚠ Complete: ${skipCount} file${skipCount === 1 ? "" : "s"} skipped`;
           flash(
-            `Backup complete, but ${skipCount} file${skipCount === 1 ? "" : "s"} couldn't be copied. See Skipped Files.`,
+            `Backup complete, but ${skipCount} file${skipCount === 1 ? "" : "s"} couldn't be copied.`,
             "error",
             7000
           );

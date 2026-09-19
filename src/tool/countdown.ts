@@ -900,7 +900,7 @@ function silenceAlarm(): void {
 
 async function startCountdown(): Promise<void> {
   if (pendingDurationMs <= 0) {
-    flash("Set a duration first. Double-click the clock to type one.", "error");
+    flash("Set a duration first.", "error");
     return;
   }
   if (pendingDurationMs > MAX_DURATION_MS) {
@@ -1075,7 +1075,7 @@ function closeClockEditor(commit: boolean): void {
   if (commit) {
     const parsed = parseDuration(clockEditInput.value);
     if (parsed === null) {
-      flash(`Couldn't read that duration. Try 25m, 1:30:00, or a plain number of ${bareUnitWord()}.`, "error");
+      flash(`Couldn't read that duration: it is not 25m, 1:30:00, or a plain number of ${bareUnitWord()}.`, "error");
     } else if (parsed <= 0) {
       flash("Duration has to be more than zero", "error");
     } else if (parsed > MAX_DURATION_MS) {
@@ -1603,7 +1603,7 @@ async function logToTimeTracker(entry: CountdownLogEntry): Promise<void> {
   if (!entry.memo.trim()) {
     // The Time Tracker keys everything off the activity name, so an unnamed
     // session has nothing to file itself under.
-    flash("Give the session a memo before logging it. It becomes the activity name.", "error");
+    flash("This session has no memo, so there is no activity to file it under.", "error");
     return;
   }
 
@@ -1774,7 +1774,7 @@ function openDisplayView(): void {
   // Can only be reached while a session exists (render() hides the button
   // otherwise), but the run can end between paint and click.
   if (!session) {
-    flash("Start the countdown first. Display View shows a running clock.", "error");
+    flash("Start the countdown first.", "error");
     return;
   }
   displayOpen = true;
@@ -2198,7 +2198,7 @@ function getPresetsModal(): Modal {
 function savePresetFromForm(): void {
   const ms = parseDuration(presetDurationInput.value);
   if (ms === null || ms <= 0) {
-    flash(`Couldn't read that duration. Try 25m, 1:30:00, or a plain number of ${bareUnitWord()}.`, "error");
+    flash(`Couldn't read that duration: it is not 25m, 1:30:00, or a plain number of ${bareUnitWord()}.`, "error");
     return;
   }
   if (ms > MAX_DURATION_MS) {
