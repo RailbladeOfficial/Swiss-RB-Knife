@@ -114,6 +114,11 @@ interface Stroke {
    *  the edge of the area it was copied from, so a line that ran out of the
    *  copied area is cut where the copy was cut. */
   clip?: [number, number, number, number];
+  /** Rectangles this stroke is not drawn in, each [x, y, w, h]. Restyling part
+   *  of a line leaves a hole in it where the selection was, and a restyled copy
+   *  clipped to that same rectangle on top, so the change lands exactly inside
+   *  the selection and nowhere else, whichever way the line runs through it. */
+  holes?: [number, number, number, number][];
   /** Board coordinates as flat x,y pairs. */
   pts: number[];
 }
@@ -247,6 +252,9 @@ const MAX_POINTS_PER_STROKE = 20_000;
 const MAX_TEXTS = 2000;
 const MAX_TEXT_LEN = 4000;
 const MAX_UNDO = 100;
+/** Holes one stroke can carry, one per restyle that cut through it. Past this a
+ *  hand-edited file is trimmed rather than drawn slowly forever. */
+const MAX_HOLES = 64;
 
 /** How far an arrow's head spreads from its line, in radians. */
 const ARROW_SPREAD = Math.PI / 7;
@@ -507,6 +515,7 @@ function normalizeStroke(raw: unknown): Stroke | null {
       ? { shape: strokeShape(r.shape, r.erase === true)! }
       : {}),
     ...(normalizeClip(r.clip) ? { clip: normalizeClip(r.clip)! } : {}),
+    ...(normalizeHoles(r.holes) ? { holes: normalizeHoles(r.holes)! } : {}),
     pts,
   };
 }
@@ -516,6 +525,15 @@ function normalizeStroke(raw: unknown): Stroke | null {
 function strokeShape(raw: unknown, erase: boolean): ShapeKind | "clear" | null {
   if (erase) return raw === "clear" || raw === "rect" ? "clear" : null;
   return SHAPES.includes(raw as ShapeKind) ? (raw as ShapeKind) : null;
+}
+
+function normalizeHoles(raw: unknown): [number, number, number, number][] | null {
+  if (!Array.isArray(raw)) return null;
+  const holes = raw
+    .map(normalizeClip)
+    .filter((h): h is [number, number, number, number] => h !== null)
+    .slice(0, MAX_HOLES);
+  return holes.length > 0 ? holes : null;
 }
 
 function normalizeClip(raw: unknown): [number, number, number, number] | null {
@@ -922,16 +940,27 @@ function styleFor(c: CanvasRenderingContext2D, s: Stroke): void {
 /** A finished stroke, smoothed through the midpoints between its samples so a
  *  mouse's straight hops read as a curve. */
 function drawStroke(c: CanvasRenderingContext2D, s: Stroke): void {
+  if (!s.clip && !s.holes) {
+    drawStrokeShape(c, s);
+    return;
+  }
+  c.save();
   if (s.clip) {
-    c.save();
     c.beginPath();
     c.rect(...s.clip);
     c.clip();
-    drawStrokeShape(c, s);
-    c.restore();
-  } else {
-    drawStrokeShape(c, s);
   }
+  // Each hole is its own clip, the board with that rectangle cut out of it.
+  // Clips stack by intersection, so the stroke is kept out of every hole,
+  // however they overlap.
+  for (const hole of s.holes ?? []) {
+    c.beginPath();
+    c.rect(-SURFACE_W, -SURFACE_H, SURFACE_W * 3, SURFACE_H * 3);
+    c.rect(...hole);
+    c.clip("evenodd");
+  }
+  drawStrokeShape(c, s);
+  c.restore();
 }
 
 function drawStrokeShape(c: CanvasRenderingContext2D, s: Stroke): void {
@@ -1024,6 +1053,8 @@ function touchesStroke(s: Stroke, x: number, y: number, r: number): boolean {
     const [cx, cy, cw, ch] = s.clip;
     if (x < cx - r || y < cy - r || x > cx + cw + r || y > cy + ch + r) return false;
   }
+  // Nothing of it is drawn inside a hole, so nothing there can be touched.
+  if (s.holes?.some(([hx, hy, hw, hh]) => x >= hx && y >= hy && x <= hx + hw && y <= hy + hh)) return false;
   const reach = r + strokeWidth(s) / 2;
   const p = strokePath(s);
   if (p.length === 2) return Math.hypot(x - p[0], y - p[1]) <= reach;
@@ -1801,6 +1832,7 @@ function shiftStroke(s: Stroke, dx: number, dy: number, clip?: [number, number, 
   const out: Stroke = { ...s, id: newId(), pts };
   if (c) out.clip = c;
   else delete out.clip;
+  if (s.holes) out.holes = s.holes.map(([x, y, w, h]) => [x + dx, y + dy, w, h]);
   return out;
 }
 
@@ -2590,68 +2622,58 @@ function setSize(next: SizeId): void {
  *  its ink, and its text boxes unless the preference says ink only. A stroke
  *  crossing the edge is left as it is, since a line cannot be half one color.
  *  One Undo step. */
-/**
- * A freehand stroke cut where its line crosses an area's edge, in order, each
- * piece marked inside or outside. The crossing point is added to both pieces
- * so they meet with no gap. Each segment is clipped to the area (Liang-Barsky),
- * which finds where it enters and leaves even when neither end is inside.
- */
-function splitStroke(st: Stroke, area: Area): { stroke: Stroke; inside: boolean }[] {
-  const x0 = area.x;
-  const y0 = area.y;
-  const x1 = area.x + area.w;
-  const y1 = area.y + area.h;
-  const isIn = (x: number, y: number): boolean => x >= x0 && x <= x1 && y >= y0 && y <= y1;
-  const p = st.pts;
-  // Cut first, judge after: each piece is inside or out by the middle of its
-  // first stretch, which a line that only grazes the edge, or starts exactly
-  // on it, cannot fool the way flipping a flag at each crossing can.
-  const cutUp: number[][] = [[p[0], p[1]]];
+/** How close a point is to a rectangle, 0 inside it. */
+function distanceToRect(x: number, y: number, r: Area): number {
+  const dx = Math.max(r.x - x, 0, x - (r.x + r.w));
+  const dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+  return Math.hypot(dx, dy);
+}
 
+/** Whether any of a stroke's drawn line, thickness included, falls inside an
+ *  area: a segment passing just outside the edge can still paint inside it. */
+function strokeTouchesArea(s: Stroke, area: Area): boolean {
+  const reach = strokeWidth(s) / 2;
+  const p = strokePath(s);
+  if (p.length === 2) return distanceToRect(p[0], p[1], area) <= reach;
+  const corners = [
+    [area.x, area.y],
+    [area.x + area.w, area.y],
+    [area.x, area.y + area.h],
+    [area.x + area.w, area.y + area.h],
+  ];
   for (let i = 0; i + 3 < p.length; i += 2) {
-    const ax = p[i];
-    const ay = p[i + 1];
-    const dx = p[i + 2] - ax;
-    const dy = p[i + 3] - ay;
-    // The stretch of this segment, 0..1, that lies in the area, if any.
-    let t0 = 0;
-    let t1 = 1;
-    let hits = true;
-    for (const [q, r] of [
-      [-dx, ax - x0],
-      [dx, x1 - ax],
-      [-dy, ay - y0],
-      [dy, y1 - ay],
-    ]) {
-      if (q === 0) {
-        if (r < 0) hits = false;
-      } else {
-        const t = r / q;
-        if (q < 0) t0 = Math.max(t0, t);
-        else t1 = Math.min(t1, t);
-      }
-    }
-    const cuts = hits && t1 > t0 ? [t0, t1].filter((t) => t > 0 && t < 1) : [];
-    for (const t of cuts) {
-      const cx = round1(ax + dx * t);
-      const cy = round1(ay + dy * t);
-      cutUp[cutUp.length - 1].push(cx, cy);
-      cutUp.push([cx, cy]);
-    }
-    cutUp[cutUp.length - 1].push(p[i + 2], p[i + 3]);
+    const [ax, ay, bx, by] = [p[i], p[i + 1], p[i + 2], p[i + 3]];
+    if (distanceToRect(ax, ay, area) <= reach || distanceToRect(bx, by, area) <= reach) return true;
+    // A segment crossing the whole area with both ends outside it: the
+    // nearest point is then on the segment, closest to one of the corners,
+    // or the segment runs straight through.
+    if (corners.some(([cx, cy]) => distanceToSegment(cx, cy, ax, ay, bx, by) <= reach)) return true;
+    if (segmentCrossesRect(ax, ay, bx, by, area)) return true;
   }
+  return false;
+}
 
-  const pieces: { pts: number[]; inside: boolean }[] = [];
-  for (const pts of cutUp) {
-    const mx = pts.length >= 4 ? (pts[0] + pts[2]) / 2 : pts[0];
-    const my = pts.length >= 4 ? (pts[1] + pts[3]) / 2 : pts[1];
-    const inside = isIn(mx, my);
-    const last = pieces[pieces.length - 1];
-    // Two pieces on the same side in a row are one piece: drop the shared point.
-    if (last && last.inside === inside) last.pts.push(...pts.slice(2));
-    else pieces.push({ pts, inside });
+/** Whether a segment passes through a rectangle (Liang-Barsky). */
+function segmentCrossesRect(ax: number, ay: number, bx: number, by: number, r: Area): boolean {
+  const dx = bx - ax;
+  const dy = by - ay;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [q, d] of [
+    [-dx, ax - r.x],
+    [dx, r.x + r.w - ax],
+    [-dy, ay - r.y],
+    [dy, r.y + r.h - ay],
+  ]) {
+    if (q === 0) {
+      if (d < 0) return false;
+    } else {
+      const t = d / q;
+      if (q < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+    }
   }
-  return pieces.map((piece) => ({ stroke: { ...st, id: newId(), pts: piece.pts }, inside: piece.inside }));
+  return t0 <= t1;
 }
 
 function restyleSelection(patch: { ink?: Pen; size?: SizeId }): void {
@@ -2669,11 +2691,30 @@ function restyleSelection(patch: { ink?: Pen; size?: SizeId }): void {
     if (st.erase || !overlaps(boundsOf(st), area)) return [st];
     // A shape is one thing, so touching it restyles all of it.
     if (st.shape) return [restyle(st)];
-    // A freehand line is cut at the selection's edge, and only the part
-    // inside changes, the way it would in a paint program.
-    const pieces = splitStroke(st, area);
-    if (!pieces.some((p) => p.inside)) return [st];
-    return pieces.map((p) => (p.inside ? restyle(p.stroke) : p.stroke));
+    /* A freehand line changes exactly inside the selection, the way it would
+       in a paint program: the line keeps its old look everywhere but a hole
+       the size of the selection, and a restyled copy of it drawn only inside
+       that rectangle sits straight on top. Cutting the line's path at the edge
+       instead left the restyled piece's thickness and rounded ends spilling
+       past the selection wherever the line ran along it. */
+    if (!strokeTouchesArea(st, area)) return [st];
+    // Already that color and size: nothing to cut.
+    if ((patch.ink ?? st.ink) === st.ink && (patch.size ?? st.size) === st.size) return [st];
+    const within = (r: [number, number, number, number]): boolean =>
+      r[0] >= area.x && r[1] >= area.y && r[0] + r[2] <= area.x + area.w && r[1] + r[3] <= area.y + area.h;
+    const covers = (r: [number, number, number, number]): boolean =>
+      r[0] <= area.x && r[1] <= area.y && r[0] + r[2] >= area.x + area.w && r[1] + r[3] >= area.y + area.h;
+    // A copy from an earlier restyle that lies wholly inside this selection is
+    // restyled as it is, so restyling one selection again does not pile up
+    // copies. A line with a hole already covering the selection shows nothing
+    // there to change.
+    if (st.clip && within(st.clip)) return [restyle(st)];
+    if (st.holes?.some(covers)) return [st];
+    const rect: [number, number, number, number] = [area.x, area.y, area.w, area.h];
+    const clip = st.clip ? intersectRect(st.clip, rect) : rect;
+    if (clip[2] <= 0 || clip[3] <= 0) return [st];
+    const kept: Stroke = { ...st, id: newId(), holes: [...(st.holes ?? []), rect].slice(-MAX_HOLES) };
+    return [kept, { ...restyle(st), clip }];
   });
   for (const note of settings.selectionStylesText ? texts : []) {
     const b = noteArea(note);
