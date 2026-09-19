@@ -172,7 +172,13 @@ test("the dev server does not watch the folders an import renames", () => {
      at <repo>/data, and Vite watched the whole repo, so every import in dev was
      refused at the swap. */
   const config = read("vite.config.ts");
-  assert.match(config, /first === "data"/, "the dev server watches the dev data folder");
+  const unwatched = /UNWATCHED_FOLDERS = new Set\(\[([^\]]*)\]\)/.exec(config)?.[1] ?? "";
+  assert.match(unwatched, /"data"/, "the dev server watches the dev data folder");
+  // And the folders files are saved into from outside the app: a screenshot
+  // mid-save in demo/ is a locked file, and the watcher meeting it crashed the
+  // dev server.
+  assert.match(unwatched, /"demo"/, "the dev server watches demo/, where a file mid-save crashes it");
+  assert.match(config, /UNWATCHED_FOLDERS\.has\(first\)/, "the unwatched set is not what decides");
   assert.match(config, /first\.startsWith\("data\.srbk-"\)/, "the dev server watches the import's staging and replaced folders");
   assert.match(config, /isUnwatched\(file\)/, "the unwatched list is not passed to the watcher");
 

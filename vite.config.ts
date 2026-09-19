@@ -12,9 +12,17 @@ const ROOT_DIR = path.dirname(fileURLToPath(import.meta.url));
 // every import in dev failed ("Access is denied") and stayed unapplied. dev/
 // holds the srbk-agent.exe copy, which is renamed aside the same way while an
 // agent runs it. Vite serves nothing from any of them.
+//
+// demo/ and files-to-review/ are the other kind: folders files are SAVED into
+// from outside the app (screenshots dropped in to show a bug, reports written
+// to read later). A file mid-save is locked on Windows, and the watcher meeting
+// one threw EBUSY and took the whole dev server down with it, which ended
+// `tauri dev`. Nothing in either is part of the app.
+const UNWATCHED_FOLDERS = new Set(["data", "dev", "demo", "files-to-review"]);
+
 function isUnwatched(file: string): boolean {
   const first = path.relative(ROOT_DIR, file).split(path.sep)[0];
-  return first === "data" || first.startsWith("data.srbk-") || first === "dev";
+  return UNWATCHED_FOLDERS.has(first) || first.startsWith("data.srbk-");
 }
 
 
