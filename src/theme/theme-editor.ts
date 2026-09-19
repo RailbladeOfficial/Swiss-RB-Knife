@@ -34,6 +34,7 @@ import {
   themeCssUrl,
   getActiveCustomId,
   setActiveCustomId,
+  scheduleColorSchemeSync,
 } from "./theme-core";
 import { BASE_THEME_ID, DEFAULT_THEME_ID } from "./theme-ids";
 
@@ -370,6 +371,8 @@ export function applyCustomThemeById(id: string): void {
     root.style.setProperty(key, value);
   }
   applyCustomThemeStyles(theme);
+  // Silent like the preview path above, and for the same reason.
+  scheduleColorSchemeSync();
 }
 
 /** Lightens (or, for very light buttons, darkens) a hex color to serve as the
@@ -629,6 +632,11 @@ function teLivePreview(): void {
     advanced: { ..._teWorkingAdv },
   };
   applyCustomThemeStyles(synthetic);
+  /* This path sets :root directly and fires no themechange, so the browser is
+     told here instead. It matters while the editor is open: dragging the
+     input background from near-black to near-white has to take the date
+     field's calendar icon with it. */
+  scheduleColorSchemeSync();
 }
 
 /** Reads all swatch inputs and rebuilds _teWorkingVars, then live-previews. */

@@ -104,6 +104,14 @@ export function resolveThemeId(themeId: string): string {
  *  (persistent reuses the stored palette; regenerative always generates fresh).
  *  For "custom": applies the selected custom theme by id. */
 export function applyTheme(themeName: string): void {
+  applyThemeInner(themeName);
+  // Every branch below finishes by changing what :root computes to, whether
+  // through a stylesheet swap or inline variables, and the browser has to be
+  // told which way the result goes. See NATIVE CONTROL SCHEME.
+  scheduleColorSchemeSync();
+}
+
+function applyThemeInner(themeName: string): void {
   // Holiday Overrides are app-wide, not a Cycle rule. While today falls
   // inside a Holiday theme's window the override paints that theme over
   // whatever mode is selected, and settings.theme is deliberately left
@@ -187,6 +195,131 @@ export function applyTheme(themeName: string): void {
   clearRandomPalette();
   clearCustomTheme();
 }
+
+/* =============================================================================
+   NATIVE CONTROL SCHEME
+   -----------------------------------------------------------------------------
+   Some controls the app uses are drawn by the browser, not by this codebase,
+   and the only say we have over their colors is telling it whether the page
+   is light or dark. The `color-scheme` property is that switch.
+
+   THE BUG IT FIXES. A date field's calendar button is one of those. Left
+   alone the browser assumes a light page and draws a dark glyph, which on the
+   22 of the 28 themes whose --color-input-bg is near black was a dark icon on
+   a dark field. The same switch also makes the calendar popup that button
+   opens, and a <select>'s drop-down list, come up dark on those themes
+   instead of as a white rectangle in the middle of a dark app.
+
+   MEASURED, NOT LISTED. A list of "the dark themes" would be a 22-line table
+   to keep in step with the theme folder, and it still could not answer for
+   Custom or Random, which are built at runtime and can land either way. So
+   the input background is read as the browser actually resolves it and its
+   luminance decides. A theme, a custom theme, a re-rolled random palette and
+   a live edit in the theme editor all go through the same check.
+
+   The app's own inputs do not change either way: shell.css sets their
+   background and text color explicitly, so this reaches only the parts that
+   were never ours to paint. Scrollbars are hidden app-wide, so they are not
+   affected either.
+============================================================================= */
+
+/** Below this the theme counts as dark. Relative luminance, so the scale is
+ *  the perceptual one: 0.18 sits between the lightest theme that still reads
+ *  as dark (Thanksgiving, a warm brown) and the darkest that reads as light,
+ *  with plenty of room either side. */
+const DARK_INPUT_LUMINANCE = 0.18;
+
+/** Reused rather than made per call: this runs on every theme change, every
+ *  random re-roll and on every keystroke of a live edit in the theme editor. */
+let schemeProbe: HTMLElement | null = null;
+
+/**
+ * The input background as the browser resolves it, as "rgb(r, g, b)".
+ *
+ * Read off a real element rather than out of the custom property, because the
+ * property's own computed value is whatever text the theme file wrote:
+ * `#111827` in most, but a color-mix() or a named color would be just as
+ * legal and neither parses as hex. Painting it onto something and asking what
+ * came out hands the parsing to the browser, which owns it.
+ */
+function resolvedInputBackground(): string | null {
+  if (!document.body) return null;
+  if (!schemeProbe) {
+    schemeProbe = document.createElement("div");
+    /* Out of the layout and out of the tree's reading order, but NOT
+       display:none: a hidden element still computes its background, but
+       getComputedStyle on a display:none subtree is not somewhere to build a
+       habit of reading from. */
+    schemeProbe.style.cssText =
+      "position:fixed;left:-9999px;top:0;width:1px;height:1px;pointer-events:none";
+    schemeProbe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(schemeProbe);
+  }
+  schemeProbe.style.background = "var(--color-input-bg)";
+  return getComputedStyle(schemeProbe).backgroundColor;
+}
+
+/** WCAG relative luminance of an "rgb(r, g, b)" string, 0 to 1.
+ *
+ *  kanban.ts has this pair too, over hex, for choosing ink on a card someone
+ *  colored. Not shared: that one is a tool, this is core, and core importing
+ *  a tool is the load-order loop the module-init check exists to catch. The
+ *  input shapes differ as well. */
+function luminanceOf(rgb: string): number {
+  // Every form the browser hands back, rgb() and rgba() alike, puts the three
+  // channels first, so the numbers in order are all this needs.
+  const m = rgb.match(/\d+(?:\.\d+)?/g);
+  if (!m || m.length < 3) return 1;
+  const toLinear = (n: number): number => {
+    const v = Math.min(255, Math.max(0, n)) / 255;
+    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  return (
+    0.2126 * toLinear(parseFloat(m[0])) +
+    0.7152 * toLinear(parseFloat(m[1])) +
+    0.0722 * toLinear(parseFloat(m[2]))
+  );
+}
+
+/** Tells the browser which way the painted theme goes, so the controls it
+ *  draws itself come out the right color. Safe to call as often as you like;
+ *  it writes only when the answer has changed. */
+export function syncColorScheme(): void {
+  const background = resolvedInputBackground();
+  // No body yet, so nothing has been painted and there is nothing to answer
+  // from. The next call, after a frame, will have one.
+  if (background === null) return;
+  const scheme = luminanceOf(background) < DARK_INPUT_LUMINANCE ? "dark" : "light";
+  const root = document.documentElement;
+  if (root.style.colorScheme !== scheme) root.style.colorScheme = scheme;
+}
+
+/** The same, on the next frame.
+ *
+ *  Every caller here changes :root and then wants to read it back, and a read
+ *  in the same turn can land before a swapped stylesheet has been applied.
+ *  Coalesced, because a live edit in the theme editor fires this per
+ *  keystroke and a theme change fires it from three places at once. */
+let schemeSyncQueued = false;
+export function scheduleColorSchemeSync(): void {
+  if (schemeSyncQueued) return;
+  schemeSyncQueued = true;
+  requestAnimationFrame(() => {
+    schemeSyncQueued = false;
+    syncColorScheme();
+  });
+}
+
+/* The stylesheet swap and the inline-variable paths announce themselves
+   differently, so both are listened for rather than picking one. applyTheme
+   schedules a sync of its own on top, for the custom-theme path, which
+   announces nothing. */
+themeLink.addEventListener("load", scheduleColorSchemeSync);
+window.addEventListener("themechange", scheduleColorSchemeSync);
+/* And once at startup. The stored theme's sheet can already be loaded by the
+   time this module runs, in which case the load listener above has missed
+   its event and applyTheme has not been called yet. */
+scheduleColorSchemeSync();
 
 /* =============================================================================
    SEASONAL THEME EFFECTS  (Christmas snow / Halloween lightning)
