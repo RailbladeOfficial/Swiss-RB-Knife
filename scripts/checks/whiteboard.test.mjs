@@ -77,7 +77,7 @@ test("Send and Clear lets go of what it sent only after Kanban has written it", 
   // Both ways over are checked, the text cards and the picture.
   for (const [fn, removalCall] of [
     ["async function sendText(", "texts = texts.filter("],
-    ["async function sendImage(", "removeInside("],
+    ["async function sendImage(", "clearArea("],
   ]) {
     const start = read(TS).indexOf(fn);
     assert.notEqual(start, -1, `${fn} is missing`);

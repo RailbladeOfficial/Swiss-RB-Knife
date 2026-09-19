@@ -1807,14 +1807,15 @@
             <button id="wbSendOpenBtn" class="wb-send-open-btn">Send to Kanban</button>
           </div>
 
-          <!-- The canvas is the size of the view, not the board, and sits UNDER
-               the scroller: the strokes are redrawn for whatever is in view as it
-               scrolls, and the text boxes scroll natively inside the surface.
-               See the header of whiteboard.ts. -->
+          <!-- The canvas is the size of the view (plus a margin), not the board. It
+               sits on the surface under the text layer, so it scrolls natively
+               with the text and the grid, and is moved back over the view and
+               redrawn after each scroll. See the header of whiteboard.ts. -->
           <div id="wbStage" class="wb-stage">
-            <canvas id="wbInk" class="wb-ink"></canvas>
             <div id="wbScroller" class="wb-scroller">
-              <div id="wbSurface" class="wb-surface wb-mode-type"></div>
+              <div id="wbSurface" class="wb-surface wb-mode-type">
+                <canvas id="wbInk" class="wb-ink"></canvas>
+              </div>
             </div>
           </div>
         </div><!-- /productivity-tool-whiteboard -->
@@ -7838,6 +7839,7 @@
         <div class="modal-tabs">
           <button class="modal-tab active" data-wb-tab="preferences">Preferences</button>
           <button class="modal-tab" data-wb-tab="data">Data</button>
+          <button class="modal-tab" data-wb-tab="info">Info</button>
         </div>
 
         <div id="wbTabPreferences" class="modal-tab-pane">
@@ -7878,6 +7880,47 @@
               <button id="wbHistoryRefreshBtn" class="settings-action-btn">Refresh</button>
             </div>
             <div id="wbHistoryList" class="tool-backup-list"></div>
+          </div>
+        </div>
+
+        <div id="wbTabInfo" class="modal-tab-pane" style="display:none;">
+          <div class="wb-keys">
+            <div class="wb-key-group">
+              <div class="wb-key-heading">Modes</div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>T</kbd></span><span>Type</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>D</kbd></span><span>Draw</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>E</kbd></span><span>Erase</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>S</kbd></span><span>Select</span></div>
+            </div>
+            <div class="wb-key-group">
+              <div class="wb-key-heading">Typing</div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Enter</kbd></span><span>Finish the line and start the next one below it</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Shift</kbd> <kbd>Enter</kbd></span><span>New line in the same box</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Esc</kbd></span><span>Stop typing</span></div>
+            </div>
+            <div class="wb-key-group">
+              <div class="wb-key-heading">Editing</div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Z</kbd></span><span>Undo</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Y</kbd></span><span>Redo (also Ctrl+Shift+Z)</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Delete</kbd></span><span>Clear the selected area (also Backspace)</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>X</kbd></span><span>Cut the selected area</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>C</kbd></span><span>Copy the selected area</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>V</kbd></span><span>Paste at the pointer</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Esc</kbd></span><span>Clear the selection</span></div>
+            </div>
+            <div class="wb-key-group">
+              <div class="wb-key-heading">Moving around</div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Wheel</kbd></span><span>Zoom around the pointer</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Middle drag</kbd></span><span>Pan</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Shift</kbd> <kbd>Wheel</kbd></span><span>Scroll sideways</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Esc</kbd></span><span>Leave Overview</span></div>
+            </div>
+            <div class="wb-key-group">
+              <div class="wb-key-heading">Mouse</div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Click</kbd></span><span>Type: a new text box, or edit one</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Drag</kbd></span><span>Type: move a text box. Select: pick an area</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Right-click</kbd></span><span>Menus for a text box, a selection, or the board</span></div>
+            </div>
           </div>
         </div>
       </div>

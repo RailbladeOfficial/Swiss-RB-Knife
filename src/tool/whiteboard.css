@@ -225,10 +225,12 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 /* =============================================================================
    THE BOARD
    -----------------------------------------------------------------------------
-   Three layers in one box: the stage paints the surface and the dot grid, the
-   canvas over it holds the ink, and the scroller over that holds the text
-   boxes and takes every click. The canvas never takes a pointer event; the
-   surface works out where on the board a press landed.
+   The stage paints the board's color. Inside its scroller, the surface is the
+   board itself: its background is the dot grid, the canvas on it holds the
+   ink, and the layer over that holds the text boxes. All three scroll
+   natively together, so nothing trails the rest by a frame. The canvas never
+   takes a pointer event; the surface works out where on the board a press
+   landed.
 ============================================================================= */
 
 .wb-stage {
@@ -239,16 +241,9 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background-color: var(--wb-board, var(--color-input-bg));
-  /* whiteboard.ts moves the grid with the scroll. */
-  background-image: radial-gradient(circle, var(--wb-dot, var(--color-border-dashed)) 1px, transparent 1.6px);
-  background-size: 24px 24px;
   transition:
     background-color var(--hover-transition),
     border-color var(--hover-transition);
-}
-
-.wb-stage.wb-no-grid {
-  background-image: none;
 }
 
 .wb-ink {
@@ -267,6 +262,16 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 /* Sized in whiteboard.ts from SURFACE_W and SURFACE_H, the one place they live. */
 .wb-surface {
   position: relative;
+  /* The dot grid, on the surface so it scrolls with the board natively. Its
+     spacing, dot size and fade come from placeGrid() in whiteboard.ts, and
+     change only with the zoom. */
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--wb-dot, var(--color-border-dashed)) var(--wb-grid-alpha, 100%), transparent)
+      var(--wb-grid-dot, 1px),
+    transparent calc(var(--wb-grid-dot, 1px) + 0.6px)
+  );
+  background-size: var(--wb-grid-step, 24px) var(--wb-grid-step, 24px);
   /* Stops a drag from selecting text boxes as it goes, and stops a touchpad or
      pen from scrolling instead of drawing. */
   user-select: none;
@@ -531,4 +536,58 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   border: 1px solid var(--color-border);
   border-radius: 6px;
   cursor: pointer;
+}
+
+.wb-stage.wb-no-grid .wb-surface {
+  background-image: none;
+}
+
+/* ── Setup: Info ── */
+
+.wb-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wb-key-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-key-heading {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wb-key-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--color-text);
+}
+
+.wb-key-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.wb-key-keys kbd {
+  padding: 1px 7px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  color: var(--color-text);
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
 }

@@ -92,6 +92,14 @@ interface Stroke {
   size: SizeId;
   /** Rubs out ink under it instead of laying any down. */
   erase: boolean;
+  /** "rect" is a cleared rectangle rather than a line: pts is its two
+   *  corners. What Delete and Cut leave behind, so an area is emptied without
+   *  touching the parts of a stroke that run out past its edge. */
+  shape?: "rect";
+  /** Drawn only inside this rectangle, [x, y, w, h]. A pasted stroke carries
+   *  the edge of the area it was copied from, so a line that ran out of the
+   *  copied area is cut where the copy was cut. */
+  clip?: [number, number, number, number];
   /** Board coordinates as flat x,y pairs. */
   pts: number[];
 }
@@ -235,12 +243,21 @@ const PREVIEW_WIDTH = 480;
 /* Zoom. The floor is not a number: it is whatever shows the whole board in
    the window, which is what Overview goes to. */
 const ZOOM_MAX = 2;
-const ZOOM_STEP = 1.25;
+/** The zooms the buttons and the wheel step through, so each step is one of
+ *  these rather than a factor of wherever you happened to be. The floor below
+ *  the first is Overview's, and is reached by stepping past it. */
+const ZOOM_LEVELS = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+/** Wheel travel that makes one zoom step: one notch of an ordinary mouse. */
+const WHEEL_PER_STEP = 100;
 /** Spacing of the grid's dots at actual size, in board pixels. */
 const GRID_STEP = 24;
-/** Below this the dots would crowd into a grey wash, so they are spread four
- *  times as far apart. */
-const GRID_SPARSE_BELOW = 0.5;
+/** The grid fades out between these on-screen spacings as you zoom out, rather
+ *  than crowding into a grey wash. */
+const GRID_FADE_FROM = 12;
+const GRID_FADE_TO = 6;
+/** How far past the view the ink is drawn, in screen pixels, so a quick scroll
+ *  shows ink already there rather than a blank edge waiting for the redraw. */
+const INK_OVERSCAN = 256;
 /** Margin kept around your notes when Go to Notes brings them into view. */
 const NOTES_MARGIN = 40;
 
@@ -328,6 +345,20 @@ let overview = false;
  *  or one text box's color from its right-click menu. */
 let colorFor: { kind: "pen" } | { kind: "note"; id: string } = { kind: "pen" };
 
+/** Wheel travel not yet spent on a zoom step. */
+let wheelCarry = 0;
+
+/** The canvas's top-left corner, in surface pixels, as of the last redraw.
+ *  The canvas sits inside the scrolling surface so it moves with the text and
+ *  the grid, and is put back over the view each redraw. */
+let inkOrigin = { x: 0, y: 0 };
+
+/** The last point on the board under the pointer, which is where a paste lands. */
+let lastPointer: { x: number; y: number } | null = null;
+
+/** What Copy and Cut took: an area's ink and text, relative to its corner. */
+let clipboard: { w: number; h: number; strokes: Stroke[]; texts: TextNote[] } | null = null;
+
 const noteEls = new Map<string, HTMLElement>();
 const inkColors = new Map<InkId, string>();
 const strokeBounds = new WeakMap<Stroke, [number, number, number, number]>();
@@ -405,8 +436,17 @@ function normalizeStroke(raw: unknown): Stroke | null {
     ink: isPen(r.ink) ? r.ink : "ink",
     size: SIZES.includes(r.size as SizeId) ? (r.size as SizeId) : "medium",
     erase: r.erase === true,
+    ...(r.shape === "rect" && pts.length >= 4 ? { shape: "rect" as const } : {}),
+    ...(normalizeClip(r.clip) ? { clip: normalizeClip(r.clip)! } : {}),
     pts,
   };
+}
+
+function normalizeClip(raw: unknown): [number, number, number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 4) return null;
+  const n = raw.map(Number);
+  if (!n.every(Number.isFinite) || n[2] <= 0 || n[3] <= 0) return null;
+  return [n[0], n[1], n[2], n[3]];
 }
 
 function normalizeNote(raw: unknown): TextNote | null {
@@ -759,8 +799,12 @@ function boundsOf(s: Stroke): [number, number, number, number] {
     minY = Math.min(minY, s.pts[i + 1]);
     maxY = Math.max(maxY, s.pts[i + 1]);
   }
-  const pad = strokeWidth(s) / 2 + 1;
-  const b: [number, number, number, number] = [minX - pad, minY - pad, maxX + pad, maxY + pad];
+  const pad = s.shape === "rect" ? 0 : strokeWidth(s) / 2 + 1;
+  let b: [number, number, number, number] = [minX - pad, minY - pad, maxX + pad, maxY + pad];
+  if (s.clip) {
+    const [cx, cy, cw, ch] = s.clip;
+    b = [Math.max(b[0], cx), Math.max(b[1], cy), Math.min(b[2], cx + cw), Math.min(b[3], cy + ch)];
+  }
   strokeBounds.set(s, b);
   return b;
 }
@@ -777,8 +821,25 @@ function styleFor(c: CanvasRenderingContext2D, s: Stroke): void {
 /** A finished stroke, smoothed through the midpoints between its samples so a
  *  mouse's straight hops read as a curve. */
 function drawStroke(c: CanvasRenderingContext2D, s: Stroke): void {
+  if (s.clip) {
+    c.save();
+    c.beginPath();
+    c.rect(...s.clip);
+    c.clip();
+    drawStrokeShape(c, s);
+    c.restore();
+  } else {
+    drawStrokeShape(c, s);
+  }
+}
+
+function drawStrokeShape(c: CanvasRenderingContext2D, s: Stroke): void {
   styleFor(c, s);
   const p = s.pts;
+  if (s.shape === "rect") {
+    c.fillRect(p[0], p[1], p[2] - p[0], p[3] - p[1]);
+    return;
+  }
   if (p.length === 2) {
     c.beginPath();
     c.arc(p[0], p[1], strokeWidth(s) / 2, 0, Math.PI * 2);
@@ -797,11 +858,11 @@ function drawStroke(c: CanvasRenderingContext2D, s: Stroke): void {
 }
 
 /** The canvas's transform: backing pixels to CSS pixels, then the board
- *  scrolled to where the view is. */
+ *  moved to where the canvas sits on the surface. */
 function applyViewTransform(): void {
   const dpr = window.devicePixelRatio || 1;
   const k = dpr * zoom;
-  ctx.setTransform(k, 0, 0, k, -scroller.scrollLeft * dpr, -scroller.scrollTop * dpr);
+  ctx.setTransform(k, 0, 0, k, -inkOrigin.x * dpr, -inkOrigin.y * dpr);
 }
 
 function overlaps(b: [number, number, number, number], a: Area): boolean {
@@ -815,14 +876,27 @@ function redraw(): void {
   // Hidden (another tool is open). The resize observer asks again on return.
   if (w === 0 || h === 0) return;
 
+  /* The view plus a margin on every side, clamped to the surface. The canvas
+     is placed there on the surface itself, so between redraws it scrolls with
+     the text and the grid instead of trailing them by a frame. */
+  const surfW = SURFACE_W * zoom;
+  const surfH = SURFACE_H * zoom;
+  const left = Math.max(0, scroller.scrollLeft - INK_OVERSCAN);
+  const top = Math.max(0, scroller.scrollTop - INK_OVERSCAN);
+  const cw = Math.max(1, Math.min(surfW - left, w + INK_OVERSCAN * 2));
+  const ch = Math.max(1, Math.min(surfH - top, h + INK_OVERSCAN * 2));
+  inkOrigin = { x: left, y: top };
+  canvas.style.left = `${left}px`;
+  canvas.style.top = `${top}px`;
+
   const dpr = window.devicePixelRatio || 1;
-  const bw = Math.round(w * dpr);
-  const bh = Math.round(h * dpr);
+  const bw = Math.round(cw * dpr);
+  const bh = Math.round(ch * dpr);
   if (canvas.width !== bw || canvas.height !== bh) {
     canvas.width = bw;
     canvas.height = bh;
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
+    canvas.style.width = `${cw}px`;
+    canvas.style.height = `${ch}px`;
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -830,12 +904,7 @@ function redraw(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   applyViewTransform();
 
-  const view: Area = {
-    x: scroller.scrollLeft / zoom,
-    y: scroller.scrollTop / zoom,
-    w: w / zoom,
-    h: h / zoom,
-  };
+  const view: Area = { x: left / zoom, y: top / zoom, w: cw / zoom, h: ch / zoom };
   for (const s of strokes) {
     if (overlaps(boundsOf(s), view)) drawStroke(ctx, s);
   }
@@ -1182,6 +1251,149 @@ function contentArea(includeText: boolean): Area | null {
 }
 
 /* =============================================================================
+   DELETE, CUT, COPY, PASTE
+   -----------------------------------------------------------------------------
+   All four work on the selection's AREA, not on whole strokes. A stroke that
+   runs out past the edge is cut there: Delete and Cut leave a cleared
+   rectangle over the part inside (a "rect" stroke), and Copy clips the copy to
+   the edge. Text boxes cannot be cut in half, so a box goes when it lies
+   wholly inside and stays when it does not.
+
+   The clipboard is the Whiteboard's own and lasts the session. A paste lands
+   with its corner under the pointer, or near the top of the view when the
+   pointer is off the board, and arrives selected, so it can be deleted again
+   or cut somewhere else straight away.
+
+   A paste lies over what is already there. An eraser mark copied with the ink
+   is still an eraser, so inside the pasted area it rubs out whatever it lands
+   on, as it did where it was copied from.
+============================================================================= */
+
+function intersectRect(
+  a: [number, number, number, number],
+  b: [number, number, number, number],
+): [number, number, number, number] {
+  const x = Math.max(a[0], b[0]);
+  const y = Math.max(a[1], b[1]);
+  const w = Math.min(a[0] + a[2], b[0] + b[2]) - x;
+  const h = Math.min(a[1] + a[3], b[1] + b[3]) - y;
+  return [x, y, Math.max(0, w), Math.max(0, h)];
+}
+
+/** A stroke moved by (dx, dy), as a new stroke, clipped to `clip` when given. */
+function shiftStroke(s: Stroke, dx: number, dy: number, clip?: [number, number, number, number]): Stroke {
+  const pts = s.pts.map((v, i) => round1(v + (i % 2 === 0 ? dx : dy)));
+  let c = clip;
+  if (s.clip) {
+    const moved: [number, number, number, number] = [s.clip[0] + dx, s.clip[1] + dy, s.clip[2], s.clip[3]];
+    c = clip ? intersectRect(moved, clip) : moved;
+  }
+  const out: Stroke = { ...s, id: newId(), pts };
+  if (c) out.clip = c;
+  else delete out.clip;
+  return out;
+}
+
+/** Empties an area: ink wholly inside is removed, ink crossing the edge is
+ *  cleared inside it, and text boxes wholly inside go when `includeText`. */
+function clearArea(area: Area, includeText: boolean): void {
+  const kept: Stroke[] = [];
+  let crossing = false;
+  for (const s of strokes) {
+    const b = boundsOf(s);
+    if (inside(boundsArea(b), area)) continue;
+    if (overlaps(b, area)) crossing = true;
+    kept.push(s);
+  }
+  if (crossing) {
+    kept.push({
+      id: newId(),
+      ink: "ink",
+      size: "medium",
+      erase: true,
+      shape: "rect",
+      pts: [round1(area.x), round1(area.y), round1(area.x + area.w), round1(area.y + area.h)],
+    });
+  }
+  strokes = kept;
+  if (includeText) texts = texts.filter((t) => !inside(noteArea(t), area));
+  selection = null;
+  recountPoints();
+  rebuildTexts();
+  showSelection();
+  requestRedraw();
+}
+
+function deleteSelection(): void {
+  const area = selection;
+  if (!area) return;
+  checkpoint();
+  clearArea(area, true);
+  markDirty();
+  updateChrome();
+}
+
+/** Takes the selection's ink and text onto the clipboard. False when the
+ *  selection holds nothing, so an empty copy never replaces a full one. */
+function copySelection(): boolean {
+  const area = selection;
+  if (!area) return false;
+  const clip: [number, number, number, number] = [0, 0, area.w, area.h];
+  const copied = strokes
+    .filter((s) => overlaps(boundsOf(s), area))
+    .map((s) => shiftStroke(s, -area.x, -area.y, clip))
+    .filter((s) => !s.clip || (s.clip[2] > 0 && s.clip[3] > 0));
+  const copiedTexts = texts
+    .filter((t) => inside(noteArea(t), area))
+    .map((t) => ({ ...t, x: t.x - area.x, y: t.y - area.y }));
+  if (copied.length === 0 && copiedTexts.length === 0) return false;
+  clipboard = { w: area.w, h: area.h, strokes: copied, texts: copiedTexts };
+  updateChrome();
+  return true;
+}
+
+function cutSelection(): void {
+  const area = selection;
+  if (!area || !copySelection()) return;
+  checkpoint();
+  clearArea(area, true);
+  markDirty();
+  updateChrome();
+}
+
+function pasteClipboard(): void {
+  const cb = clipboard;
+  if (!cb) return;
+  endEditing();
+  const points = cb.strokes.reduce((n, st) => n + st.pts.length / 2, 0);
+  if (totalPoints + points > MAX_TOTAL_POINTS || texts.length + cb.texts.length > MAX_TEXTS) {
+    flash("The Whiteboard is full.", "error");
+    return;
+  }
+  const at = lastPointer ?? {
+    x: scroller.scrollLeft / zoom + NOTES_MARGIN,
+    y: scroller.scrollTop / zoom + NOTES_MARGIN,
+  };
+  const x = Math.round(Math.min(Math.max(0, at.x), SURFACE_W - cb.w));
+  const y = Math.round(Math.min(Math.max(0, at.y), SURFACE_H - cb.h));
+
+  checkpoint();
+  for (const st of cb.strokes) strokes.push(shiftStroke(st, x, y));
+  for (const t of cb.texts) texts.push({ ...t, id: newId(), x: t.x + x, y: t.y + y });
+  recountPoints();
+  rebuildTexts();
+  // Straight into Select with the paste selected. Set directly rather than
+  // through setMode, which would drop the selection on the way.
+  settings.mode = "select";
+  saveSettings();
+  selection = { x, y, w: cb.w, h: cb.h };
+  showSelection();
+  requestRedraw();
+  markDirty();
+  updateChrome();
+}
+
+/* =============================================================================
    PICTURES OF THE BOARD
    -----------------------------------------------------------------------------
    An area drawn into a canvas of its own: the board's color, then the ink on a
@@ -1348,6 +1560,7 @@ function onSurfacePointerDown(e: PointerEvent): void {
 }
 
 function onSurfacePointerMove(e: PointerEvent): void {
+  lastPointer = boardPoint(e);
   if (pan && e.pointerId === pan.pointerId) {
     scroller.scrollLeft = pan.left - (e.clientX - pan.x);
     scroller.scrollTop = pan.top - (e.clientY - pan.y);
@@ -1419,16 +1632,20 @@ function onSurfacePointerUp(e: PointerEvent): void {
   }
 }
 
-/** The dot grid is the stage's background, so it has to be moved and sized by
- *  hand to look like it belongs to the board rather than the window. */
+/** The dot grid is the surface's own background, so it scrolls with the
+ *  board natively. Only the zoom changes it: the spacing scales with the
+ *  board, the dots grow and shrink a little with it, and the whole grid fades
+ *  out as the dots close up rather than turning into a grey wash. */
 function placeGrid(): void {
-  const step = GRID_STEP * zoom * (zoom < GRID_SPARSE_BELOW ? 4 : 1);
-  stage.style.backgroundSize = `${step}px ${step}px`;
-  stage.style.backgroundPosition = `${-scroller.scrollLeft}px ${-scroller.scrollTop}px`;
+  const step = GRID_STEP * zoom;
+  const fade = Math.min(1, Math.max(0, (step - GRID_FADE_TO) / (GRID_FADE_FROM - GRID_FADE_TO)));
+  const dot = Math.min(1.5, Math.max(0.6, zoom));
+  surface.style.setProperty("--wb-grid-step", `${step}px`);
+  surface.style.setProperty("--wb-grid-alpha", `${Math.round(fade * 100)}%`);
+  surface.style.setProperty("--wb-grid-dot", `${dot}px`);
 }
 
 function onScroll(): void {
-  placeGrid();
   // Only a scroll the person made. Hiding the tool resets the scroller to 0,0
   // and restoring a position scrolls it too; neither is somewhere they went.
   if (loaded && pendingScroll === null && scroller.clientWidth > 0) {
@@ -1443,7 +1660,6 @@ function applyPendingScroll(): void {
   const at = pendingScroll;
   scroller.scrollLeft = at.x;
   scroller.scrollTop = at.y;
-  placeGrid();
   /* Cleared a frame later rather than now: the scroll event from the lines
      above arrives after this function returns, and while pendingScroll is set
      onScroll does not mistake it for the person scrolling. */
@@ -1509,7 +1725,6 @@ function scrollViewTo(left: number, top: number): void {
   scroller.scrollTop = Math.max(0, top);
   viewScroll = { x: scroller.scrollLeft, y: scroller.scrollTop };
   scrollDirty = true;
-  placeGrid();
   requestRedraw();
 }
 
@@ -1535,8 +1750,15 @@ function leaveOverviewAt(e: PointerEvent): void {
 function goToNotes(): void {
   endEditing();
   const area = contentArea(true);
-  if (!area) return;
   overview = false;
+  if (!area) {
+    // Nothing written: back to where a new board starts, the top-left corner
+    // at actual size.
+    zoom = 1;
+    applyZoomLayout();
+    scrollViewTo(0, 0);
+    return;
+  }
   const w = scroller.clientWidth;
   const h = scroller.clientHeight;
   const fit = Math.min((w - NOTES_MARGIN * 2) / area.w, (h - NOTES_MARGIN * 2) / area.h);
@@ -1547,13 +1769,33 @@ function goToNotes(): void {
   scrollViewTo(cx - w / 2, cy - h / 2);
 }
 
+/** The next zoom on the ladder in a direction, from wherever the zoom is now,
+ *  on the ladder or between two of its steps. Past the bottom is Overview's
+ *  floor, the whole board. */
+function nextZoom(direction: 1 | -1): number {
+  const eps = 0.001;
+  if (direction > 0) return ZOOM_LEVELS.find((z) => z > zoom + eps) ?? ZOOM_MAX;
+  const lower = [...ZOOM_LEVELS].reverse().find((z) => z < zoom - eps);
+  return lower ?? fitBoardZoom();
+}
+
+function stepZoom(direction: 1 | -1, anchor?: { clientX: number; clientY: number }): void {
+  overview = false;
+  setZoom(nextZoom(direction), anchor);
+}
+
 function onWheel(e: WheelEvent): void {
-  // Ctrl+wheel zooms around the pointer, the way it does in most boards.
-  // Taken here so it never reaches the webview's own page zoom.
+  // Ctrl+wheel zooms around the pointer, one ladder step per notch, however
+  // finely the wheel or touchpad reports. Taken here so it never reaches the
+  // webview's own page zoom.
   if (!e.ctrlKey) return;
   e.preventDefault();
-  overview = false;
-  setZoom(zoom * Math.exp(-e.deltaY * 0.0015), e);
+  wheelCarry += e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+  while (Math.abs(wheelCarry) >= WHEEL_PER_STEP) {
+    const direction = wheelCarry > 0 ? -1 : 1;
+    wheelCarry -= WHEEL_PER_STEP * -direction;
+    stepZoom(direction, e);
+  }
 }
 
 function onKeydown(e: KeyboardEvent): void {
@@ -1575,7 +1817,26 @@ function onKeydown(e: KeyboardEvent): void {
     setMode(MODE_KEYS[key]);
     return;
   }
+  if ((e.key === "Delete" || e.key === "Backspace") && selection && !e.ctrlKey && !e.altKey) {
+    e.preventDefault();
+    deleteSelection();
+    return;
+  }
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  if (key === "c" && selection) {
+    if (copySelection()) e.preventDefault();
+    return;
+  }
+  if (key === "x" && selection) {
+    e.preventDefault();
+    cutSelection();
+    return;
+  }
+  if (key === "v" && clipboard) {
+    e.preventDefault();
+    pasteClipboard();
+    return;
+  }
   if (key === "z" && !e.shiftKey) {
     e.preventDefault();
     undo();
@@ -1617,10 +1878,9 @@ function isEmpty(): boolean {
 /** Everything on screen that reflects state: which mode, pen and size are
  *  picked, and which actions have anything to act on. */
 /* The pointer in Draw and Erase is the stroke it will make: a dot the pen's
-   size and color, or a ring the eraser's size, at the current zoom. Ringed
-   dark then light, so it shows on any board. Chromium drops a cursor image
-   past 128px, hence the ceiling; the crosshair in the stylesheet is what is
-   left if an image is ever refused. */
+   size and color, or a ring the eraser's size, at the current zoom. Chromium
+   drops a cursor image past 128px, hence the ceiling; the crosshair in the
+   stylesheet is what is left if an image is ever refused. */
 const CURSOR_MAX = 120;
 const CURSOR_MIN_DOT = 4;
 
@@ -1636,12 +1896,12 @@ function updateCursor(): void {
   const size = Math.ceil(d + 4);
   const c = size / 2;
   const r = d / 2;
-  const fill = erase ? "none" : penColor(settings.ink);
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">` +
-    `<circle cx="${c}" cy="${c}" r="${r + 1}" fill="none" stroke="#ffffff" stroke-width="1"/>` +
-    `<circle cx="${c}" cy="${c}" r="${r}" fill="${fill}" stroke="#000000" stroke-width="1"/>` +
-    `</svg>`;
+  // The pen is its own color and nothing else, exactly the dot it will leave.
+  // The eraser has no color of its own, so it is a ring in the board's ink.
+  const shape = erase
+    ? `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${penColor("ink")}" stroke-width="1.5"/>`
+    : `<circle cx="${c}" cy="${c}" r="${r}" fill="${penColor(settings.ink)}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">${shape}</svg>`;
   const hot = Math.round(c);
   surface.style.cursor = `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${hot} ${hot}, crosshair`;
 }
@@ -2066,24 +2326,12 @@ async function sendImage(clearAfter: boolean): Promise<void> {
 
   if (clearAfter) {
     checkpoint();
-    removeInside(area, includeText);
+    clearArea(area, includeText);
     markDirty();
     updateChrome();
     await flushSave();
   }
   flash(`Sent to "${dest.board.name}".`, "success");
-}
-
-/** Takes off the board everything lying wholly inside an area: ink, and text
- *  boxes when they went too. */
-function removeInside(area: Area, includeText: boolean): void {
-  strokes = strokes.filter((s) => !inside(boundsArea(boundsOf(s)), area));
-  if (includeText) texts = texts.filter((t) => !inside(noteArea(t), area));
-  selection = null;
-  recountPoints();
-  rebuildTexts();
-  showSelection();
-  requestRedraw();
 }
 
 function send(clearAfter: boolean): void {
@@ -2145,7 +2393,7 @@ function wireSendModal(): void {
    also an ordinary Undo step for the rest of the session.
 ============================================================================= */
 
-type SetupTab = "preferences" | "data";
+type SetupTab = "preferences" | "data" | "info";
 
 let setupModal: Modal;
 let gridToggle: HTMLInputElement;
@@ -2220,7 +2468,7 @@ function wireSetup(): void {
   const tabs = new ModalTabs<SetupTab>({
     scope: "#wbSetupModal",
     key: "wbTab",
-    panes: { preferences: "wbTabPreferences", data: "wbTabData" },
+    panes: { preferences: "wbTabPreferences", data: "wbTabData", info: "wbTabInfo" },
     onActivate: (tab) => {
       if (tab === "data") void refreshHistory();
     },
@@ -2304,6 +2552,19 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
     { label: "Type Here", onClick: typeAtMenuPoint },
     { label: "Undo", disabled: undoStack.length === 0, onClick: undo },
     { label: "Redo", disabled: redoStack.length === 0, onClick: redo },
+    { separator: true },
+    { label: "Cut", disabled: !selection, onClick: cutSelection },
+    { label: "Copy", disabled: !selection, onClick: () => void copySelection() },
+    {
+      label: "Paste",
+      disabled: !clipboard,
+      onClick: () => {
+        // Where the menu was opened, not wherever the pointer went after.
+        lastPointer = menuPoint;
+        pasteClipboard();
+      },
+    },
+    { label: "Delete", danger: true, disabled: !selection, onClick: deleteSelection },
     { separator: true },
     { label: "Send to Kanban…", disabled: isEmpty(), onClick: () => openSend() },
     { label: "Send Selection to Kanban…", disabled: !selection, onClick: () => openSend("image") },
@@ -2449,6 +2710,10 @@ export function initWhiteboard(): void {
   surface.addEventListener("pointermove", onSurfacePointerMove);
   surface.addEventListener("pointerup", onSurfacePointerUp);
   surface.addEventListener("pointercancel", onSurfacePointerUp);
+  // Off the board, a paste goes near the top of the view instead.
+  surface.addEventListener("pointerleave", () => {
+    lastPointer = null;
+  });
   // A dropped file would otherwise be opened by the webview in place of the app.
   surface.addEventListener("dragover", (e) => e.preventDefault());
   surface.addEventListener("drop", (e) => e.preventDefault());
@@ -2474,14 +2739,8 @@ export function initWhiteboard(): void {
   undoBtn.addEventListener("click", undo);
   redoBtn.addEventListener("click", redo);
   sendOpenBtn.addEventListener("click", () => openSend());
-  document.getElementById("wbZoomOutBtn")!.addEventListener("click", () => {
-    overview = false;
-    setZoom(zoom / ZOOM_STEP);
-  });
-  document.getElementById("wbZoomInBtn")!.addEventListener("click", () => {
-    overview = false;
-    setZoom(zoom * ZOOM_STEP);
-  });
+  document.getElementById("wbZoomOutBtn")!.addEventListener("click", () => stepZoom(-1));
+  document.getElementById("wbZoomInBtn")!.addEventListener("click", () => stepZoom(1));
   zoomLabel.addEventListener("click", () => {
     overview = false;
     setZoom(1);
