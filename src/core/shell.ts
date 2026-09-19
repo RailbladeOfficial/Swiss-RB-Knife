@@ -850,7 +850,11 @@ function applyViewScroll(): void {
  *  has to put you in front of it rather than open a modal over whatever you
  *  happened to be looking at. */
 export function navigateToTool(sectionKey: string, toolKey: string): void {
-  switchSection(sectionKey, toolKey);
+  /* The whole of a sidebar click, not switchSection() alone. switchSection
+     only marks the sidebar row and the section; it is activateTool() that
+     shows the tool's view, runs its entry hook and records the visit. Calling
+     the half left the sidebar pointing at a tool that never appeared. */
+  activateToolFromClick(sectionKey, toolKey);
 }
 
 function switchSection(sectionKey: string, toolKey?: string): void {

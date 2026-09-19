@@ -438,3 +438,15 @@ test("a pop-up forgets its tab on every close, handoff or not", () => {
     "there should be exactly one place a modal forgets its tab",
   );
 });
+
+test("a link that sends you to a tool actually opens it", () => {
+  /* navigateToTool once called switchSection() alone, which marks the sidebar
+     row and nothing else. The Whiteboard's Open Kanban button used it: the
+     sidebar moved to Kanban and the Whiteboard stayed on screen. It has to be
+     the whole of a sidebar click. */
+  const shell = read("src/core/shell.ts");
+  const at = shell.indexOf("export function navigateToTool(");
+  assert.notEqual(at, -1, "navigateToTool is missing");
+  const body = shell.slice(at, shell.indexOf("\n}\n", at));
+  assert.match(body, /activateTool(FromClick)?\(/, "navigateToTool does not open the tool's view");
+});
