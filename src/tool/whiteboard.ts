@@ -2486,6 +2486,11 @@ function onKeydown(e: KeyboardEvent): void {
   const key = e.key.toLowerCase();
   // The mode keys. Only with nothing held, so they never shadow a shortcut,
   // and never while typing, which the text-entry check above already rules out.
+  if (key === "c" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    e.preventDefault();
+    cycleInk();
+    return;
+  }
   if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && MODE_KEYS[key]) {
     e.preventDefault();
     const mode = MODE_KEYS[key];
@@ -2542,6 +2547,15 @@ function setMode(next: Mode): void {
   updateChrome();
 }
 
+/** The next pen along: the six theme pens, then the last color picked by hand
+ *  if there is one, wrapping round. A pen picked by hand that is no longer the
+ *  last one starts the round again from the first. */
+function cycleInk(): void {
+  const pens: Pen[] = INKS.map((i) => i.id);
+  if (settings.customInk) pens.push(settings.customInk);
+  setInk(pens[(pens.indexOf(settings.ink) + 1) % pens.length]);
+}
+
 /** The next kind along for Shapes or Erase, wrapping round. */
 function cycleKind(mode: "shape" | "erase"): void {
   if (mode === "shape") {
@@ -2573,21 +2587,94 @@ function setSize(next: SizeId): void {
  *  its ink, and its text boxes unless the preference says ink only. A stroke
  *  crossing the edge is left as it is, since a line cannot be half one color.
  *  One Undo step. */
+/**
+ * A freehand stroke cut where its line crosses an area's edge, in order, each
+ * piece marked inside or outside. The crossing point is added to both pieces
+ * so they meet with no gap. Each segment is clipped to the area (Liang-Barsky),
+ * which finds where it enters and leaves even when neither end is inside.
+ */
+function splitStroke(st: Stroke, area: Area): { stroke: Stroke; inside: boolean }[] {
+  const x0 = area.x;
+  const y0 = area.y;
+  const x1 = area.x + area.w;
+  const y1 = area.y + area.h;
+  const isIn = (x: number, y: number): boolean => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+  const p = st.pts;
+  // Cut first, judge after: each piece is inside or out by the middle of its
+  // first stretch, which a line that only grazes the edge, or starts exactly
+  // on it, cannot fool the way flipping a flag at each crossing can.
+  const cutUp: number[][] = [[p[0], p[1]]];
+
+  for (let i = 0; i + 3 < p.length; i += 2) {
+    const ax = p[i];
+    const ay = p[i + 1];
+    const dx = p[i + 2] - ax;
+    const dy = p[i + 3] - ay;
+    // The stretch of this segment, 0..1, that lies in the area, if any.
+    let t0 = 0;
+    let t1 = 1;
+    let hits = true;
+    for (const [q, r] of [
+      [-dx, ax - x0],
+      [dx, x1 - ax],
+      [-dy, ay - y0],
+      [dy, y1 - ay],
+    ]) {
+      if (q === 0) {
+        if (r < 0) hits = false;
+      } else {
+        const t = r / q;
+        if (q < 0) t0 = Math.max(t0, t);
+        else t1 = Math.min(t1, t);
+      }
+    }
+    const cuts = hits && t1 > t0 ? [t0, t1].filter((t) => t > 0 && t < 1) : [];
+    for (const t of cuts) {
+      const cx = round1(ax + dx * t);
+      const cy = round1(ay + dy * t);
+      cutUp[cutUp.length - 1].push(cx, cy);
+      cutUp.push([cx, cy]);
+    }
+    cutUp[cutUp.length - 1].push(p[i + 2], p[i + 3]);
+  }
+
+  const pieces: { pts: number[]; inside: boolean }[] = [];
+  for (const pts of cutUp) {
+    const mx = pts.length >= 4 ? (pts[0] + pts[2]) / 2 : pts[0];
+    const my = pts.length >= 4 ? (pts[1] + pts[3]) / 2 : pts[1];
+    const inside = isIn(mx, my);
+    const last = pieces[pieces.length - 1];
+    // Two pieces on the same side in a row are one piece: drop the shared point.
+    if (last && last.inside === inside) last.pts.push(...pts.slice(2));
+    else pieces.push({ pts, inside });
+  }
+  return pieces.map((piece) => ({ stroke: { ...st, id: newId(), pts: piece.pts }, inside: piece.inside }));
+}
+
 function restyleSelection(patch: { ink?: Pen; size?: SizeId }): void {
   const area = selection;
   if (!area || editingId) return;
   const pre = snapshot();
   let changed = false;
-  strokes = strokes.map((st) => {
-    if (st.erase || !inside(boundsArea(boundsOf(st)), area)) return st;
-    const next = { ...st, ...patch };
-    if (next.ink === st.ink && next.size === st.size) return st;
-    changed = true;
-    // A new object, not an edit: Undo's snapshots hold the old one.
+  const restyle = (st: Stroke): Stroke => {
+    const next = { ...st, ...patch, id: newId() };
+    if (next.ink !== st.ink || next.size !== st.size) changed = true;
     return next;
+  };
+  // New objects, never edits: Undo's snapshots hold the old ones.
+  strokes = strokes.flatMap((st) => {
+    if (st.erase || !overlaps(boundsOf(st), area)) return [st];
+    // A shape is one thing, so touching it restyles all of it.
+    if (st.shape) return [restyle(st)];
+    // A freehand line is cut at the selection's edge, and only the part
+    // inside changes, the way it would in a paint program.
+    const pieces = splitStroke(st, area);
+    if (!pieces.some((p) => p.inside)) return [st];
+    return pieces.map((p) => (p.inside ? restyle(p.stroke) : p.stroke));
   });
   for (const note of settings.selectionStylesText ? texts : []) {
-    if (!inside(noteArea(note), area)) continue;
+    const b = noteArea(note);
+    if (!overlaps([b.x, b.y, b.x + b.w, b.y + b.h], area)) continue;
     const before = JSON.stringify(note);
     styleWholeNote(note, patch);
     if (JSON.stringify(note) !== before) changed = true;
