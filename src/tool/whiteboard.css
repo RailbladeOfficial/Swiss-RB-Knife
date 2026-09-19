@@ -396,8 +396,12 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   font-variant-numeric: tabular-nums;
 }
 
+/* Border-box, so the dashed outline is drawn inside the selected area. As
+   content-box the border sat outside it, and the box on screen ran a border's
+   width past the area anything was actually done to. */
 .wb-selection {
   position: absolute;
+  box-sizing: border-box;
   border: 1.5px dashed var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
   pointer-events: none;
