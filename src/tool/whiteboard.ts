@@ -137,6 +137,9 @@ interface WhiteboardFile {
 
 interface WhiteboardSettings {
   grid: boolean;
+  /** After Send and Clear, go back to the top-left corner at actual size, where
+   *  a new board starts. */
+  homeAfterSend: boolean;
   boardColor: BoardColor;
   /** The Custom board color, kept while another choice is in use so switching
    *  back does not lose it. */
@@ -188,6 +191,7 @@ const BOARD_COLORS: readonly BoardColor[] = ["theme", "black", "white", "custom"
 
 const DEFAULT_SETTINGS: WhiteboardSettings = {
   grid: true,
+  homeAfterSend: true,
   boardColor: "theme",
   boardCustom: "#fdf6e3",
   mode: "type",
@@ -515,6 +519,7 @@ function normalizeSettings(raw: unknown): WhiteboardSettings {
   const hex = (v: unknown): v is string => isHexColor(v) && /^#[0-9a-f]{6}$/i.test(v as string);
   return {
     grid: r.grid !== false,
+    homeAfterSend: r.homeAfterSend !== false,
     boardColor: BOARD_COLORS.includes(r.boardColor as BoardColor)
       ? (r.boardColor as BoardColor)
       : DEFAULT_SETTINGS.boardColor,
@@ -1745,6 +1750,14 @@ function leaveOverviewAt(e: PointerEvent): void {
   setZoom(1, e);
 }
 
+/** Back to where a new board starts: the top-left corner at actual size. */
+function goHome(): void {
+  overview = false;
+  zoom = 1;
+  applyZoomLayout();
+  scrollViewTo(0, 0);
+}
+
 /** Brings your notes into view: centered if they fit at this zoom, and
  *  zoomed out just far enough to fit them if they do not. */
 function goToNotes(): void {
@@ -1752,11 +1765,7 @@ function goToNotes(): void {
   const area = contentArea(true);
   overview = false;
   if (!area) {
-    // Nothing written: back to where a new board starts, the top-left corner
-    // at actual size.
-    zoom = 1;
-    applyZoomLayout();
-    scrollViewTo(0, 0);
+    goHome();
     return;
   }
   const w = scroller.clientWidth;
@@ -1823,6 +1832,12 @@ function onKeydown(e: KeyboardEvent): void {
     return;
   }
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  if (key === "0") {
+    e.preventDefault();
+    overview = false;
+    setZoom(1);
+    return;
+  }
   if (key === "c" && selection) {
     if (copySelection()) e.preventDefault();
     return;
@@ -2292,6 +2307,7 @@ async function sendText(clearAfter: boolean): Promise<void> {
     rebuildTexts();
     markDirty();
     updateChrome();
+    if (settings.homeAfterSend) goHome();
     await flushSave();
   }
   const n = result.numbers.length;
@@ -2329,6 +2345,7 @@ async function sendImage(clearAfter: boolean): Promise<void> {
     clearArea(area, includeText);
     markDirty();
     updateChrome();
+    if (settings.homeAfterSend) goHome();
     await flushSave();
   }
   flash(`Sent to "${dest.board.name}".`, "success");
@@ -2398,6 +2415,8 @@ type SetupTab = "preferences" | "data" | "info";
 let setupModal: Modal;
 let gridToggle: HTMLInputElement;
 let gridLabel: HTMLElement;
+let homeToggle: HTMLInputElement;
+let homeLabel: HTMLElement;
 let boardColorSel: HTMLSelectElement;
 let boardColorInput: HTMLInputElement;
 let boardCustomRow: HTMLElement;
@@ -2407,6 +2426,8 @@ let boardCustomRow: HTMLElement;
 function applySettingsToForm(): void {
   gridToggle.checked = settings.grid;
   gridLabel.textContent = settings.grid ? "Enabled" : "Disabled";
+  homeToggle.checked = settings.homeAfterSend;
+  homeLabel.textContent = settings.homeAfterSend ? "Enabled" : "Disabled";
   boardColorSel.value = settings.boardColor;
   boardColorInput.value = settings.boardCustom;
   boardCustomRow.style.display = settings.boardColor === "custom" ? "" : "none";
@@ -2479,6 +2500,8 @@ function wireSetup(): void {
   });
   gridToggle = document.getElementById("wbGridToggle") as HTMLInputElement;
   gridLabel = document.getElementById("wbGridLabel")!;
+  homeToggle = document.getElementById("wbHomeToggle") as HTMLInputElement;
+  homeLabel = document.getElementById("wbHomeLabel")!;
   boardColorSel = document.getElementById("wbBoardColorSelect") as HTMLSelectElement;
   boardColorInput = document.getElementById("wbBoardColorInput") as HTMLInputElement;
   boardCustomRow = document.getElementById("wbBoardCustomRow")!;
@@ -2498,6 +2521,11 @@ function wireSetup(): void {
     saveSettings();
     applySettingsToForm();
     applyBoardLook();
+  });
+  homeToggle.addEventListener("change", () => {
+    settings.homeAfterSend = homeToggle.checked;
+    saveSettings();
+    applySettingsToForm();
   });
   boardColorSel.addEventListener("change", () => {
     const next = boardColorSel.value as BoardColor;
@@ -2575,7 +2603,7 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
   ];
 }
 
-const SIZE_LABELS: Record<SizeId, string> = { fine: "Fine", medium: "Medium", bold: "Bold" };
+const SIZE_LABELS: Record<SizeId, string> = { fine: "Small", medium: "Medium", bold: "Large" };
 
 /** A color as #rrggbb, for a menu row's swatch, or undefined when the theme's
  *  value is not a plain opaque color the swatch could show. */

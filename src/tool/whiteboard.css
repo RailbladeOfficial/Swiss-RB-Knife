@@ -58,11 +58,31 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   flex-shrink: 0;
 }
 
-.wb-group {
+/* A cluster of related controls, framed as one piece. The buttons inside drop
+   their own borders, so a group reads as a unit rather than a row of boxes. */
+.wb-toolbar .wb-group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.wb-toolbar .wb-group .wb-icon-btn,
+.wb-toolbar .wb-group .wb-color-btn {
+  border-color: transparent;
+}
+
+/* The view controls and Send to Kanban, together at the right-hand end. */
+.wb-toolbar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-left: auto;
 }
 
 .wb-toolbar button:disabled,
@@ -93,7 +113,6 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 .wb-icon-btn:hover {
   background: var(--color-hover);
   color: var(--color-text);
-  border-color: var(--color-border);
 }
 
 .wb-icon-btn.active,
@@ -107,10 +126,6 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   color: var(--color-danger);
   border-color: var(--color-danger);
   background: var(--color-danger-subtle);
-}
-
-.wb-send-open-btn {
-  margin-left: auto;
 }
 
 /* ── Pen color: a button showing the pen, and the list it opens ── */
@@ -568,7 +583,7 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 
 .wb-key-row {
   display: grid;
-  grid-template-columns: 150px 1fr;
+  grid-template-columns: 210px 1fr;
   align-items: center;
   gap: 10px;
   font-size: 0.85rem;
@@ -590,4 +605,10 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   border: 1px solid var(--color-border);
   border-bottom-width: 2px;
   border-radius: 4px;
+}
+
+/* Between two ways of doing the same thing, e.g. Delete / Backspace. */
+.wb-key-or {
+  margin: 0 2px;
+  color: var(--color-text-muted);
 }

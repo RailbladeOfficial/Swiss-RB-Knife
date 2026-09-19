@@ -1765,13 +1765,13 @@
             </div>
 
             <div class="wb-group" role="group" aria-label="Pen size">
-              <button class="wb-icon-btn wb-size-btn" data-size="fine" title="Fine">
+              <button class="wb-icon-btn wb-size-btn" data-size="fine" title="Small">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" /></svg>
               </button>
               <button class="wb-icon-btn wb-size-btn" data-size="medium" title="Medium">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" /></svg>
               </button>
-              <button class="wb-icon-btn wb-size-btn" data-size="bold" title="Bold">
+              <button class="wb-icon-btn wb-size-btn" data-size="bold" title="Large">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6.5" fill="currentColor" stroke="none" /></svg>
               </button>
             </div>
@@ -1788,23 +1788,24 @@
               </button>
             </div>
 
-            <div class="wb-group" role="group" aria-label="View">
-              <button id="wbNotesBtn" class="wb-icon-btn" title="Go to notes">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" /><line x1="12" y1="2" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="2" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="22" y2="12" /></svg>
-              </button>
-              <button id="wbOverviewBtn" class="wb-icon-btn" title="Overview">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 9 4 4 9 4" /><polyline points="15 4 20 4 20 9" /><polyline points="20 15 20 20 15 20" /><polyline points="9 20 4 20 4 15" /><rect x="9" y="9" width="6" height="6" rx="1" /></svg>
-              </button>
-              <button id="wbZoomOutBtn" class="wb-icon-btn" title="Zoom out (Ctrl+wheel)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              </button>
-              <button id="wbZoomResetBtn" class="wb-icon-btn wb-zoom-label" title="Actual size">100%</button>
-              <button id="wbZoomInBtn" class="wb-icon-btn" title="Zoom in (Ctrl+wheel)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              </button>
+            <div class="wb-toolbar-end">
+              <div class="wb-group" role="group" aria-label="View">
+                <button id="wbNotesBtn" class="wb-icon-btn" title="Go to notes">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" /><line x1="12" y1="2" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="2" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="22" y2="12" /></svg>
+                </button>
+                <button id="wbOverviewBtn" class="wb-icon-btn" title="Overview">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 9 4 4 9 4" /><polyline points="15 4 20 4 20 9" /><polyline points="20 15 20 20 15 20" /><polyline points="9 20 4 20 4 15" /><rect x="9" y="9" width="6" height="6" rx="1" /></svg>
+                </button>
+                <button id="wbZoomOutBtn" class="wb-icon-btn" title="Zoom out (Ctrl+wheel)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+                <button id="wbZoomResetBtn" class="wb-icon-btn wb-zoom-label" title="Zoom to 100% (Ctrl+0)">100%</button>
+                <button id="wbZoomInBtn" class="wb-icon-btn" title="Zoom in (Ctrl+wheel)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+              </div>
+              <button id="wbSendOpenBtn">Send to Kanban</button>
             </div>
-
-            <button id="wbSendOpenBtn" class="wb-send-open-btn">Send to Kanban</button>
           </div>
 
           <!-- The canvas is the size of the view (plus a margin), not the board. It
@@ -7855,6 +7856,16 @@
               </div>
             </div>
             <div class="settings-row">
+              <span>Return to Start After Send and Clear:</span>
+              <div class="toggle-with-label">
+                <span id="wbHomeLabel">Enabled</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="wbHomeToggle" checked />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="settings-row">
               <span>Board Color:</span>
               <select id="wbBoardColorSelect" class="settings-select">
                 <option value="theme">Theme</option>
@@ -7901,8 +7912,8 @@
             <div class="wb-key-group">
               <div class="wb-key-heading">Editing</div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Z</kbd></span><span>Undo</span></div>
-              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Y</kbd></span><span>Redo (also Ctrl+Shift+Z)</span></div>
-              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Delete</kbd></span><span>Clear the selected area (also Backspace)</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Y</kbd><span class="wb-key-or">/</span><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></span><span>Redo</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Delete</kbd><span class="wb-key-or">/</span><kbd>Backspace</kbd></span><span>Clear the selected area</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>X</kbd></span><span>Cut the selected area</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>C</kbd></span><span>Copy the selected area</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>V</kbd></span><span>Paste at the pointer</span></div>
@@ -7911,6 +7922,7 @@
             <div class="wb-key-group">
               <div class="wb-key-heading">Moving around</div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Wheel</kbd></span><span>Zoom around the pointer</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>0</kbd></span><span>Zoom to 100%</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Middle drag</kbd></span><span>Pan</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Shift</kbd> <kbd>Wheel</kbd></span><span>Scroll sideways</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Esc</kbd></span><span>Leave Overview</span></div>
