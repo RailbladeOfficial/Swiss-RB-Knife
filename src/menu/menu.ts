@@ -134,6 +134,67 @@ const EDGE_GAP = 8;
 /** The gap between an element anchor and the menu hanging off it. */
 const ANCHOR_GAP = 4;
 
+/** How many rows a menu shows before it scrolls.
+ *
+ *  The HALF is the whole point. Cutting a menu off at a whole number of rows
+ *  produces a panel that looks complete and is not: a board with thirty tags
+ *  in one category would read as having ten. Half a row hanging off the
+ *  bottom edge is the only thing on screen that says keep going, which is why
+ *  the scrollbar can be hidden without leaving the list a trap. */
+const MAX_ROWS = 10.5;
+
+/**
+ * Caps a rendered level at MAX_ROWS and lets the rest scroll.
+ *
+ * MEASURED, not a fixed pixel figure. A row's height comes from its padding
+ * and its font size, both of which are theme-facing CSS, and a hardcoded
+ * max-height here would quietly become nine and a half rows the day either
+ * changes. The first row on screen is asked how tall it is instead.
+ *
+ * Also the one thing keeping a long menu inside the window: before this, a
+ * level taller than the viewport was placed at the top edge and simply ran
+ * off the bottom with no way to reach the rest.
+ *
+ * Called on every draw, because each level has its own length.
+ */
+function capHeight(menu: HTMLElement): void {
+  // Cleared first: the cap is measured from the rows, and one left over from
+  // the taller level we just replaced is what they would measure against.
+  menu.style.maxHeight = "";
+
+  /* The Back row is excluded deliberately. It carries extra padding and a
+     rule under it, so measuring that one would leave every submenu's budget
+     a little short. */
+  const row = menu.querySelector<HTMLElement>(".menu-item:not(.menu-item-back)");
+  if (!row) return;
+
+  const rowHeight = row.getBoundingClientRect().height;
+  const style = getComputedStyle(menu);
+
+  /** The panel's own padding and border: what surrounds the rows. */
+  const frame =
+    parseFloat(style.paddingTop) +
+    parseFloat(style.paddingBottom) +
+    parseFloat(style.borderTopWidth) +
+    parseFloat(style.borderBottomWidth);
+
+  /* Read rather than assumed, because this file does not own menu.css and a
+     global reset could turn up later. Under border-box the frame comes out
+     of max-height and has to be added back, or the bottom row loses its
+     padding; under content-box it sits outside and the window budget has to
+     make room for it instead. */
+  const borderBox = style.boxSizing === "border-box";
+  const budget = rowHeight * MAX_ROWS + (borderBox ? frame : 0);
+  /* Never taller than the window either, however few rows that comes to. It
+     is also the only thing stopping a long level running off the bottom edge
+     with no way to reach the rest: before this there was no cap at all. */
+  const ceiling = window.innerHeight - EDGE_GAP * 2 - (borderBox ? 0 : frame);
+
+  // One row is the floor. A window too short for even that is better scrolled
+  // than collapsed to nothing.
+  menu.style.maxHeight = `${Math.max(rowHeight, Math.min(budget, ceiling))}px`;
+}
+
 /** Drops separators that would rule off nothing: one at either end of a
  *  level, and any run of them collapsed to a single line. Lets a caller build
  *  a menu by concatenation without having to know which of its parts came
@@ -322,6 +383,8 @@ export function openMenu(anchor: MenuAnchor, items: MenuItems): void {
 
       menu.appendChild(btn);
     }
+
+    capHeight(menu);
   };
 
   /** Draws whatever `trail` now points at, and places the panel again: a
