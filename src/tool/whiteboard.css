@@ -371,10 +371,18 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   pointer-events: none;
 }
 
-/* Kept in step with TEXT_REM in whiteboard.ts. */
-.wb-text.wb-tsize-fine { font-size: 0.85rem; }
-.wb-text.wb-tsize-medium { font-size: 1rem; }
-.wb-text.wb-tsize-bold { font-size: 1.4rem; }
+/* Kept in step with TEXT_REM in whiteboard.ts. A run is a stretch of a box
+   styled apart from it, so it carries the same classes. */
+.wb-text.wb-tsize-fine,
+.wb-run.wb-tsize-fine { font-size: 0.85rem; }
+.wb-text.wb-tsize-medium,
+.wb-run.wb-tsize-medium { font-size: 1rem; }
+.wb-text.wb-tsize-bold,
+.wb-run.wb-tsize-bold { font-size: 1.4rem; }
+
+.wb-run {
+  color: var(--wb-c);
+}
 
 .wb-mode-type .wb-text:hover {
   border-color: var(--color-border-dashed);

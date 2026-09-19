@@ -121,3 +121,11 @@ test("the text sizes in code match the ones the stylesheet draws", () => {
   }
   assert.deepEqual(problems, []);
 });
+
+test("typed text is never put on the page as markup", () => {
+  // Text boxes are built from runs of text somebody typed, now with spans for
+  // their colors and sizes. Every one of those has to be made from nodes;
+  // one innerHTML with a run's text in it is a way to run markup from a note.
+  const ts = read(TS);
+  assert.doesNotMatch(ts, /\.(innerHTML|outerHTML)\s*=|insertAdjacentHTML/, "whiteboard.ts writes markup");
+});

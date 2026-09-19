@@ -108,9 +108,23 @@ interface TextNote {
   id: string;
   x: number;
   y: number;
+  /** The box's own color and size, which any run without its own follows. */
   ink: Pen;
   size: SizeId;
+  /** The box's plain text, always. What goes to Kanban, and what a box with
+   *  no runs is drawn from. */
   text: string;
+  /** Stretches styled apart from the box, in order, together spelling out
+   *  `text` exactly. Absent when the whole box is in its own color and size. */
+  runs?: TextRun[];
+}
+
+/** A stretch of a text box in a color or size of its own. It carries only
+ *  what differs from the box. */
+interface TextRun {
+  text: string;
+  ink?: Pen;
+  size?: SizeId;
 }
 
 interface SendTarget {
@@ -468,7 +482,27 @@ function normalizeNote(raw: unknown): TextNote | null {
     ink: isPen(r.ink) ? r.ink : "ink",
     size: SIZES.includes(r.size as SizeId) ? (r.size as SizeId) : "medium",
     text,
+    ...(normalizeStoredRuns(r.runs, text) ? { runs: normalizeStoredRuns(r.runs, text)! } : {}),
   };
+}
+
+/** Runs from disk, kept only if they spell out the box's text exactly. Runs
+ *  that disagree with the text are dropped whole: the text is what matters,
+ *  and a box drawn in one color is a smaller loss than one drawn wrong. */
+function normalizeStoredRuns(raw: unknown, text: string): TextRun[] | null {
+  if (!Array.isArray(raw)) return null;
+  const runs: TextRun[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") return null;
+    const r = item as Record<string, unknown>;
+    if (typeof r.text !== "string") return null;
+    const run: TextRun = { text: r.text };
+    if (isPen(r.ink)) run.ink = r.ink;
+    if (SIZES.includes(r.size as SizeId)) run.size = r.size as SizeId;
+    runs.push(run);
+  }
+  if (runs.map((r) => r.text).join("") !== text) return null;
+  return runs.some((r) => r.ink !== undefined || r.size !== undefined) ? runs : null;
 }
 
 function normalizeFile(raw: unknown): WhiteboardFile | null {
@@ -1011,8 +1045,7 @@ function buildNoteEl(note: TextNote): HTMLElement {
   el.dataset.id = note.id;
   el.style.left = `${note.x}px`;
   el.style.top = `${note.y}px`;
-  // textContent, never markup: this is text somebody typed.
-  el.textContent = note.text;
+  renderRuns(el, note);
   el.spellcheck = true;
   el.addEventListener("keydown", (e) => onNoteKeydown(e, el));
   el.addEventListener("focusout", () => {
@@ -1092,6 +1125,7 @@ function beginEditing(
   el.focus();
   if (opts.at) placeCaretAtPoint(el, opts.at.clientX, opts.at.clientY);
   else placeCaretAtEnd(el);
+  updateChrome();
 }
 
 /** Leaves the box being edited, keeping what was typed. An emptied box is
@@ -1109,16 +1143,17 @@ function endEditing(): void {
     el.classList.remove("wb-text-editing");
   }
   if (note && el) {
-    const text = readNoteText(el);
+    const runs = tidyRuns(readRuns(el), note);
+    const text = runs.map((r) => r.text).join("");
     if (text.trim() === "") {
       texts = texts.filter((t) => t.id !== id);
       noteEls.delete(id);
       el.remove();
     } else {
-      note.text = text;
+      setNoteRuns(note, runs);
       // What was saved, not what was typed: trailing space is gone, and the
       // box should show that now rather than after the next rebuild.
-      if (el.textContent !== text) el.textContent = text;
+      renderRuns(el, note);
     }
   }
   if (pre && !sameBoard(pre, snapshot())) {
@@ -1193,6 +1228,235 @@ function deleteNote(id: string): void {
 function noteArea(note: TextNote): Area {
   const el = noteEls.get(note.id);
   return { x: note.x, y: note.y, w: el?.offsetWidth ?? 0, h: el?.offsetHeight ?? 0 };
+}
+
+/* =============================================================================
+   STYLED TEXT
+   -----------------------------------------------------------------------------
+   While a box is being typed in, the toolbar's color and size apply to it
+   rather than taking the focus away: to the selected text when some is
+   selected, and to the whole box when the caret is only sitting there.
+
+   Every change goes through PLAIN-TEXT OFFSETS, not the DOM. The box's runs
+   are read out, the style is applied to characters start..end, the runs are
+   tidied and drawn back in, and the selection is put back at the same
+   offsets. Working on the DOM directly would nest a span in a span every time
+   a range was restyled, and the box would slowly become unreadable markup.
+============================================================================= */
+
+/** What the selection in the box being typed in was, as plain-text offsets. */
+interface EditSelection {
+  id: string;
+  start: number;
+  end: number;
+}
+
+/** The selection held while the system color picker is open, which takes the
+ *  focus and can drop it. */
+let pickerSelection: EditSelection | null = null;
+
+/** A box's runs, one run standing for the whole box when it has none. */
+function noteRuns(note: TextNote): TextRun[] {
+  return note.runs ?? [{ text: note.text }];
+}
+
+/** Draws a box's text into its element: plain text nodes for what follows the
+ *  box, spans for runs of their own. Built as nodes, never markup: this is
+ *  text somebody typed. */
+function renderRuns(el: HTMLElement, note: TextNote): void {
+  paintWithPen(el, note.ink);
+  for (const sz of SIZES) el.classList.toggle(`wb-tsize-${sz}`, sz === note.size);
+  el.replaceChildren(
+    ...noteRuns(note).map((run) => {
+      if (run.ink === undefined && run.size === undefined) return document.createTextNode(run.text);
+      const span = document.createElement("span");
+      span.className = "wb-run";
+      if (run.ink !== undefined) {
+        span.dataset.ink = run.ink;
+        paintWithPen(span, run.ink);
+      }
+      if (run.size !== undefined) {
+        span.dataset.size = run.size;
+        span.classList.add(`wb-tsize-${run.size}`);
+      }
+      span.textContent = run.text;
+      return span;
+    }),
+  );
+}
+
+/** The runs a box's element holds right now, as typed. Reads what the browser
+ *  may have put there as well as what renderRuns did: a <br> or a new block
+ *  is a line break. */
+function readRuns(root: Node): TextRun[] {
+  const out: TextRun[] = [];
+  const push = (text: string, style: { ink?: Pen; size?: SizeId }): void => {
+    if (text) out.push({ text, ...style });
+  };
+  const endsWithBreak = (): boolean => {
+    const last = out[out.length - 1];
+    return !last || last.text.endsWith("\n");
+  };
+  const walk = (node: Node, style: { ink?: Pen; size?: SizeId }): void => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        push(child.textContent ?? "", style);
+        return;
+      }
+      if (!(child instanceof HTMLElement)) return;
+      if (child.tagName === "BR") {
+        push("\n", style);
+        return;
+      }
+      if ((child.tagName === "DIV" || child.tagName === "P") && !endsWithBreak()) push("\n", style);
+      const next = { ...style };
+      if (isPen(child.dataset.ink)) next.ink = child.dataset.ink;
+      if (SIZES.includes(child.dataset.size as SizeId)) next.size = child.dataset.size as SizeId;
+      walk(child, next);
+    });
+  };
+  walk(root, {});
+  return out;
+}
+
+/** Runs made tidy for keeping: what matches the box is dropped from each run,
+ *  neighbors that now look the same are merged, the no-break spaces a browser
+ *  types are made ordinary, and trailing space is trimmed off the end. */
+function tidyRuns(runs: TextRun[], note: TextNote, trimEnd = true): TextRun[] {
+  const out: TextRun[] = [];
+  for (const r of runs) {
+    const run: TextRun = { text: r.text.replace(/\r/g, "").replace(/ /g, " ") };
+    if (r.ink !== undefined && r.ink !== note.ink) run.ink = r.ink;
+    if (r.size !== undefined && r.size !== note.size) run.size = r.size;
+    const last = out[out.length - 1];
+    if (last && last.ink === run.ink && last.size === run.size) last.text += run.text;
+    else if (run.text) out.push(run);
+  }
+  // Only when the box is finished: mid-sentence, the space just typed is
+  // where the next word goes.
+  while (trimEnd && out.length > 0) {
+    const last = out[out.length - 1];
+    last.text = last.text.replace(/\s+$/, "");
+    if (last.text) break;
+    out.pop();
+  }
+  let room = MAX_TEXT_LEN;
+  return out
+    .map((r) => {
+      const text = r.text.slice(0, Math.max(0, room));
+      room -= text.length;
+      return { ...r, text };
+    })
+    .filter((r) => r.text);
+}
+
+/** Keeps tidied runs on a box, and the plain text they spell. */
+function setNoteRuns(note: TextNote, runs: TextRun[]): void {
+  note.text = runs.map((r) => r.text).join("");
+  const styled = runs.some((r) => r.ink !== undefined || r.size !== undefined);
+  if (styled) note.runs = runs;
+  else delete note.runs;
+}
+
+/** A color or size for the whole box: the box takes it, and no run keeps a
+ *  color or size of its own that would contradict it. */
+function styleWholeNote(note: TextNote, patch: { ink?: Pen; size?: SizeId }, trimEnd = true): void {
+  if (patch.ink !== undefined) note.ink = patch.ink;
+  if (patch.size !== undefined) note.size = patch.size;
+  const runs = noteRuns(note).map((r) => {
+    const run: TextRun = { ...r };
+    if (patch.ink !== undefined) delete run.ink;
+    if (patch.size !== undefined) delete run.size;
+    return run;
+  });
+  setNoteRuns(note, tidyRuns(runs, note, trimEnd));
+}
+
+/** The style applied to characters start..end, splitting the runs it cuts. */
+function styleRange(runs: TextRun[], start: number, end: number, patch: { ink?: Pen; size?: SizeId }): TextRun[] {
+  const out: TextRun[] = [];
+  let at = 0;
+  for (const r of runs) {
+    const from = at;
+    const to = at + r.text.length;
+    at = to;
+    const a = Math.max(from, Math.min(start, to));
+    const b = Math.max(from, Math.min(end, to));
+    if (a > from) out.push({ ...r, text: r.text.slice(0, a - from) });
+    if (b > a) out.push({ ...r, ...patch, text: r.text.slice(a - from, b - from) });
+    if (to > b) out.push({ ...r, text: r.text.slice(b - from) });
+  }
+  return out;
+}
+
+/** How many characters of plain text come before a point in the box. */
+function textOffset(el: HTMLElement, node: Node, offset: number): number {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.setEnd(node, offset);
+  const holder = document.createElement("div");
+  holder.appendChild(range.cloneContents());
+  return readRuns(holder).reduce((n, r) => n + r.text.length, 0);
+}
+
+/** The DOM point at a plain-text offset, in a box drawn by renderRuns, which
+ *  holds only text nodes and spans of text. */
+function pointAt(el: HTMLElement, offset: number): { node: Node; offset: number } {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let left = offset;
+  let last: Text | null = null;
+  for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+    const len = n.data.length;
+    if (left <= len) return { node: n, offset: left };
+    left -= len;
+    last = n;
+  }
+  return last ? { node: last, offset: last.data.length } : { node: el, offset: el.childNodes.length };
+}
+
+function captureEditSelection(): EditSelection | null {
+  const el = noteEls.get(editingId ?? "");
+  const sel = window.getSelection();
+  if (!editingId || !el || !sel || sel.rangeCount === 0) return null;
+  const r = sel.getRangeAt(0);
+  if (!el.contains(r.startContainer) || !el.contains(r.endContainer)) return null;
+  const start = textOffset(el, r.startContainer, r.startOffset);
+  const end = textOffset(el, r.endContainer, r.endOffset);
+  return { id: editingId, start: Math.min(start, end), end: Math.max(start, end) };
+}
+
+function restoreEditSelection(saved: EditSelection | null): void {
+  if (!saved || saved.id !== editingId) return;
+  const el = noteEls.get(saved.id);
+  if (!el) return;
+  el.focus();
+  const a = pointAt(el, saved.start);
+  const b = pointAt(el, saved.end);
+  const range = document.createRange();
+  range.setStart(a.node, a.offset);
+  range.setEnd(b.node, b.offset);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
+/** A toolbar color or size, applied to the box being typed in, if there is
+ *  one: the selected text, or the whole box. Part of the edit's own Undo
+ *  step, which endEditing records. */
+function styleWhileTyping(patch: { ink?: Pen; size?: SizeId }): void {
+  const note = noteById(editingId);
+  const el = note ? noteEls.get(note.id) : undefined;
+  if (!note || !el) return;
+  const saved = captureEditSelection();
+  const runs = readRuns(el);
+  if (saved && saved.end > saved.start) {
+    setNoteRuns(note, tidyRuns(styleRange(runs, saved.start, saved.end, patch), note, false));
+  } else {
+    setNoteRuns(note, tidyRuns(runs, note, false));
+    styleWholeNote(note, patch, false);
+  }
+  renderRuns(el, note);
+  restoreEditSelection(saved);
 }
 
 /* =============================================================================
@@ -1450,40 +1714,86 @@ function drawNoteText(c: CanvasRenderingContext2D, note: TextNote): void {
   const el = noteEls.get(note.id);
   if (!el) return;
   const cs = getComputedStyle(el);
-  const fontSize = parseFloat(cs.fontSize) || 16;
-  const lineHeight = parseFloat(cs.lineHeight) || fontSize * 1.4;
-  c.font = `${cs.fontStyle} ${cs.fontWeight} ${fontSize}px ${cs.fontFamily}`;
-  c.fillStyle = penColor(note.ink);
-  c.textBaseline = "middle";
-  const lines = wrapLines(c, note.text, TEXT_MAX_WIDTH);
-  lines.forEach((line, i) => {
-    c.fillText(line, note.x + TEXT_INSET_X, note.y + TEXT_INSET_Y + i * lineHeight + lineHeight / 2);
-  });
+  const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const fontOf = (size: SizeId): string =>
+    `${cs.fontStyle} ${cs.fontWeight} ${TEXT_REM[size] * remPx}px ${cs.fontFamily}`;
+  c.textBaseline = "alphabetic";
+  let y = note.y + TEXT_INSET_Y;
+  for (const line of layoutRuns(c, note, fontOf, remPx)) {
+    const lineHeight = line.fontPx * 1.4;
+    const baseline = y + (lineHeight - line.fontPx) / 2 + line.fontPx * 0.8;
+    for (const piece of line.pieces) {
+      c.font = fontOf(piece.size);
+      c.fillStyle = penColor(piece.ink);
+      c.fillText(piece.text, note.x + TEXT_INSET_X + piece.x, baseline);
+    }
+    y += lineHeight;
+  }
 }
 
-/** The text split the way the box wraps it: at its own line breaks, then at
- *  word breaks past the width, then anywhere in a word too long for a line. */
-function wrapLines(c: CanvasRenderingContext2D, text: string, width: number): string[] {
-  const out: string[] = [];
-  for (const para of text.split("\n")) {
-    let line = "";
-    for (const word of para.split(/(\s+)/)) {
-      if (c.measureText(line + word).width <= width) {
-        line += word;
+interface LaidPiece {
+  text: string;
+  x: number;
+  ink: Pen;
+  size: SizeId;
+}
+
+/** A box's runs broken into lines the way the box wraps them: at its own line
+ *  breaks, then at word breaks past the width, then anywhere in a word too
+ *  long for a line. Each line knows its largest text, which sets its height. */
+function layoutRuns(
+  c: CanvasRenderingContext2D,
+  note: TextNote,
+  fontOf: (size: SizeId) => string,
+  remPx: number,
+): { pieces: LaidPiece[]; fontPx: number }[] {
+  const lines: { pieces: LaidPiece[]; fontPx: number }[] = [];
+  let pieces: LaidPiece[] = [];
+  let x = 0;
+  let fontPx = TEXT_REM[note.size] * remPx;
+  const newLine = (): void => {
+    lines.push({ pieces, fontPx });
+    pieces = [];
+    x = 0;
+    fontPx = TEXT_REM[note.size] * remPx;
+  };
+  const place = (text: string, ink: Pen, size: SizeId, width: number): void => {
+    pieces.push({ text, x, ink, size });
+    x += width;
+    fontPx = Math.max(fontPx, TEXT_REM[size] * remPx);
+  };
+
+  for (const run of noteRuns(note)) {
+    const ink = run.ink ?? note.ink;
+    const size = run.size ?? note.size;
+    c.font = fontOf(size);
+    for (const token of run.text.split(/(\n|\s+)/)) {
+      if (token === "") continue;
+      if (token === "\n") {
+        newLine();
         continue;
       }
-      if (line.trim()) out.push(line.trimEnd());
-      line = word.trimStart();
-      while (c.measureText(line).width > width && line.length > 1) {
-        let cut = line.length - 1;
-        while (cut > 1 && c.measureText(line.slice(0, cut)).width > width) cut--;
-        out.push(line.slice(0, cut));
-        line = line.slice(cut);
+      let w = c.measureText(token).width;
+      if (x + w <= TEXT_MAX_WIDTH) {
+        place(token, ink, size, w);
+        continue;
       }
+      if (/^\s+$/.test(token)) continue; // a space at a wrap hangs off the line
+      if (x > 0) newLine();
+      let rest = token;
+      while (w > TEXT_MAX_WIDTH && rest.length > 1) {
+        let cut = rest.length - 1;
+        while (cut > 1 && c.measureText(rest.slice(0, cut)).width > TEXT_MAX_WIDTH) cut--;
+        place(rest.slice(0, cut), ink, size, 0);
+        newLine();
+        rest = rest.slice(cut);
+        w = c.measureText(rest).width;
+      }
+      place(rest, ink, size, w);
     }
-    out.push(line);
   }
-  return out;
+  newLine();
+  return lines;
 }
 
 /* =============================================================================
@@ -1877,12 +2187,14 @@ function setMode(next: Mode): void {
 function setInk(next: Pen): void {
   settings.ink = next;
   saveSettings();
+  styleWhileTyping({ ink: next });
   updateChrome();
 }
 
 function setSize(next: SizeId): void {
   settings.size = next;
   saveSettings();
+  styleWhileTyping({ size: next });
   updateChrome();
 }
 
@@ -1942,8 +2254,9 @@ function updateChrome(): void {
   } else {
     colorRecent.hidden = true;
   }
-  undoBtn.disabled = undoStack.length === 0;
-  redoBtn.disabled = redoStack.length === 0;
+  // While typing they are the box's own history, which this cannot see.
+  undoBtn.disabled = !editingId && undoStack.length === 0;
+  redoBtn.disabled = !editingId && redoStack.length === 0;
   clearBtn.disabled = isEmpty();
   sendOpenBtn.disabled = isEmpty();
   noticeWrap.style.display = blocked ? "" : "none";
@@ -2013,8 +2326,10 @@ function wireColorPop(): void {
       saveSettings();
       setNoteStyle(target.id, { ink: hex });
     } else {
+      restoreEditSelection(pickerSelection);
       setInk(hex);
     }
+    pickerSelection = null;
     closeColorPop();
   });
   // Anywhere else closes it, the way a dropdown does.
@@ -2642,17 +2957,20 @@ function setNoteStyle(id: string, patch: { ink?: Pen; size?: SizeId }): void {
   endEditing();
   const note = noteById(id);
   if (!note) return;
-  if ((patch.ink === undefined || patch.ink === note.ink) && (patch.size === undefined || patch.size === note.size)) {
+  const runsCarry = (note.runs ?? []).some(
+    (r) => (patch.ink !== undefined && r.ink !== undefined) || (patch.size !== undefined && r.size !== undefined),
+  );
+  if (
+    !runsCarry &&
+    (patch.ink === undefined || patch.ink === note.ink) &&
+    (patch.size === undefined || patch.size === note.size)
+  ) {
     return;
   }
   checkpoint();
-  if (patch.ink !== undefined) note.ink = patch.ink;
-  if (patch.size !== undefined) note.size = patch.size;
+  styleWholeNote(note, patch);
   const el = noteEls.get(id);
-  if (el) {
-    paintWithPen(el, note.ink);
-    for (const sz of SIZES) el.classList.toggle(`wb-tsize-${sz}`, sz === note.size);
-  }
+  if (el) renderRuns(el, note);
   markDirty();
   updateChrome();
 }
@@ -2660,6 +2978,7 @@ function setNoteStyle(id: string, patch: { ink?: Pen; size?: SizeId }): void {
 /** Opens the system color picker for the pen or for one text box. */
 function pickColorFor(target: typeof colorFor): void {
   colorFor = target;
+  pickerSelection = editingId ? captureEditSelection() : null;
   const note = target.kind === "note" ? noteById(target.id) : null;
   const start = note ? note.ink : settings.ink;
   colorInput.value = isInk(start) ? settings.customInk ?? toHex(penColor(start)) ?? "#ff4f81" : start;
@@ -2764,8 +3083,23 @@ export function initWhiteboard(): void {
   document.querySelectorAll<HTMLButtonElement>(".wb-size-btn").forEach((b) => {
     b.addEventListener("click", () => setSize(b.dataset.size as SizeId));
   });
-  undoBtn.addEventListener("click", undo);
-  redoBtn.addEventListener("click", redo);
+  /* Color, size, Undo and Redo work on the box being typed in, so pressing
+     them must not take the focus out of it: a mousedown that is let through
+     blurs the box, which ends the edit before the click arrives. */
+  const keepsTyping = [
+    colorBtn,
+    undoBtn,
+    redoBtn,
+    ...document.querySelectorAll<HTMLButtonElement>(".wb-size-btn, #wbColorPop .wb-swatch"),
+  ];
+  for (const b of keepsTyping) {
+    b.addEventListener("mousedown", (e) => {
+      if (editingId) e.preventDefault();
+    });
+  }
+  // While typing, Undo and Redo are the box's own typing history.
+  undoBtn.addEventListener("click", () => (editingId ? document.execCommand("undo") : undo()));
+  redoBtn.addEventListener("click", () => (editingId ? document.execCommand("redo") : redo()));
   sendOpenBtn.addEventListener("click", () => openSend());
   document.getElementById("wbZoomOutBtn")!.addEventListener("click", () => stepZoom(-1));
   document.getElementById("wbZoomInBtn")!.addEventListener("click", () => stepZoom(1));
