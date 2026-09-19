@@ -110,6 +110,12 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   height: 18px;
 }
 
+/* The Shapes and Erase buttons carry an icon for every kind and show the one
+   in use. The hidden attribute alone does not hide an SVG element. */
+.wb-icon-btn svg[hidden] {
+  display: none;
+}
+
 .wb-icon-btn:hover {
   background: var(--color-hover);
   color: var(--color-text);

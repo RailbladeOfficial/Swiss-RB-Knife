@@ -303,8 +303,6 @@ const GRID_FADE_TO = 6;
 /** How far past the view the ink is drawn, in screen pixels, so a quick scroll
  *  shows ink already there rather than a blank edge waiting for the redraw. */
 const INK_OVERSCAN = 256;
-/** How far below and right of the original a duplicate lands. */
-const DUPLICATE_OFFSET = 24;
 /** Margin kept around your notes when Go to Notes brings them into view. */
 const NOTES_MARGIN = 40;
 
@@ -361,8 +359,9 @@ let editStart: Snapshot | null = null;
 /** The stroke under the mouse right now, and what the board was before it. */
 let liveStroke: Stroke | null = null;
 let livePre: Snapshot | null = null;
-/** Where a stroke turned straight when Shift was pressed, which it stays. */
-let straightFrom: { x: number; y: number } | null = null;
+/** The stroke as it stood when Shift went down. While Shift is held, the
+ *  stroke is that plus one straight line from its last point to the pointer. */
+let straightBase: number[] | null = null;
 
 /** The whole-stroke eraser mid-swipe. */
 let wipe: { pointerId: number; pre: Snapshot; removed: boolean; last: { x: number; y: number } } | null = null;
@@ -1102,7 +1101,7 @@ function startStroke(e: PointerEvent): void {
   }
   const { x, y } = boardPoint(e);
   livePre = snapshot();
-  straightFrom = null;
+  straightBase = null;
   liveStroke = {
     id: newId(),
     ink: settings.ink,
@@ -1152,15 +1151,20 @@ function extendStroke(e: PointerEvent): void {
     return;
   }
 
-  /* Shift in Draw is a straight line from where the stroke began to the
-     pointer. Once straight, the stroke stays straight: letting go of Shift
-     halfway is not a request to scribble off the end of a ruled line. */
-  if (e.shiftKey || straightFrom) {
-    straightFrom ??= { x: stroke.pts[0], y: stroke.pts[1] };
+  /* Shift in Draw rules a straight line from wherever the stroke is to the
+     pointer. Letting go goes back to freehand from the end of that line, and
+     pressing it again rules the next one, so a stroke can be part drawn and
+     part ruled. */
+  if (e.shiftKey) {
+    straightBase ??= stroke.pts.slice();
     const { x, y } = boardPoint(e);
-    stroke.pts = [straightFrom.x, straightFrom.y, round1(x), round1(y)];
+    stroke.pts = straightBase.concat(round1(x), round1(y));
     requestRedraw();
     return;
+  }
+  if (straightBase) {
+    straightBase = null;
+    requestRedraw();
   }
 
   applyViewTransform();
@@ -1185,7 +1189,7 @@ function endStroke(): void {
   const pre = livePre;
   liveStroke = null;
   livePre = null;
-  straightFrom = null;
+  straightBase = null;
   if (!stroke || !pre) return;
   // A shape dragged out to nothing (a click) is not worth keeping.
   if (stroke.shape && stroke.pts[0] === stroke.pts[2] && stroke.pts[1] === stroke.pts[3]) {
@@ -1835,7 +1839,7 @@ function deleteSelection(): void {
 }
 
 /** An area's ink and text, relative to its corner: what Copy puts on the
- *  clipboard, and what Duplicate and a move carry. */
+ *  clipboard, and what a move carries. */
 interface AreaData {
   w: number;
   h: number;
@@ -1866,14 +1870,6 @@ function copySelection(): boolean {
   clipboard = data;
   updateChrome();
   return true;
-}
-
-/** A copy of the selection a little below and to the right of it, selected. */
-function duplicateSelection(): void {
-  const area = selection;
-  const data = area ? areaData(area) : null;
-  if (!area || !data) return;
-  pasteData(data, { x: area.x + DUPLICATE_OFFSET, y: area.y + DUPLICATE_OFFSET });
 }
 
 /** Starts carrying the selection's contents once the pointer has actually
@@ -2487,7 +2483,10 @@ function onKeydown(e: KeyboardEvent): void {
   // and never while typing, which the text-entry check above already rules out.
   if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && MODE_KEYS[key]) {
     e.preventDefault();
-    setMode(MODE_KEYS[key]);
+    const mode = MODE_KEYS[key];
+    // Pressing the key of the mode already in use steps through its kinds.
+    if (mode === settings.mode && (mode === "shape" || mode === "erase")) cycleKind(mode);
+    else setMode(mode);
     return;
   }
   if ((e.key === "Delete" || e.key === "Backspace") && selection && !e.ctrlKey && !e.altKey) {
@@ -2509,11 +2508,6 @@ function onKeydown(e: KeyboardEvent): void {
   if (key === "x" && selection) {
     e.preventDefault();
     cutSelection();
-    return;
-  }
-  if (key === "d" && selection) {
-    e.preventDefault();
-    duplicateSelection();
     return;
   }
   if (key === "v" && clipboard) {
@@ -2543,10 +2537,22 @@ function setMode(next: Mode): void {
   updateChrome();
 }
 
+/** The next kind along for Shapes or Erase, wrapping round. */
+function cycleKind(mode: "shape" | "erase"): void {
+  if (mode === "shape") {
+    settings.shape = SHAPES[(SHAPES.indexOf(settings.shape) + 1) % SHAPES.length];
+  } else {
+    settings.eraser = ERASERS[(ERASERS.indexOf(settings.eraser) + 1) % ERASERS.length];
+  }
+  saveSettings();
+  updateChrome();
+}
+
 function setInk(next: Pen): void {
   settings.ink = next;
   saveSettings();
   styleWhileTyping({ ink: next });
+  restyleSelection({ ink: next });
   updateChrome();
 }
 
@@ -2554,7 +2560,39 @@ function setSize(next: SizeId): void {
   settings.size = next;
   saveSettings();
   styleWhileTyping({ size: next });
+  restyleSelection({ size: next });
   updateChrome();
+}
+
+/** A toolbar color or size, applied to everything wholly inside the selection:
+ *  its ink and its text boxes. A stroke crossing the edge is left as it is,
+ *  since a line cannot be half one color. One Undo step. */
+function restyleSelection(patch: { ink?: Pen; size?: SizeId }): void {
+  const area = selection;
+  if (!area || editingId) return;
+  const pre = snapshot();
+  let changed = false;
+  strokes = strokes.map((st) => {
+    if (st.erase || !inside(boundsArea(boundsOf(st)), area)) return st;
+    const next = { ...st, ...patch };
+    if (next.ink === st.ink && next.size === st.size) return st;
+    changed = true;
+    // A new object, not an edit: Undo's snapshots hold the old one.
+    return next;
+  });
+  for (const note of texts) {
+    if (!inside(noteArea(note), area)) continue;
+    const before = JSON.stringify(note);
+    styleWholeNote(note, patch);
+    if (JSON.stringify(note) !== before) changed = true;
+  }
+  if (!changed) return;
+  pushUndo(pre);
+  recountPoints();
+  rebuildTexts();
+  showSelection();
+  requestRedraw();
+  markDirty();
 }
 
 function isEmpty(): boolean {
@@ -2606,6 +2644,11 @@ function updateChrome(): void {
   });
   document.querySelectorAll<HTMLButtonElement>(".wb-shape-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.shape === settings.shape);
+  });
+  // The Shapes and Erase buttons wear the icon of the kind they will use.
+  document.querySelectorAll<SVGElement>("[data-kind-icon]").forEach((icon) => {
+    const kind = icon.dataset.kindIcon;
+    icon.toggleAttribute("hidden", kind !== settings.shape && kind !== settings.eraser);
   });
   document.querySelectorAll<HTMLButtonElement>(".wb-eraser-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.eraser === settings.eraser);
@@ -3449,7 +3492,6 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
         pasteClipboard();
       },
     },
-    { label: "Duplicate", disabled: !selection, onClick: duplicateSelection },
     { label: "Delete", danger: true, disabled: !selection, onClick: deleteSelection },
     { separator: true },
     { label: "Send to Kanban…", disabled: isEmpty(), onClick: () => openSend() },
