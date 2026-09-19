@@ -2486,9 +2486,12 @@ function onKeydown(e: KeyboardEvent): void {
   const key = e.key.toLowerCase();
   // The mode keys. Only with nothing held, so they never shadow a shortcut,
   // and never while typing, which the text-entry check above already rules out.
-  if (key === "c" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+  // C and Z step through the pens and sizes. Only with nothing held: Ctrl+C
+  // is Copy and Ctrl+Z is Undo.
+  if ((key === "c" || key === "z") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
     e.preventDefault();
-    cycleInk();
+    if (key === "c") cycleInk();
+    else setSize(SIZES[(SIZES.indexOf(settings.size) + 1) % SIZES.length]);
     return;
   }
   if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && MODE_KEYS[key]) {
