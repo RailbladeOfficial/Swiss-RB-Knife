@@ -2921,6 +2921,7 @@ let sendDest: "new" | "existing" = "new";
 let sendCardId: string | null = null;
 let sendTagIds = new Set<string>();
 let sendColumnField: HTMLElement;
+let sendDestGroup: HTMLElement;
 let sendNewFields: HTMLElement;
 let sendExistingFields: HTMLElement;
 let sendCardSearch: HTMLInputElement;
@@ -3104,14 +3105,18 @@ function chosenArea(): Area | null {
   return contentArea(sendIncludeText.checked);
 }
 
-/** Shows the fields the current tab and destination use, and only those. An
- *  existing card needs no column and takes no new-card extras. */
+/** Shows the fields the current tab and destination use, and only those.
+ *  Text always makes new cards, so New Card / Existing Card is the Image
+ *  tab's alone. An existing card needs no column, no title and no new-card
+ *  extras; a new picture card needs a title. */
 function syncSendFields(): void {
-  const existing = sendTabs.active === "image" && sendDest === "existing";
+  const image = sendTabs.active === "image";
+  const existing = image && sendDest === "existing";
+  sendDestGroup.style.display = image ? "" : "none";
   sendColumnField.style.display = existing ? "none" : "";
   sendAdvanced.style.display = existing ? "none" : "";
-  sendNewFields.style.display = sendDest === "new" ? "" : "none";
-  sendExistingFields.style.display = sendDest === "existing" ? "" : "none";
+  sendNewFields.style.display = image && !existing ? "" : "none";
+  sendExistingFields.style.display = existing ? "" : "none";
   document.querySelectorAll<HTMLButtonElement>(".wb-dest-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.dest === sendDest);
   });
@@ -3351,6 +3356,7 @@ function wireSendModal(): void {
   sendPreview = document.getElementById("wbSendPreview") as HTMLImageElement;
   sendAreaNote = document.getElementById("wbSendAreaEmpty")!;
   sendColumnField = document.getElementById("wbSendColumnField")!;
+  sendDestGroup = document.getElementById("wbSendDestGroup")!;
   sendNewFields = document.getElementById("wbSendNewFields")!;
   sendExistingFields = document.getElementById("wbSendExistingFields")!;
   sendCardSearch = document.getElementById("wbSendCardSearch") as HTMLInputElement;

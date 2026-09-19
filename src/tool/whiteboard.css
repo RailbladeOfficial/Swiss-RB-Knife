@@ -486,11 +486,29 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 }
 
 .wb-send-tabs {
-  margin-top: 14px;
+  margin-bottom: 4px;
+}
+
+/* Where it goes, set apart from what goes. */
+.wb-send-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.wb-send-section-title {
+  font-size: 0.72rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .wb-send-empty {
-  margin: 10px 0 4px;
+  margin: 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
 }
@@ -606,7 +624,6 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 .wb-dest-group {
   display: flex;
   gap: 4px;
-  margin: 2px 0 10px;
 }
 
 .wb-dest-group .toggle-btn,

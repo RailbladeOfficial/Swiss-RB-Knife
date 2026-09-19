@@ -7786,20 +7786,8 @@
         </button>
       </div>
       <div class="modal-body setup-body">
-        <div class="wb-send-target">
-          <div class="setup-field">
-            <label for="wbSendBoard">Board</label>
-            <select id="wbSendBoard"></select>
-          </div>
-          <div id="wbSendColumnField" class="setup-field">
-            <label for="wbSendColumn">Column</label>
-            <select id="wbSendColumn"></select>
-          </div>
-        </div>
-        <div id="wbSendEmpty" class="wb-send-empty" style="display:none;"></div>
-        <button id="wbSendOpenKanbanBtn" type="button" class="modal-cancel-btn" style="display:none;">Open
-          Kanban</button>
-
+        <!-- What goes, then where it goes. The tabs pick what; everything below
+             them is shared, and shows only the fields the choice above it uses. -->
         <div class="modal-tabs wb-send-tabs">
           <button class="modal-tab active" data-wb-send-tab="text">Text as Cards</button>
           <button class="modal-tab" data-wb-send-tab="image">Image</button>
@@ -7822,9 +7810,30 @@
             <label class="wb-send-check"><input type="checkbox" id="wbSendIncludeText" checked /> Include text
               boxes</label>
           </div>
-          <div class="wb-dest-group" role="group" aria-label="Destination">
+          <div class="wb-send-preview-wrap">
+            <img id="wbSendPreview" class="wb-send-preview" alt="" />
+            <p id="wbSendAreaEmpty" class="wb-send-empty" style="display:none;">Nothing to send.</p>
+          </div>
+        </div>
+
+        <div class="wb-send-section">
+          <div class="wb-send-section-title">Send To</div>
+          <div id="wbSendDestGroup" class="wb-dest-group" role="group" aria-label="Destination">
             <button type="button" class="toggle-btn wb-dest-btn" data-dest="new">New Card</button>
             <button type="button" class="toggle-btn wb-dest-btn" data-dest="existing">Existing Card</button>
+          </div>
+          <div id="wbSendEmpty" class="wb-send-empty" style="display:none;"></div>
+          <button id="wbSendOpenKanbanBtn" type="button" class="modal-cancel-btn" style="display:none;">Open
+            Kanban</button>
+          <div class="wb-send-target">
+            <div class="setup-field">
+              <label for="wbSendBoard">Board</label>
+              <select id="wbSendBoard"></select>
+            </div>
+            <div id="wbSendColumnField" class="setup-field">
+              <label for="wbSendColumn">Column</label>
+              <select id="wbSendColumn"></select>
+            </div>
           </div>
           <div id="wbSendNewFields" class="setup-field">
             <label for="wbSendImageTitle">Card Title</label>
@@ -7835,10 +7844,6 @@
             <input id="wbSendCardSearch" type="search" placeholder="Search cards" autocomplete="off"
               spellcheck="false" />
             <div id="wbSendCardResults" class="wb-card-results"></div>
-          </div>
-          <div class="wb-send-preview-wrap">
-            <img id="wbSendPreview" class="wb-send-preview" alt="" />
-            <p id="wbSendAreaEmpty" class="wb-send-empty" style="display:none;">Nothing to send.</p>
           </div>
         </div>
 
