@@ -78,29 +78,21 @@ import {
   maybeRegenerateRandom,
 } from "../theme/random-theme";
 import {
-  ANIMATED_THEMES,
   applyTheme,
   isKnownBuiltinTheme,
-  themeCssUrl,
   getActiveCustomId,
   setActiveCustomId,
 } from "../theme/theme-core";
 import { DEFAULT_THEME_ID, THEME_SENTINELS, migrateThemeId } from "../theme/theme-ids";
 import {
   advanceCycleNow,
-  getActiveHolidayOverrideThemeId,
-  getDayNightStatus,
-  getHolidayOverrideEndDate,
 } from "../theme/cycle-theme";
 import {
   genThemeId,
   saveCustomThemes,
   loadCustomThemes,
   applyCustomThemeById,
-  clearCustomTheme,
   customThemes,
-  openThemeEditor,
-  requestDeleteCustomTheme,
 } from "../theme/theme-editor";
 import {
   DEFAULT_SETTINGS,
@@ -130,7 +122,6 @@ import {
   refreshThemeCurrentBadge,
   syncCycleSettingsVisibility,
   syncHolidayOverrideControls,
-  themePickerModal,
   themePickerTabs,
 } from "../theme/theme-picker";
 // Re-exported so theme-editor.ts keeps importing these from shell, matching

@@ -1608,8 +1608,17 @@ test("a column sort is a view, not a rewrite of the board's order", () => {
   assert.ok(opens.includes("board"), "Board Setup cannot set the board's default sort");
   assert.ok(opens.includes("column"), "a column's settings cannot override the sort");
 
-  // And one wording for a rule set, so the three places that describe it agree.
+  // And one wording for a rule set, so the places that describe it agree. Used,
+  // not only defined: the column tooltip once carried a copy of its body while
+  // the function sat unread, and a check for the definition alone still passed.
   assert.match(src, /function describeSortRules\(/, "each screen words the rules its own way");
+  assert.match(
+    src.replace(/function describeSortRules\([^)]*\)/, ""),
+    /describeSortRules\(/,
+    "the shared wording for a rule set is defined but nothing uses it",
+  );
+  assert.doesNotMatch(src, /"high to low" : "low to high"[\s\S]*"high to low" : "low to high"/,
+    "a rule set is worded in two places again");
 });
 
 test("dragging one of several selected cards brings the rest", () => {

@@ -42,7 +42,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { loadToolJson, saveToolJson, unblockAfterReplacement } from "../core/tool-store";
+import { loadToolJson, saveToolJson } from "../core/tool-store";
 import { listen } from "@tauri-apps/api/event";
 import { flash, escapeHtml } from "../core/shell";
 import { Modal } from "../modal/modal";

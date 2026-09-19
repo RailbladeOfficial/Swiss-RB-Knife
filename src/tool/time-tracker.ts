@@ -24,7 +24,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { flash, devError, shortPath, navigateToTool } from "../core/shell";
+import { flash, devError, shortPath } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
 import { renderToolBackups, readToolBackup } from "../core/tool-backups";
@@ -781,20 +781,6 @@ function entriesFrom(parsed: unknown): Entry[] {
 
       return { date, start, endDate, end, activity: String(e.activity), project, notes };
     });
-}
-
-/** One record, checked before anything renders it. Used on the import path,
- *  where the file came from outside the app and has not been through
- *  parseEntries. */
-function isStoredEntry(e: unknown): e is Entry {
-  if (!e || typeof e !== "object") return false;
-  const r = e as Partial<Entry>;
-  return (
-    typeof r.date === "string" && r.date.length > 0 &&
-    typeof r.start === "string" &&
-    typeof r.end === "string" &&
-    typeof r.activity === "string"
-  );
 }
 
 /* =============================================================================
@@ -3196,23 +3182,6 @@ async function refreshTTBackups(): Promise<void> {
 }
 
 
-/* -----------------------------------------------------------------------------
-   EXPORT AND IMPORT
-   -----------------------------------------------------------------------------
-   Registered with the Data tab in App Settings, which owns the buttons.
-
-   Entries AND the activity/project vocabulary go in one file, because an export
-   is meant to rebuild the tool: entries name their activity as free text, so a
-   set of entries without the list that autocompletes them is a tool that works
-   but has forgotten what you call things.
------------------------------------------------------------------------------ */
-
-interface TimeTrackerExport {
-  entries: Entry[];
-  activities: Activity[];
-  projects: Project[];
-  settings: Partial<TTSettings>;
-}
 function openTTSetupOnTab(tab?: TTSetupTab): void {
   if (tab) ttSetupTabs.select(tab);
   getTTSetupModal().open();

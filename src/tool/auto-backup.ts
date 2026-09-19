@@ -29,7 +29,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { bindInfoTooltips, closeInfoTooltip } from "../core/info-tooltip";
 import { formatDataSize as formatBytes } from "../core/format";
-import { loadToolJson, saveToolJson, unblockAfterReplacement } from "../core/tool-store";
+import { loadToolJson, saveToolJson } from "../core/tool-store";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { flash, devError, devWarn, setToolAttention } from "../core/shell";
@@ -236,7 +236,6 @@ let runStartTime: number | null = null;
 let runTotalFiles = 0;
 let runTotalDirs = 0;
 let runTotalBytes = 0;
-let hasRunOnce = false; // tracks whether a backup has run this session
 
 /** Files the last run couldn't copy (locked/access error), populated by
  *  backup-complete, read by the "View Skipped Files" modal. */
@@ -358,7 +357,6 @@ let detailsToggle: HTMLInputElement;
 let detailsLabel: HTMLElement;
 let detailsToggleWrap: HTMLElement;
 
-let progressPanel: HTMLElement;
 let progressContent: HTMLElement;
 let progressIdleEl: HTMLElement;
 let progressCurrentLabel: HTMLElement;
@@ -1943,7 +1941,6 @@ async function launchBackup(): Promise<void> {
   // Fast mode has no live per-file text, hide that line for this run so it
   // doesn't sit frozen on a stale filename. Details mode shows it as usual.
   progressCurrentFileEl.style.display = config.showDetails ? "" : "none";
-  hasRunOnce = true;
   clearBtn.disabled = true; // disabled while running
   setBackupRunning(true);
   startBarEngine();
@@ -2759,7 +2756,6 @@ export async function initAutoBackup(): Promise<void> {
   detailsLabel  = document.getElementById("ab-details-label")!;
   detailsToggleWrap = document.getElementById("ab-details-toggle-wrap")!;
 
-  progressPanel        = document.getElementById("ab-progress-panel")!;
   progressContent      = document.getElementById("ab-progress-content")!;
   progressIdleEl       = document.getElementById("ab-progress-idle")!;
   progressCurrentLabel    = document.getElementById("ab-progress-current")!;

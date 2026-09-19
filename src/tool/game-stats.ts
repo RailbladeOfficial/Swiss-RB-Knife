@@ -34,10 +34,10 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { devError, flash, setSubNavHandler, shortPath, navigateToTool } from "../core/shell";
+import { devError, flash, setSubNavHandler, shortPath } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { renderDbBackups } from "../core/db-backups";
-import { loadToolJson, saveToolJson, saveToolText, unblockAfterReplacement } from "../core/tool-store";
+import { loadToolJson, saveToolJson, saveToolText } from "../core/tool-store";
 import { newId } from "../core/ids";
 import { fileTimestamp } from "../core/timestamp";
 import { diffRows } from "../core/row-diff";
@@ -70,7 +70,6 @@ import {
   gameNumberFromSheetName,
   PACE_THRESHOLDS,
   FIRST_ROUND,
-  LAST_FIXED_ROUND,
   type PlayerStats,
   type GameReference,
   type StatPolarity,

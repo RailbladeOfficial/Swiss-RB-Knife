@@ -98,7 +98,6 @@ import {
   flash,
   setSubNavHandler,
   setToolAttention,
-  shortPath,
   settings as shellSettings,
 } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
@@ -800,8 +799,6 @@ export interface KanbanStore {
    CONSTANTS
 ============================================================================= */
 
-const STORE_VERSION = 1;
-
 /** How long an edit sits before it is written. Long enough that typing a
  *  description is one write rather than forty, short enough that a crash
  *  between keystroke and save costs half a second of typing. */
@@ -1423,15 +1420,6 @@ function markIndex(): void {
   queueSave();
 }
 
-/** Marks the board a card belongs to. The one place card writes are queued
- *  from, called by stampCard(), which every card mutation already went
- *  through. */
-function markCard(cardId: string): void {
-  const card = getCard(cardId);
-  if (card) dirtyBoards.add(card.boardId);
-  queueSave();
-}
-
 function markSettings(): void {
   dirtySettings = true;
   queueSave();
@@ -1786,8 +1774,6 @@ function normalizeEffortColors(raw: unknown): Record<Effort, string> {
 }
 
 export function normalizeSettings(raw: Partial<KbSettings>): KbSettings {
-  const bool = (v: unknown, fallback: boolean): boolean =>
-    typeof v === "boolean" ? v : fallback;
   return {
     // overdueWarn is board-scoped now, so normalizeScoped reads it. A second
     // line for it here would be the same field read twice, and the day the two
@@ -2297,10 +2283,6 @@ function scopeTags(): Tag[] {
   return activeTagScope?.tags ?? [];
 }
 
-function scopeTagCategories(): TagCategory[] {
-  return activeTagScope?.tagCategories ?? [];
-}
-
 function getTag(id: string): Tag | null {
   return scopeTags().find((t) => t.id === id) ?? null;
 }
@@ -2370,10 +2352,6 @@ export function resolveCardColor(card: Card, board: Board | null): string | null
     if (color) return color;
   }
   return null;
-}
-
-function getTagCategory(id: string): TagCategory | null {
-  return scopeTagCategories().find((c) => c.id === id) ?? null;
 }
 
 /* -----------------------------------------------------------------------------
@@ -3244,9 +3222,11 @@ function describeSortBadge(column: Column): string {
   return "Customized";
 }
 
-/** A rule set as a sentence. One wording, used by the Board Setup row, the
- *  column editor's button and the header tooltip, so the three cannot describe
- *  the same rules differently. */
+/** A rule set as a sentence, for the column header's sorted-by tooltip. The
+ *  Board Setup row and the column editor say only whether a sort is set (see
+ *  WHAT A SETTINGS BADGE SAYS), so this is the one place rules are spelled
+ *  out; anything that comes to spell them out too calls this rather than
+ *  writing its own. */
 function describeSortRules(rules: SortRule[], categories: TagCategory[]): string {
   if (rules.length === 0) return "Manual, the order you dragged them into";
   return rules
@@ -3738,11 +3718,7 @@ function buildColumn(board: Board, column: Column, todayStr: string): HTMLElemen
     const chip = document.createElement("span");
     chip.className = "kb-column-sorted";
     chip.textContent = "⇅";
-    chip.title =
-      "Sorted by " +
-      rules
-        .map((r) => `${sortFieldLabel(r.field, board.tagCategories)} ${r.dir === "desc" ? "high to low" : "low to high"}`)
-        .join(", then ");
+    chip.title = `Sorted by ${describeSortRules(rules, board.tagCategories)}`;
     head.appendChild(chip);
   }
 
@@ -5571,7 +5547,6 @@ function getCardModal(): Modal {
   const boardSelect = document.getElementById("kbCardBoardSelect") as HTMLSelectElement;
   const dueInput = document.getElementById("kbCardDueInput") as HTMLInputElement;
   const subtaskInput = document.getElementById("kbCardSubtaskInput") as HTMLInputElement;
-  const colorCustom = document.getElementById("kbCardColorCustom") as HTMLInputElement;
 
   _cardModal = new Modal(backdrop, {
     /* HANDING THE TABS OVER IS WHAT MAKES A DEEP LINK WORK.
@@ -10416,12 +10391,6 @@ function setScopedTags(next: Tag[]): void {
   else globalTags = next;
 }
 
-/** Re-renders whichever tag list is currently on screen. */
-function renderActiveTagList(): void {
-  if (tagEditScope === "board") renderBoardTagList();
-  else renderTagCategoriesList();
-}
-
 /** The defaults, in the tool's own Setup. */
 function renderTagCategoriesList(): void {
   renderTagVocabulary(document.getElementById("kbTagCategoriesList")!, "global", null);
@@ -12150,25 +12119,6 @@ async function reviveAttachmentsFor(boardIds: string[]): Promise<void> {
    INIT + SHELL HOOKS
 ============================================================================= */
 
-/* -----------------------------------------------------------------------------
-   EXPORT AND IMPORT
-   -----------------------------------------------------------------------------
-   Registered with the Data tab in App Settings, which owns the buttons; this is
-   only what "everything the Kanban holds" means and how to put it back.
-
-   The FILES are not in it. Board backgrounds and card attachments are pictures,
-   videos and documents, and a JSON file that inlined them would be enormous and
-   unreadable. They are named in the export, so an import restores every card
-   with its attachment list intact and those files reported as missing, which is
-   the honest outcome: the records came back and the bytes did not.
------------------------------------------------------------------------------ */
-
-interface KanbanExport {
-  boards: Board[];
-  cards: Card[];
-  tagCategories: TagCategory[];
-  tags: Tag[];
-}
 /* =============================================================================
    THE AGENTS TAB
    -----------------------------------------------------------------------------

@@ -39,7 +39,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { loadToolJson, saveToolJson, unblockAfterReplacement } from "../core/tool-store";
+import { loadToolJson, saveToolJson } from "../core/tool-store";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import {

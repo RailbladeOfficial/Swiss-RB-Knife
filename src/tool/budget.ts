@@ -203,6 +203,9 @@ type _CoveredFields = (typeof ENTITY_FIELDS)[number] | (typeof ENTRY_FIELDS)[num
 // doing anything else, or it will never be written to disk.
 type _AssertAllBudgetFieldsRouted = keyof BudgetData extends _CoveredFields ? true : never;
 const _assertAllBudgetFieldsRouted: _AssertAllBudgetFieldsRouted = true;
+// Read here only so noUnusedLocals leaves it alone: the check is the TYPE
+// above, and this value exists to make the compiler evaluate it.
+void _assertAllBudgetFieldsRouted;
 
 function pickFields<K extends keyof BudgetData>(d: BudgetData, fields: readonly K[]): Pick<BudgetData, K> {
   const out = {} as Pick<BudgetData, K>;
@@ -1132,14 +1135,6 @@ function commitRangeInput(): void {
     renderRangeNav();
     renderAll();
   }
-}
-
-// Keep the old name for the single caller that used it, now an alias
-function renderMonthNav(): void {
-  renderRangeNav();
-}
-function shiftMonth(delta: number): void {
-  shiftRange(delta);
 }
 
 /* =============================================================================
@@ -5465,18 +5460,6 @@ function bindEnterToSubmit(
 type SimpleListKind = "categories" | "sources" | "expenseSources";
 type SimpleEntity = { id: string; name: string; status: Status };
 
-const SIMPLE_DELETE_KIND: Record<SimpleListKind, SetupDeleteKind> = {
-  categories: "category",
-  sources: "source",
-  expenseSources: "expenseSource",
-};
-
-const SIMPLE_KIND_LABEL: Record<SimpleListKind, string> = {
-  categories: "Category",
-  sources: "Income source",
-  expenseSources: "Expense source",
-};
-
 // Plural, lowercase (used in the "No ___ yet) add one above." empty-state
 // message so it reads naturally for each tab (mirrors the Recurring Bills
 // empty state at renderRecurringBillsList()).
@@ -6203,18 +6186,6 @@ function addOrReactivateSimple(kind: SimpleListKind, name: string): void {
 
 let editingBillId: string | "new" | null = null;
 let billEditModal: Modal | null = null;
-
-/** Labeled field wrapper for the setup forms. Pass "" to omit the <label>. */
-function makeSetupField(label: string): HTMLElement {
-  const field = document.createElement("div");
-  field.className = "budget-setup-field";
-  if (label) {
-    const labelEl = document.createElement("label");
-    labelEl.textContent = label;
-    field.appendChild(labelEl);
-  }
-  return field;
-}
 
 function getBillEditModal(): Modal {
   if (!billEditModal) {
