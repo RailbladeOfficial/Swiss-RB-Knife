@@ -85,8 +85,13 @@ Desktop.ini
 # named after the data folder and sit beside it (see
 # src-tauri/src/data_archive.rs), so in a dev build they land at the repo root
 # next to /data.
-/data.srbk-incoming
-/data.srbk-replaced-*
+#
+# Every data.srbk-* folder, not only those two: dev/fake-data/use.mjs sets the
+# dev data aside as data.srbk-shotbackup for screenshots and copies it to
+# data.srbk-before-install-<timestamp> before installing test data. Each is a
+# whole copy of the dev data folder. Same pattern vite.config.ts keeps the dev
+# server off.
+/data.srbk-*
 
 # Local working notes (see dev/ for the checklist and standards docs)
 /dev
