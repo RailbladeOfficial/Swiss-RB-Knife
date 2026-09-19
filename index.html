@@ -1833,7 +1833,7 @@
                sits on the surface under the text layer, so it scrolls natively
                with the text and the grid, and is moved back over the view and
                redrawn after each scroll. See the header of whiteboard.ts. -->
-          <div id="wbStage" class="wb-stage">
+          <div id="wbStage" class="wb-stage wb-no-grid">
             <div id="wbScroller" class="wb-scroller">
               <div id="wbSurface" class="wb-surface wb-mode-type">
                 <canvas id="wbInk" class="wb-ink"></canvas>
@@ -7898,9 +7898,9 @@
             <div class="settings-row">
               <span>Whiteboard Grid:</span>
               <div class="toggle-with-label">
-                <span id="wbGridLabel">Enabled</span>
+                <span id="wbGridLabel">Disabled</span>
                 <label class="toggle-switch">
-                  <input type="checkbox" id="wbGridToggle" checked />
+                  <input type="checkbox" id="wbGridToggle" />
                   <span class="toggle-slider"></span>
                 </label>
               </div>
