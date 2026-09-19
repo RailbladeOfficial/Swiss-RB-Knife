@@ -2339,6 +2339,6 @@ test("every agent except Claude Code is labeled beta in the Agent picker", () =>
   const helper = slice("src/tool/kanban-agents.ts", "export function agentClientOptionLabel(", "\n}");
   assert.match(helper, /\(beta\)/, "untested agents are not labeled beta");
 
-  const picker = slice("src/tool/kanban.ts", "function renderAgentClientPicker(", "\n}");
+  const picker = slice("src/tool/kanban-agents-tab.ts", "function renderAgentClientPicker(", "\n}");
   assert.match(picker, /option\.textContent = agentClientOptionLabel\(client\)/, "the Agent picker shows the bare name");
 });

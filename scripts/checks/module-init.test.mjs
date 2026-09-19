@@ -250,6 +250,7 @@ test("the import loops this project has are the ones we know about", () => {
          back. Deliberate, and safe for the reason at the top of this file:
          every reference is inside a function, and the earliest one runs is
          the first agent request. */
+      "src/tool/kanban-agents-tab",
       "src/tool/kanban-executor",
       "src/tool/rng",
       "src/tool/time-tracker",

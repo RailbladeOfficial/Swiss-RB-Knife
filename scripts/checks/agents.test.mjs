@@ -9,7 +9,7 @@
      src/tool/kanban-agents.ts     the same permission ids, and the labels the
                                    switches are drawn from.
      src/tool/kanban-executor.ts   the operations, performed.
-     src/tool/kanban.ts            the Agents TAB, which is ordinary UI.
+     src/tool/kanban-agents-tab.ts the screen the switches are drawn on.
      src-tauri/agent/src/main.rs   the tools an AI agent is offered.
 
    What drift looks like, in each direction:
@@ -34,8 +34,9 @@ import { read, htmlIds, slice } from "./_source.mjs";
 
 const gate = () => read("src-tauri/src/agent_gate.rs");
 const settings = () => read("src/tool/kanban-agents.ts");
-/* The Agents TAB, which is still in kanban.ts. */
-const kanban = () => read("src/tool/kanban.ts");
+/* The Agents tab, its own file since 0.8.0. Still called `kanban` here
+   because every assertion using it is about that screen. */
+const kanban = () => read("src/tool/kanban-agents-tab.ts");
 /* The operations, which left kanban.ts for their own file in 0.8.0. */
 const executor = () => read("src/tool/kanban-executor.ts");
 const sidecar = () => read("src-tauri/agent/src/main.rs");
@@ -375,8 +376,10 @@ test("the Agents tab is reachable from the board setup modal", () => {
   // A pane with no tab button is a screen nothing can open.
   const html = read("index.html");
   assert.match(html, /data-kb-board-tab="agents"/, "there is no Agents tab button");
+  // Board Setup owns its tab list, and that stayed in kanban.ts when the
+  // pane's contents moved out.
   assert.match(
-    kanban(),
+    read("src/tool/kanban.ts"),
     /agents:\s*"kbBoardTabAgents"/,
     "the Agents pane is not registered with the modal's tabs",
   );
@@ -492,7 +495,7 @@ test("only the clients with a command offer one", () => {
 
   // The button copies a command only when Copy As asks for one AND there is one.
   assert.match(
-    read("src/tool/kanban.ts"),
+    read("src/tool/kanban-agents-tab.ts"),
     /const command = agentCopyMode === "command" \? connectionCommand\(info, client\) : null;/,
     "the copy button can copy a command the client does not have",
   );
