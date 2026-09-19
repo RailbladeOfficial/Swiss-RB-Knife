@@ -595,6 +595,108 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   object-fit: contain;
 }
 
+/* ── Image tab: where it goes ── */
+
+.wb-dest-group {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0 10px;
+}
+
+.wb-dest-group .toggle-btn,
+.wb-send-tags .toggle-btn {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+.wb-card-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  margin-top: 6px;
+  overflow-y: auto;
+}
+
+.wb-card-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.wb-card-result:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.wb-card-result.active,
+.wb-card-result.active:hover {
+  background: color-mix(in srgb, var(--color-btn) 18%, transparent);
+  border-color: var(--color-btn);
+}
+
+.wb-card-result-num,
+.wb-card-result-col {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.wb-card-result-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.wb-send-none {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Advanced ── */
+
+.wb-send-advanced {
+  margin-top: 14px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.wb-send-advanced summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.wb-send-advanced summary:hover {
+  color: var(--color-text);
+}
+
+.wb-send-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.wb-field-label {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.wb-send-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 /* Cancel on its own at the left, the two sends together at the right. */
 .wb-send-actions {
   display: flex;

@@ -61,8 +61,14 @@ import { attachMenu, isTextEntry, type MenuItem } from "../menu/menu";
 import { appConfirm, backgroundMenu, flash, navigateToTool } from "../core/shell";
 import {
   MAX_TITLE_LEN,
+  PRIORITIES,
   addCardsFromElsewhere,
   addImageCardFromElsewhere,
+  attachImageToCard,
+  findCardsOnBoard,
+  priorityLabel,
+  type IncomingOptions,
+  type Priority,
   isHexColor,
   kanbanTargets,
   readableTextOn,
@@ -2771,6 +2777,18 @@ let sendAreaNote: HTMLElement;
 let sendTargets: KanbanTarget[] = [];
 let sendChecked = new Set<string>();
 let sendArea: ImageArea = "board";
+/** Where the Image tab sends: a new card, or one already on the board. */
+let sendDest: "new" | "existing" = "new";
+let sendCardId: string | null = null;
+let sendTagIds = new Set<string>();
+let sendColumnField: HTMLElement;
+let sendNewFields: HTMLElement;
+let sendExistingFields: HTMLElement;
+let sendCardSearch: HTMLInputElement;
+let sendCardResults: HTMLElement;
+let sendAdvanced: HTMLDetailsElement;
+let sendPriority: HTMLSelectElement;
+let sendTagsEl: HTMLElement;
 let sendBusy = false;
 
 /** Top to bottom, then left to right, the order a person reads a board in. */
@@ -2834,6 +2852,14 @@ function openSend(tab?: SendTab, onlyNote?: string): void {
   sendChecked = new Set(onlyNote ? [onlyNote] : notes.map((n) => n.id));
   sendArea = selection ? "selection" : "board";
   sendImageTitle.value = "Whiteboard";
+  // Every send starts plain: a new card, nothing extra. Advanced is there
+  // when it is wanted and costs nothing when it is not.
+  sendDest = "new";
+  sendCardId = null;
+  sendCardSearch.value = "";
+  sendTagIds = new Set();
+  sendPriority.value = "none";
+  sendAdvanced.open = false;
   sendTabs.select(tab ?? (selection || texts.length === 0 ? "image" : "text"));
   fillSendTargets();
   renderSendList();
@@ -2869,6 +2895,11 @@ function fillSendTargets(): void {
 }
 
 function fillSendColumns(): void {
+  // A different board has different tags and different cards.
+  sendTagIds = new Set();
+  sendCardId = null;
+  renderSendTags();
+  renderCardResults();
   sendColumnSel.replaceChildren();
   const board = sendTargets.find((t) => t.id === sendBoardSel.value);
   if (!board || board.columns.length === 0) {
@@ -2934,6 +2965,92 @@ function chosenArea(): Area | null {
   return contentArea(sendIncludeText.checked);
 }
 
+/** Shows the fields the current tab and destination use, and only those. An
+ *  existing card needs no column and takes no new-card extras. */
+function syncSendFields(): void {
+  const existing = sendTabs.active === "image" && sendDest === "existing";
+  sendColumnField.style.display = existing ? "none" : "";
+  sendAdvanced.style.display = existing ? "none" : "";
+  sendNewFields.style.display = sendDest === "new" ? "" : "none";
+  sendExistingFields.style.display = sendDest === "existing" ? "" : "none";
+  document.querySelectorAll<HTMLButtonElement>(".wb-dest-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.dest === sendDest);
+  });
+  updateSendButtons();
+}
+
+function renderSendTags(): void {
+  const board = sendTargets.find((t) => t.id === sendBoardSel.value);
+  sendTagsEl.replaceChildren();
+  if (!board || board.tags.length === 0) {
+    const none = document.createElement("span");
+    none.className = "wb-send-none";
+    none.textContent = "No tags";
+    sendTagsEl.appendChild(none);
+    return;
+  }
+  for (const tag of board.tags) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "toggle-btn wb-tag-chip";
+    chip.textContent = tag.name;
+    chip.title = tag.category;
+    chip.classList.toggle("active", sendTagIds.has(tag.id));
+    chip.addEventListener("click", () => {
+      if (sendTagIds.has(tag.id)) sendTagIds.delete(tag.id);
+      else sendTagIds.add(tag.id);
+      chip.classList.toggle("active", sendTagIds.has(tag.id));
+    });
+    sendTagsEl.appendChild(chip);
+  }
+}
+
+/** The cards matching the search, best first. Picking one is what Send sends
+ *  to; a new search that no longer lists it lets it go. */
+function renderCardResults(): void {
+  const board = sendTargets.find((t) => t.id === sendBoardSel.value);
+  const matches = board ? findCardsOnBoard(board.id, sendCardSearch.value) : [];
+  if (!matches.some((m) => m.id === sendCardId)) sendCardId = null;
+  sendCardResults.replaceChildren();
+  if (matches.length === 0) {
+    const none = document.createElement("span");
+    none.className = "wb-send-none";
+    none.textContent = board ? "No matching cards" : "";
+    sendCardResults.appendChild(none);
+  }
+  for (const m of matches) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "wb-card-result";
+    row.classList.toggle("active", m.id === sendCardId);
+    const num = document.createElement("span");
+    num.className = "wb-card-result-num";
+    num.textContent = `#${m.number}`;
+    const title = document.createElement("span");
+    title.className = "wb-card-result-title";
+    title.textContent = m.title;
+    const col = document.createElement("span");
+    col.className = "wb-card-result-col";
+    col.textContent = m.column;
+    row.append(num, title, col);
+    row.addEventListener("click", () => {
+      sendCardId = m.id;
+      renderCardResults();
+    });
+    sendCardResults.appendChild(row);
+  }
+  updateSendButtons();
+}
+
+/** The Advanced choices, for the cards a send creates. */
+function sendOptions(): IncomingOptions {
+  const priority = sendPriority.value as Priority;
+  return {
+    tagIds: [...sendTagIds],
+    priority: PRIORITIES.includes(priority) ? priority : undefined,
+  };
+}
+
 function renderImageTab(): void {
   document.querySelectorAll<HTMLButtonElement>(".wb-area-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.area === sendArea);
@@ -2957,9 +3074,11 @@ function updateSendButtons(): void {
   const picked = texts.filter((t) => sendChecked.has(t.id)).length;
   sendCount.textContent = `${picked} of ${total}`;
   sendAllBtn.textContent = picked === total ? "Select None" : "Select All";
-  const hasTarget = !sendBoardSel.disabled && !sendColumnSel.disabled && !sendBusy;
+  const existing = sendTabs.active === "image" && sendDest === "existing";
+  const hasTarget = !sendBoardSel.disabled && (existing || !sendColumnSel.disabled) && !sendBusy;
   const ready =
-    hasTarget && (sendTabs.active === "text" ? picked > 0 : chosenArea() !== null);
+    hasTarget &&
+    (sendTabs.active === "text" ? picked > 0 : chosenArea() !== null && (!existing || sendCardId !== null));
   sendBtn.disabled = !ready;
   sendClearBtn.disabled = !ready;
 }
@@ -2991,7 +3110,7 @@ async function sendText(clearAfter: boolean): Promise<void> {
   if (!dest || chosen.length === 0 || sendBusy) return;
 
   setSendBusy(true);
-  const result = await addCardsFromElsewhere(dest.board.id, dest.column.id, chosen.map(noteToCard));
+  const result = await addCardsFromElsewhere(dest.board.id, dest.column.id, chosen.map(noteToCard), sendOptions());
   setSendBusy(false);
   if (!result.ok) {
     flash(result.error, "error", 8000);
@@ -3021,18 +3140,26 @@ async function sendText(clearAfter: boolean): Promise<void> {
 async function sendImage(clearAfter: boolean): Promise<void> {
   const area = chosenArea();
   const includeText = sendIncludeText.checked;
-  const dest = sendDestination();
-  if (!dest || !area || sendBusy) return;
+  const board = sendTargets.find((t) => t.id === sendBoardSel.value);
+  const existing = sendDest === "existing";
+  // An existing card has a column of its own, so only a new card needs one.
+  const dest = existing ? null : sendDestination();
+  if (!board || !area || sendBusy || (existing ? !sendCardId : !dest)) return;
 
   setSendBusy(true);
   const png = renderArea(area, includeText).toDataURL("image/png").split(",")[1] ?? "";
-  const result = await addImageCardFromElsewhere(
-    dest.board.id,
-    dest.column.id,
-    sendImageTitle.value.trim().slice(0, MAX_TITLE_LEN) || "Whiteboard",
-    `whiteboard-${fileTimestamp()}.png`,
-    png,
-  );
+  const fileName = `whiteboard-${fileTimestamp()}.png`;
+  const result =
+    existing && sendCardId
+      ? await attachImageToCard(board.id, sendCardId, fileName, png)
+      : await addImageCardFromElsewhere(
+          board.id,
+          dest!.column.id,
+          sendImageTitle.value.trim().slice(0, MAX_TITLE_LEN) || "Whiteboard",
+          fileName,
+          png,
+          sendOptions(),
+        );
   setSendBusy(false);
   if (!result.ok) {
     flash(result.error, "error", 8000);
@@ -3040,7 +3167,7 @@ async function sendImage(clearAfter: boolean): Promise<void> {
   }
   sendModal.close();
   if (!result.saved) {
-    flash("Kanban couldn't save the new card.", "error", 8000);
+    flash("Kanban couldn't save the card.", "error", 8000);
     return;
   }
 
@@ -3052,7 +3179,7 @@ async function sendImage(clearAfter: boolean): Promise<void> {
     if (settings.homeAfterSend) goHome();
     await flushSave();
   }
-  flash(`Sent to "${dest.board.name}".`, "success");
+  flash(existing ? `Added to card #${result.number}.` : `Sent to "${board.name}".`, "success");
 }
 
 function send(clearAfter: boolean): void {
@@ -3067,7 +3194,7 @@ function wireSendModal(): void {
     panes: { text: "wbSendTabText", image: "wbSendTabImage" },
     onActivate: (tab) => {
       if (tab === "image") renderImageTab();
-      else updateSendButtons();
+      syncSendFields();
     },
   });
   sendModal = new Modal(document.getElementById("wbSendBackdrop")!, { tabs: sendTabs });
@@ -3084,6 +3211,32 @@ function wireSendModal(): void {
   sendImageTitle = document.getElementById("wbSendImageTitle") as HTMLInputElement;
   sendPreview = document.getElementById("wbSendPreview") as HTMLImageElement;
   sendAreaNote = document.getElementById("wbSendAreaEmpty")!;
+  sendColumnField = document.getElementById("wbSendColumnField")!;
+  sendNewFields = document.getElementById("wbSendNewFields")!;
+  sendExistingFields = document.getElementById("wbSendExistingFields")!;
+  sendCardSearch = document.getElementById("wbSendCardSearch") as HTMLInputElement;
+  sendCardResults = document.getElementById("wbSendCardResults")!;
+  sendAdvanced = document.getElementById("wbSendAdvanced") as HTMLDetailsElement;
+  sendPriority = document.getElementById("wbSendPriority") as HTMLSelectElement;
+  sendTagsEl = document.getElementById("wbSendTags")!;
+
+  for (const level of PRIORITIES) {
+    const opt = document.createElement("option");
+    opt.value = level;
+    opt.textContent = priorityLabel(level);
+    sendPriority.appendChild(opt);
+  }
+  sendCardSearch.addEventListener("input", renderCardResults);
+  document.querySelectorAll<HTMLButtonElement>(".wb-dest-btn").forEach((b) => {
+    b.addEventListener("click", () => {
+      sendDest = b.dataset.dest === "existing" ? "existing" : "new";
+      syncSendFields();
+      if (sendDest === "existing") {
+        renderCardResults();
+        sendCardSearch.focus();
+      }
+    });
+  });
 
   document.getElementById("wbSendClose")!.addEventListener("click", () => sendModal.close());
   document.getElementById("wbSendCancelBtn")!.addEventListener("click", () => sendModal.close());

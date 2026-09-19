@@ -14115,6 +14115,8 @@ export interface KanbanTarget {
   id: string;
   name: string;
   columns: { id: string; title: string }[];
+  /** The board's tags still in use, in the order its setup lists them. */
+  tags: { id: string; name: string; category: string }[];
 }
 
 /** Every board, in the order the gallery shows them, or null while Kanban is
@@ -14125,7 +14127,76 @@ export function kanbanTargets(): KanbanTarget[] | null {
     id: b.id,
     name: b.name,
     columns: b.columns.map((c) => ({ id: c.id, title: c.title })),
+    tags: b.tagCategories
+      .filter((cat) => cat.status === "active")
+      .flatMap((cat) =>
+        b.tags
+          .filter((t) => t.categoryId === cat.id && t.status === "active")
+          .map((t) => ({ id: t.id, name: t.name, category: cat.name })),
+      ),
   }));
+}
+
+/** A card as a picker lists it. */
+export interface CardMatch {
+  id: string;
+  number: number;
+  title: string;
+  column: string;
+}
+
+/**
+ * Cards on a board matching what was typed, best first, for finding one whose
+ * exact name you cannot remember.
+ *
+ * Every word has to match, through the board's own filter (cardMatchesText),
+ * so "crash bob" finds the card whose comment mentions Bob's crash log. The
+ * ranking puts the title first: a number typed as the card's number, then a
+ * title that starts with the words, then one that has every word, then cards
+ * that matched only on what is written inside them. Nothing typed lists the
+ * most recently changed cards.
+ */
+export function findCardsOnBoard(boardId: string, query: string, limit = 20): CardMatch[] {
+  const board = getBoard(boardId);
+  if (!board) return [];
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const live = liveCardsOnBoard(board.id);
+  const scored: { card: Card; score: number }[] = [];
+  for (const card of live) {
+    if (!words.every((w) => cardMatchesText(card, w))) continue;
+    const title = card.title.toLowerCase();
+    const q = words.join(" ");
+    let score = 0;
+    if (words.length === 1 && String(card.number) === words[0].replace(/^#/, "")) {
+      score = 4;
+    } else if (q && title.startsWith(q)) score = 3;
+    else if (words.length > 0 && words.every((w) => title.includes(w))) score = 2;
+    else if (words.length > 0) score = 1;
+    scored.push({ card, score });
+  }
+  scored.sort((a, b) => b.score - a.score || b.card.updatedAt - a.card.updatedAt);
+  return scored.slice(0, limit).map(({ card }) => ({
+    id: card.id,
+    number: card.number,
+    title: card.title,
+    column: getColumn(board, card.columnId)?.title ?? "",
+  }));
+}
+
+/** What new cards can carry from the start, beyond a title. */
+export interface IncomingOptions {
+  tagIds?: string[];
+  priority?: Priority;
+}
+
+/** Options checked against the board: tags that are not on it, or no longer
+ *  in use, are left off rather than refusing the send. */
+function applyIncomingOptions(card: Card, board: Board, options: IncomingOptions | undefined): void {
+  if (!options) return;
+  if (options.priority && PRIORITIES.includes(options.priority)) card.priority = options.priority;
+  const known = new Set(board.tags.filter((t) => t.status === "active").map((t) => t.id));
+  const tagIds = (options.tagIds ?? []).filter((id) => known.has(id));
+  if (tagIds.length > 0) card.tagIds = [...new Set(tagIds)];
 }
 
 export interface IncomingCard {
@@ -14145,6 +14216,7 @@ export async function addCardsFromElsewhere(
   boardId: string,
   columnId: string,
   incoming: IncomingCard[],
+  options?: IncomingOptions,
 ): Promise<IncomingCardsResult> {
   const refusal = incomingRefusal(boardId, columnId, incoming.length);
   if (refusal) return { ok: false, error: refusal };
@@ -14160,6 +14232,7 @@ export async function addCardsFromElsewhere(
     const card = createCard(board, column.id, title, "bottom");
     if (!card) break;
     card.description = trimTo(item.description, MAX_DESC_LEN);
+    applyIncomingOptions(card, board, options);
     card.subtasks = (item.subtasks ?? [])
       .filter((t) => t.text.trim())
       .slice(0, MAX_SUBTASKS_PER_CARD)
@@ -14173,9 +14246,8 @@ export async function addCardsFromElsewhere(
   return { ok: true, numbers, saved: !dirtyBoards.has(board.id) };
 }
 
-/** Everything that stops a batch landing on a board, asked before anything is
- *  made. Null when it can land. */
-function incomingRefusal(boardId: string, columnId: string, count: number): string | null {
+/** Everything that stops anything being written to a board. Null when it can. */
+function boardRefusal(boardId: string): string | null {
   if (!storeLoaded) return "Kanban is still loading. Try again in a moment.";
   const frozen = writesFrozen();
   if (frozen) return `Kanban is not saving: ${frozen}`;
@@ -14184,12 +14256,77 @@ function incomingRefusal(boardId: string, columnId: string, count: number): stri
   if (unreadableFiles.has(board.id) || unreadableFiles.has("index")) {
     return `Kanban could not read the file for "${board.name}" when the app started, so nothing is added to it.`;
   }
+  return null;
+}
+
+/** Everything that stops a batch landing on a board, asked before anything is
+ *  made. Null when it can land. */
+function incomingRefusal(boardId: string, columnId: string, count: number): string | null {
+  const refused = boardRefusal(boardId);
+  if (refused) return refused;
+  const board = getBoard(boardId)!;
   if (!getColumn(board, columnId)) return `That column is no longer on "${board.name}".`;
   const room = MAX_CARDS_PER_BOARD - liveCardsOnBoard(board.id).length;
   if (count > room) {
     return `"${board.name}" has room for ${room.toLocaleString()} more ${room === 1 ? "card" : "cards"}.`;
   }
   return null;
+}
+
+/** A PNG added to a card that already exists. Stored first, so a refused
+ *  store leaves the card as it was. */
+export async function attachImageToCard(
+  boardId: string,
+  cardId: string,
+  fileName: string,
+  pngBase64: string,
+): Promise<IncomingImageResult> {
+  const refusal = boardRefusal(boardId);
+  if (refusal) return { ok: false, error: refusal };
+  const card = getCard(cardId);
+  if (!card || card.boardId !== boardId || card.archived) {
+    return { ok: false, error: "That card is no longer on the board." };
+  }
+  // The card modal saves as you type, so a card open in it is left alone, the
+  // same rule an agent is held to.
+  if (openCardId === card.id) return { ok: false, error: `Card #${card.number} is open in Kanban.` };
+  if (card.attachments.length >= MAX_ATTACHMENTS) {
+    return { ok: false, error: `Card #${card.number} has ${MAX_ATTACHMENTS} attachments, the most it can hold.` };
+  }
+  if (pngBase64.length > (MAX_ATTACHMENT_BYTES / 3) * 4) {
+    return {
+      ok: false,
+      error: `That image is over the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB limit for one attachment.`,
+    };
+  }
+  let stored: { id: string; name: string; size: number; file: string };
+  try {
+    stored = await invoke("paste_kanban_attachment", {
+      boardId,
+      attachmentId: newId(),
+      name: fileName,
+      dataBase64: pngBase64,
+    });
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+  // Asked again: the card could have gone while the image was being written.
+  const still = getCard(cardId);
+  if (!still || still.archived) {
+    void invoke("delete_kanban_attachment", { boardId, attachmentId: stored.id }).catch(() => {});
+    return { ok: false, error: "That card is no longer on the board." };
+  }
+  still.attachments.push({
+    id: stored.id,
+    name: stored.name,
+    size: stored.size,
+    file: stored.file,
+    addedAt: Date.now(),
+  });
+  stampCard(still);
+  renderAll();
+  await flushSave();
+  return { ok: true, number: still.number, saved: !dirtyBoards.has(boardId) };
 }
 
 export type IncomingImageResult =
@@ -14205,6 +14342,7 @@ export async function addImageCardFromElsewhere(
   title: string,
   fileName: string,
   pngBase64: string,
+  options?: IncomingOptions,
 ): Promise<IncomingImageResult> {
   const refusal = incomingRefusal(boardId, columnId, 1);
   if (refusal) return { ok: false, error: refusal };
@@ -14242,6 +14380,7 @@ export async function addImageCardFromElsewhere(
     file: stored.file,
     addedAt: Date.now(),
   });
+  applyIncomingOptions(card, board!, options);
   stampCard(card);
   renderAll();
   await flushSave();

@@ -7787,7 +7787,7 @@
             <label for="wbSendBoard">Board</label>
             <select id="wbSendBoard"></select>
           </div>
-          <div class="setup-field">
+          <div id="wbSendColumnField" class="setup-field">
             <label for="wbSendColumn">Column</label>
             <select id="wbSendColumn"></select>
           </div>
@@ -7818,15 +7818,39 @@
             <label class="wb-send-check"><input type="checkbox" id="wbSendIncludeText" checked /> Include text
               boxes</label>
           </div>
-          <div class="setup-field">
+          <div class="wb-dest-group" role="group" aria-label="Destination">
+            <button type="button" class="toggle-btn wb-dest-btn" data-dest="new">New Card</button>
+            <button type="button" class="toggle-btn wb-dest-btn" data-dest="existing">Existing Card</button>
+          </div>
+          <div id="wbSendNewFields" class="setup-field">
             <label for="wbSendImageTitle">Card Title</label>
             <input id="wbSendImageTitle" type="text" maxlength="200" autocomplete="off" />
+          </div>
+          <div id="wbSendExistingFields" class="setup-field" style="display:none;">
+            <label for="wbSendCardSearch">Card</label>
+            <input id="wbSendCardSearch" type="search" placeholder="Search cards" autocomplete="off"
+              spellcheck="false" />
+            <div id="wbSendCardResults" class="wb-card-results"></div>
           </div>
           <div class="wb-send-preview-wrap">
             <img id="wbSendPreview" class="wb-send-preview" alt="" />
             <p id="wbSendAreaEmpty" class="wb-send-empty" style="display:none;">Nothing to send.</p>
           </div>
         </div>
+
+        <details id="wbSendAdvanced" class="wb-send-advanced">
+          <summary>Advanced</summary>
+          <div class="wb-send-advanced-body">
+            <div class="setup-field">
+              <label for="wbSendPriority">Priority</label>
+              <select id="wbSendPriority"></select>
+            </div>
+            <div class="setup-field">
+              <span class="wb-field-label">Tags</span>
+              <div id="wbSendTags" class="wb-send-tags"></div>
+            </div>
+          </div>
+        </details>
 
         <div class="wb-send-actions">
           <button id="wbSendCancelBtn" type="button" class="modal-cancel-btn">Cancel</button>
