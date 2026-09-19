@@ -34,6 +34,12 @@
 
    Either way the menu is kept fully on screen; see positionMenu().
 
+   The SECOND argument takes a function as well as an array. Pass a function
+   when any row is marked keepOpen: that row leaves the menu up, and the panel
+   is then built again from the function so its ticks, counts and grayed-out
+   rows describe what the click just did. attachMenu already does this for its
+   callers. An array is still right for a menu whose every row closes it.
+
    -----------------------------------------------------------------------------
    WIRING A RIGHT-CLICK MENU
 
@@ -66,6 +72,20 @@ export interface MenuItem {
    *  own without the menu still sitting over it. Ignored when `submenu` is
    *  set: that row's job is to open the submenu. */
   onClick?: () => void;
+  /** Leaves the menu up after `onClick`, and builds it again from the
+   *  caller so the row's own state is current.
+   *
+   *  For the EDIT rows: priority, effort, owner, tags. Those are the ones you
+   *  reach for several at a time, and a menu that closes on each one makes
+   *  putting three tags on a card three right-clicks and six drill-downs. A
+   *  row that opens a screen of its own, moves the card somewhere else, or
+   *  destroys something must NOT set this: the menu would be left describing
+   *  something that is no longer in front of you.
+   *
+   *  Only meaningful when the caller passed its rows as a function; see
+   *  MenuItems. With a plain array there is nothing to rebuild from, so the
+   *  panel would redraw the stale list. */
+  keepOpen?: boolean;
   /** Turns the row into a drill-down into these items. See DRILL-DOWN below. */
   submenu?: MenuItem[];
   /** Renders in the danger color. For destructive rows (Delete, Remove). */
@@ -153,12 +173,39 @@ export function isMenuOpen(): boolean {
   return openMenuEl !== null;
 }
 
+/** How a caller hands its rows over.
+ *
+ *  A plain array is the common case: the rows are decided when the menu
+ *  opens and nothing about them changes while it is up.
+ *
+ *  A FUNCTION is what a menu containing `keepOpen` rows needs. Those rows
+ *  change the very thing the menu is describing, so after one runs the panel
+ *  has to be built again from the new state rather than redrawn from the list
+ *  it was opened with. Passing the builder rather than its output is what
+ *  makes that possible. */
+export type MenuItems = MenuItem[] | (() => MenuItem[]);
+
 /** Opens a menu at `anchor`. Replaces any menu already open. */
-export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
+export function openMenu(anchor: MenuAnchor, items: MenuItems): void {
   closeMenu();
+
+  const build: () => MenuItem[] = typeof items === "function" ? items : () => items;
+
+  const top = build();
   // Separators alone are not a menu: a caller that assembled every group out
   // of nothing would otherwise get an empty panel with a rule in it.
-  if (items.every((item) => item.separator === true)) return;
+  if (top.length === 0 || top.every((item) => item.separator === true)) return;
+
+  /* The check above already built the tree, so the first draw uses that one
+     rather than asking for another. Not about the cost: a builder is allowed
+     to have a side effect (the card menu drops a stale selection as it
+     builds), and running it twice for one opening would run that twice. */
+  let firstBuild: MenuItem[] | null = top;
+  const buildOnce = (): MenuItem[] => {
+    const tree = firstBuild ?? build();
+    firstBuild = null;
+    return tree;
+  };
 
   const menu = document.createElement("div");
   menu.className = "menu";
@@ -166,22 +213,41 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
   // reads a bare stack of buttons with no indication they belong together.
   menu.setAttribute("role", "menu");
 
-  /** Fills the panel with one level. `back` is the level to return to, or
-   *  null at the top. Re-entrant: a submenu row calls it again. */
-  const renderLevel = (level: MenuItem[], back: MenuItem[] | null): void => {
+  /* WHERE WE ARE, HELD AS LABELS RATHER THAN AS THE ROWS THEMSELVES.
+     The drill-down path used to be the actual MenuItem arrays, passed down as
+     the level to go back to. That cannot survive a rebuild: a keepOpen row
+     inside a submenu produces a whole new tree, and the arrays we were
+     holding belong to the old one. Labels are what the two trees have in
+     common, so the path is re-walked rather than remembered. */
+  const trail: string[] = [];
+
+  /** The level `trail` points at, built fresh from the caller each time.
+   *  Null when a rebuild no longer has that submenu in it, which is the
+   *  honest answer for a category whose last tag was just deleted. */
+  const levelAt = (): MenuItem[] | null => {
+    let level = buildOnce();
+    for (const label of trail) {
+      const row = level.find((i) => !i.separator && i.label === label && i.submenu);
+      if (!row?.submenu || row.submenu.length === 0) return null;
+      level = row.submenu;
+    }
+    return level;
+  };
+
+  /** Fills the panel with one level, growing a "‹ Back" row whenever there is
+   *  somewhere to go back to. */
+  const renderLevel = (level: MenuItem[]): void => {
     menu.textContent = "";
 
-    if (back) {
+    if (trail.length > 0) {
       const backBtn = document.createElement("button");
       backBtn.type = "button";
       backBtn.className = "menu-item menu-item-back";
       backBtn.setAttribute("role", "menuitem");
       backBtn.textContent = "‹ Back";
       backBtn.addEventListener("click", () => {
-        renderLevel(back, null);
-        // The level being returned to is usually taller, so it can now hang
-        // off the bottom of the window if it was opened low down.
-        positionMenu(menu, anchor);
+        trail.pop();
+        render();
       });
       menu.appendChild(backBtn);
     }
@@ -205,6 +271,22 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
       if (item.danger) btn.classList.add("menu-item-danger");
       btn.disabled = item.disabled === true;
 
+      /** What clicking the row does, once its contents are in place. */
+      const activate = (): void => {
+        if (item.keepOpen) {
+          // The panel is about to be thrown away and built again, so the
+          // scroll position has to be carried across by hand or a long tag
+          // list jumps back to the top on every tick.
+          const scroll = menu.scrollTop;
+          item.onClick?.();
+          render();
+          menu.scrollTop = scroll;
+          return;
+        }
+        closeMenu();
+        item.onClick?.();
+      };
+
       if (item.submenu && item.submenu.length > 0) {
         btn.classList.add("menu-item-parent");
         // The chevron is a separate element rather than part of the label so
@@ -219,8 +301,8 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
         chevron.setAttribute("aria-hidden", "true");
         btn.append(text, chevron);
         btn.addEventListener("click", () => {
-          renderLevel(item.submenu!, level);
-          positionMenu(menu, anchor);
+          trail.push(item.label ?? "");
+          render();
         });
       } else if (item.swatch) {
         // Swatch then label, as two elements, so the color is a block rather
@@ -232,23 +314,28 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
         const text = document.createElement("span");
         text.textContent = item.label ?? "";
         btn.append(dot, text);
-        btn.addEventListener("click", () => {
-          closeMenu();
-          item.onClick?.();
-        });
+        btn.addEventListener("click", activate);
       } else {
         btn.textContent = item.label ?? "";
-        btn.addEventListener("click", () => {
-          closeMenu();
-          item.onClick?.();
-        });
+        btn.addEventListener("click", activate);
       }
 
       menu.appendChild(btn);
     }
   };
 
-  renderLevel(items, null);
+  /** Draws whatever `trail` now points at, and places the panel again: a
+   *  level reached by drilling in is a different height from the one it
+   *  replaced. Closes instead when the path has gone. */
+  const render = (): void => {
+    const level = levelAt();
+    if (!level || level.length === 0) {
+      closeMenu();
+      return;
+    }
+    renderLevel(level);
+    positionMenu(menu, anchor);
+  };
 
   // A menu never takes focus. Pressing a <button> focuses it, which blurs
   // whatever had focus before, and the text-field menu (edit-menu.ts) acts on
@@ -259,10 +346,11 @@ export function openMenu(anchor: MenuAnchor, items: MenuItem[]): void {
   // nothing here that wanted the focus.
   menu.addEventListener("mousedown", (e) => e.preventDefault());
 
-  // Appended before positioning: the placement math needs the menu's real
-  // measured size, which does not exist until it is in the document.
+  // Appended before the first draw: both the height cap and the placement
+  // math need the menu's real measured size, which does not exist until it is
+  // in the document.
   document.body.appendChild(menu);
-  positionMenu(menu, anchor);
+  render();
 
   openMenuEl = menu;
   menuDismiss = new AbortController();
@@ -325,7 +413,20 @@ export function attachMenu(
     // outer element's handler would fire next and replace the menu the inner
     // one just opened, so the most specific target always wins.
     e.stopPropagation();
-    openMenu({ x: e.clientX, y: e.clientY }, items);
+    // The BUILDER goes in, not just the rows it produced, so a keepOpen row
+    // can rebuild against the state its own click left behind. The rows in
+    // hand are handed over for the first draw so the builder still runs
+    // exactly once per opening.
+    if (typeof build !== "function") {
+      openMenu({ x: e.clientX, y: e.clientY }, items);
+      return;
+    }
+    let first: MenuItem[] | null = items;
+    openMenu({ x: e.clientX, y: e.clientY }, () => {
+      const rows = first ?? build(e) ?? [];
+      first = null;
+      return rows;
+    });
   });
 }
 
@@ -348,7 +449,12 @@ export function attachMenuDelegated(
     if (!items || items.length === 0) return;
     e.preventDefault();
     e.stopPropagation();
-    openMenu({ x: e.clientX, y: e.clientY }, items);
+    let first: MenuItem[] | null = items;
+    openMenu({ x: e.clientX, y: e.clientY }, () => {
+      const rows = first ?? build(row, e) ?? [];
+      first = null;
+      return rows;
+    });
   });
 }
 

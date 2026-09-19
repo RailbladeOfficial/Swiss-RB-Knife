@@ -4395,6 +4395,7 @@ function ownerChoices(
   const items: MenuItem[] = [
     {
       label: "You",
+      keepOpen: true,
       onClick: () => apply(undefined),
     },
   ];
@@ -4402,10 +4403,14 @@ function ownerChoices(
   for (const token of agentConnectionsForBoard(boardId)) {
     items.push({
       label: token.label,
+      keepOpen: true,
       onClick: () => apply({ kind: "agent", by: token.id, label: token.label }),
     });
   }
 
+  /* NOT keepOpen, unlike the rows above it: this one puts a prompt on screen,
+     and a menu left standing behind a dialog is a menu about something you
+     can no longer see. */
   items.push({
     label: "External\u2026",
     onClick: () => {
@@ -4527,6 +4532,7 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
 
   const priorityItems: MenuItem[] = PRIORITIES.map((p) => ({
     label: priorityLabel(p),
+    keepOpen: true,
     onClick: () =>
       overSelection(
         (card) => {
@@ -4539,6 +4545,7 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
 
   const effortItems: MenuItem[] = EFFORTS.map((eff) => ({
     label: effortLabel(eff),
+    keepOpen: true,
     onClick: () =>
       overSelection(
         (card) => {
@@ -4605,6 +4612,7 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
           return {
             label: `${mark} ${tag.name}${on > 0 && on < count ? ` (${on} of ${count})` : ""}`,
             swatch: tagColor(tag, categories) ?? undefined,
+            keepOpen: true,
             onClick: () => {
               // Re-read at click time, not from `selection`: the count that
               // decided the mark was taken when the menu was built.
@@ -4747,6 +4755,7 @@ function boardCardMenu(card: Card): MenuItem[] {
   const priorityItems: MenuItem[] = PRIORITIES.map((p) => ({
     label: priorityLabel(p),
     disabled: card.priority === p,
+    keepOpen: true,
     onClick: () => {
       card.priority = p;
       stampCard(card);
@@ -4761,6 +4770,7 @@ function boardCardMenu(card: Card): MenuItem[] {
   const effortItems: MenuItem[] = EFFORTS.map((eff) => ({
     label: effortLabel(eff),
     disabled: card.effort === eff,
+    keepOpen: true,
     onClick: () => {
       card.effort = eff;
       stampCard(card);
@@ -5757,7 +5767,10 @@ function getCardModal(): Modal {
   document.getElementById("kbCardMenuBtn")!.addEventListener("click", (e) => {
     const card = getCard(openCardId);
     if (!card) return;
-    openMenu(e.currentTarget as HTMLElement, [
+    /* A BUILDER, not an array: Owner is a keepOpen row, so the panel is drawn
+       again after one is picked and has to be built from the card as it now
+       is, not as it was when the button was pressed. */
+    openMenu(e.currentTarget as HTMLElement, () => [
       { label: "Card Color", onClick: () => openCardColor(card) },
       { label: "Owner", submenu: cardOwnerMenu(card) },
       { label: "Card Stats", onClick: () => openCardStats(card) },
@@ -7945,7 +7958,9 @@ function renderCardTags(card: Card): void {
   add.title = "Put a tag on this card, by category";
   add.addEventListener("click", (e) => {
     closeTagSearch();
-    openMenu(e.currentTarget as HTMLElement, cardTagMenu(card, boardCategories, boardTags));
+    // Rebuilt on each tick rather than opened once: the ticks and the per
+    // category counts are what tell you what you have just done.
+    openMenu(e.currentTarget as HTMLElement, () => cardTagMenu(card, boardCategories, boardTags));
   });
   tools.appendChild(add);
 
@@ -8286,6 +8301,7 @@ function cardTagMenu(
            the same tags. A tag with no color of its own inherits its category's,
            and one with neither gets no swatch rather than an invented color. */
         swatch: tagColor(tag, categories) ?? undefined,
+        keepOpen: true,
         onClick: () => {
           if (card.tagIds.includes(tag.id)) {
             card.tagIds = card.tagIds.filter((id) => id !== tag.id);
