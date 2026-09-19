@@ -246,6 +246,11 @@ test("the import loops this project has are the ones we know about", () => {
       "src/tool/game-stats",
       "src/tool/image-ccr",
       "src/tool/kanban",
+      /* The agent operations came out of kanban.ts in 0.8.0 and read the board
+         back. Deliberate, and safe for the reason at the top of this file:
+         every reference is inside a function, and the earliest one runs is
+         the first agent request. */
+      "src/tool/kanban-executor",
       "src/tool/rng",
       "src/tool/time-tracker",
       "src/tool/tts-repeater",

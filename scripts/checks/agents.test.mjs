@@ -8,7 +8,8 @@
                                    costs. This is the half that enforces.
      src/tool/kanban-agents.ts     the same permission ids, and the labels the
                                    switches are drawn from.
-     src/tool/kanban.ts            the operations, performed.
+     src/tool/kanban-executor.ts   the operations, performed.
+     src/tool/kanban.ts            the Agents TAB, which is ordinary UI.
      src-tauri/agent/src/main.rs   the tools an AI agent is offered.
 
    What drift looks like, in each direction:
@@ -22,9 +23,9 @@
        appear anywhere in the app.
      • An operation the sidecar offers that the gate does not know is a tool
        that always fails.
-     • An operation the gate allows that kanban.ts has no case for reaches the
-       front end and dies in the default branch, after the permission check has
-       already said yes.
+     • An operation the gate allows that the executor has no case for reaches
+       the front end and dies in the default branch, after the permission
+       check has already said yes.
 ============================================================================= */
 
 import test from "node:test";
@@ -33,7 +34,10 @@ import { read, htmlIds, slice } from "./_source.mjs";
 
 const gate = () => read("src-tauri/src/agent_gate.rs");
 const settings = () => read("src/tool/kanban-agents.ts");
+/* The Agents TAB, which is still in kanban.ts. */
 const kanban = () => read("src/tool/kanban.ts");
+/* The operations, which left kanban.ts for their own file in 0.8.0. */
+const executor = () => read("src/tool/kanban-executor.ts");
 const sidecar = () => read("src-tauri/agent/src/main.rs");
 
 /* -----------------------------------------------------------------------------
@@ -76,9 +80,9 @@ function gateOps() {
   }));
 }
 
-/** Every operation kanban.ts will actually perform. */
+/** Every operation the front end will actually perform. */
 function frontEndOps() {
-  const text = kanban();
+  const text = executor();
   const at = text.indexOf("async function runAgentRequest(");
   const block = text.slice(at, text.indexOf("\n}", text.indexOf("switch (req.op)", at)));
   return [...block.matchAll(/case "(\w+)":/g)].map((m) => m[1]);
@@ -229,13 +233,13 @@ test("a refused edit names the exact switch for that card, and asking never chan
   assert.match(asker, /"explain":\s*true/, "the gate does not mark its question as a question");
   assert.match(asker, /fallback/, "a failed question could lose the refusal's wording");
 
-  const text = kanban();
+  const text = executor();
   const run = text.slice(text.indexOf("async function runAgentRequest("), text.indexOf("switch (req.op)", text.indexOf("async function runAgentRequest(")));
   const explainAt = run.indexOf("if (req.explain)");
   assert.ok(explainAt > -1, "the front end does not answer the gate's question");
   assert.ok(explainAt < run.indexOf("checkAgentWriteRate"), "asking for wording is charged as a write");
 
-  const explain = slice("src/tool/kanban.ts", "function explainEditRefusal(", "\n}");
+  const explain = slice("src/tool/kanban-executor.ts", "function explainEditRefusal(", "\n}");
   for (const write of ["stampCard", "touchBoard", "flushSave", "renderAll", "saveBoard"]) {
     assert.ok(!explain.includes(write), `explaining a refusal calls ${write}, so it can change the board`);
   }

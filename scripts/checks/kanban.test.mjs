@@ -2306,20 +2306,22 @@ test("an agent can set the stage date a column stamps, and never on a done colum
     assert.match(spec, /"stage":/, `${tool} does not offer a stage`);
   }
 
-  const parse = slice("src/tool/kanban.ts", "function agentColumnStage(", "\n}");
+  // The operations moved to kanban-executor.ts in 0.8.0; the sidecar and the
+  // column editor they are checked against did not.
+  const parse = slice("src/tool/kanban-executor.ts", "function agentColumnStage(", "\n}");
   assert.match(parse, /raw === "completed"/, "an agent can set Completed as a stage instead of marking the column done");
   for (const fn of ["agentCreateColumn", "agentUpdateColumn"]) {
-    const body = slice("src/tool/kanban.ts", `function ${fn}(`, "\n}");
+    const body = slice("src/tool/kanban-executor.ts", `function ${fn}(`, "\n}");
     assert.match(body, /agentColumnStage\(params\)/, `${fn} ignores the stage`);
     assert.match(body, /isDone(?: \?\? column\.isDone\))? && stage\)/, `${fn} lets a done column stamp another stage`);
   }
-  const update = slice("src/tool/kanban.ts", "function agentUpdateColumn(", "\n}");
+  const update = slice("src/tool/kanban-executor.ts", "function agentUpdateColumn(", "\n}");
   assert.ok(
     update.indexOf("agentColumnStage(params)") < update.indexOf("column.title = trimmed"),
     "a refused stage can leave the column half changed",
   );
 
-  const board = slice("src/tool/kanban.ts", "function agentGetBoard(", "\n}");
+  const board = slice("src/tool/kanban-executor.ts", "function agentGetBoard(", "\n}");
   assert.match(board, /stage: arrivalStage\(column\)/, "an agent cannot see which stage a column stamps");
 });
 
