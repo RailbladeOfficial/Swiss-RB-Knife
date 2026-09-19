@@ -129,3 +129,16 @@ test("typed text is never put on the page as markup", () => {
   const ts = read(TS);
   assert.doesNotMatch(ts, /\.(innerHTML|outerHTML)\s*=|insertAdjacentHTML/, "whiteboard.ts writes markup");
 });
+
+test("a Custom theme repaints the ink, not only the text", () => {
+  /* Custom themes, and the theme editor's live preview, write their colors
+     onto the root element and never announce a "themechange". Text boxes
+     follow through CSS; the canvas does not, and without watching the root it
+     kept drawing a Custom theme's ink in the palette from before. */
+  const ts = read(TS);
+  assert.match(
+    ts,
+    /new MutationObserver\([\s\S]{0,400}?\)\.observe\(document\.documentElement,\s*\{[^}]*attributeFilter:\s*\["style"\]/,
+    "the whiteboard no longer watches the root for a Custom theme's colors",
+  );
+});

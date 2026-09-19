@@ -72,6 +72,8 @@ import {
   type Effort,
   type IncomingOptions,
   type Priority,
+  contrastRatio,
+  hexToRgb,
   isHexColor,
   kanbanTargets,
   readableTextOn,
@@ -217,6 +219,13 @@ const INKS: readonly { id: InkId; cssVar: string; label: string }[] = [
 ];
 
 const BOARD_FIXED: Record<"black" | "white", string> = { black: "#000000", white: "#ffffff" };
+
+/** The least contrast a theme pen is allowed against the board before it is
+ *  nudged toward readable. Low on purpose: this is "can you see the line",
+ *  not body-text legibility, and a pen should keep looking like its color. */
+const MIN_PEN_CONTRAST = 2;
+/** At most this many tenths of the way toward readable ink. */
+const PEN_NUDGE_STEPS = 7;
 
 /** Pen widths in board pixels. The eraser is wider than the pen at every size,
  *  because rubbing out a fine line with a fine eraser takes several passes. */
@@ -852,14 +861,13 @@ function boardHex(): string | null {
  *  swatch in the toolbar shows the same ink the board uses. */
 function applyBoardLook(): void {
   const hex = boardHex();
+  // --wb-ink is set by resolveInkColors, below, for every board.
   if (hex) {
     const ink = readableTextOn(hex);
     toolView.style.setProperty("--wb-board", hex);
-    toolView.style.setProperty("--wb-ink", ink);
     toolView.style.setProperty("--wb-dot", `color-mix(in srgb, ${ink} 22%, transparent)`);
   } else {
     toolView.style.removeProperty("--wb-board");
-    toolView.style.removeProperty("--wb-ink");
     toolView.style.removeProperty("--wb-dot");
   }
   stage.classList.toggle("wb-no-grid", !settings.grid);
@@ -868,15 +876,57 @@ function applyBoardLook(): void {
   requestRedraw();
 }
 
-/** Reads the pens out of the live theme. Called at load, on every theme
- *  change, and on entry, since a custom palette can change under the tool. */
+/**
+ * Reads the pens out of the live theme, as they will look on this board.
+ * Called at load, on every theme change, when the board's color changes, and
+ * on entry, since a custom palette can change under the tool.
+ *
+ * A PEN IS NUDGED UNTIL IT SHOWS. The five theme pens are a theme's chart
+ * colors, chosen to read on its panels, not on its board: a few themes carry
+ * one that nearly vanishes there (Rainbow's third, Valentine's fourth), and on
+ * a Black, White or Custom board any of them can. Such a pen is mixed toward
+ * whichever of dark or light reads on the board, a step at a time, only until
+ * it clears MIN_PEN_CONTRAST, so it stays recognizably the color it was. The
+ * result is handed to the stylesheet as --wb-pen-*, so a typed line and a
+ * drawn one in the same pen are the same color. A color picked by hand is
+ * never nudged: that was a choice, not a theme's accident.
+ */
 function resolveInkColors(): void {
   const style = getComputedStyle(document.documentElement);
+  const board = boardHex() ?? toHex(getComputedStyle(toolView).getPropertyValue("--color-input-bg").trim()) ?? null;
   for (const i of INKS) {
-    inkColors.set(i.id, style.getPropertyValue(i.cssVar).trim() || "#888888");
+    let color = style.getPropertyValue(i.cssVar).trim() || "#888888";
+    if (i.id === "ink" && boardHex()) color = readableTextOn(boardHex()!);
+    if (board) color = legibleOn(color, board);
+    inkColors.set(i.id, color);
+    toolView.style.setProperty(i.id === "ink" ? "--wb-ink" : `--wb-pen-${i.id}`, color);
   }
-  const hex = boardHex();
-  if (hex) inkColors.set("ink", readableTextOn(hex));
+}
+
+/** A color moved toward the readable ink for a board only as far as it needs
+ *  to be seen on it. See resolveInkColors. */
+function legibleOn(color: string, board: string): string {
+  const from = toHex(color);
+  const to = readableTextOn(board);
+  if (!from || contrastRatio(from, board) >= MIN_PEN_CONTRAST) return from ?? color;
+  let mixed = from;
+  for (let step = 1; step <= PEN_NUDGE_STEPS; step++) {
+    mixed = mixHex(from, to, step / 10);
+    if (contrastRatio(mixed, board) >= MIN_PEN_CONTRAST) break;
+  }
+  return mixed;
+}
+
+/** a mixed t of the way toward b, as #rrggbb. */
+function mixHex(a: string, b: string, t: number): string {
+  const x = hexToRgb(a);
+  const y = hexToRgb(b);
+  if (!x || !y) return a;
+  const ch = (p: number, q: number): string =>
+    Math.round(p + (q - p) * t)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${ch(x.r, y.r)}${ch(x.g, y.g)}${ch(x.b, y.b)}`;
 }
 
 function penColor(pen: Pen): string {
@@ -3945,11 +3995,27 @@ export function initWhiteboard(): void {
   wireSendModal();
   wireSetup();
 
-  window.addEventListener("themechange", () => {
+  const repaintForTheme = (): void => {
     resolveInkColors();
     updateCursor();
     requestRedraw();
-  });
+  };
+  window.addEventListener("themechange", repaintForTheme);
+  /* A Custom theme is applied by writing its colors onto the page's root
+     element, and the theme editor previews edits the same way, and neither
+     announces a "themechange". The text boxes follow those colors on their
+     own, through CSS; the canvas only sees them when asked, so it watches the
+     root for them. Batched to one repaint a frame, since a custom theme
+     writes forty-odd properties one at a time. */
+  let themeRepaintQueued = false;
+  new MutationObserver(() => {
+    if (themeRepaintQueued) return;
+    themeRepaintQueued = true;
+    requestAnimationFrame(() => {
+      themeRepaintQueued = false;
+      repaintForTheme();
+    });
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
 
   updateChrome();
   void load();

@@ -2,12 +2,14 @@
    WHITEBOARD
    -----------------------------------------------------------------------------
    A toolbar, and under it a board that fills the rest of the window. Colors
-   are theme variables, with three of the tool's own laid over them by
-   applyBoardLook() in whiteboard.ts when the board is not the theme's:
+   are theme variables, with some of the tool's own laid over them by
+   applyBoardLook() and resolveInkColors() in whiteboard.ts:
 
      --wb-board   the board's color          (default: the theme's input surface)
      --wb-ink     the "Ink" pen, readable on it (default: the theme's text)
      --wb-dot     the grid's dots            (default: the theme's dashed border)
+     --wb-pen-c1..c5  the five theme pens, nudged until they show on this
+                      board (default: the theme's chart colors)
 
    Every pen color is --wb-c, set by a wb-ink-* class for a theme slot or inline
    for a color picked by hand, so a swatch, the color button and a text box all
@@ -39,11 +41,11 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 }
 
 .wb-ink-ink { --wb-c: var(--wb-ink, var(--color-text)); }
-.wb-ink-c1 { --wb-c: var(--color-chart-1); }
-.wb-ink-c2 { --wb-c: var(--color-chart-2); }
-.wb-ink-c3 { --wb-c: var(--color-chart-3); }
-.wb-ink-c4 { --wb-c: var(--color-chart-4); }
-.wb-ink-c5 { --wb-c: var(--color-chart-5); }
+.wb-ink-c1 { --wb-c: var(--wb-pen-c1, var(--color-chart-1)); }
+.wb-ink-c2 { --wb-c: var(--wb-pen-c2, var(--color-chart-2)); }
+.wb-ink-c3 { --wb-c: var(--wb-pen-c3, var(--color-chart-3)); }
+.wb-ink-c4 { --wb-c: var(--wb-pen-c4, var(--color-chart-4)); }
+.wb-ink-c5 { --wb-c: var(--wb-pen-c5, var(--color-chart-5)); }
 
 /* =============================================================================
    TOOLBAR
