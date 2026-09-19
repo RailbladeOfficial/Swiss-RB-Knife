@@ -1825,7 +1825,7 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 </button>
               </div>
-              <button id="wbSendOpenBtn">Send to Kanban</button>
+              <button id="wbSendOpenBtn" title="Send to Kanban (K)">Send to Kanban</button>
             </div>
           </div>
 
@@ -7836,8 +7836,8 @@
             </div>
           </div>
           <div id="wbSendNewFields" class="setup-field">
-            <label for="wbSendImageTitle">Card Title</label>
-            <input id="wbSendImageTitle" type="text" maxlength="200" autocomplete="off" />
+            <label for="wbSendTitle">Card Title</label>
+            <input id="wbSendTitle" type="text" maxlength="200" autocomplete="off" />
           </div>
           <div id="wbSendExistingFields" class="setup-field" style="display:none;">
             <label for="wbSendCardSearch">Card</label>
@@ -7850,9 +7850,23 @@
         <details id="wbSendAdvanced" class="wb-send-advanced">
           <summary>Advanced</summary>
           <div class="wb-send-advanced-body">
+            <div class="wb-send-target">
+              <div class="setup-field">
+                <label for="wbSendPriority">Priority</label>
+                <select id="wbSendPriority"></select>
+              </div>
+              <div class="setup-field">
+                <label for="wbSendEffort">Effort</label>
+                <select id="wbSendEffort"></select>
+              </div>
+              <div class="setup-field">
+                <label for="wbSendDue">Due Date</label>
+                <input id="wbSendDue" type="date" />
+              </div>
+            </div>
             <div class="setup-field">
-              <label for="wbSendPriority">Priority</label>
-              <select id="wbSendPriority"></select>
+              <label for="wbSendDescription">Description</label>
+              <textarea id="wbSendDescription" rows="3"></textarea>
             </div>
             <div class="setup-field">
               <span class="wb-field-label">Tags</span>
@@ -7963,6 +7977,7 @@
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Q</kbd></span><span>Shapes, and again for the next shape</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>E</kbd></span><span>Erase, and again for the other eraser</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>S</kbd></span><span>Select</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>K</kbd></span><span>Send to Kanban</span></div>
             </div>
             <div class="wb-key-group">
               <div class="wb-key-heading">Typing</div>

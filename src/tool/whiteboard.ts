@@ -61,12 +61,15 @@ import { attachMenu, isTextEntry, type MenuItem } from "../menu/menu";
 import { appConfirm, backgroundMenu, flash, navigateToTool } from "../core/shell";
 import {
   MAX_TITLE_LEN,
+  EFFORTS,
   PRIORITIES,
   addCardsFromElsewhere,
   addImageCardFromElsewhere,
   attachImageToCard,
   findCardsOnBoard,
+  effortLabel,
   priorityLabel,
+  type Effort,
   type IncomingOptions,
   type Priority,
   isHexColor,
@@ -2518,6 +2521,11 @@ function onKeydown(e: KeyboardEvent): void {
   const key = e.key.toLowerCase();
   // The mode keys. Only with nothing held, so they never shadow a shortcut,
   // and never while typing, which the text-entry check above already rules out.
+  if (key === "k" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    e.preventDefault();
+    requestSend();
+    return;
+  }
   // C and Z step through the pens and sizes. Only with nothing held: Ctrl+C
   // is Copy and Ctrl+Z is Undo.
   if ((key === "c" || key === "z") && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
@@ -2951,7 +2959,7 @@ let sendOpenKanbanBtn: HTMLButtonElement;
 let sendBtn: HTMLButtonElement;
 let sendClearBtn: HTMLButtonElement;
 let sendIncludeText: HTMLInputElement;
-let sendImageTitle: HTMLInputElement;
+let sendTitle: HTMLInputElement;
 let sendPreview: HTMLImageElement;
 let sendAreaNote: HTMLElement;
 let sendTargets: KanbanTarget[] = [];
@@ -2969,6 +2977,9 @@ let sendCardSearch: HTMLInputElement;
 let sendCardResults: HTMLElement;
 let sendAdvanced: HTMLDetailsElement;
 let sendPriority: HTMLSelectElement;
+let sendEffort: HTMLSelectElement;
+let sendDue: HTMLInputElement;
+let sendDescription: HTMLTextAreaElement;
 let sendTagsEl: HTMLElement;
 let sendBusy = false;
 
@@ -2986,25 +2997,51 @@ function noteToCard(note: TextNote): IncomingCard {
     .filter((l) => l !== "");
   const firstLine = lines[0] ?? "";
 
-  /* A CHECKLIST: a first line, then only list lines. The first line is the
-     title and the list lines are the card's subtasks, ticked where they were
-     written as [x]. A box with any plain line after the first is ordinary
-     text, and goes over whole in the description. */
-  const rest = lines.slice(1);
+  /* A CHECKLIST: list lines, ticked where they were written as [x], become
+     the card's subtasks. When every line is a list line, every one of them is
+     a subtask, and the title is the first item's text unless one is typed in
+     the modal (see cardsToSend). When a plain first line leads the list, it is
+     the title. A box with any plain line after the first is ordinary text, and
+     goes over whole in the description. */
+  const allListed = lines.length > 1 && lines.every((l) => CHECKLIST_LINE.test(l));
+  const rest = allListed ? lines : lines.slice(1);
   if (rest.length > 0 && rest.every((l) => CHECKLIST_LINE.test(l))) {
     return {
       title: cutTitle(firstLine.replace(CHECKLIST_LINE, "")),
       description: "",
-      subtasks: rest.map((l) => {
-        const m = CHECKLIST_LINE.exec(l)!;
-        return { text: l.slice(m[0].length), done: /x/i.test(m[1] ?? m[2] ?? "") };
-      }),
+      subtasks: rest.map(checklistItem),
     };
   }
 
   // A list marker is never part of a title, even on a box that is one line.
   const title = cutTitle(firstLine.replace(CHECKLIST_LINE, ""));
   return { title, description: title === full.replace(CHECKLIST_LINE, "") ? "" : full };
+}
+
+/** One line as a subtask: its list marker gone, ticked if written [x]. */
+function checklistItem(line: string): { text: string; done: boolean } {
+  const m = CHECKLIST_LINE.exec(line);
+  if (!m) return { text: line, done: false };
+  return { text: line.slice(m[0].length), done: /x/i.test(m[1] ?? m[2] ?? "") };
+}
+
+/**
+ * The cards a Text as Cards send makes. With no title typed, one card per box.
+ * With a title typed, ONE card with that title, whose subtasks are every line
+ * of every box picked, in reading order: the way to turn a list, or a few
+ * boxes, into one card named on the spot.
+ */
+function cardsToSend(notes: TextNote[]): IncomingCard[] {
+  const title = sendTitle.value.trim();
+  if (!title) return notes.map(noteToCard);
+  const subtasks = notes.flatMap((n) =>
+    n.text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l !== "")
+      .map(checklistItem),
+  );
+  return [{ title: cutTitle(title), description: "", subtasks }];
 }
 
 /** A list line: "- ", "* ", "• ", "[ ] " or "[x] " at the start. The bracket's
@@ -3025,6 +3062,16 @@ function cutTitle(line: string): string {
   return title;
 }
 
+/** Send to Kanban from the keyboard: the modal when there is somewhere to send
+ *  and something to send, and a toast saying which is missing when not. */
+function requestSend(): void {
+  const targets = kanbanTargets();
+  if (isEmpty()) flash("There's nothing on the whiteboard to send.", "error");
+  else if (targets === null) flash("Kanban is still loading.", "error");
+  else if (targets.length === 0) flash("There are no Kanban boards yet.", "error");
+  else openSend();
+}
+
 function openSend(tab?: SendTab, onlyNote?: string): void {
   endEditing();
   closeColorPop();
@@ -3032,7 +3079,7 @@ function openSend(tab?: SendTab, onlyNote?: string): void {
   const notes = notesInReadingOrder();
   sendChecked = new Set(onlyNote ? [onlyNote] : notes.map((n) => n.id));
   sendArea = selection ? "selection" : "board";
-  sendImageTitle.value = "Whiteboard";
+  sendTitle.value = "";
   // Every send starts plain: a new card, nothing extra. Advanced is there
   // when it is wanted and costs nothing when it is not.
   sendDest = "new";
@@ -3040,6 +3087,9 @@ function openSend(tab?: SendTab, onlyNote?: string): void {
   sendCardSearch.value = "";
   sendTagIds = new Set();
   sendPriority.value = "none";
+  sendEffort.value = "none";
+  sendDue.value = "";
+  sendDescription.value = "";
   sendAdvanced.open = false;
   sendTabs.select(tab ?? (selection || texts.length === 0 ? "image" : "text"));
   fillSendTargets();
@@ -3156,7 +3206,8 @@ function syncSendFields(): void {
   sendDestGroup.style.display = image ? "" : "none";
   sendColumnField.style.display = existing ? "none" : "";
   sendAdvanced.style.display = existing ? "none" : "";
-  sendNewFields.style.display = image && !existing ? "" : "none";
+  // Text always makes new cards, so its title field shows on that tab too.
+  sendNewFields.style.display = existing ? "none" : "";
   sendExistingFields.style.display = existing ? "" : "none";
   document.querySelectorAll<HTMLButtonElement>(".wb-dest-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.dest === sendDest);
@@ -3230,9 +3281,13 @@ function renderCardResults(): void {
 /** The Advanced choices, for the cards a send creates. */
 function sendOptions(): IncomingOptions {
   const priority = sendPriority.value as Priority;
+  const effort = sendEffort.value as Effort;
   return {
     tagIds: [...sendTagIds],
     priority: PRIORITIES.includes(priority) ? priority : undefined,
+    effort: EFFORTS.includes(effort) ? effort : undefined,
+    due: sendDue.value || undefined,
+    description: sendDescription.value.trim() || undefined,
   };
 }
 
@@ -3257,7 +3312,8 @@ function renderImageTab(): void {
 function updateSendButtons(): void {
   const total = texts.length;
   const picked = texts.filter((t) => sendChecked.has(t.id)).length;
-  sendCount.textContent = `${picked} of ${total}`;
+  const cards = picked === 0 ? 0 : sendTitle.value.trim() ? 1 : picked;
+  sendCount.textContent = `${picked} of ${total} \u00b7 ${cards} ${cards === 1 ? "card" : "cards"}`;
   sendAllBtn.textContent = picked === total ? "Select None" : "Select All";
   const existing = sendTabs.active === "image" && sendDest === "existing";
   const hasTarget = !sendBoardSel.disabled && (existing || !sendColumnSel.disabled) && !sendBusy;
@@ -3295,7 +3351,7 @@ async function sendText(clearAfter: boolean): Promise<void> {
   if (!dest || chosen.length === 0 || sendBusy) return;
 
   setSendBusy(true);
-  const result = await addCardsFromElsewhere(dest.board.id, dest.column.id, chosen.map(noteToCard), sendOptions());
+  const result = await addCardsFromElsewhere(dest.board.id, dest.column.id, cardsToSend(chosen), sendOptions());
   setSendBusy(false);
   if (!result.ok) {
     flash(result.error, "error", 8000);
@@ -3340,7 +3396,7 @@ async function sendImage(clearAfter: boolean): Promise<void> {
       : await addImageCardFromElsewhere(
           board.id,
           dest!.column.id,
-          sendImageTitle.value.trim().slice(0, MAX_TITLE_LEN) || "Whiteboard",
+          sendTitle.value.trim().slice(0, MAX_TITLE_LEN) || "Whiteboard",
           fileName,
           png,
           sendOptions(),
@@ -3393,7 +3449,7 @@ function wireSendModal(): void {
   sendBtn = document.getElementById("wbSendBtn") as HTMLButtonElement;
   sendClearBtn = document.getElementById("wbSendClearBtn") as HTMLButtonElement;
   sendIncludeText = document.getElementById("wbSendIncludeText") as HTMLInputElement;
-  sendImageTitle = document.getElementById("wbSendImageTitle") as HTMLInputElement;
+  sendTitle = document.getElementById("wbSendTitle") as HTMLInputElement;
   sendPreview = document.getElementById("wbSendPreview") as HTMLImageElement;
   sendAreaNote = document.getElementById("wbSendAreaEmpty")!;
   sendColumnField = document.getElementById("wbSendColumnField")!;
@@ -3404,6 +3460,9 @@ function wireSendModal(): void {
   sendCardResults = document.getElementById("wbSendCardResults")!;
   sendAdvanced = document.getElementById("wbSendAdvanced") as HTMLDetailsElement;
   sendPriority = document.getElementById("wbSendPriority") as HTMLSelectElement;
+  sendEffort = document.getElementById("wbSendEffort") as HTMLSelectElement;
+  sendDue = document.getElementById("wbSendDue") as HTMLInputElement;
+  sendDescription = document.getElementById("wbSendDescription") as HTMLTextAreaElement;
   sendTagsEl = document.getElementById("wbSendTags")!;
 
   for (const level of PRIORITIES) {
@@ -3412,7 +3471,15 @@ function wireSendModal(): void {
     opt.textContent = priorityLabel(level);
     sendPriority.appendChild(opt);
   }
+  for (const level of EFFORTS) {
+    const opt = document.createElement("option");
+    opt.value = level;
+    opt.textContent = effortLabel(level);
+    sendEffort.appendChild(opt);
+  }
   sendCardSearch.addEventListener("input", renderCardResults);
+  // A typed title changes how many cards a text send makes.
+  sendTitle.addEventListener("input", updateSendButtons);
   document.querySelectorAll<HTMLButtonElement>(".wb-dest-btn").forEach((b) => {
     b.addEventListener("click", () => {
       sendDest = b.dataset.dest === "existing" ? "existing" : "new";

@@ -14187,6 +14187,11 @@ export function findCardsOnBoard(boardId: string, query: string, limit = 20): Ca
 export interface IncomingOptions {
   tagIds?: string[];
   priority?: Priority;
+  effort?: Effort;
+  /** A due date as YYYY-MM-DD, a day and never a moment. */
+  due?: string;
+  /** Added under whatever the card already carries in its description. */
+  description?: string;
 }
 
 /** Options checked against the board: tags that are not on it, or no longer
@@ -14194,6 +14199,14 @@ export interface IncomingOptions {
 function applyIncomingOptions(card: Card, board: Board, options: IncomingOptions | undefined): void {
   if (!options) return;
   if (options.priority && PRIORITIES.includes(options.priority)) card.priority = options.priority;
+  if (options.effort && EFFORTS.includes(options.effort)) card.effort = options.effort;
+  // A due date is a day. A value that is not one is left off rather than
+  // stored as something the card cannot read back.
+  if (options.due && /^\d{4}-\d{2}-\d{2}$/.test(options.due) && parseDay(options.due)) {
+    card.dates.due = options.due;
+  }
+  const extra = options.description?.trim();
+  if (extra) card.description = trimTo([card.description, extra].filter(Boolean).join("\n\n"), MAX_DESC_LEN);
   const known = new Set(board.tags.filter((t) => t.status === "active").map((t) => t.id));
   const tagIds = (options.tagIds ?? []).filter((id) => known.has(id));
   if (tagIds.length > 0) card.tagIds = [...new Set(tagIds)];
