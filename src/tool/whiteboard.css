@@ -182,8 +182,64 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 }
 
 .wb-color-pop[hidden],
+.wb-mode-pop[hidden],
 .wb-swatch[hidden] {
   display: none;
+}
+
+/* ── Shapes and Erase: the kinds under their buttons ── */
+
+.wb-pop-anchor {
+  position: relative;
+  display: flex;
+}
+
+.wb-mode-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--color-bg) 60%, transparent);
+}
+
+.wb-eraser-pop {
+  flex-direction: column;
+}
+
+.wb-eraser-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.wb-eraser-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.wb-eraser-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.wb-eraser-btn.active,
+.wb-eraser-btn.active:hover {
+  background: var(--color-btn);
+  color: var(--color-btn-text);
 }
 
 .wb-swatch {
@@ -298,8 +354,14 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 }
 
 .wb-surface.wb-mode-draw,
+.wb-surface.wb-mode-shape,
 .wb-surface.wb-mode-select {
   cursor: crosshair;
+}
+
+/* Over the selection, a drag moves what is in it. */
+.wb-surface.wb-mode-select.wb-over-selection {
+  cursor: move;
 }
 
 .wb-surface.wb-mode-erase {
@@ -365,6 +427,7 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 /* Drawing, erasing and selecting go straight through text, so a stroke or a
    selection can start on top of a box without grabbing it. */
 .wb-mode-draw .wb-text,
+.wb-mode-shape .wb-text,
 .wb-mode-erase .wb-text,
 .wb-mode-select .wb-text,
 .wb-overview .wb-text {

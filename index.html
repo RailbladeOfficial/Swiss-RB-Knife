@@ -1738,9 +1738,26 @@
               <button class="wb-icon-btn wb-mode-btn" data-mode="draw" title="Draw (D)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L9 19H5v-4z" /><line x1="13" y1="7" x2="17" y2="11" /></svg>
               </button>
-              <button class="wb-icon-btn wb-mode-btn" data-mode="erase" title="Erase (E)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19.5 4.5 16a1.5 1.5 0 0 1 0-2.1L13 5.4a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L12 19.5z" /><line x1="8.5" y1="9.9" x2="14.1" y2="15.5" /><line x1="12" y1="19.5" x2="20" y2="19.5" /></svg>
-              </button>
+              <div class="wb-pop-anchor">
+                <button class="wb-icon-btn wb-mode-btn" data-mode="shape" title="Shapes (L)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="10" height="10" rx="1" /><circle cx="15" cy="15" r="5.5" /></svg>
+                </button>
+                <div class="wb-mode-pop" data-for="shape" hidden>
+                  <button class="wb-icon-btn wb-shape-btn" data-shape="line" title="Line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5" /></svg></button>
+                  <button class="wb-icon-btn wb-shape-btn" data-shape="arrow" title="Arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5" /><polyline points="10 5 19 5 19 14" /></svg></button>
+                  <button class="wb-icon-btn wb-shape-btn" data-shape="box" title="Box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1" /></svg></button>
+                  <button class="wb-icon-btn wb-shape-btn" data-shape="ellipse" title="Circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="8.5" ry="6.5" /></svg></button>
+                </div>
+              </div>
+              <div class="wb-pop-anchor">
+                <button class="wb-icon-btn wb-mode-btn" data-mode="erase" title="Erase (E)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19.5 4.5 16a1.5 1.5 0 0 1 0-2.1L13 5.4a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L12 19.5z" /><line x1="8.5" y1="9.9" x2="14.1" y2="15.5" /><line x1="12" y1="19.5" x2="20" y2="19.5" /></svg>
+                </button>
+                <div class="wb-mode-pop wb-eraser-pop" data-for="erase" hidden>
+                  <button class="wb-eraser-btn" data-eraser="rub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19.5 4.5 16a1.5 1.5 0 0 1 0-2.1L13 5.4a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L12 19.5z" /><line x1="8.5" y1="9.9" x2="14.1" y2="15.5" /><line x1="12" y1="19.5" x2="20" y2="19.5" /></svg><span>Rub Out</span></button>
+                  <button class="wb-eraser-btn" data-eraser="stroke"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c3-6 6-9 9-9s4 3 7 1" /><line x1="5" y1="5" x2="19" y2="19" /></svg><span>Whole Strokes</span></button>
+                </div>
+              </div>
               <button class="wb-icon-btn wb-mode-btn" data-mode="select" title="Select (S)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.6" /></svg>
               </button>
@@ -7900,6 +7917,7 @@
               <div class="wb-key-heading">Modes</div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>T</kbd></span><span>Type</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>D</kbd></span><span>Draw</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>L</kbd></span><span>Shapes</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>E</kbd></span><span>Erase</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>S</kbd></span><span>Select</span></div>
             </div>
@@ -7910,6 +7928,10 @@
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Esc</kbd></span><span>Stop typing</span></div>
             </div>
             <div class="wb-key-group">
+              <div class="wb-key-heading">Drawing</div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Shift</kbd> <kbd>Drag</kbd></span><span>Draw: a straight line. Shapes: a square, a circle, or a line at 45 degrees</span></div>
+            </div>
+            <div class="wb-key-group">
               <div class="wb-key-heading">Editing</div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Z</kbd></span><span>Undo</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>Y</kbd><span class="wb-key-or">/</span><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></span><span>Redo</span></div>
@@ -7917,6 +7939,7 @@
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>X</kbd></span><span>Cut the selected area</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>C</kbd></span><span>Copy the selected area</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>V</kbd></span><span>Paste at the pointer</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Ctrl</kbd> <kbd>D</kbd></span><span>Duplicate the selected area</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Esc</kbd></span><span>Clear the selection</span></div>
             </div>
             <div class="wb-key-group">
@@ -7930,7 +7953,7 @@
             <div class="wb-key-group">
               <div class="wb-key-heading">Mouse</div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Click</kbd></span><span>Type: a new text box, or edit one</span></div>
-              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Drag</kbd></span><span>Type: move a text box. Select: pick an area</span></div>
+              <div class="wb-key-row"><span class="wb-key-keys"><kbd>Drag</kbd></span><span>Type: move a text box. Select: pick an area, or move the one picked</span></div>
               <div class="wb-key-row"><span class="wb-key-keys"><kbd>Right-click</kbd></span><span>Menus for a text box, a selection, or the board</span></div>
             </div>
           </div>

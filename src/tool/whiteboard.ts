@@ -74,7 +74,14 @@ import {
    TYPES AND LIMITS
 ============================================================================= */
 
-type Mode = "type" | "draw" | "erase" | "select";
+type Mode = "type" | "draw" | "shape" | "erase" | "select";
+
+/** What Shapes draws. */
+type ShapeKind = "line" | "arrow" | "box" | "ellipse";
+
+/** Rub Out takes ink off where it passes, like a real eraser. Whole Strokes
+ *  removes any stroke it touches, which also gives back the room it took. */
+type EraserKind = "rub" | "stroke";
 
 /** A pen slot in the theme. See COLORS in the header. */
 type InkId = "ink" | "c1" | "c2" | "c3" | "c4" | "c5";
@@ -92,10 +99,11 @@ interface Stroke {
   size: SizeId;
   /** Rubs out ink under it instead of laying any down. */
   erase: boolean;
-  /** "rect" is a cleared rectangle rather than a line: pts is its two
-   *  corners. What Delete and Cut leave behind, so an area is emptied without
-   *  touching the parts of a stroke that run out past its edge. */
-  shape?: "rect";
+  /** A shape rather than a freehand line, drawn between the two corners in
+   *  pts. "clear" is a cleared rectangle (with erase set): what Delete and Cut
+   *  leave behind, so an area is emptied without touching the parts of a
+   *  stroke that run out past its edge. */
+  shape?: ShapeKind | "clear";
   /** Drawn only inside this rectangle, [x, y, w, h]. A pasted stroke carries
    *  the edge of the area it was copied from, so a line that ran out of the
    *  copied area is cut where the copy was cut. */
@@ -159,6 +167,8 @@ interface WhiteboardSettings {
    *  back does not lose it. */
   boardCustom: string;
   mode: Mode;
+  shape: ShapeKind;
+  eraser: EraserKind;
   ink: Pen;
   size: SizeId;
   /** The last color picked by hand, offered again in the color list. */
@@ -196,10 +206,12 @@ const BOARD_FIXED: Record<"black" | "white", string> = { black: "#000000", white
 const PEN_WIDTH: Record<SizeId, number> = { fine: 2, medium: 4, bold: 8 };
 const ERASER_WIDTH: Record<SizeId, number> = { fine: 10, medium: 20, bold: 40 };
 
-const MODES: readonly Mode[] = ["type", "draw", "erase", "select"];
+const MODES: readonly Mode[] = ["type", "draw", "shape", "erase", "select"];
+const SHAPES: readonly ShapeKind[] = ["line", "arrow", "box", "ellipse"];
+const ERASERS: readonly EraserKind[] = ["rub", "stroke"];
 
 /** The single keys that switch mode, while not typing in a box. */
-const MODE_KEYS: Record<string, Mode> = { t: "type", d: "draw", e: "erase", s: "select" };
+const MODE_KEYS: Record<string, Mode> = { t: "type", d: "draw", l: "shape", e: "erase", s: "select" };
 const SIZES: readonly SizeId[] = ["fine", "medium", "bold"];
 const BOARD_COLORS: readonly BoardColor[] = ["theme", "black", "white", "custom"];
 
@@ -209,6 +221,8 @@ const DEFAULT_SETTINGS: WhiteboardSettings = {
   boardColor: "theme",
   boardCustom: "#fdf6e3",
   mode: "type",
+  shape: "box",
+  eraser: "rub",
   ink: "ink",
   size: "medium",
   customInk: null,
@@ -223,6 +237,13 @@ const MAX_POINTS_PER_STROKE = 20_000;
 const MAX_TEXTS = 2000;
 const MAX_TEXT_LEN = 4000;
 const MAX_UNDO = 100;
+
+/** How far an arrow's head spreads from its line, in radians. */
+const ARROW_SPREAD = Math.PI / 7;
+/** Points around an ellipse when telling whether the eraser touches it. */
+const ELLIPSE_SAMPLES = 48;
+/** Shift snaps a shape's line to multiples of this angle. */
+const SNAP_ANGLE = Math.PI / 4;
 
 /** Points closer than this to the last one add nothing a mouse can draw. */
 const MIN_POINT_GAP = 1.5;
@@ -276,6 +297,8 @@ const GRID_FADE_TO = 6;
 /** How far past the view the ink is drawn, in screen pixels, so a quick scroll
  *  shows ink already there rather than a blank edge waiting for the redraw. */
 const INK_OVERSCAN = 256;
+/** How far below and right of the original a duplicate lands. */
+const DUPLICATE_OFFSET = 24;
 /** Margin kept around your notes when Go to Notes brings them into view. */
 const NOTES_MARGIN = 40;
 
@@ -332,6 +355,23 @@ let editStart: Snapshot | null = null;
 /** The stroke under the mouse right now, and what the board was before it. */
 let liveStroke: Stroke | null = null;
 let livePre: Snapshot | null = null;
+/** Where a stroke turned straight when Shift was pressed, which it stays. */
+let straightFrom: { x: number; y: number } | null = null;
+
+/** The whole-stroke eraser mid-swipe. */
+let wipe: { pointerId: number; pre: Snapshot; removed: boolean; last: { x: number; y: number } } | null = null;
+
+/** The selection's contents being dragged somewhere else. */
+let areaMove: {
+  pointerId: number;
+  start: { x: number; y: number };
+  area: Area;
+  pre: Snapshot;
+  data: AreaData | null;
+  base: Stroke[];
+  notes: TextNote[];
+  moved: boolean;
+} | null = null;
 
 let boxDrag: {
   id: string;
@@ -454,10 +494,19 @@ function normalizeStroke(raw: unknown): Stroke | null {
     ink: isPen(r.ink) ? r.ink : "ink",
     size: SIZES.includes(r.size as SizeId) ? (r.size as SizeId) : "medium",
     erase: r.erase === true,
-    ...(r.shape === "rect" && pts.length >= 4 ? { shape: "rect" as const } : {}),
+    ...(strokeShape(r.shape, r.erase === true) && pts.length >= 4
+      ? { shape: strokeShape(r.shape, r.erase === true)! }
+      : {}),
     ...(normalizeClip(r.clip) ? { clip: normalizeClip(r.clip)! } : {}),
     pts,
   };
+}
+
+/** A stored shape name, or null for a freehand line. "rect" is what a cleared
+ *  area was called before shapes arrived, on boards drawn in development. */
+function strokeShape(raw: unknown, erase: boolean): ShapeKind | "clear" | null {
+  if (erase) return raw === "clear" || raw === "rect" ? "clear" : null;
+  return SHAPES.includes(raw as ShapeKind) ? (raw as ShapeKind) : null;
 }
 
 function normalizeClip(raw: unknown): [number, number, number, number] | null {
@@ -559,6 +608,8 @@ function normalizeSettings(raw: unknown): WhiteboardSettings {
       : DEFAULT_SETTINGS.boardColor,
     boardCustom: hex(r.boardCustom) ? r.boardCustom : DEFAULT_SETTINGS.boardCustom,
     mode: MODES.includes(r.mode as Mode) ? (r.mode as Mode) : DEFAULT_SETTINGS.mode,
+    shape: SHAPES.includes(r.shape as ShapeKind) ? (r.shape as ShapeKind) : DEFAULT_SETTINGS.shape,
+    eraser: ERASERS.includes(r.eraser as EraserKind) ? (r.eraser as EraserKind) : DEFAULT_SETTINGS.eraser,
     ink: isPen(r.ink) ? r.ink : DEFAULT_SETTINGS.ink,
     size: SIZES.includes(r.size as SizeId) ? (r.size as SizeId) : DEFAULT_SETTINGS.size,
     customInk: hex(r.customInk) ? r.customInk : null,
@@ -838,7 +889,8 @@ function boundsOf(s: Stroke): [number, number, number, number] {
     minY = Math.min(minY, s.pts[i + 1]);
     maxY = Math.max(maxY, s.pts[i + 1]);
   }
-  const pad = s.shape === "rect" ? 0 : strokeWidth(s) / 2 + 1;
+  const pad =
+    s.shape === "clear" ? 0 : strokeWidth(s) / 2 + 1 + (s.shape === "arrow" ? arrowHead(s) : 0);
   let b: [number, number, number, number] = [minX - pad, minY - pad, maxX + pad, maxY + pad];
   if (s.clip) {
     const [cx, cy, cw, ch] = s.clip;
@@ -875,8 +927,12 @@ function drawStroke(c: CanvasRenderingContext2D, s: Stroke): void {
 function drawStrokeShape(c: CanvasRenderingContext2D, s: Stroke): void {
   styleFor(c, s);
   const p = s.pts;
-  if (s.shape === "rect") {
+  if (s.shape === "clear") {
     c.fillRect(p[0], p[1], p[2] - p[0], p[3] - p[1]);
+    return;
+  }
+  if (s.shape) {
+    drawShape(c, s);
     return;
   }
   if (p.length === 2) {
@@ -894,6 +950,77 @@ function drawStrokeShape(c: CanvasRenderingContext2D, s: Stroke): void {
   }
   c.lineTo(p[p.length - 2], p[p.length - 1]);
   c.stroke();
+}
+
+/** How long an arrow's head is, for its line width. */
+function arrowHead(s: Stroke): number {
+  return Math.max(12, strokeWidth(s) * 4);
+}
+
+/** A line, arrow, box or ellipse between the two corners in pts. */
+function drawShape(c: CanvasRenderingContext2D, s: Stroke): void {
+  const [x0, y0, x1, y1] = s.pts;
+  c.beginPath();
+  if (s.shape === "box") {
+    c.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+  } else if (s.shape === "ellipse") {
+    c.ellipse((x0 + x1) / 2, (y0 + y1) / 2, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, 0, 0, Math.PI * 2);
+  } else {
+    c.moveTo(x0, y0);
+    c.lineTo(x1, y1);
+    if (s.shape === "arrow" && (x1 !== x0 || y1 !== y0)) {
+      const angle = Math.atan2(y1 - y0, x1 - x0);
+      const head = arrowHead(s);
+      for (const side of [-1, 1]) {
+        c.moveTo(x1, y1);
+        c.lineTo(x1 - head * Math.cos(angle + side * ARROW_SPREAD), y1 - head * Math.sin(angle + side * ARROW_SPREAD));
+      }
+    }
+  }
+  c.stroke();
+}
+
+/** Points along a stroke as it is drawn, for telling whether a point is on it. */
+function strokePath(s: Stroke): number[] {
+  if (!s.shape) return s.pts;
+  const [x0, y0, x1, y1] = s.pts;
+  if (s.shape === "box" || s.shape === "clear") return [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0];
+  if (s.shape === "ellipse") {
+    const out: number[] = [];
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
+    const rx = Math.abs(x1 - x0) / 2;
+    const ry = Math.abs(y1 - y0) / 2;
+    for (let i = 0; i <= ELLIPSE_SAMPLES; i++) {
+      const t = (i / ELLIPSE_SAMPLES) * Math.PI * 2;
+      out.push(cx + rx * Math.cos(t), cy + ry * Math.sin(t));
+    }
+    return out;
+  }
+  return [x0, y0, x1, y1];
+}
+
+function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = dx * dx + dy * dy;
+  const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/** Whether a circle of radius r at (x, y) touches a stroke's drawn line. */
+function touchesStroke(s: Stroke, x: number, y: number, r: number): boolean {
+  if (s.clip) {
+    const [cx, cy, cw, ch] = s.clip;
+    if (x < cx - r || y < cy - r || x > cx + cw + r || y > cy + ch + r) return false;
+  }
+  const reach = r + strokeWidth(s) / 2;
+  const p = strokePath(s);
+  if (p.length === 2) return Math.hypot(x - p[0], y - p[1]) <= reach;
+  for (let i = 0; i + 3 < p.length; i += 2) {
+    if (distanceToSegment(x, y, p[i], p[i + 1], p[i + 2], p[i + 3]) <= reach) return true;
+  }
+  return false;
 }
 
 /** The canvas's transform: backing pixels to CSS pixels, then the board
@@ -969,6 +1096,7 @@ function startStroke(e: PointerEvent): void {
   }
   const { x, y } = boardPoint(e);
   livePre = snapshot();
+  straightFrom = null;
   liveStroke = {
     id: newId(),
     ink: settings.ink,
@@ -976,9 +1104,27 @@ function startStroke(e: PointerEvent): void {
     erase: settings.mode === "erase",
     pts: [round1(x), round1(y)],
   };
+  if (settings.mode === "shape") {
+    liveStroke.shape = settings.shape;
+    liveStroke.pts.push(round1(x), round1(y));
+  }
   surface.setPointerCapture(e.pointerId);
   applyViewTransform();
   drawStroke(ctx, liveStroke);
+}
+
+/** A shape's far corner, with Shift held: a square, a circle, or a line at a
+ *  multiple of 45 degrees. */
+function constrainCorner(kind: ShapeKind, x0: number, y0: number, x: number, y: number): [number, number] {
+  const dx = x - x0;
+  const dy = y - y0;
+  if (kind === "box" || kind === "ellipse") {
+    const side = Math.max(Math.abs(dx), Math.abs(dy));
+    return [x0 + Math.sign(dx || 1) * side, y0 + Math.sign(dy || 1) * side];
+  }
+  const angle = Math.round(Math.atan2(dy, dx) / SNAP_ANGLE) * SNAP_ANGLE;
+  const len = Math.hypot(dx, dy);
+  return [x0 + Math.cos(angle) * len, y0 + Math.sin(angle) * len];
 }
 
 function extendStroke(e: PointerEvent): void {
@@ -989,6 +1135,28 @@ function extendStroke(e: PointerEvent): void {
      handful of straight lines. */
   const samples = e.getCoalescedEvents?.() ?? [];
   const events = samples.length > 0 ? samples : [e];
+
+  // A shape only ever has its two corners; the far one follows the pointer.
+  if (stroke.shape && stroke.shape !== "clear") {
+    const { x, y } = boardPoint(e);
+    const [fx, fy] = e.shiftKey ? constrainCorner(stroke.shape, stroke.pts[0], stroke.pts[1], x, y) : [x, y];
+    stroke.pts[2] = round1(clampX(fx));
+    stroke.pts[3] = round1(clampY(fy));
+    requestRedraw();
+    return;
+  }
+
+  /* Shift in Draw is a straight line from where the stroke began to the
+     pointer. Once straight, the stroke stays straight: letting go of Shift
+     halfway is not a request to scribble off the end of a ruled line. */
+  if (e.shiftKey || straightFrom) {
+    straightFrom ??= { x: stroke.pts[0], y: stroke.pts[1] };
+    const { x, y } = boardPoint(e);
+    stroke.pts = [straightFrom.x, straightFrom.y, round1(x), round1(y)];
+    requestRedraw();
+    return;
+  }
+
   applyViewTransform();
   styleFor(ctx, stroke);
   for (const ev of events) {
@@ -1011,11 +1179,69 @@ function endStroke(): void {
   const pre = livePre;
   liveStroke = null;
   livePre = null;
+  straightFrom = null;
   if (!stroke || !pre) return;
+  // A shape dragged out to nothing (a click) is not worth keeping.
+  if (stroke.shape && stroke.pts[0] === stroke.pts[2] && stroke.pts[1] === stroke.pts[3]) {
+    requestRedraw();
+    return;
+  }
   strokes.push(stroke);
   totalPoints += stroke.pts.length / 2;
   pushUndo(pre);
   requestRedraw();
+  markDirty();
+  updateChrome();
+}
+
+/* ── The whole-stroke eraser ── */
+
+function startWipe(e: PointerEvent): void {
+  wipe = { pointerId: e.pointerId, pre: snapshot(), removed: false, last: boardPoint(e) };
+  surface.setPointerCapture(e.pointerId);
+  wipeAt(wipe.last.x, wipe.last.y);
+}
+
+/** Removes every stroke the eraser touches at a point. Eraser strokes and
+ *  cleared areas are left alone: taking one away would bring back the ink it
+ *  had rubbed out. */
+function wipeAt(x: number, y: number): void {
+  if (!wipe) return;
+  const r = ERASER_WIDTH[settings.size] / 2;
+  const before = strokes.length;
+  strokes = strokes.filter((s) => {
+    if (s.erase) return true;
+    const b = boundsOf(s);
+    if (x < b[0] - r || x > b[2] + r || y < b[1] - r || y > b[3] + r) return true;
+    return !touchesStroke(s, x, y, r);
+  });
+  if (strokes.length !== before) {
+    wipe.removed = true;
+    recountPoints();
+    requestRedraw();
+  }
+}
+
+/** Follows the pointer in steps no wider than half the eraser, so a fast
+ *  swipe cannot jump over a thin line between two samples. */
+function extendWipe(e: PointerEvent): void {
+  if (!wipe) return;
+  const step = ERASER_WIDTH[settings.size] / 4;
+  const samples = e.getCoalescedEvents?.() ?? [];
+  for (const ev of samples.length > 0 ? samples : [e]) {
+    const to = boardPoint(ev);
+    const from = wipe.last;
+    const n = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / step));
+    for (let i = 1; i <= n; i++) wipeAt(from.x + ((to.x - from.x) * i) / n, from.y + ((to.y - from.y) * i) / n);
+    wipe.last = to;
+  }
+}
+
+function endWipe(): void {
+  const done = wipe;
+  wipe = null;
+  if (!done?.removed) return;
+  pushUndo(done.pre);
   markDirty();
   updateChrome();
 }
@@ -1580,7 +1806,7 @@ function clearArea(area: Area, includeText: boolean): void {
       ink: "ink",
       size: "medium",
       erase: true,
-      shape: "rect",
+      shape: "clear",
       pts: [round1(area.x), round1(area.y), round1(area.x + area.w), round1(area.y + area.h)],
     });
   }
@@ -1602,11 +1828,17 @@ function deleteSelection(): void {
   updateChrome();
 }
 
-/** Takes the selection's ink and text onto the clipboard. False when the
- *  selection holds nothing, so an empty copy never replaces a full one. */
-function copySelection(): boolean {
-  const area = selection;
-  if (!area) return false;
+/** An area's ink and text, relative to its corner: what Copy puts on the
+ *  clipboard, and what Duplicate and a move carry. */
+interface AreaData {
+  w: number;
+  h: number;
+  strokes: Stroke[];
+  texts: TextNote[];
+}
+
+/** What lies in an area, or null when it holds nothing. */
+function areaData(area: Area): AreaData | null {
   const clip: [number, number, number, number] = [0, 0, area.w, area.h];
   const copied = strokes
     .filter((s) => overlaps(boundsOf(s), area))
@@ -1615,10 +1847,81 @@ function copySelection(): boolean {
   const copiedTexts = texts
     .filter((t) => inside(noteArea(t), area))
     .map((t) => ({ ...t, x: t.x - area.x, y: t.y - area.y }));
-  if (copied.length === 0 && copiedTexts.length === 0) return false;
-  clipboard = { w: area.w, h: area.h, strokes: copied, texts: copiedTexts };
+  if (copied.length === 0 && copiedTexts.length === 0) return null;
+  return { w: area.w, h: area.h, strokes: copied, texts: copiedTexts };
+}
+
+/** Takes the selection's ink and text onto the clipboard. False when the
+ *  selection holds nothing, so an empty copy never replaces a full one. */
+function copySelection(): boolean {
+  const area = selection;
+  const data = area ? areaData(area) : null;
+  if (!data) return false;
+  clipboard = data;
   updateChrome();
   return true;
+}
+
+/** A copy of the selection a little below and to the right of it, selected. */
+function duplicateSelection(): void {
+  const area = selection;
+  const data = area ? areaData(area) : null;
+  if (!area || !data) return;
+  pasteData(data, { x: area.x + DUPLICATE_OFFSET, y: area.y + DUPLICATE_OFFSET });
+}
+
+/** Starts carrying the selection's contents once the pointer has actually
+ *  moved, then keeps them under it. They are lifted out the way Cut takes
+ *  them, so a stroke crossing the edge leaves its outside part behind. */
+function moveArea(e: PointerEvent): void {
+  const m = areaMove;
+  if (!m) return;
+  const p = boardPoint(e);
+  let dx = p.x - m.start.x;
+  let dy = p.y - m.start.y;
+  if (!m.moved) {
+    if (Math.hypot(dx, dy) * zoom < DRAG_THRESHOLD) return;
+    m.data = areaData(m.area);
+    if (!m.data) {
+      areaMove = null;
+      return;
+    }
+    m.moved = true;
+    clearArea(m.area, true);
+    m.base = strokes.slice();
+    m.notes = m.data.texts.map((t) => ({ ...t, id: newId(), x: t.x + m.area.x, y: t.y + m.area.y }));
+    texts.push(...m.notes);
+    rebuildTexts();
+  }
+  const data = m.data!;
+  dx = Math.min(Math.max(dx, -m.area.x), SURFACE_W - m.area.w - m.area.x);
+  dy = Math.min(Math.max(dy, -m.area.y), SURFACE_H - m.area.h - m.area.y);
+  const x = m.area.x + dx;
+  const y = m.area.y + dy;
+  strokes = m.base.concat(data.strokes.map((st) => shiftStroke(st, x, y)));
+  data.texts.forEach((t, i) => {
+    const note = m.notes[i];
+    note.x = t.x + x;
+    note.y = t.y + y;
+    const el = noteEls.get(note.id);
+    if (el) {
+      el.style.left = `${note.x}px`;
+      el.style.top = `${note.y}px`;
+    }
+  });
+  selection = { x, y, w: m.area.w, h: m.area.h };
+  showSelection();
+  requestRedraw();
+}
+
+function endMoveArea(): void {
+  const m = areaMove;
+  areaMove = null;
+  if (!m?.moved) return;
+  recountPoints();
+  pushUndo(m.pre);
+  markDirty();
+  updateChrome();
 }
 
 function cutSelection(): void {
@@ -1631,20 +1934,25 @@ function cutSelection(): void {
 }
 
 function pasteClipboard(): void {
-  const cb = clipboard;
-  if (!cb) return;
+  if (!clipboard) return;
+  pasteData(clipboard, lastPointer);
+}
+
+/** Puts area data on the board with its corner at `at` (or near the top of
+ *  the view), and selects it. */
+function pasteData(cb: AreaData, at: { x: number; y: number } | null): void {
   endEditing();
   const points = cb.strokes.reduce((n, st) => n + st.pts.length / 2, 0);
   if (totalPoints + points > MAX_TOTAL_POINTS || texts.length + cb.texts.length > MAX_TEXTS) {
     flash("The Whiteboard is full.", "error");
     return;
   }
-  const at = lastPointer ?? {
+  const corner = at ?? {
     x: scroller.scrollLeft / zoom + NOTES_MARGIN,
     y: scroller.scrollTop / zoom + NOTES_MARGIN,
   };
-  const x = Math.round(Math.min(Math.max(0, at.x), SURFACE_W - cb.w));
-  const y = Math.round(Math.min(Math.max(0, at.y), SURFACE_H - cb.h));
+  const x = Math.round(Math.min(Math.max(0, corner.x), SURFACE_W - cb.w));
+  const y = Math.round(Math.min(Math.max(0, corner.y), SURFACE_H - cb.h));
 
   checkpoint();
   for (const st of cb.strokes) strokes.push(shiftStroke(st, x, y));
@@ -1824,8 +2132,14 @@ function onSurfacePointerDown(e: PointerEvent): void {
     return;
   }
 
+  closePops();
   const mode = settings.mode;
-  if (mode === "draw" || mode === "erase") {
+  if (mode === "erase" && settings.eraser === "stroke") {
+    e.preventDefault();
+    startWipe(e);
+    return;
+  }
+  if (mode === "draw" || mode === "erase" || mode === "shape") {
     e.preventDefault();
     startStroke(e);
     return;
@@ -1834,7 +2148,21 @@ function onSurfacePointerDown(e: PointerEvent): void {
   if (mode === "select") {
     e.preventDefault();
     const { x, y } = boardPoint(e);
-    selectDrag = { pointerId: e.pointerId, x, y, moved: false };
+    // Inside the selection, a drag moves what is in it.
+    if (selection && inside({ x, y, w: 0, h: 0 }, selection)) {
+      areaMove = {
+        pointerId: e.pointerId,
+        start: { x, y },
+        area: { ...selection },
+        pre: snapshot(),
+        data: null,
+        base: [],
+        notes: [],
+        moved: false,
+      };
+    } else {
+      selectDrag = { pointerId: e.pointerId, x, y, moved: false };
+    }
     surface.setPointerCapture(e.pointerId);
     return;
   }
@@ -1885,6 +2213,18 @@ function onSurfacePointerMove(e: PointerEvent): void {
     extendStroke(e);
     return;
   }
+  if (wipe && e.pointerId === wipe.pointerId) {
+    extendWipe(e);
+    return;
+  }
+  if (areaMove && e.pointerId === areaMove.pointerId) {
+    moveArea(e);
+    return;
+  }
+  if (settings.mode === "select") {
+    const p = boardPoint(e);
+    surface.classList.toggle("wb-over-selection", !!selection && inside({ ...p, w: 0, h: 0 }, selection));
+  }
   const sel = selectDrag;
   if (sel && e.pointerId === sel.pointerId) {
     const { x, y } = boardPoint(e);
@@ -1923,6 +2263,14 @@ function onSurfacePointerUp(e: PointerEvent): void {
   }
   if (liveStroke) {
     endStroke();
+    return;
+  }
+  if (wipe && e.pointerId === wipe.pointerId) {
+    endWipe();
+    return;
+  }
+  if (areaMove && e.pointerId === areaMove.pointerId) {
+    endMoveArea();
     return;
   }
   const sel = selectDrag;
@@ -2123,7 +2471,7 @@ function onKeydown(e: KeyboardEvent): void {
   // Inside a text box, Ctrl+Z is that box's own typing undo.
   if (isTextEntry(e.target)) return;
   if (e.key === "Escape") {
-    if (!colorPop.hidden) closeColorPop();
+    if (anyPopOpen()) closePops();
     else if (overview) toggleOverview();
     else clearSelection();
     return;
@@ -2155,6 +2503,11 @@ function onKeydown(e: KeyboardEvent): void {
   if (key === "x" && selection) {
     e.preventDefault();
     cutSelection();
+    return;
+  }
+  if (key === "d" && selection) {
+    e.preventDefault();
+    duplicateSelection();
     return;
   }
   if (key === "v" && clipboard) {
@@ -2218,6 +2571,7 @@ function updateCursor(): void {
     return;
   }
   const erase = mode === "erase";
+  const whole = erase && settings.eraser === "stroke";
   const width = (erase ? ERASER_WIDTH : PEN_WIDTH)[settings.size] * zoom;
   const d = Math.min(CURSOR_MAX - 4, Math.max(erase ? 6 : CURSOR_MIN_DOT, width));
   const size = Math.ceil(d + 4);
@@ -2226,7 +2580,9 @@ function updateCursor(): void {
   // The pen is its own color and nothing else, exactly the dot it will leave.
   // The eraser has no color of its own, so it is a ring in the board's ink.
   const shape = erase
-    ? `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${penColor("ink")}" stroke-width="1.5"/>`
+    ? `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${penColor("ink")}" stroke-width="1.5"${
+        whole ? ' stroke-dasharray="3 2"' : ""
+      }/>`
     : `<circle cx="${c}" cy="${c}" r="${r}" fill="${penColor(settings.ink)}"/>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">${shape}</svg>`;
   const hot = Math.round(c);
@@ -2241,6 +2597,12 @@ function updateChrome(): void {
   });
   document.querySelectorAll<HTMLButtonElement>(".wb-size-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.size === settings.size);
+  });
+  document.querySelectorAll<HTMLButtonElement>(".wb-shape-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.shape === settings.shape);
+  });
+  document.querySelectorAll<HTMLButtonElement>(".wb-eraser-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.eraser === settings.eraser);
   });
   paintWithPen(colorChip, settings.ink);
   colorPop.querySelectorAll<HTMLButtonElement>(".wb-swatch[data-ink]").forEach((b) => {
@@ -2292,6 +2654,7 @@ async function clearBoard(): Promise<void> {
 /* ── The pen color list ── */
 
 function openColorPop(): void {
+  closePops();
   colorPop.hidden = false;
   colorBtn.classList.add("active");
 }
@@ -2299,6 +2662,31 @@ function openColorPop(): void {
 function closeColorPop(): void {
   colorPop.hidden = true;
   colorBtn.classList.remove("active");
+}
+
+/* The Shapes and Erase buttons each have a small list of kinds under them.
+   Pressing the button picks the mode and opens its list; drawing, a pick, or a
+   click anywhere else closes it, so the list costs nothing when not wanted. */
+
+function modePops(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>(".wb-mode-pop")];
+}
+
+function anyPopOpen(): boolean {
+  return !colorPop.hidden || modePops().some((p) => !p.hidden);
+}
+
+function closePops(): void {
+  closeColorPop();
+  for (const p of modePops()) p.hidden = true;
+}
+
+function toggleModePop(mode: Mode): void {
+  const pop = document.querySelector<HTMLElement>(`.wb-mode-pop[data-for="${mode}"]`);
+  if (!pop) return;
+  const open = pop.hidden;
+  closePops();
+  pop.hidden = !open;
 }
 
 function wireColorPop(): void {
@@ -2332,12 +2720,13 @@ function wireColorPop(): void {
     pickerSelection = null;
     closeColorPop();
   });
-  // Anywhere else closes it, the way a dropdown does.
+  // Anywhere else closes it, the way a dropdown does. The same goes for the
+  // Shapes and Erase lists.
   document.addEventListener("pointerdown", (e) => {
-    if (colorPop.hidden) return;
-    const t = e.target as Node;
-    if (colorPop.contains(t) || colorBtn.contains(t)) return;
-    closeColorPop();
+    if (!anyPopOpen()) return;
+    const t = e.target as HTMLElement;
+    if (t.closest?.(".wb-color-group, .wb-pop-anchor")) return;
+    closePops();
   });
 }
 
@@ -2907,6 +3296,7 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
         pasteClipboard();
       },
     },
+    { label: "Duplicate", disabled: !selection, onClick: duplicateSelection },
     { label: "Delete", danger: true, disabled: !selection, onClick: deleteSelection },
     { separator: true },
     { label: "Send to Kanban…", disabled: isEmpty(), onClick: () => openSend() },
@@ -3078,7 +3468,28 @@ export function initWhiteboard(): void {
   }).observe(scroller);
 
   document.querySelectorAll<HTMLButtonElement>(".wb-mode-btn").forEach((b) => {
-    b.addEventListener("click", () => setMode(b.dataset.mode as Mode));
+    b.addEventListener("click", () => {
+      const mode = b.dataset.mode as Mode;
+      setMode(mode);
+      if (mode === "shape" || mode === "erase") toggleModePop(mode);
+      else closePops();
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>(".wb-shape-btn").forEach((b) => {
+    b.addEventListener("click", () => {
+      settings.shape = b.dataset.shape as ShapeKind;
+      saveSettings();
+      closePops();
+      updateChrome();
+    });
+  });
+  document.querySelectorAll<HTMLButtonElement>(".wb-eraser-btn").forEach((b) => {
+    b.addEventListener("click", () => {
+      settings.eraser = b.dataset.eraser as EraserKind;
+      saveSettings();
+      closePops();
+      updateChrome();
+    });
   });
   document.querySelectorAll<HTMLButtonElement>(".wb-size-btn").forEach((b) => {
     b.addEventListener("click", () => setSize(b.dataset.size as SizeId));
