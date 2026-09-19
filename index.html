@@ -4783,6 +4783,7 @@
         <div class="modal-tabs">
           <button class="modal-tab active" data-cd-tab="timer">Timer</button>
           <button class="modal-tab" data-cd-tab="display">Display View</button>
+          <button class="modal-tab" data-cd-tab="data">Data</button>
         </div>
 
         <div id="cdTabTimer" class="modal-tab-pane">
@@ -5074,6 +5075,28 @@
 
         </div><!-- /cdTabDisplay -->
 
+        <!-- DATA
+             Presets and the session log are the two things in here someone
+             built by hand, and Restore Defaults and Clear History are one
+             click each. Same panel as Time Tracker's and Budget's. -->
+        <div id="cdTabData" class="modal-tab-pane" style="display:none;">
+          <div class="setup-preferences-list">
+
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span class="kb-label-with-info">Snapshots
+                  <button type="button" class="info-trigger-btn kb-info-btn"
+                    data-tooltip="Every save captures the file it overwrites, by hour. Restoring is itself captured, so an unwanted restore is undone by restoring the newest entry. Presets, history and settings are all in one file and travel together.">&#8505;</button>
+                </span>
+                <span id="cdBackupSummary" class="settings-status-badge"></span>
+              </div>
+              <button id="cdBackupRefreshBtn" class="settings-action-btn">Refresh</button>
+            </div>
+            <div id="cdBackupList" class="tool-backup-list"></div>
+
+          </div>
+        </div><!-- /cdTabData -->
+
       </div>
     </div>
   </div>
@@ -5236,6 +5259,25 @@
         <div class="tts-setup-actions">
           <button id="tts-display-reset-btn" class="modal-cancel-btn"
             title="Restore the default Display View appearance">Reset to Defaults</button>
+        </div>
+
+        <!-- SNAPSHOTS
+             Presets are a message, an interval and a repeat rule saved under a
+             name, which is the thing in here worth getting back.
+             Not a tab, because this modal has none; a section at the end,
+             below the settings it is about. -->
+        <div class="setup-preferences-list">
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span class="kb-label-with-info">Snapshots
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Every save captures the file it overwrites, by hour. Restoring is itself captured, so an unwanted restore is undone by restoring the newest entry. Presets and settings share one file and travel together.">&#8505;</button>
+              </span>
+              <span id="ttsBackupSummary" class="settings-status-badge"></span>
+            </div>
+            <button id="ttsBackupRefreshBtn" class="settings-action-btn">Refresh</button>
+          </div>
+          <div id="ttsBackupList" class="tool-backup-list"></div>
         </div>
 
       </div>
@@ -6554,6 +6596,26 @@
             </div>
           </div>
         </div>
+
+        <!-- SNAPSHOTS
+             Every path in the source and destination lists was typed or
+             picked by hand, and the presets name them, so the two are
+             captured together and restore together. Not a tab, because this
+             modal has none; a section at the end. -->
+        <div class="setup-preferences-list">
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span class="kb-label-with-info">Snapshots
+                <button type="button" class="info-trigger-btn kb-info-btn"
+                  data-tooltip="Every save captures the file it overwrites, by hour. Restoring is itself captured, so an unwanted restore is undone by restoring the newest entry. The folder lists and the presets are captured together, because a preset names paths from those lists.">&#8505;</button>
+              </span>
+              <span id="abBackupSummary" class="settings-status-badge"></span>
+            </div>
+            <button id="abBackupRefreshBtn" class="settings-action-btn">Refresh</button>
+          </div>
+          <div id="abBackupList" class="tool-backup-list"></div>
+        </div>
+
       </div>
     </div>
   </div>

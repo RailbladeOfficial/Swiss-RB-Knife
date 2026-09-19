@@ -947,6 +947,26 @@ const KANBAN_AGENTS_GROUP: &[&str] = &["kanban/kanban-agents.json"];
 /// ever "saved" by hand, and Clear is one click away.
 const WHITEBOARD_GROUP: &[&str] = &["whiteboard/whiteboard.json"];
 
+/// Countdown's duration presets and its session log. Both were once fair to
+/// call scratch, and both have since grown into something authored: a preset
+/// is a label and a duration typed by hand, and the log is the last 200
+/// sessions with their memos. Restore Defaults and Clear History are one
+/// click each.
+const COUNTDOWN_GROUP: &[&str] = &["countdown/countdown.json"];
+
+/// TTS Repeater's presets: a message, an interval and a repeat rule, saved
+/// under a name. The settings in the same file are preferences and would not
+/// be worth a group on their own; they ride along because they share it.
+const TTS_GROUP: &[&str] = &["tts-repeater/tts-repeater.json"];
+
+/// Auto-Backup's source and destination lists together with the presets that
+/// name them. AS A SET, and that is the point: a preset holds which paths it
+/// selects, so one restored beside a different pair of lists selects folders
+/// those lists no longer hold. Every path in here was typed or picked by
+/// hand, which is exactly what makes losing them expensive.
+const AUTO_BACKUP_GROUP: &[&str] =
+    &["auto-backup/auto-backup.json", "auto-backup/auto-backup-presets.json"];
+
 fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
     let (name, empty, group) = match (tool_id, kind) {
         ("time-tracker", "settings") => {
@@ -970,7 +990,7 @@ fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
             KANBAN_AGENTS_GROUP,
         ),
         ("countdown", "data") => {
-            ("countdown/countdown.json", r#"{"session":null,"log":[]}"#, NO_SNAPSHOT)
+            ("countdown/countdown.json", r#"{"session":null,"log":[]}"#, COUNTDOWN_GROUP)
         }
         /* READ ONLY IN PRACTICE. game-stats.json is the pre-database history,
            and the only thing that still opens it is the one-time migration.
@@ -989,14 +1009,16 @@ fn tool_file(tool_id: &str, kind: &str) -> Result<ToolFile, String> {
         ("tts-repeater", "data") => (
             "tts-repeater/tts-repeater.json",
             r#"{"settings":null,"presets":[],"display":null}"#,
-            NO_SNAPSHOT,
+            TTS_GROUP,
         ),
         ("auto-backup", "data") => (
             "auto-backup/auto-backup.json",
             r#"{"sources":[],"destinations":[],"copySpeed":31457280}"#,
-            NO_SNAPSHOT,
+            AUTO_BACKUP_GROUP,
         ),
-        ("auto-backup", "presets") => ("auto-backup/auto-backup-presets.json", "[]", NO_SNAPSHOT),
+        ("auto-backup", "presets") => {
+            ("auto-backup/auto-backup-presets.json", "[]", AUTO_BACKUP_GROUP)
+        }
         ("whiteboard", "data") => (
             "whiteboard/whiteboard.json",
             r#"{"strokes":[],"texts":[]}"#,

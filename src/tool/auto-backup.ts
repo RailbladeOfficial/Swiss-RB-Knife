@@ -29,7 +29,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { bindInfoTooltips, closeInfoTooltip } from "../core/info-tooltip";
 import { formatDataSize as formatBytes } from "../core/format";
-import { loadToolJson, saveToolJson } from "../core/tool-store";
+import { loadToolJson, saveToolJson, saveToolText, unblockAfterReplacement } from "../core/tool-store";
+import { renderToolBackups, readToolBackup } from "../core/tool-backups";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { flash, devError, devWarn, setToolAttention } from "../core/shell";
@@ -508,6 +509,49 @@ async function savePresets(): Promise<void> {
   } catch (e) {
     devWarn("save_backup_presets invoke failed:", e);
   }
+}
+
+/* -----------------------------------------------------------------------------
+   SNAPSHOTS
+
+   The two files come back TOGETHER, and the shared list offers a row per
+   file inside one hourly capture, so restoring both is two clicks on the
+   same row group rather than a choice between them. Restoring one alone is
+   allowed and is sometimes what you want; what it must not do is look like
+   the only option.
+----------------------------------------------------------------------------- */
+
+let abBackupRefreshWired = false;
+
+async function refreshAbBackups(): Promise<void> {
+  if (!abBackupRefreshWired) {
+    abBackupRefreshWired = true;
+    document
+      .getElementById("abBackupRefreshBtn")!
+      .addEventListener("click", () => void refreshAbBackups());
+  }
+  await renderToolBackups({
+    toolId: "auto-backup",
+    host: document.getElementById("abBackupList")!,
+    summary: document.getElementById("abBackupSummary"),
+    labels: { data: "Source and destination lists", presets: "Presets" },
+    onRestore: async (entry, snapshot) => {
+      const raw = await readToolBackup("auto-backup", snapshot.name, entry.kind);
+      // Ordinary save path, which captures what it replaces on the way past.
+      // See core/tool-backups.ts.
+      unblockAfterReplacement("auto-backup", entry.kind);
+      await saveToolText("auto-backup", entry.kind, raw);
+      if (entry.kind === "presets") {
+        await loadPresets();
+        renderPresetList();
+      } else {
+        await loadConfig();
+        renderSourceList();
+        renderDestList();
+      }
+      await refreshAbBackups();
+    },
+  });
 }
 
 async function loadPresets(): Promise<void> {
@@ -2140,6 +2184,9 @@ function initSetupModal(): void {
       renderSetupReminderToggle();
       renderSetupReminderMode();
       renderSetupReminderSchedule();
+      // No tabs here, so the list is read on open. It is a directory listing
+      // of at most thirty folders.
+      void refreshAbBackups();
     },
     onClosed: () => closeInfoTooltip(),
   });

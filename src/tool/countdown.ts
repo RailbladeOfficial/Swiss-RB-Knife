@@ -39,7 +39,8 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { loadToolJson, saveToolJson } from "../core/tool-store";
+import { loadToolJson, saveToolJson, saveToolText, unblockAfterReplacement } from "../core/tool-store";
+import { renderToolBackups, readToolBackup } from "../core/tool-backups";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import {
@@ -99,7 +100,7 @@ type ProgressStyle = "none" | "bar" | "ring" | "hourglass";
 const PROGRESS_STYLES: ProgressStyle[] = ["none", "bar", "ring", "hourglass"];
 /** The Setup modal's two tabs: how the timer behaves, and how it looks on a
  *  shared screen. */
-type CdSetupTab = "timer" | "display";
+type CdSetupTab = "timer" | "display" | "data";
 type ClockFormat = "colon" | "units";
 type DisplayMode = "brief" | "partial" | "full";
 /** What a duration typed as a plain number means. */
@@ -526,6 +527,42 @@ async function loadStore(): Promise<void> {
     if (session.pausedAt === null) void startTicker();
   }
   render();
+}
+
+/* -----------------------------------------------------------------------------
+   SNAPSHOTS
+
+   Presets and the session log live in the same file as the settings, so all
+   three are captured and restored as one. That is not a compromise: a preset
+   list from one hour beside settings from another is not a state this tool
+   was ever in.
+----------------------------------------------------------------------------- */
+
+let cdBackupRefreshWired = false;
+
+async function refreshCdBackups(): Promise<void> {
+  if (!cdBackupRefreshWired) {
+    cdBackupRefreshWired = true;
+    document
+      .getElementById("cdBackupRefreshBtn")!
+      .addEventListener("click", () => void refreshCdBackups());
+  }
+  await renderToolBackups({
+    toolId: "countdown",
+    host: document.getElementById("cdBackupList")!,
+    summary: document.getElementById("cdBackupSummary"),
+    labels: { data: "Presets, history and settings" },
+    onRestore: async (entry, snapshot) => {
+      const raw = await readToolBackup("countdown", snapshot.name, entry.kind);
+      /* Written back through the ordinary save path, which captures what it
+         is replacing on the way past, so an unwanted restore is undone by
+         restoring the newest entry. See core/tool-backups.ts. */
+      unblockAfterReplacement("countdown", entry.kind);
+      await saveToolText("countdown", entry.kind, raw);
+      await loadStore();
+      await refreshCdBackups();
+    },
+  });
 }
 
 async function saveStore(): Promise<void> {
@@ -1870,8 +1907,12 @@ function getSetupModal(): Modal {
     setupTabs = new ModalTabs<CdSetupTab>({
       scope: "#cdSetupModal",
       key: "cdTab",
-      panes: { timer: "cdTabTimer", display: "cdTabDisplay" },
+      panes: { timer: "cdTabTimer", display: "cdTabDisplay", data: "cdTabData" },
       onActivate: (tab) => {
+        // Read on arrival rather than on open: it is a directory listing of
+        // up to thirty folders, and doing it here keeps it off the path of
+        // someone who only came in to change the alarm.
+        if (tab === "data") void refreshCdBackups();
         // The preview's ring is measured off its clock box, and a box inside a
         // hidden pane measures zero. Showing the pane is the first moment
         // there is anything real to measure, so the cached geometry is dropped

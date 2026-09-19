@@ -42,7 +42,8 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { loadToolJson, saveToolJson } from "../core/tool-store";
+import { loadToolJson, saveToolJson, saveToolText, unblockAfterReplacement } from "../core/tool-store";
+import { renderToolBackups, readToolBackup } from "../core/tool-backups";
 import { listen } from "@tauri-apps/api/event";
 import { flash, escapeHtml } from "../core/shell";
 import { Modal } from "../modal/modal";
@@ -286,6 +287,40 @@ async function loadStore(): Promise<void> {
   } finally {
     storeLoaded = true;
   }
+}
+
+/* -----------------------------------------------------------------------------
+   SNAPSHOTS
+
+   The presets are what this is for: a message, an interval and a repeat rule
+   saved under a name. The settings share the file and come back with them.
+----------------------------------------------------------------------------- */
+
+let ttsBackupRefreshWired = false;
+
+async function refreshTtsBackups(): Promise<void> {
+  if (!ttsBackupRefreshWired) {
+    ttsBackupRefreshWired = true;
+    document
+      .getElementById("ttsBackupRefreshBtn")!
+      .addEventListener("click", () => void refreshTtsBackups());
+  }
+  await renderToolBackups({
+    toolId: "tts-repeater",
+    host: document.getElementById("ttsBackupList")!,
+    summary: document.getElementById("ttsBackupSummary"),
+    labels: { data: "Presets and settings" },
+    onRestore: async (entry, snapshot) => {
+      const raw = await readToolBackup("tts-repeater", snapshot.name, entry.kind);
+      // Ordinary save path, which captures what it replaces. See
+      // core/tool-backups.ts.
+      unblockAfterReplacement("tts-repeater", entry.kind);
+      await saveToolText("tts-repeater", entry.kind, raw);
+      await loadStore();
+      renderPresetList();
+      await refreshTtsBackups();
+    },
+  });
 }
 
 async function saveStore(): Promise<void> {
@@ -917,6 +952,9 @@ function getSetupModal(): Modal {
       onOpen: () => {
         applyDisplayToSetupForm();
         syncSetupUI();
+        // No tabs here, so the list is read on open. It is a directory
+        // listing of at most thirty folders.
+        void refreshTtsBackups();
       },
     });
     document.getElementById("tts-setup-close")!.addEventListener("click", () => {
