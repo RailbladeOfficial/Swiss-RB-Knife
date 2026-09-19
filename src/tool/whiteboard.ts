@@ -101,6 +101,7 @@ interface TextNote {
   x: number;
   y: number;
   ink: Pen;
+  size: SizeId;
   text: string;
 }
 
@@ -122,6 +123,8 @@ interface WhiteboardFile {
   strokes: Stroke[];
   texts: TextNote[];
   scroll: { x: number; y: number };
+  /** How far in or out the view is, 1 being actual size. */
+  zoom: number;
 }
 
 interface WhiteboardSettings {
@@ -169,6 +172,9 @@ const PEN_WIDTH: Record<SizeId, number> = { fine: 2, medium: 4, bold: 8 };
 const ERASER_WIDTH: Record<SizeId, number> = { fine: 10, medium: 20, bold: 40 };
 
 const MODES: readonly Mode[] = ["type", "draw", "erase", "select"];
+
+/** The single keys that switch mode, while not typing in a box. */
+const MODE_KEYS: Record<string, Mode> = { t: "type", d: "draw", e: "erase", s: "select" };
 const SIZES: readonly SizeId[] = ["fine", "medium", "bold"];
 const BOARD_COLORS: readonly BoardColor[] = ["theme", "black", "white", "custom"];
 
@@ -207,6 +213,7 @@ const SAVE_DEBOUNCE_MS = 500;
 /** Offset from the click to a new box's top-left corner, so the caret lands
  *  under the pointer rather than below and to the right of it. */
 const NEW_BOX_NUDGE_X = 5;
+/** Half a line of text at medium size, scaled by TEXT_REM for the others. */
 const NEW_BOX_NUDGE_Y = 13;
 
 /* A text box's box model, as whiteboard.css draws it, for drawing its text
@@ -224,6 +231,22 @@ const IMAGE_MAX_SIDE = 8192;
 /** Margin around everything on the board when the whole board is sent. */
 const BOARD_IMAGE_MARGIN = 24;
 const PREVIEW_WIDTH = 480;
+
+/* Zoom. The floor is not a number: it is whatever shows the whole board in
+   the window, which is what Overview goes to. */
+const ZOOM_MAX = 2;
+const ZOOM_STEP = 1.25;
+/** Spacing of the grid's dots at actual size, in board pixels. */
+const GRID_STEP = 24;
+/** Below this the dots would crowd into a grey wash, so they are spread four
+ *  times as far apart. */
+const GRID_SPARSE_BELOW = 0.5;
+/** Margin kept around your notes when Go to Notes brings them into view. */
+const NOTES_MARGIN = 40;
+
+/** Text sizes, in rem, so they follow the app's font scale. Mirrored by the
+ *  wb-tsize-* classes in whiteboard.css. */
+const TEXT_REM: Record<SizeId, number> = { fine: 0.85, medium: 1, bold: 1.4 };
 
 /* =============================================================================
    STATE
@@ -295,6 +318,16 @@ let selectDrag: { pointerId: number; x: number; y: number; moved: boolean } | nu
 /** Where the last right-click on the board landed, for "Type Here". */
 let menuPoint: { x: number; y: number } | null = null;
 
+/** Board pixels to screen pixels. */
+let zoom = 1;
+/** Zoomed out to the whole board, where a click zooms back in at that spot
+ *  rather than doing what the mode would do. */
+let overview = false;
+
+/** What the hidden color input is choosing for when it next reports: the pen,
+ *  or one text box's color from its right-click menu. */
+let colorFor: { kind: "pen" } | { kind: "note"; id: string } = { kind: "pen" };
+
 const noteEls = new Map<string, HTMLElement>();
 const inkColors = new Map<InkId, string>();
 const strokeBounds = new WeakMap<Stroke, [number, number, number, number]>();
@@ -308,7 +341,11 @@ let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D;
 let scroller: HTMLElement;
 let surface: HTMLElement;
+/** Holds the text boxes and the selection, scaled by the zoom. */
+let layer: HTMLElement;
 let selectionEl: HTMLElement;
+let zoomLabel: HTMLButtonElement;
+let overviewBtn: HTMLButtonElement;
 let undoBtn: HTMLButtonElement;
 let redoBtn: HTMLButtonElement;
 let sendOpenBtn: HTMLButtonElement;
@@ -385,6 +422,7 @@ function normalizeNote(raw: unknown): TextNote | null {
     x: Number.isFinite(x) ? clampX(x) : 0,
     y: Number.isFinite(y) ? clampY(y) : 0,
     ink: isPen(r.ink) ? r.ink : "ink",
+    size: SIZES.includes(r.size as SizeId) ? (r.size as SizeId) : "medium",
     text,
   };
 }
@@ -415,15 +453,19 @@ function normalizeFile(raw: unknown): WhiteboardFile | null {
   const scrollRaw = (r.scroll ?? {}) as Record<string, unknown>;
   const sx = Number(scrollRaw.x);
   const sy = Number(scrollRaw.y);
+  const z = Number(r.zoom);
 
   return {
     version: 1,
     strokes: outStrokes,
     texts: outTexts,
+    // The scroll is in screen pixels at that zoom, so it can run past the
+    // board's own size when zoomed in. The browser clamps it on the way in.
     scroll: {
-      x: Number.isFinite(sx) ? clampX(sx) : 0,
-      y: Number.isFinite(sy) ? clampY(sy) : 0,
+      x: Number.isFinite(sx) ? Math.max(0, sx) : 0,
+      y: Number.isFinite(sy) ? Math.max(0, sy) : 0,
     },
+    zoom: Number.isFinite(z) && z > 0 ? Math.min(z, ZOOM_MAX) : 1,
   };
 }
 
@@ -453,6 +495,7 @@ function normalizeSettings(raw: unknown): WhiteboardSettings {
 function applyFile(file: WhiteboardFile): void {
   strokes = file.strokes;
   texts = file.texts;
+  zoom = file.zoom;
   viewScroll = { ...file.scroll };
   writtenScroll = { ...file.scroll };
   pendingScroll = { ...file.scroll };
@@ -489,6 +532,7 @@ async function load(): Promise<void> {
   }
   if (!blocked) blocked = isToolFileBlocked("whiteboard", "data");
   loaded = true;
+  applyZoomLayout();
   rebuildTexts();
   applyBoardLook();
   applyPendingScroll();
@@ -500,7 +544,7 @@ async function load(): Promise<void> {
 ============================================================================= */
 
 function buildFile(): WhiteboardFile {
-  return { version: 1, strokes, texts, scroll: { ...viewScroll } };
+  return { version: 1, strokes, texts, scroll: { ...viewScroll }, zoom };
 }
 
 function markDirty(): void {
@@ -755,7 +799,8 @@ function drawStroke(c: CanvasRenderingContext2D, s: Stroke): void {
  *  scrolled to where the view is. */
 function applyViewTransform(): void {
   const dpr = window.devicePixelRatio || 1;
-  ctx.setTransform(dpr, 0, 0, dpr, -scroller.scrollLeft * dpr, -scroller.scrollTop * dpr);
+  const k = dpr * zoom;
+  ctx.setTransform(k, 0, 0, k, -scroller.scrollLeft * dpr, -scroller.scrollTop * dpr);
 }
 
 function overlaps(b: [number, number, number, number], a: Area): boolean {
@@ -784,7 +829,12 @@ function redraw(): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   applyViewTransform();
 
-  const view: Area = { x: scroller.scrollLeft, y: scroller.scrollTop, w, h };
+  const view: Area = {
+    x: scroller.scrollLeft / zoom,
+    y: scroller.scrollTop / zoom,
+    w: w / zoom,
+    h: h / zoom,
+  };
   for (const s of strokes) {
     if (overlaps(boundsOf(s), view)) drawStroke(ctx, s);
   }
@@ -800,7 +850,7 @@ function requestRedraw(): void {
 /** The point under the pointer, in board coordinates. */
 function boardPoint(e: { clientX: number; clientY: number }): { x: number; y: number } {
   const r = surface.getBoundingClientRect();
-  return { x: clampX(e.clientX - r.left), y: clampY(e.clientY - r.top) };
+  return { x: clampX((e.clientX - r.left) / zoom), y: clampY((e.clientY - r.top) / zoom) };
 }
 
 function startStroke(e: PointerEvent): void {
@@ -881,7 +931,7 @@ function noteById(id: string | null): TextNote | null {
 
 function buildNoteEl(note: TextNote): HTMLElement {
   const el = document.createElement("div");
-  el.className = "wb-text";
+  el.className = `wb-text wb-tsize-${note.size}`;
   paintWithPen(el, note.ink);
   el.dataset.id = note.id;
   el.style.left = `${note.x}px`;
@@ -912,14 +962,14 @@ function rebuildTexts(): void {
   editingId = null;
   editStart = null;
   noteEls.clear();
-  surface.replaceChildren();
+  layer.replaceChildren();
   for (const note of texts) {
     const el = buildNoteEl(note);
     noteEls.set(note.id, el);
-    surface.appendChild(el);
+    layer.appendChild(el);
   }
   // Last, so the selection outline sits above the text it is picking.
-  surface.appendChild(selectionEl);
+  layer.appendChild(selectionEl);
 }
 
 /** The text a box holds, as it would be saved. */
@@ -1003,8 +1053,9 @@ function endEditing(): void {
   updateChrome();
 }
 
-/** A new, empty box at a board point, ready to type in. */
-function createNoteAt(x: number, y: number): void {
+/** A new, empty box at a board point, ready to type in, in the pen's color and
+ *  size unless it is carrying on from a box above it. */
+function createNoteAt(x: number, y: number, style?: { ink: Pen; size: SizeId }): void {
   if (texts.length >= MAX_TEXTS) {
     flash("The Whiteboard can't hold more text boxes.", "error");
     return;
@@ -1014,13 +1065,14 @@ function createNoteAt(x: number, y: number): void {
     id: newId(),
     x: clampX(Math.min(x, SURFACE_W - 40)),
     y: clampY(Math.min(y, SURFACE_H - 30)),
-    ink: settings.ink,
+    ink: style?.ink ?? settings.ink,
+    size: style?.size ?? settings.size,
     text: "",
   };
   texts.push(note);
   const el = buildNoteEl(note);
   noteEls.set(note.id, el);
-  surface.insertBefore(el, selectionEl);
+  layer.insertBefore(el, selectionEl);
   beginEditing(note.id, { pre });
   updateChrome();
 }
@@ -1043,8 +1095,11 @@ function onNoteKeydown(e: KeyboardEvent, el: HTMLElement): void {
     }
     const nextY = note.y + el.offsetHeight + NEXT_LINE_GAP;
     const x = note.x;
+    // The next line carries on in this box's color and size, not the pen's:
+    // a list started in red and large is still that list.
+    const style = { ink: note.ink, size: note.size };
     endEditing();
-    if (nextY < SURFACE_H - 30) createNoteAt(x, nextY);
+    if (nextY < SURFACE_H - 30) createNoteAt(x, nextY, style);
   }
 }
 
@@ -1235,6 +1290,12 @@ function onSurfacePointerDown(e: PointerEvent): void {
   }
   if (e.button !== 0) return;
 
+  if (overview) {
+    e.preventDefault();
+    leaveOverviewAt(e);
+    return;
+  }
+
   const mode = settings.mode;
   if (mode === "draw" || mode === "erase") {
     e.preventDefault();
@@ -1282,7 +1343,7 @@ function onSurfacePointerDown(e: PointerEvent): void {
     return;
   }
   const { x, y } = boardPoint(e);
-  createNoteAt(x - NEW_BOX_NUDGE_X, y - NEW_BOX_NUDGE_Y);
+  createNoteAt(x - NEW_BOX_NUDGE_X, y - NEW_BOX_NUDGE_Y * TEXT_REM[settings.size]);
 }
 
 function onSurfacePointerMove(e: PointerEvent): void {
@@ -1298,7 +1359,7 @@ function onSurfacePointerMove(e: PointerEvent): void {
   const sel = selectDrag;
   if (sel && e.pointerId === sel.pointerId) {
     const { x, y } = boardPoint(e);
-    if (!sel.moved && Math.hypot(x - sel.x, y - sel.y) < DRAG_THRESHOLD) return;
+    if (!sel.moved && Math.hypot(x - sel.x, y - sel.y) * zoom < DRAG_THRESHOLD) return;
     sel.moved = true;
     selection = {
       x: Math.min(x, sel.x),
@@ -1311,9 +1372,9 @@ function onSurfacePointerMove(e: PointerEvent): void {
   }
   const drag = boxDrag;
   if (drag && e.pointerId === drag.pointerId) {
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    const dx = (e.clientX - drag.startX) / zoom;
+    const dy = (e.clientY - drag.startY) / zoom;
+    if (!drag.moved && Math.hypot(dx, dy) * zoom < DRAG_THRESHOLD) return;
     drag.moved = true;
     const note = noteById(drag.id);
     const el = noteEls.get(drag.id);
@@ -1357,10 +1418,16 @@ function onSurfacePointerUp(e: PointerEvent): void {
   }
 }
 
-function onScroll(): void {
-  // The dot grid is the stage's background, so it has to be moved by hand to
-  // look like it belongs to the board rather than the window.
+/** The dot grid is the stage's background, so it has to be moved and sized by
+ *  hand to look like it belongs to the board rather than the window. */
+function placeGrid(): void {
+  const step = GRID_STEP * zoom * (zoom < GRID_SPARSE_BELOW ? 4 : 1);
+  stage.style.backgroundSize = `${step}px ${step}px`;
   stage.style.backgroundPosition = `${-scroller.scrollLeft}px ${-scroller.scrollTop}px`;
+}
+
+function onScroll(): void {
+  placeGrid();
   // Only a scroll the person made. Hiding the tool resets the scroller to 0,0
   // and restoring a position scrolls it too; neither is somewhere they went.
   if (loaded && pendingScroll === null && scroller.clientWidth > 0) {
@@ -1375,7 +1442,7 @@ function applyPendingScroll(): void {
   const at = pendingScroll;
   scroller.scrollLeft = at.x;
   scroller.scrollTop = at.y;
-  stage.style.backgroundPosition = `${-scroller.scrollLeft}px ${-scroller.scrollTop}px`;
+  placeGrid();
   /* Cleared a frame later rather than now: the scroll event from the lines
      above arrives after this function returns, and while pendingScroll is set
      onScroll does not mistake it for the person scrolling. */
@@ -1385,6 +1452,108 @@ function applyPendingScroll(): void {
   requestRedraw();
 }
 
+/* =============================================================================
+   ZOOM AND FINDING YOUR WAY
+   -----------------------------------------------------------------------------
+   The surface is sized to the board at the current zoom, so the scrollbars
+   stay honest, and the text boxes sit in a layer scaled by it. The canvas is
+   told the zoom in its transform. Everything that turns a pointer into a board
+   point divides by it (boardPoint), so every mode works at any zoom.
+
+   OVERVIEW is zoomed out to the whole board. A click there zooms back to
+   actual size at the spot clicked, rather than typing or drawing, which is
+   what makes the whole board a map you can jump across.
+============================================================================= */
+
+/** The zoom that shows the whole board in the window. */
+function fitBoardZoom(): number {
+  const w = scroller.clientWidth || 1;
+  const h = scroller.clientHeight || 1;
+  return Math.min(1, w / SURFACE_W, h / SURFACE_H);
+}
+
+function clampZoom(z: number): number {
+  return Math.min(ZOOM_MAX, Math.max(fitBoardZoom(), z));
+}
+
+/** Sizes the surface and scales the layer for the current zoom. */
+function applyZoomLayout(): void {
+  surface.style.width = `${SURFACE_W * zoom}px`;
+  surface.style.height = `${SURFACE_H * zoom}px`;
+  layer.style.transform = `scale(${zoom})`;
+  zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+  surface.classList.toggle("wb-overview", overview);
+  overviewBtn.classList.toggle("active", overview);
+  placeGrid();
+}
+
+/** Changes the zoom, keeping the board point under `anchor` (a screen point)
+ *  where it is. With no anchor, the middle of the view stays put. */
+function setZoom(next: number, anchor?: { clientX: number; clientY: number }): void {
+  const z = clampZoom(next);
+  const r = scroller.getBoundingClientRect();
+  const ax = anchor ? anchor.clientX - r.left : scroller.clientWidth / 2;
+  const ay = anchor ? anchor.clientY - r.top : scroller.clientHeight / 2;
+  const bx = (scroller.scrollLeft + ax) / zoom;
+  const by = (scroller.scrollTop + ay) / zoom;
+  zoom = z;
+  applyZoomLayout();
+  scrollViewTo(bx * zoom - ax, by * zoom - ay);
+}
+
+/** Scrolls the view, and records it as where you are. */
+function scrollViewTo(left: number, top: number): void {
+  scroller.scrollLeft = Math.max(0, left);
+  scroller.scrollTop = Math.max(0, top);
+  viewScroll = { x: scroller.scrollLeft, y: scroller.scrollTop };
+  scrollDirty = true;
+  placeGrid();
+  requestRedraw();
+}
+
+function toggleOverview(): void {
+  endEditing();
+  if (overview) {
+    overview = false;
+    setZoom(1);
+  } else {
+    overview = true;
+    setZoom(fitBoardZoom());
+  }
+}
+
+/** Out of Overview, at actual size, with the spot clicked under the pointer. */
+function leaveOverviewAt(e: PointerEvent): void {
+  overview = false;
+  setZoom(1, e);
+}
+
+/** Brings your notes into view: centered if they fit at this zoom, and
+ *  zoomed out just far enough to fit them if they do not. */
+function goToNotes(): void {
+  endEditing();
+  const area = contentArea(true);
+  if (!area) return;
+  overview = false;
+  const w = scroller.clientWidth;
+  const h = scroller.clientHeight;
+  const fit = Math.min((w - NOTES_MARGIN * 2) / area.w, (h - NOTES_MARGIN * 2) / area.h);
+  if (fit < zoom) zoom = clampZoom(fit);
+  applyZoomLayout();
+  const cx = (area.x + area.w / 2) * zoom;
+  const cy = (area.y + area.h / 2) * zoom;
+  scrollViewTo(cx - w / 2, cy - h / 2);
+}
+
+function onWheel(e: WheelEvent): void {
+  // Ctrl+wheel zooms around the pointer, the way it does in most boards.
+  // Taken here so it never reaches the webview's own page zoom.
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  overview = false;
+  setZoom(zoom * Math.exp(-e.deltaY * 0.0015), e);
+}
+
 function onKeydown(e: KeyboardEvent): void {
   if (document.body.dataset.activeTool !== "productivity/whiteboard") return;
   if (document.body.classList.contains("modal-open")) return;
@@ -1392,11 +1561,19 @@ function onKeydown(e: KeyboardEvent): void {
   if (isTextEntry(e.target)) return;
   if (e.key === "Escape") {
     if (!colorPop.hidden) closeColorPop();
+    else if (overview) toggleOverview();
     else clearSelection();
     return;
   }
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
   const key = e.key.toLowerCase();
+  // The mode keys. Only with nothing held, so they never shadow a shortcut,
+  // and never while typing, which the text-entry check above already rules out.
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && MODE_KEYS[key]) {
+    e.preventDefault();
+    setMode(MODE_KEYS[key]);
+    return;
+  }
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
   if (key === "z" && !e.shiftKey) {
     e.preventDefault();
     undo();
@@ -1515,15 +1692,21 @@ function wireColorPop(): void {
       closeColorPop();
     });
   });
-  document.getElementById("wbColorPickBtn")!.addEventListener("click", () => {
-    colorInput.value = settings.customInk ?? (isInk(settings.ink) ? "#ff4f81" : settings.ink);
-    colorInput.click();
-  });
+  document
+    .getElementById("wbColorPickBtn")!
+    .addEventListener("click", () => pickColorFor({ kind: "pen" }));
   colorInput.addEventListener("change", () => {
     const hex = colorInput.value.toLowerCase();
     if (!isPen(hex)) return;
     settings.customInk = hex;
-    setInk(hex);
+    const target = colorFor;
+    colorFor = { kind: "pen" };
+    if (target.kind === "note") {
+      saveSettings();
+      setNoteStyle(target.id, { ink: hex });
+    } else {
+      setInk(hex);
+    }
     closeColorPop();
   });
   // Anywhere else closes it, the way a dropdown does.
@@ -1586,12 +1769,41 @@ function notesInReadingOrder(): TextNote[] {
 /** A box as the card it becomes. See the section header for the rule. */
 function noteToCard(note: TextNote): IncomingCard {
   const full = note.text.trim();
-  const firstLine =
-    full
-      .split("\n")
-      .map((l) => l.trim())
-      .find((l) => l !== "") ?? "";
-  let title = firstLine;
+  const lines = full
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "");
+  const firstLine = lines[0] ?? "";
+
+  /* A CHECKLIST: a first line, then only list lines. The first line is the
+     title and the list lines are the card's subtasks, ticked where they were
+     written as [x]. A box with any plain line after the first is ordinary
+     text, and goes over whole in the description. */
+  const rest = lines.slice(1);
+  if (rest.length > 0 && rest.every((l) => CHECKLIST_LINE.test(l))) {
+    return {
+      title: cutTitle(firstLine.replace(CHECKLIST_LINE, "")),
+      description: "",
+      subtasks: rest.map((l) => {
+        const m = CHECKLIST_LINE.exec(l)!;
+        return { text: l.slice(m[0].length), done: /x/i.test(m[1] ?? m[2] ?? "") };
+      }),
+    };
+  }
+
+  // A list marker is never part of a title, even on a box that is one line.
+  const title = cutTitle(firstLine.replace(CHECKLIST_LINE, ""));
+  return { title, description: title === full.replace(CHECKLIST_LINE, "") ? "" : full };
+}
+
+/** A list line: "- ", "* ", "• ", "[ ] " or "[x] " at the start. The bracket's
+ *  contents are captured, to tell a ticked item from an open one. */
+const CHECKLIST_LINE = /^(?:[-*•]\s+(?:\[([ xX]?)\]\s*)?|\[([ xX]?)\]\s*)/;
+
+/** A card title within Kanban's limit, cut at a word break where there is one
+ *  reasonably near the end, so it is not cut mid-word. */
+function cutTitle(line: string): string {
+  let title = line.trim();
   if (title.length > MAX_TITLE_LEN) {
     const cut = title.slice(0, MAX_TITLE_LEN - 1);
     const space = cut.lastIndexOf(" ");
@@ -1599,7 +1811,7 @@ function noteToCard(note: TextNote): IncomingCard {
     // not cut mid-word; otherwise wherever the limit falls.
     title = `${(space > MAX_TITLE_LEN * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
   }
-  return { title, description: title === full ? "" : full };
+  return title;
 }
 
 function openSend(tab?: SendTab, onlyNote?: string): void {
@@ -1688,9 +1900,17 @@ function renderSendList(): void {
 
     const title = document.createElement("span");
     title.className = "wb-send-title";
-    title.textContent = noteToCard(note).title;
+    const card = noteToCard(note);
+    title.textContent = card.title;
     row.title = note.text;
     row.appendChild(title);
+    const subtasks = card.subtasks?.length ?? 0;
+    if (subtasks > 0) {
+      const count = document.createElement("span");
+      count.className = "wb-send-meta";
+      count.textContent = `${subtasks} ${subtasks === 1 ? "subtask" : "subtasks"}`;
+      row.appendChild(count);
+    }
     sendList.appendChild(row);
   }
   updateSendButtons();
@@ -2029,8 +2249,18 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
   const boxEl = (e.target as HTMLElement).closest<HTMLElement>(".wb-text");
   const id = boxEl?.dataset.id;
   if (id && id !== editingId) {
+    const note = noteById(id);
     return [
       { label: "Edit", onClick: () => beginEditing(id) },
+      { label: "Color", submenu: noteColorMenu(id, note?.ink) },
+      {
+        label: "Size",
+        submenu: SIZES.map((sz) => ({
+          label: SIZE_LABELS[sz],
+          disabled: note?.size === sz,
+          onClick: () => setNoteStyle(id, { size: sz }),
+        })),
+      },
       { label: "Send to Kanban…", onClick: () => openSend("text", id) },
       { separator: true },
       { label: "Delete", danger: true, onClick: () => deleteNote(id) },
@@ -2051,12 +2281,75 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
   ];
 }
 
+const SIZE_LABELS: Record<SizeId, string> = { fine: "Fine", medium: "Medium", bold: "Bold" };
+
+/** A color as #rrggbb, for a menu row's swatch, or undefined when the theme's
+ *  value is not a plain opaque color the swatch could show. */
+function toHex(color: string): string | undefined {
+  const c = document.createElement("canvas").getContext("2d");
+  if (!c) return undefined;
+  c.fillStyle = "#000000";
+  c.fillStyle = color;
+  return /^#[0-9a-f]{6}$/i.test(c.fillStyle) ? c.fillStyle : undefined;
+}
+
+/** The pens, plus the last hand-picked color and a way to pick another, for
+ *  one text box. */
+function noteColorMenu(id: string, current: Pen | undefined): MenuItem[] {
+  const rows: MenuItem[] = INKS.map((i) => ({
+    label: i.label,
+    swatch: toHex(penColor(i.id)),
+    disabled: current === i.id,
+    onClick: () => setNoteStyle(id, { ink: i.id }),
+  }));
+  const custom = settings.customInk;
+  if (custom) {
+    rows.push({
+      label: custom,
+      swatch: custom,
+      disabled: current === custom,
+      onClick: () => setNoteStyle(id, { ink: custom }),
+    });
+  }
+  rows.push({ separator: true }, { label: "Custom…", onClick: () => pickColorFor({ kind: "note", id }) });
+  return rows;
+}
+
+/** Recolors or resizes one text box, as one Undo step. */
+function setNoteStyle(id: string, patch: { ink?: Pen; size?: SizeId }): void {
+  endEditing();
+  const note = noteById(id);
+  if (!note) return;
+  if ((patch.ink === undefined || patch.ink === note.ink) && (patch.size === undefined || patch.size === note.size)) {
+    return;
+  }
+  checkpoint();
+  if (patch.ink !== undefined) note.ink = patch.ink;
+  if (patch.size !== undefined) note.size = patch.size;
+  const el = noteEls.get(id);
+  if (el) {
+    paintWithPen(el, note.ink);
+    for (const sz of SIZES) el.classList.toggle(`wb-tsize-${sz}`, sz === note.size);
+  }
+  markDirty();
+  updateChrome();
+}
+
+/** Opens the system color picker for the pen or for one text box. */
+function pickColorFor(target: typeof colorFor): void {
+  colorFor = target;
+  const note = target.kind === "note" ? noteById(target.id) : null;
+  const start = note ? note.ink : settings.ink;
+  colorInput.value = isInk(start) ? settings.customInk ?? toHex(penColor(start)) ?? "#ff4f81" : start;
+  colorInput.click();
+}
+
 function typeAtMenuPoint(): void {
   const at = menuPoint;
   if (!at) return;
   setMode("type");
   endEditing();
-  createNoteAt(at.x - NEW_BOX_NUDGE_X, at.y - NEW_BOX_NUDGE_Y);
+  createNoteAt(at.x - NEW_BOX_NUDGE_X, at.y - NEW_BOX_NUDGE_Y * TEXT_REM[settings.size]);
 }
 
 /* =============================================================================
@@ -2103,13 +2396,21 @@ export function initWhiteboard(): void {
   notice = document.getElementById("wbHeaderNotice")!;
   notice.textContent = "Not saving";
 
+  zoomLabel = document.getElementById("wbZoomResetBtn") as HTMLButtonElement;
+  overviewBtn = document.getElementById("wbOverviewBtn") as HTMLButtonElement;
+
+  layer = document.createElement("div");
+  layer.className = "wb-layer";
+  layer.style.width = `${SURFACE_W}px`;
+  layer.style.height = `${SURFACE_H}px`;
+  surface.appendChild(layer);
+
   selectionEl = document.createElement("div");
   selectionEl.className = "wb-selection";
   selectionEl.style.display = "none";
-  surface.appendChild(selectionEl);
+  layer.appendChild(selectionEl);
 
-  surface.style.width = `${SURFACE_W}px`;
-  surface.style.height = `${SURFACE_H}px`;
+  applyZoomLayout();
 
   surface.addEventListener("pointerdown", onSurfacePointerDown);
   surface.addEventListener("pointermove", onSurfacePointerMove);
@@ -2119,7 +2420,14 @@ export function initWhiteboard(): void {
   surface.addEventListener("dragover", (e) => e.preventDefault());
   surface.addEventListener("drop", (e) => e.preventDefault());
   scroller.addEventListener("scroll", onScroll, { passive: true });
+  // Not passive: Ctrl+wheel has to be kept from the webview's page zoom.
+  scroller.addEventListener("wheel", onWheel, { passive: false });
   new ResizeObserver(() => {
+    // Overview is "the whole board", so it follows the window's size.
+    if (overview && scroller.clientWidth > 0) {
+      zoom = fitBoardZoom();
+      applyZoomLayout();
+    }
     applyPendingScroll();
     requestRedraw();
   }).observe(scroller);
@@ -2133,6 +2441,20 @@ export function initWhiteboard(): void {
   undoBtn.addEventListener("click", undo);
   redoBtn.addEventListener("click", redo);
   sendOpenBtn.addEventListener("click", () => openSend());
+  document.getElementById("wbZoomOutBtn")!.addEventListener("click", () => {
+    overview = false;
+    setZoom(zoom / ZOOM_STEP);
+  });
+  document.getElementById("wbZoomInBtn")!.addEventListener("click", () => {
+    overview = false;
+    setZoom(zoom * ZOOM_STEP);
+  });
+  zoomLabel.addEventListener("click", () => {
+    overview = false;
+    setZoom(1);
+  });
+  overviewBtn.addEventListener("click", toggleOverview);
+  document.getElementById("wbNotesBtn")!.addEventListener("click", goToNotes);
   clearBtn.addEventListener("click", requestClear);
   document.addEventListener("keydown", onKeydown);
   wireColorPop();

@@ -105,3 +105,19 @@ test("leaving the tool and quitting both write what is waiting", () => {
   const quit = slice("src/core/shell.ts", "export async function quitApp", "\n}\n");
   assert.match(quit, /await onWhiteboardToolExit\(\)/, "quitting does not flush the Whiteboard");
 });
+
+test("the text sizes in code match the ones the stylesheet draws", () => {
+  // A picture of the board lays text out again from TEXT_REM. If the CSS says
+  // something else, the picture's text lands a different size from the box.
+  const rem = slice(TS, "const TEXT_REM", ";");
+  const css = read("src/tool/whiteboard.css");
+  const sizes = [...rem.matchAll(/(\w+): ([\d.]+)/g)];
+  assert.equal(sizes.length, 3, "TEXT_REM did not parse as three sizes");
+  const problems = [];
+  for (const m of sizes) {
+    const rule = css.match(new RegExp(String.raw`\.wb-tsize-${m[1]}\s*\{\s*font-size:\s*([\d.]+)rem`));
+    if (!rule) problems.push(`${m[1]}: no .wb-tsize-${m[1]} rule`);
+    else if (Number(rule[1]) !== Number(m[2])) problems.push(`${m[1]}: CSS ${rule[1]}rem, code ${m[2]}rem`);
+  }
+  assert.deepEqual(problems, []);
+});

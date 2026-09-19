@@ -286,6 +286,28 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   cursor: cell;
 }
 
+/* In Overview a click zooms back in where it lands, whatever the mode. */
+.wb-surface.wb-overview {
+  cursor: zoom-in;
+}
+
+/* The text boxes and the selection, at board size, scaled by the zoom. The
+   surface around it is sized to the zoomed board, so the scrollbars match. */
+.wb-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.wb-zoom-label {
+  width: auto;
+  min-width: 52px;
+  padding: 0 6px;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .wb-selection {
   position: absolute;
   border: 1.5px dashed var(--color-accent);
@@ -324,9 +346,15 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
    selection can start on top of a box without grabbing it. */
 .wb-mode-draw .wb-text,
 .wb-mode-erase .wb-text,
-.wb-mode-select .wb-text {
+.wb-mode-select .wb-text,
+.wb-overview .wb-text {
   pointer-events: none;
 }
+
+/* Kept in step with TEXT_REM in whiteboard.ts. */
+.wb-text.wb-tsize-fine { font-size: 0.85rem; }
+.wb-text.wb-tsize-medium { font-size: 1rem; }
+.wb-text.wb-tsize-bold { font-size: 1.4rem; }
 
 .wb-mode-type .wb-text:hover {
   border-color: var(--color-border-dashed);
@@ -425,6 +453,13 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
 .wb-send-title {
   color: var(--color-text);
   overflow-wrap: anywhere;
+}
+
+.wb-send-meta {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 .wb-send-image-controls {

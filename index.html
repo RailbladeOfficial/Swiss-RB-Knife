@@ -1732,16 +1732,16 @@
 
           <div class="wb-toolbar panel panel-accent-input">
             <div class="wb-group" role="group" aria-label="Mode">
-              <button class="wb-icon-btn wb-mode-btn" data-mode="type" title="Type">
+              <button class="wb-icon-btn wb-mode-btn" data-mode="type" title="Type (T)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7V5h14v2" /><line x1="12" y1="5" x2="12" y2="19" /><line x1="9" y1="19" x2="15" y2="19" /></svg>
               </button>
-              <button class="wb-icon-btn wb-mode-btn" data-mode="draw" title="Draw">
+              <button class="wb-icon-btn wb-mode-btn" data-mode="draw" title="Draw (D)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L9 19H5v-4z" /><line x1="13" y1="7" x2="17" y2="11" /></svg>
               </button>
-              <button class="wb-icon-btn wb-mode-btn" data-mode="erase" title="Erase">
+              <button class="wb-icon-btn wb-mode-btn" data-mode="erase" title="Erase (E)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 19.5 4.5 16a1.5 1.5 0 0 1 0-2.1L13 5.4a1.5 1.5 0 0 1 2.1 0l4.5 4.5a1.5 1.5 0 0 1 0 2.1L12 19.5z" /><line x1="8.5" y1="9.9" x2="14.1" y2="15.5" /><line x1="12" y1="19.5" x2="20" y2="19.5" /></svg>
               </button>
-              <button class="wb-icon-btn wb-mode-btn" data-mode="select" title="Select">
+              <button class="wb-icon-btn wb-mode-btn" data-mode="select" title="Select (S)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.6" /></svg>
               </button>
             </div>
@@ -1785,6 +1785,22 @@
               </button>
               <button id="wbClearBtn" class="wb-icon-btn wb-icon-danger" title="Clear">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+              </button>
+            </div>
+
+            <div class="wb-group" role="group" aria-label="View">
+              <button id="wbNotesBtn" class="wb-icon-btn" title="Go to notes">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" /><line x1="12" y1="2" x2="12" y2="5" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="2" y1="12" x2="5" y2="12" /><line x1="19" y1="12" x2="22" y2="12" /></svg>
+              </button>
+              <button id="wbOverviewBtn" class="wb-icon-btn" title="Overview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 9 4 4 9 4" /><polyline points="15 4 20 4 20 9" /><polyline points="20 15 20 20 15 20" /><polyline points="9 20 4 20 4 15" /><rect x="9" y="9" width="6" height="6" rx="1" /></svg>
+              </button>
+              <button id="wbZoomOutBtn" class="wb-icon-btn" title="Zoom out (Ctrl+wheel)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+              </button>
+              <button id="wbZoomResetBtn" class="wb-icon-btn wb-zoom-label" title="Actual size">100%</button>
+              <button id="wbZoomInBtn" class="wb-icon-btn" title="Zoom in (Ctrl+wheel)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
               </button>
             </div>
 

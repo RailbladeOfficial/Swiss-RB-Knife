@@ -14131,6 +14131,8 @@ export function kanbanTargets(): KanbanTarget[] | null {
 export interface IncomingCard {
   title: string;
   description: string;
+  /** Checklist lines, as the card's subtasks. */
+  subtasks?: { text: string; done: boolean }[];
 }
 
 export type IncomingCardsResult =
@@ -14158,6 +14160,10 @@ export async function addCardsFromElsewhere(
     const card = createCard(board, column.id, title, "bottom");
     if (!card) break;
     card.description = trimTo(item.description, MAX_DESC_LEN);
+    card.subtasks = (item.subtasks ?? [])
+      .filter((t) => t.text.trim())
+      .slice(0, MAX_SUBTASKS_PER_CARD)
+      .map((t) => ({ id: newId(), text: trimTo(t.text.trim(), MAX_TITLE_LEN), done: t.done }));
     stampCard(card);
     numbers.push(card.number);
   }
