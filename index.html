@@ -3250,23 +3250,10 @@
                   <option value="files">File Tools</option>
                   <option value="calculators">Calculators</option>
                 </optgroup>
-                <!-- Classic order, i.e. ALL_TOOLS' own order in shell.ts. Kept in
-                     sync with it by hand: refreshStartupSelectOptions() only
-                     toggles these options' visibility, it never reorders them. -->
-                <optgroup label="Specific Tool">
-                  <option value="tracking:budget">Budget Tracker</option>
-                  <option value="tracking:time-tracker">Time Tracker</option>
-                  <option value="productivity:kanban">Kanban</option>
-                  <option value="files:auto-backup">Auto-Backup</option>
-                  <option value="productivity:whiteboard">Whiteboard</option>
-                  <option value="productivity:countdown">Countdown Timer</option>
-                  <option value="tracking:game-stats">Game Stats</option>
-                  <option value="files:image-ccr">Image CCR</option>
-                  <option value="calculators:days-between">Days Between Dates</option>
-                  <option value="productivity:tts-repeater">TTS Repeater</option>
-                  <option value="files:dummy-file-generator">Dummy File Generator</option>
-                  <option value="calculators:rng">RNGesus</option>
-                </optgroup>
+                <!-- Filled from ALL_TOOLS in shell.ts, in Classic order, by
+                     buildStartupToolOptions(). refreshStartupSelectOptions()
+                     hides the ones for hidden tools. -->
+                <optgroup id="startupToolGroup" label="Specific Tool"></optgroup>
               </select>
             </div>
 

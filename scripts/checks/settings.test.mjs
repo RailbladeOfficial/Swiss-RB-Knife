@@ -65,15 +65,27 @@ test("every startup view the app offers actually leads somewhere", () => {
   }
 });
 
-test("the startup dropdown lists exactly the tools the app has", () => {
-  // Kept in sync by hand: nothing in the app reconciles these two lists.
-  const tools = [...slice("src/core/shell.ts", "const ALL_TOOLS", "];").matchAll(
-    /section: "([a-z-]+)", tool: "([a-z-]+)"/g,
-  )].map((m) => `${m[1]}:${m[2]}`);
+test("the startup dropdown's tools are built from ALL_TOOLS, not typed out", () => {
+  /* The Specific Tool choices used to be a hand-kept copy of the Classic
+     ranking in index.html, and it had drifted out of order. They are built
+     from ALL_TOOLS now, so the thing to guard is that nobody types a copy back
+     in, and that the builder still reads ALL_TOOLS and still runs as the file
+     loads, before a saved startup choice is checked against the options. */
   const listed = selectOptions("startupSelect")
     .map((o) => o.value)
     .filter((v) => v.includes(":"));
-  assert.deepEqual([...listed].sort(), [...tools].sort(), "ALL_TOOLS and the dropdown disagree");
+  assert.deepEqual(listed, [], "index.html lists tools in the startup dropdown by hand again");
+  assert.match(read("index.html"), /<optgroup id="startupToolGroup" label="Specific Tool"><\/optgroup>/);
+
+  const shell = read("src/core/shell.ts");
+  const builder = slice("src/core/shell.ts", "function buildStartupToolOptions", "\n}\n");
+  assert.match(builder, /ALL_TOOLS\.map\(/, "the startup tools are not built from ALL_TOOLS");
+  assert.match(builder, /`\$\{t\.section\}:\$\{t\.tool\}`/, "the option values are not section:tool");
+  assert.match(shell, /^buildStartupToolOptions\(\);$/m, "the startup tools are never built");
+  assert.ok(
+    shell.indexOf("\nbuildStartupToolOptions();") < shell.indexOf("isKnownStartupTarget(currentStartupTarget("),
+    "the startup tools are built after a saved choice is checked against them",
+  );
 });
 
 test("every notification sound file the app references exists (otherwise alerts are silent)", () => {

@@ -686,6 +686,26 @@ export const startupSelect = document.getElementById(
   "startupSelect",
 ) as HTMLSelectElement;
 
+/* The "Specific Tool" choices are built from ALL_TOOLS, in its order, rather
+   than typed out in index.html. They used to be, as a second copy of the
+   Classic ranking kept in step by hand, and it had drifted out of step. Built
+   here, as the file loads, because isKnownStartupTarget() checks a saved
+   startup choice against these options and the saved settings are read later
+   in init(); refreshStartupSelectOptions() in sidebar-edit.ts then hides the
+   ones for hidden tools, as before. */
+function buildStartupToolOptions(): void {
+  const group = document.getElementById("startupToolGroup")!;
+  group.replaceChildren(
+    ...ALL_TOOLS.map((t) => {
+      const opt = document.createElement("option");
+      opt.value = `${t.section}:${t.tool}`;
+      opt.textContent = t.label;
+      return opt;
+    }),
+  );
+}
+buildStartupToolOptions();
+
 
 const cycleOrderToggle = document.getElementById("cycleOrderToggle") as HTMLInputElement;
 const cycleOrderLabel = document.getElementById("cycleOrderLabel")!;
