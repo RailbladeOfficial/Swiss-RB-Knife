@@ -2951,6 +2951,35 @@ function applyBoardBackground(board: Board): void {
   viewBoard.classList.add("kb-has-bg");
 }
 
+/** The absolute path of kanban-backgrounds/, learned once from the back end
+ *  in loadAll(). Needed because the asset protocol takes a real path, and
+ *  only the back end knows where the data directory is. */
+let backgroundsRoot = "";
+
+/**
+ * Where a board background actually is.
+ *
+ * ALWAYS REBUILT FROM THE FILENAME, never used as stored. A background used to
+ * be recorded as a whole absolute path, and when the data folder was split into
+ * one folder per tool, the file moved and every record kept pointing at where
+ * it used to be. The board then drew a background that was not there, with
+ * nothing on screen to say why.
+ *
+ * Taking the last path segment and joining it to the folder the back end
+ * reports means the record only has to remember which image, and the app
+ * answers where. This is the same rule attachments follow, and for the same
+ * reason: a stored path is a guess about the future that a tidy-up can break.
+ */
+function backgroundSrc(bg: BoardBackground): string {
+  // lastIndexOf twice rather than a regex character class. The class that
+  // belongs here is [\\/], and a single missing backslash makes it match only
+  // forward slashes, which silently does nothing to a Windows path and hands
+  // back the whole stale record. This form cannot be got wrong quietly.
+  const cut = Math.max(bg.path.lastIndexOf("/"), bg.path.lastIndexOf("\\"));
+  const file = cut === -1 ? bg.path : bg.path.slice(cut + 1);
+  return convertFileSrc(`${backgroundsRoot}/${file}`);
+}
+
 function renderBoardCounts(board: Board): void {
   const todayStr = today();
   const live = liveCardsOnBoard(board.id);
@@ -6620,33 +6649,6 @@ function attachmentPath(boardId: string, attachment: Attachment): string {
  *  Needed because the asset protocol takes a real path, and only the back end
  *  knows where the data directory is. */
 let attachmentsRoot = "";
-
-/** The same, for kanban-backgrounds/. */
-let backgroundsRoot = "";
-
-/**
- * Where a board background actually is.
- *
- * ALWAYS REBUILT FROM THE FILENAME, never used as stored. A background used to
- * be recorded as a whole absolute path, and when the data folder was split into
- * one folder per tool, the file moved and every record kept pointing at where
- * it used to be. The board then drew a background that was not there, with
- * nothing on screen to say why.
- *
- * Taking the last path segment and joining it to the folder the back end
- * reports means the record only has to remember which image, and the app
- * answers where. This is the same rule attachments follow, and for the same
- * reason: a stored path is a guess about the future that a tidy-up can break.
- */
-function backgroundSrc(bg: BoardBackground): string {
-  // lastIndexOf twice rather than a regex character class. The class that
-  // belongs here is [\\/], and a single missing backslash makes it match only
-  // forward slashes, which silently does nothing to a Windows path and hands
-  // back the whole stale record. This form cannot be got wrong quietly.
-  const cut = Math.max(bg.path.lastIndexOf("/"), bg.path.lastIndexOf("\\"));
-  const file = cut === -1 ? bg.path : bg.path.slice(cut + 1);
-  return convertFileSrc(`${backgroundsRoot}/${file}`);
-}
 
 /** Unlinks the copies behind these records, best effort.
  *
