@@ -1269,6 +1269,50 @@ test("text a person typed is escaped before any of it becomes markup", () => {
   }
 });
 
+test("a numbered list keeps its numbers", () => {
+  /* Two separate defects, both of which made every item render as "1.".
+     A blank line or a line of prose closed the list outright, so the next item
+     opened a fresh <ol> that browsers number from 1 again; and the number an
+     ordered list was written with was read only to decide it WAS ordered and
+     then thrown away, so "3." "4." came out 1, 2. */
+  const src = rt();
+
+  // A blank line inside a list is a gap, not the end of it.
+  const at = src.indexOf('if (line.trim() === "")');
+  assert.notEqual(at, -1, "the blank-line branch has moved");
+  const blank = src.slice(at, src.indexOf("\n    }", at));
+  assert.match(blank, /if \(list\) \{/, "a blank line still closes the list it is inside");
+  assert.match(blank, /listGap = true/, "a blank line does not record that it was a gap");
+
+  // A line that is not an item continues the item above it.
+  assert.match(
+    src,
+    /if \(list && !listGap && itemOpen !== null\) \{\s*\n\s*itemLines\.push\(inline\(line\)\);/,
+    "a line under an item does not continue it",
+  );
+
+  // And an item is held open rather than emitted, which is what makes the
+  // line above possible at all.
+  assert.match(src, /const closeItem = \(\): void => \{/, "there is no held-open item");
+  assert.match(src, /const closeList = \(\): void => \{\s*\n\s*closeItem\(\);/,
+    "closing a list does not close the item still open inside it");
+
+  // The number is kept.
+  assert.match(src, /start="\$\{first\}"/, "an ordered list is never told where to start");
+  assert.match(src, /first <= MAX_LIST_START/, "the start number is not bounded");
+});
+
+test("a line continuing a list item is escaped like every other line", () => {
+  /* The continuation is a new place source text reaches the output, so it has
+     to go through the same inline scan. Pushing the raw line would have made a
+     card description a place to write a script tag. */
+  const src = rt();
+  const at = src.indexOf("if (list && !listGap && itemOpen !== null)");
+  assert.notEqual(at, -1, "the continuation branch does not exist");
+  const body = src.slice(at, src.indexOf("}", at));
+  assert.match(body, /itemLines\.push\(inline\(line\)\)/, "a continuation line is not escaped");
+});
+
 test("a link in someone's notes cannot carry a scheme the app will not open", () => {
   const src = rt();
   assert.match(src, /const SAFE_LINK_SCHEME = /, "no allowlist of link schemes");

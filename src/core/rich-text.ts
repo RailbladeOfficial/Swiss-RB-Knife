@@ -160,6 +160,11 @@ function anchor(href: string, label: string, plainLabel = false): string {
 
 type ListKind = "ul" | "ol" | null;
 
+/** The largest number an ordered list may be told to start at. Past this it is
+ *  not a list someone is numbering, and Number() has already turned it into
+ *  exponent notation that no browser reads as a start. */
+const MAX_LIST_START = 1_000_000;
+
 /**
  * Renders user-written Markdown to HTML that is safe to assign with innerHTML.
  *
@@ -173,6 +178,16 @@ export function renderRichText(source: string): string {
   const out: string[] = [];
 
   let list: ListKind = null;
+  /* THE OPEN ITEM, held rather than emitted, so a line under it can join it.
+     See LISTS below for why an item is not finished the moment its first line
+     is read. */
+  let itemOpen: string | null = null;
+  let itemClose = "";
+  let itemLines: string[] = [];
+  /* A blank line INSIDE a list. The list is not closed on the spot, because
+     whether it ended depends on what comes next: another item continues it
+     (one loose list), anything else ends it. */
+  let listGap = false;
   let inQuote = false;
   let inFence = false;
   let fence: string[] = [];
@@ -186,7 +201,18 @@ export function renderRichText(source: string): string {
     out.push(`<p class="rt-p">${paragraph.join("<br>")}</p>`);
     paragraph = [];
   };
+  const closeItem = (): void => {
+    if (itemOpen === null) return;
+    // The lines of one item, joined the way a paragraph joins its own: the
+    // person pressed Enter because they wanted a new line.
+    out.push(itemOpen + itemLines.join("<br>") + itemClose);
+    itemOpen = null;
+    itemClose = "";
+    itemLines = [];
+  };
   const closeList = (): void => {
+    closeItem();
+    listGap = false;
     if (!list) return;
     out.push(`</${list}>`);
     list = null;
@@ -235,6 +261,16 @@ export function renderRichText(source: string): string {
     }
 
     if (line.trim() === "") {
+      /* Inside a list this is a GAP, not the end. "1. one", blank, "2. two" is
+         one list of two items in every other Markdown renderer, and closing it
+         here opened a second <ol> that browsers start again at 1. That was the
+         whole of the "every item says 1." bug. The item is finished; whether
+         the list is depends on the next line that is not blank. */
+      if (list) {
+        closeItem();
+        listGap = true;
+        continue;
+      }
       closeAll();
       continue;
     }
@@ -296,31 +332,73 @@ export function renderRichText(source: string): string {
     }
     closeQuote();
 
-    /* List items. A task marker is recognized inside a bullet and drawn as a
-       read-only box: these are a way of writing a checklist in prose, and the
-       card's own Subtasks block is the one that is actually tickable. */
+    /* LISTS
+       -----------------------------------------------------------------------
+       A task marker is recognized inside a bullet and drawn as a read-only box:
+       these are a way of writing a checklist in prose, and the card's own
+       Subtasks block is the one that is actually tickable.
+
+       AN ITEM IS NOT FINISHED BY ITS FIRST LINE. A line under an item that is
+       not itself an item continues it, which is what every other Markdown
+       renderer does (CommonMark calls it lazy continuation). This used to end
+       the list, so
+
+           1. What stays global?
+           You are deglobalizing the text.
+
+           2. Clicking it in the gallery.
+
+       came out as three blocks with two separate <ol>s in them, and a fresh
+       <ol> starts again at 1. Every item said "1.".
+
+       A NUMBERED LIST STARTS WHERE IT SAYS. "3." then "4." used to render as
+       1, 2, because the number was read only to decide that this was an
+       ordered list and then thrown away. */
     const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
-    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const numbered = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
     if (bullet || numbered) {
       closeParagraph();
+      closeItem();
       const want: ListKind = bullet ? "ul" : "ol";
       if (list !== want) {
         closeList();
-        out.push(`<${want} class="rt-list">`);
+        /* start is written only when it is not 1, so the common case stays the
+           plain markup it has always been, and only for a number small enough
+           to be a list: "999999999999999999999." parses to 1e+21, which is not
+           a number an attribute can carry. Out of range renders from 1, which
+           is what it did before this attribute existed. */
+        const first = numbered ? Number(numbered[1]) : 1;
+        const start =
+          want === "ol" && Number.isInteger(first) && first !== 1 && first <= MAX_LIST_START
+            ? ` start="${first}"`
+            : "";
+        out.push(`<${want} class="rt-list"${start}>`);
         list = want;
       }
-      let text = (bullet ? bullet[1] : numbered![1]) ?? "";
+      listGap = false;
+      const text = (bullet ? bullet[1] : numbered![2]) ?? "";
       const task = text.match(/^\[([ xX])\]\s+(.*)$/);
       if (task) {
         const checked = task[1].toLowerCase() === "x";
-        out.push(
+        itemOpen =
           `<li class="rt-task${checked ? " rt-task-done" : ""}">` +
-            `<span class="rt-task-box" aria-hidden="true">${checked ? "✓" : ""}</span>` +
-            `<span>${inline(task[2])}</span></li>`,
-        );
+          `<span class="rt-task-box" aria-hidden="true">${checked ? "✓" : ""}</span>` +
+          `<span>`;
+        itemClose = "</span></li>";
+        itemLines = [inline(task[2])];
         continue;
       }
-      out.push(`<li>${inline(text)}</li>`);
+      itemOpen = "<li>";
+      itemClose = "</li>";
+      itemLines = [inline(text)];
+      continue;
+    }
+
+    /* Not an item. Inside a list with an item still open and no blank line
+       since, this is that item's next line. A blank line first means the list
+       is over and this is a paragraph of its own. */
+    if (list && !listGap && itemOpen !== null) {
+      itemLines.push(inline(line));
       continue;
     }
     closeList();
