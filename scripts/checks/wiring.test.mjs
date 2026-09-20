@@ -201,6 +201,67 @@ test("a save is not called a success before it has landed", () => {
   assert.deepEqual(unawaited, [], "these flash a success behind a save nobody waited for");
 });
 
+test("a tool that delays a save writes it out before the app closes", () => {
+  /* Several tools wait a moment after a change before saving it. Quitting used
+     to call exactly TWO of them by name, so every tool that grew a debounce
+     afterwards silently lost whatever was queued when the window closed.
+     Kanban's window was 0.4 seconds: edit a card title, Alt+F4, confirm, gone.
+
+     The fix was a registry, and this is what keeps the registry honest. Write a
+     save inside a setTimeout and you are on this list; the only way off it is
+     to register a flush. */
+  const offenders = [];
+  const watched = [];
+  // Tools only. shell.ts owns the registry rather than registering with it.
+  for (const file of filesUnder("src/tool", ".ts")) {
+    const src = read(file);
+    /* Any timer whose body reaches a save, whatever that helper is called.
+       Loose on purpose: a false positive costs one line of registration, a
+       miss costs somebody an edit. The lookbehind is what keeps ctx.save()
+       on a canvas out of it. */
+    const delayed =
+      /setTimeout\([^]{0,300}?(?<![.\w])(?:save|write|flush)[A-Za-z]*\s*\(/.test(src);
+    if (!delayed) continue;
+    watched.push(file);
+    if (!src.includes("flushOnQuit(")) offenders.push(file);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    "these delay a save but never register it with flushOnQuit, so quitting inside the window loses it",
+  );
+  /* Guards the scan itself. If the pattern above ever stops matching, the
+     check passes on an empty list and stops being a check. These six are the
+     tools known to debounce a save today. */
+  assert.deepEqual(
+    watched.sort(),
+    [
+      "src/tool/budget.ts",
+      "src/tool/game-stats.ts",
+      "src/tool/kanban.ts",
+      "src/tool/time-tracker.ts",
+      "src/tool/tts-repeater.ts",
+      "src/tool/whiteboard.ts",
+    ],
+    "the set of tools that delay a save has changed; each new one needs flushOnQuit",
+  );
+});
+
+test("the quit waits for what is queued, and is never trapped by it", () => {
+  /* Three separate ways this could strand somebody in the app, all of them
+     worse than losing the edit the flush exists to save. */
+  const shell = read("src/core/shell.ts");
+  const quit = shell.slice(shell.indexOf("async function flushBeforeQuit("), shell.indexOf("closeBtn.addEventListener"));
+  assert.match(quit, /allSettled/, "one tool's failed flush stops the others from running");
+  assert.match(quit, /catch/, "a flush that throws escapes as an unhandled rejection instead of being logged");
+  assert.match(quit, /Promise.race/, "a flush that hangs holds the window open forever");
+  assert.match(
+    shell,
+    /await flushBeforeQuit\(\);[^]{0,120}allowAppClose = true/,
+    "the window is allowed to close before what is queued has been written",
+  );
+});
+
 test("the Game Stats draft is actually saved, restored and cleared", () => {
   // Specifically pinned because this feature was plumbed and left unconnected
   // once already. Presence of the commands is not enough; all three moments

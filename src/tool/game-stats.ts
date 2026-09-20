@@ -34,7 +34,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { devError, flash, setSubNavHandler, shortPath } from "../core/shell";
+import { devError, flash, setSubNavHandler, shortPath, flushOnQuit } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { renderDbBackups } from "../core/db-backups";
 import { loadToolJson, saveToolJson, saveToolText } from "../core/tool-store";
@@ -2888,16 +2888,40 @@ let gsDraftSaveTimer: number | null = null;
  *  once rather than once per cell. Matches Time Tracker's draft timing. */
 function saveGameStatsDraft(): void {
   if (!newGameDraft || gsGameMode !== "create" || editingGameId) return;
-  const snapshot = JSON.stringify({ gameType: gsNewGameType, game: newGameDraft });
+  /* Held rather than written, so a quit inside the debounce window can still
+     write it. A snapshot, not a closure: the draft object is mutated in
+     place, and the point of taking one here is that this is the state the
+     change was made to. */
+  gsPendingDraft = JSON.stringify({ gameType: gsNewGameType, game: newGameDraft });
   if (gsDraftSaveTimer) clearTimeout(gsDraftSaveTimer);
-  gsDraftSaveTimer = window.setTimeout(async () => {
+  gsDraftSaveTimer = window.setTimeout(() => {
     gsDraftSaveTimer = null;
-    try {
-      await saveToolText("game-stats", "draft", snapshot);
-    } catch (err) {
-      devError("Game Stats: failed to save draft", err);
-    }
+    void writeGameStatsDraftNow();
   }, 500);
+}
+
+/** The draft as it stood when the last change was made, until it is written. */
+let gsPendingDraft: string | null = null;
+
+async function writeGameStatsDraftNow(): Promise<void> {
+  const snapshot = gsPendingDraft;
+  gsPendingDraft = null;
+  if (snapshot === null) return;
+  try {
+    await saveToolText("game-stats", "draft", snapshot);
+  } catch (err) {
+    devError("Game Stats: failed to save draft", err);
+  }
+}
+
+/** The queued draft, written out now. Registered with the shell so quitting
+ *  part-way through entering a game does not lose the rows already typed. */
+export async function flushGameStats(): Promise<void> {
+  if (gsDraftSaveTimer) {
+    clearTimeout(gsDraftSaveTimer);
+    gsDraftSaveTimer = null;
+  }
+  await writeGameStatsDraftNow();
 }
 
 /** Drops the stored draft. Called wherever an entry is finished or abandoned,
@@ -5097,6 +5121,9 @@ function applyGsPreferenceLabels(): void {
 }
 
 export function initGameStats(): void {
+  // Written out on the way past if anything is still queued. See
+  // flushOnQuit in shell.ts.
+  flushOnQuit("game-stats", flushGameStats);
   setSubNavHandler({ back: gsSubNavBack, forward: gsSubNavForward });
 
   document.getElementById("gsSetupBtn")!.addEventListener("click", () => openGsSetupOnTab());

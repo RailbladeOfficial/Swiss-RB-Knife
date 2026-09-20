@@ -98,6 +98,7 @@ import {
   setSubNavHandler,
   setToolAttention,
   settings as shellSettings,
+  flushOnQuit,
 } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, closeMenu, openMenu, type MenuItem } from "../menu/menu";
@@ -12425,6 +12426,9 @@ export async function addImageCardFromElsewhere(
 }
 
 export function initKanban(): void {
+  // Written out on the way past if anything is still queued. See
+  // flushOnQuit in shell.ts.
+  flushOnQuit("kanban", onKanbanToolExit);
   viewBoards = document.getElementById("kbViewBoards")!;
   viewBoard = document.getElementById("kbViewBoard")!;
   boardGrid = document.getElementById("kbBoardGrid")!;

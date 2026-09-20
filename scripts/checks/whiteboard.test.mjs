@@ -102,8 +102,14 @@ test("leaving the tool and quitting both write what is waiting", () => {
     /_activeViewKey === "productivity\/whiteboard"[^\n]*\n\s*void onWhiteboardToolExit\(\);/,
     "navigating away from the Whiteboard does not flush it",
   );
-  const quit = slice("src/core/shell.ts", "export async function quitApp", "\n}\n");
-  assert.match(quit, /await onWhiteboardToolExit\(\)/, "quitting does not flush the Whiteboard");
+  /* Quitting stopped naming tools one by one in 0.8.0: it walks the
+     flushOnQuit registry instead, so the assertion is that the Whiteboard is
+     ON that registry. wiring.test.mjs holds the registry's own end up. */
+  assert.match(
+    read("src/tool/whiteboard.ts"),
+    /flushOnQuit\("whiteboard", onWhiteboardToolExit\)/,
+    "quitting does not flush the Whiteboard",
+  );
 });
 
 test("the text sizes in code match the ones the stylesheet draws", () => {

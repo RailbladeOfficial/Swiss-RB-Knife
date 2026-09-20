@@ -45,7 +45,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { loadToolJson, saveToolJson, saveToolText, unblockAfterReplacement } from "../core/tool-store";
 import { renderToolBackups, readToolBackup } from "../core/tool-backups";
 import { listen } from "@tauri-apps/api/event";
-import { flash, escapeHtml } from "../core/shell";
+import { flash, escapeHtml, flushOnQuit } from "../core/shell";
 import { Modal } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
 import {
@@ -341,6 +341,15 @@ function queueSaveSettings(): void {
     saveSettingsTimer = null;
     void saveStore();
   }, 600);
+}
+
+/** The queued settings write, done now. Registered with the shell: 600ms is
+ *  a long window to lose a message you just finished typing in. */
+export async function flushTtsRepeater(): Promise<void> {
+  if (saveSettingsTimer === null) return;
+  clearTimeout(saveSettingsTimer);
+  saveSettingsTimer = null;
+  await saveStore();
 }
 
 /* =============================================================================
@@ -1230,6 +1239,9 @@ function handleReset(): void {
 ============================================================================= */
 
 export function initTTSRepeater(): void {
+  // Written out on the way past if anything is still queued. See
+  // flushOnQuit in shell.ts.
+  flushOnQuit("tts-repeater", flushTtsRepeater);
   messageInput = document.getElementById("tts-message") as HTMLTextAreaElement;
   messageCount = document.getElementById("tts-message-count")!;
   intervalAmountInput = document.getElementById("tts-interval-amount") as HTMLInputElement;

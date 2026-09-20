@@ -24,7 +24,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { flash, devError, shortPath } from "../core/shell";
+import { flash, devError, shortPath, flushOnQuit } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
 import { renderToolBackups, readToolBackup } from "../core/tool-backups";
@@ -575,33 +575,42 @@ function applyTTSettings(): void {
   refreshBreakInUI();
 }
 
+/** The settings write itself, split out from the timer that usually calls it
+ *  so quitting can call it directly. Reads the live state rather than a
+ *  snapshot taken when the timer was set, which is what makes it correct to
+ *  run at any moment. */
+async function writeSettingsNow(): Promise<void> {
+  // TT's settings live in TT's OWN file (time-tracker-settings.json),
+  // settings.json belongs to the shell alone. Only the keys this tool
+  // owns are written; shell-owned display prefs (fontScale, theme,
+  // hour12, americanDates) are read-only here. Activities ride along in
+  // this same file, they're TT-owned user data, and keeping them out of
+  // the entries data file (save_data) avoids reshaping that atomic blob.
+  const own = {
+    quickDelete: settings.quickDelete,
+    roundNowToMinute: settings.roundNowToMinute,
+    payPeriod: settings.payPeriod,
+    activities: activities,
+    projects: projects,
+    lastCsvImportAt: settings.lastCsvImportAt,
+    breakInUseMinutes: settings.breakInUseMinutes,
+    pausedTasks: settings.pausedTasks,
+  };
+  try {
+    await saveToolJson("time-tracker", "settings", own);
+  } catch (e) {
+    // This usually fires from a timer. Without a catch, a failed save would
+    // vanish as an unhandled rejection while the user believes the
+    // toggle stuck.
+    flash(`Failed to save Time Tracker settings: ${e}`, "error", 8000);
+  }
+}
+
 function saveSettings(): void {
   if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
-  settingsSaveTimer = window.setTimeout(async () => {
-    // TT's settings live in TT's OWN file (time-tracker-settings.json),
-    // settings.json belongs to the shell alone. Only the keys this tool
-    // owns are written; shell-owned display prefs (fontScale, theme,
-    // hour12, americanDates) are read-only here. Activities ride along in
-    // this same file, they're TT-owned user data, and keeping them out of
-    // the entries data file (save_data) avoids reshaping that atomic blob.
-    const own = {
-      quickDelete: settings.quickDelete,
-      roundNowToMinute: settings.roundNowToMinute,
-      payPeriod: settings.payPeriod,
-      activities: activities,
-      projects: projects,
-      lastCsvImportAt: settings.lastCsvImportAt,
-      breakInUseMinutes: settings.breakInUseMinutes,
-      pausedTasks: settings.pausedTasks,
-    };
-    try {
-      await saveToolJson("time-tracker", "settings", own);
-    } catch (e) {
-      // This fires from a timer. Without a catch, a failed save would
-      // vanish as an unhandled rejection while the user believes the
-      // toggle stuck.
-      flash(`Failed to save Time Tracker settings: ${e}`, "error", 8000);
-    }
+  settingsSaveTimer = window.setTimeout(() => {
+    settingsSaveTimer = null;
+    void writeSettingsNow();
   }, 500);
 }
 
@@ -796,19 +805,52 @@ function saveDraft(
   endInput: HTMLInputElement,
   notesInput: HTMLTextAreaElement,
 ): void {
-  if (draftSaveTimer) clearTimeout(draftSaveTimer);
-  draftSaveTimer = window.setTimeout(async () => {
+  /* The fields are read at WRITE time, not captured here, so a flush that
+     happens later still saves what is on screen at that moment rather than
+     what was there when the last keystroke set the timer. */
+  pendingDraftWrite = async () => {
     await saveToolJson("time-tracker", "draft", {
-        selectedDate: datePicker.value,
-        endDate: endDatePicker.value,
-        endDateManuallySet,
-        project: projectInput.value,
-        activity: activityInput.value,
-        start: startInput.value,
-        end: endInput.value,
-        notes: notesInput.value,
+      selectedDate: datePicker.value,
+      endDate: endDatePicker.value,
+      endDateManuallySet,
+      project: projectInput.value,
+      activity: activityInput.value,
+      start: startInput.value,
+      end: endInput.value,
+      notes: notesInput.value,
     });
+  };
+  if (draftSaveTimer) clearTimeout(draftSaveTimer);
+  draftSaveTimer = window.setTimeout(() => {
+    draftSaveTimer = null;
+    void writeDraftNow();
   }, 500);
+}
+
+/** The queued draft write, or nothing when no field has changed since the
+ *  last one landed. Holds the CLOSURE rather than the values, so it always
+ *  reads the boxes as they are now. */
+let pendingDraftWrite: (() => Promise<void>) | null = null;
+
+async function writeDraftNow(): Promise<void> {
+  const write = pendingDraftWrite;
+  pendingDraftWrite = null;
+  if (write) await write();
+}
+
+/** Everything this tool has queued, written out now. Registered with the
+ *  shell so quitting inside a debounce window does not lose it. */
+export async function flushTimeTracker(): Promise<void> {
+  if (settingsSaveTimer) {
+    clearTimeout(settingsSaveTimer);
+    settingsSaveTimer = null;
+    await writeSettingsNow();
+  }
+  if (draftSaveTimer) {
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = null;
+  }
+  await writeDraftNow();
 }
 
 /** The half-typed entry the draft file holds. Every field is optional: it is
@@ -4658,6 +4700,9 @@ function shiftDate(dateStr: string, delta: string): string {
 ============================================================================= */
 
 export function initTimeTracker(): void {
+  // Written out on the way past if anything is still queued. See
+  // flushOnQuit in shell.ts.
+  flushOnQuit("time-tracker", flushTimeTracker);
 
   // DOM refs (resolved here so they're guaranteed to exist when TT section loads)
   const startInput      = document.getElementById("startTime") as HTMLInputElement;

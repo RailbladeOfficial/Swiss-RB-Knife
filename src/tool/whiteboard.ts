@@ -58,7 +58,7 @@ import {
 import { formatBackupName, readToolBackup, renderToolBackups } from "../core/tool-backups";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, isTextEntry, type MenuItem } from "../menu/menu";
-import { appConfirm, backgroundMenu, flash, navigateToTool } from "../core/shell";
+import { appConfirm, backgroundMenu, flash, navigateToTool, flushOnQuit } from "../core/shell";
 import {
   MAX_TITLE_LEN,
   EFFORTS,
@@ -3874,6 +3874,9 @@ export async function onWhiteboardToolExit(): Promise<void> {
 }
 
 export function initWhiteboard(): void {
+  // Written out on the way past if anything is still queued. See
+  // flushOnQuit in shell.ts.
+  flushOnQuit("whiteboard", onWhiteboardToolExit);
   toolView = document.getElementById("productivity-tool-whiteboard")!;
   stage = document.getElementById("wbStage")!;
   canvas = document.getElementById("wbInk") as HTMLCanvasElement;

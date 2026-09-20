@@ -30,7 +30,7 @@ import { loadToolJson, saveToolJson, writesFrozen } from "../core/tool-store";
 import { newId } from "../core/ids";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
-import { flash, escapeHtml, setToolAttention } from "../core/shell";
+import { flash, escapeHtml, setToolAttention, flushOnQuit } from "../core/shell";
 import {
   DAY_MS,
   isReminderDue,
@@ -6743,6 +6743,9 @@ function openDataLoadWarning(reason: string): void {
 ============================================================================= */
 
 export async function initBudget(): Promise<void> {
+  // Written out on the way past if anything is still queued. See
+  // flushOnQuit in shell.ts.
+  flushOnQuit("budget", onBudgetToolExit);
   // Check encryption status before touching any data
   const lockStatus = await invoke<{ enabled: boolean; sessionUnlock: boolean }>(
     "budget_lock_status"

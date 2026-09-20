@@ -2951,20 +2951,71 @@ function closeExitModal(): void {
  *  re-routed to the exit modal, then closes the window. The allowAppClose
  *  flag is a fallback in case the unlisten handle isn't ready yet (e.g. a
  *  quit within the first frames of launch). */
+/* -----------------------------------------------------------------------------
+   WHAT IS STILL WAITING TO BE WRITTEN WHEN YOU QUIT
+
+   Several tools wait a moment after a change before saving it, so a burst of
+   edits becomes one write. Quitting inside that window used to lose whatever
+   was queued, because the quit called exactly TWO tools by name, Budget and
+   the Whiteboard, and every tool that grew a debounce afterwards was simply
+   not on the list. Kanban's was 0.4 seconds: edit a card title, Alt+F4,
+   confirm, and the edit could be gone.
+
+   So it is a REGISTRY now, not two calls. A tool with anything queued
+   registers a flush at init and is written out on the way past, which means
+   the next tool to grow a debounce is one line rather than a bug nobody
+   notices for a release.
+
+   THREE RULES, all of them about not blocking the quit:
+
+     • the flushes run TOGETHER, not one after another. They write different
+       files, so waiting for each in turn only adds up.
+     • a flush that THROWS is logged and ignored. A failed write is not a
+       reason to trap somebody in the app.
+     • a flush that HANGS is abandoned at the deadline. Every one of these is
+       a single small file write, so two seconds is already far longer than
+       any of them should need; past that, something is wrong and the window
+       closes anyway.
+----------------------------------------------------------------------------- */
+
+/** Past this, the quit stops waiting and closes. */
+const QUIT_FLUSH_DEADLINE_MS = 2000;
+
+const quitFlushes: { tool: string; flush: () => void | Promise<void> }[] = [];
+
+/**
+ * Registers something to write out before the window closes.
+ *
+ * For a tool that DEBOUNCES a save. `tool` names it in the log line if the
+ * flush fails, so a lost edit has something to read back.
+ *
+ * Call it once, from the tool's init. Registering the tool's existing
+ * leave-the-tool hook is usually right: quitting is leaving every tool at
+ * once, and the two want the same thing written.
+ */
+export function flushOnQuit(tool: string, flush: () => void | Promise<void>): void {
+  quitFlushes.push({ tool, flush });
+}
+
+/** Everything queued, written out, within the deadline. Never rejects. */
+async function flushBeforeQuit(): Promise<void> {
+  const all = Promise.allSettled(
+    quitFlushes.map(async ({ tool, flush }) => {
+      try {
+        await flush();
+      } catch (err) {
+        devError(`[shell] ${tool} could not write out what it had queued`, err);
+      }
+    }),
+  );
+  await Promise.race([
+    all,
+    new Promise<void>((resolve) => setTimeout(resolve, QUIT_FLUSH_DEADLINE_MS)),
+  ]);
+}
+
 export async function quitApp(): Promise<void> {
-  try {
-    await onBudgetToolExit();
-  } catch {
-    // Quitting must never be blocked by a failed flush. The debounce window
-    // is 400 ms, so in the overwhelmingly common case there's nothing queued.
-  }
-  // Same for the Whiteboard, where the thing most likely to be waiting is the
-  // line somebody was typing when they closed the app.
-  try {
-    await onWhiteboardToolExit();
-  } catch {
-    // As above: never blocks the quit.
-  }
+  await flushBeforeQuit();
   allowAppClose = true;
   unlistenCloseRequest?.();
   unlistenCloseRequest = null;
