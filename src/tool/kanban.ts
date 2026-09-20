@@ -5424,6 +5424,168 @@ function duplicateCard(card: Card): Card | null {
   return copy;
 }
 
+/* -----------------------------------------------------------------------------
+   CARD OPERATIONS THE WHOLE TOOL USES
+
+   These were filed under CARD MODAL, which was never right: the board's
+   right-click menu, the card face and drag-and-drop all call them, and the
+   modal is only one caller among several. stampCard alone has fifteen callers
+   outside that section.
+
+   Where a function lives decides what it looks like it belongs to, and these
+   belong to the board. Moved here so the card modal can become its own file
+   without dragging the board's own operations out with it.
+----------------------------------------------------------------------------- */
+
+/** Deletes a card, asking first unless this board says not to. The single
+ *  delete path, shared by the card menu and by the bin on the card face, so the
+ *  confirmation preference cannot end up honored in one place and not the
+ *  other. */
+function requestDeleteCard(card: Card, opts: { reopen?: () => void } = {}): void {
+  const remove = (): void => {
+    deleteCard(card);
+    // The board has to redraw HERE. Deleting from the card modal happened to
+    // work because closing that modal redraws; deleting from the bin on the
+    // card face did not, so the card stayed on the board until you left it and
+    // came back. The delete is what needs the redraw, not the modal.
+    renderAll();
+    flash("Card deleted.");
+  };
+  if (!effectiveForCard(card).confirmDelete) {
+    // No confirm means nothing replaced the card modal, so it is still open
+    // over a card that no longer exists.
+    if (_cardModal?.isOpen) _cardModal.close();
+    remove();
+    return;
+  }
+  kbConfirm(
+    {
+      title: `Delete card #${card.number}?`,
+      message: `"${card.title || "Untitled"}" and its ${card.subtasks.length} subtask(s) go for good. Archive instead if you only want it off the board.`,
+      confirmLabel: "Delete",
+      reopen: opts.reopen,
+    },
+    remove,
+  );
+}
+
+/** Marks a card edited and queues the write. Every card mutation goes through
+ *  it so `updatedAt` can never be forgotten by one path and not another. */
+export function stampCard(card: Card): void {
+  card.updatedAt = Date.now();
+  const board = getBoard(card.boardId);
+  if (!board) return;
+  board.updatedAt = card.updatedAt;
+  markBoard(board.id);
+  // The board behind the modal shows this card. See KEEPING THE BOARD IN STEP.
+  queueBoardRefresh();
+}
+
+export function moveCardToColumn(card: Card, columnId: string): void {
+  const board = getBoard(card.boardId);
+  if (!board) return;
+  const column = getColumn(board, columnId);
+  if (!column || column.id === card.columnId) return;
+
+  card.columnId = column.id;
+  card.order = -1; // to the top of its new column, then resequenced
+  const stage = stampOnArrival(board, column, card);
+  if (stage) flash(`Stamped the card's ${STAGE_LABELS[stage]} date.`);
+  resequence(board.id);
+  stampCard(card);
+}
+
+/** The stage date a column stamps on a card arriving in it: Completed for a
+ *  column that means done, the column's own choice otherwise, or null. */
+export function arrivalStage(column: Column): Stage | null {
+  return column.isDone ? "completed" : (column.stage ?? null);
+}
+
+/** Stamps the stage date a card moving into `column` earns, when the board's
+ *  preference is on and that date is still empty. Returns the stage stamped.
+ *  The one stamper for every way a card changes column, so a drag and a move
+ *  from the card or its menu cannot disagree about what is stamped, or how
+ *  precisely. */
+function stampOnArrival(board: Board, column: Column, card: Card): Stage | null {
+  if (!effective(board).autoCompleteOnDone) return null;
+  const stage = arrivalStage(column);
+  if (!stage || card.dates[stage]) return null;
+  // The moment, like every other stage stamp: a move is the app watching
+  // something happen, so it knows the time as well as the day.
+  card.dates[stage] = nowStamp();
+  return stage;
+}
+
+function moveCardToBoard(card: Card, boardId: string): void {
+  const target = getBoard(boardId);
+  const from = getBoard(card.boardId);
+  if (!target || target.id === card.boardId) return;
+  if (target.columns.length === 0) {
+    flash("That board has no columns to move the card into.", "error");
+    renderCardPlacement(card);
+    return;
+  }
+
+  const previous = card.number;
+  const fromBoardId = card.boardId;
+  card.boardId = target.id;
+  card.columnId = target.columns[0].id;
+  card.order = -1;
+  // A card number only means anything within its own board, so crossing boards
+  // means taking a new one. Said out loud, because "#42" may be written down
+  // somewhere outside this app.
+  card.number = target.nextCardNumber;
+  target.nextCardNumber += 1;
+
+  if (from) resequence(from.id);
+  resequence(target.id);
+  stampCard(card);
+  // The files live in a folder named after the board, so a card crossing boards
+  // has to physically take them with it. If the two boards disagree about
+  // rather than a rename, so the copy is verified before the original goes.
+  if (fromBoardId) void moveAttachmentsToBoard(card, fromBoardId, target.id);
+  flash(`Moved to ${target.name}. It is now #${card.number} (was #${previous}).`);
+}
+
+/** A stage order that cannot have happened (testing before work started),
+ *  described plainly, or null when the dates are consistent. Not an error and
+ *  nothing is blocked: hand-entered dates get typed wrong, and the fix is to
+ *  say so next to them rather than to refuse the entry. */
+export function stageOrderWarning(card: Card): string | null {
+  const chain: { label: string; value: string | null }[] = [
+    { label: "created", value: createdDay(card) },
+    { label: "work started", value: card.dates.started },
+    { label: "testing started", value: card.dates.testing },
+    { label: "completed", value: card.dates.completed },
+  ];
+  const set = chain.filter((s): s is { label: string; value: string } => s.value !== null);
+  for (let i = 1; i < set.length; i++) {
+    const prev = set[i - 1].value;
+    const cur = set[i].value;
+    /* Compared as INSTANTS when both carry a time, not rounded to whole days:
+       "completed at 09:00, work started at 14:00" is out of order on the same
+       day, and dayDiff would round that to zero and say nothing.
+
+       Compared as DAYS when either is a bare day. Created always is, and so is
+       any stamp saved before stamps had times. A bare day covers the whole day,
+       so the only thing it can be out of order with is an earlier day. It used
+       to be compared as an instant too, and parseDay pins a bare day to noon,
+       so a card created at 00:04 and started at 09:00 the same morning read as
+       "work started is before created". */
+    let outOfOrder: boolean;
+    if (hasTimeOfDay(prev) && hasTimeOfDay(cur)) {
+      const a = parseDay(prev)?.getTime();
+      const b = parseDay(cur)?.getTime();
+      outOfOrder = a !== undefined && b !== undefined && b < a;
+    } else {
+      // Stored as YYYY-MM-DD first, which sorts correctly as text.
+      outOfOrder = cur.slice(0, 10) < prev.slice(0, 10);
+    }
+    if (outOfOrder) return `${set[i].label} is before ${set[i - 1].label}`;
+  }
+  return null;
+}
+
 /* =============================================================================
    MODAL INSTANCES
    -----------------------------------------------------------------------------
@@ -5796,50 +5958,6 @@ function getCardModal(): Modal {
   return _cardModal;
 }
 
-/** Deletes a card, asking first unless this board says not to. The single
- *  delete path, shared by the card menu and by the bin on the card face, so the
- *  confirmation preference cannot end up honored in one place and not the
- *  other. */
-function requestDeleteCard(card: Card, opts: { reopen?: () => void } = {}): void {
-  const remove = (): void => {
-    deleteCard(card);
-    // The board has to redraw HERE. Deleting from the card modal happened to
-    // work because closing that modal redraws; deleting from the bin on the
-    // card face did not, so the card stayed on the board until you left it and
-    // came back. The delete is what needs the redraw, not the modal.
-    renderAll();
-    flash("Card deleted.");
-  };
-  if (!effectiveForCard(card).confirmDelete) {
-    // No confirm means nothing replaced the card modal, so it is still open
-    // over a card that no longer exists.
-    if (_cardModal?.isOpen) _cardModal.close();
-    remove();
-    return;
-  }
-  kbConfirm(
-    {
-      title: `Delete card #${card.number}?`,
-      message: `"${card.title || "Untitled"}" and its ${card.subtasks.length} subtask(s) go for good. Archive instead if you only want it off the board.`,
-      confirmLabel: "Delete",
-      reopen: opts.reopen,
-    },
-    remove,
-  );
-}
-
-/** Marks a card edited and queues the write. Every card mutation goes through
- *  it so `updatedAt` can never be forgotten by one path and not another. */
-export function stampCard(card: Card): void {
-  card.updatedAt = Date.now();
-  const board = getBoard(card.boardId);
-  if (!board) return;
-  board.updatedAt = card.updatedAt;
-  markBoard(board.id);
-  // The board behind the modal shows this card. See KEEPING THE BOARD IN STEP.
-  queueBoardRefresh();
-}
-
 /* -----------------------------------------------------------------------------
    READING A CARD VERSUS EDITING ONE
    -----------------------------------------------------------------------------
@@ -6142,72 +6260,6 @@ function renderCardPlacement(card: Card): void {
   effortSelect.value = card.effort;
 }
 
-export function moveCardToColumn(card: Card, columnId: string): void {
-  const board = getBoard(card.boardId);
-  if (!board) return;
-  const column = getColumn(board, columnId);
-  if (!column || column.id === card.columnId) return;
-
-  card.columnId = column.id;
-  card.order = -1; // to the top of its new column, then resequenced
-  const stage = stampOnArrival(board, column, card);
-  if (stage) flash(`Stamped the card's ${STAGE_LABELS[stage]} date.`);
-  resequence(board.id);
-  stampCard(card);
-}
-
-/** The stage date a column stamps on a card arriving in it: Completed for a
- *  column that means done, the column's own choice otherwise, or null. */
-export function arrivalStage(column: Column): Stage | null {
-  return column.isDone ? "completed" : (column.stage ?? null);
-}
-
-/** Stamps the stage date a card moving into `column` earns, when the board's
- *  preference is on and that date is still empty. Returns the stage stamped.
- *  The one stamper for every way a card changes column, so a drag and a move
- *  from the card or its menu cannot disagree about what is stamped, or how
- *  precisely. */
-function stampOnArrival(board: Board, column: Column, card: Card): Stage | null {
-  if (!effective(board).autoCompleteOnDone) return null;
-  const stage = arrivalStage(column);
-  if (!stage || card.dates[stage]) return null;
-  // The moment, like every other stage stamp: a move is the app watching
-  // something happen, so it knows the time as well as the day.
-  card.dates[stage] = nowStamp();
-  return stage;
-}
-
-function moveCardToBoard(card: Card, boardId: string): void {
-  const target = getBoard(boardId);
-  const from = getBoard(card.boardId);
-  if (!target || target.id === card.boardId) return;
-  if (target.columns.length === 0) {
-    flash("That board has no columns to move the card into.", "error");
-    renderCardPlacement(card);
-    return;
-  }
-
-  const previous = card.number;
-  const fromBoardId = card.boardId;
-  card.boardId = target.id;
-  card.columnId = target.columns[0].id;
-  card.order = -1;
-  // A card number only means anything within its own board, so crossing boards
-  // means taking a new one. Said out loud, because "#42" may be written down
-  // somewhere outside this app.
-  card.number = target.nextCardNumber;
-  target.nextCardNumber += 1;
-
-  if (from) resequence(from.id);
-  resequence(target.id);
-  stampCard(card);
-  // The files live in a folder named after the board, so a card crossing boards
-  // has to physically take them with it. If the two boards disagree about
-  // rather than a rename, so the copy is verified before the original goes.
-  if (fromBoardId) void moveAttachmentsToBoard(card, fromBoardId, target.id);
-  flash(`Moved to ${target.name}. It is now #${card.number} (was #${previous}).`);
-}
-
 /* -----------------------------------------------------------------------------
    STAGES
 ----------------------------------------------------------------------------- */
@@ -6230,45 +6282,6 @@ function undoStage(card: Card): void {
   if (current < 0) return;
   card.dates[STAGES[current]] = null;
   stampCard(card);
-}
-
-/** A stage order that cannot have happened (testing before work started),
- *  described plainly, or null when the dates are consistent. Not an error and
- *  nothing is blocked: hand-entered dates get typed wrong, and the fix is to
- *  say so next to them rather than to refuse the entry. */
-export function stageOrderWarning(card: Card): string | null {
-  const chain: { label: string; value: string | null }[] = [
-    { label: "created", value: createdDay(card) },
-    { label: "work started", value: card.dates.started },
-    { label: "testing started", value: card.dates.testing },
-    { label: "completed", value: card.dates.completed },
-  ];
-  const set = chain.filter((s): s is { label: string; value: string } => s.value !== null);
-  for (let i = 1; i < set.length; i++) {
-    const prev = set[i - 1].value;
-    const cur = set[i].value;
-    /* Compared as INSTANTS when both carry a time, not rounded to whole days:
-       "completed at 09:00, work started at 14:00" is out of order on the same
-       day, and dayDiff would round that to zero and say nothing.
-
-       Compared as DAYS when either is a bare day. Created always is, and so is
-       any stamp saved before stamps had times. A bare day covers the whole day,
-       so the only thing it can be out of order with is an earlier day. It used
-       to be compared as an instant too, and parseDay pins a bare day to noon,
-       so a card created at 00:04 and started at 09:00 the same morning read as
-       "work started is before created". */
-    let outOfOrder: boolean;
-    if (hasTimeOfDay(prev) && hasTimeOfDay(cur)) {
-      const a = parseDay(prev)?.getTime();
-      const b = parseDay(cur)?.getTime();
-      outOfOrder = a !== undefined && b !== undefined && b < a;
-    } else {
-      // Stored as YYYY-MM-DD first, which sorts correctly as text.
-      outOfOrder = cur.slice(0, 10) < prev.slice(0, 10);
-    }
-    if (outOfOrder) return `${set[i].label} is before ${set[i - 1].label}`;
-  }
-  return null;
 }
 
 function renderCardStages(card: Card): void {
