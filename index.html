@@ -8408,7 +8408,8 @@
              at. The two ladders are here rather than in Defaults because they
              are not defaults: a level called "Huge" on one board and "Epic" on
              another would make a card's chip mean different things depending on
-             where you were standing, so no board can override them. -->
+             where you were standing, so no board can override them. How many
+             rungs each has is yours to decide; see THE TWO SCALES. -->
         <div id="kbTabPreferences" class="modal-tab-pane" style="display:none;">
           <div class="setup-preferences-list">
 
@@ -8416,7 +8417,7 @@
               <div class="settings-label-col">
                 <span class="kb-label-with-info">Priority
                   <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="What each level is called and the color it wears, shared by every board. None has no color, because it is the absence of a priority.">&#8505;</button>
+                    data-tooltip="The levels themselves: add them, remove them, drag them into rank order, and set each one's name and color. Shared by every board. None has no color, because it is the absence of a priority.">&#8505;</button>
                 </span>
                 <span id="kbPrioritySummary" class="settings-status-badge"></span>
               </div>
@@ -8427,7 +8428,7 @@
               <div class="settings-label-col">
                 <span class="kb-label-with-info">Effort
                   <button type="button" class="info-trigger-btn kb-info-btn"
-                    data-tooltip="How heavy a card is, separately from how urgent. Rename the levels to whatever your team already says.">&#8505;</button>
+                    data-tooltip="How heavy a card is, separately from how urgent. Add, remove and reorder the levels, and name them whatever your team already says.">&#8505;</button>
                 </span>
                 <span id="kbEffortSummary" class="settings-status-badge"></span>
               </div>
@@ -8960,9 +8961,10 @@
 
   <!-- PRIORITY / EFFORT SCALE EDITOR
        ONE modal for both scales, filled at open time. They are the same shape,
-       a fixed set of rungs each with a name and a color, and two hand-written
-       copies would drift apart the moment one of them gained a column. Which
-       scale is being edited is held in kanban.ts, not in the markup. -->
+       an ordered ladder of rungs each with a name and a color, and two
+       hand-written copies would drift apart the moment one of them gained a
+       column. Which scale is being edited is held in kanban.ts, not in the
+       markup. -->
   <div id="kbScaleBackdrop" class="modal-backdrop" style="display: none;">
     <div id="kbScaleModal" class="modal">
       <div class="modal-header">
@@ -8981,10 +8983,39 @@
       </div>
       <div class="modal-body setup-body">
         <p id="kbScaleBlurb" class="kb-agent-note"></p>
+        <button id="kbScaleAddBtn" class="setup-new-btn">+ New Level</button>
         <div id="kbScaleRows" class="kb-scale-rows"></div>
         <div class="settings-row">
           <span id="kbScaleNote" class="kb-section-note"></span>
           <button id="kbScaleResetBtn" class="modal-cancel-btn">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REMOVING A RUNG
+       Its own screen rather than the shared confirm, because the destination
+       is the point: the cards on the level have to go somewhere and the app
+       cannot pick for you. See REMOVING A RUNG in kanban.ts. -->
+  <div id="kbScaleDeleteBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbScaleDeleteModal" class="modal">
+      <div class="modal-header">
+        <button id="kbScaleDeleteBack" class="nav-back-btn modal-header-left" title="Back to the scale">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <span id="kbScaleDeleteTitle">Remove level?</span>
+      </div>
+      <div class="modal-body exit-modal-body">
+        <p id="kbScaleDeleteMessage"></p>
+        <div id="kbScaleDeleteMoveField" class="settings-row">
+          <span>Move those cards to:</span>
+          <select id="kbScaleDeleteMove" class="settings-select"></select>
+        </div>
+        <div class="exit-modal-actions">
+          <button id="kbScaleDeleteConfirmBtn" class="danger-btn">Remove Level</button>
+          <button id="kbScaleDeleteCancelBtn" class="modal-cancel-btn">Cancel</button>
         </div>
       </div>
     </div>

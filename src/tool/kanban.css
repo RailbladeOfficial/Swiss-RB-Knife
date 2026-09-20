@@ -1883,9 +1883,11 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* -----------------------------------------------------------------------------
    THE SCALE EDITOR
-   One row per rung: its color, then its name. The swatch column is a fixed
-   width so the names line up into a column you can read down, including past
-   the one rung that has no swatch.
+   One row per rung: a grip, its color, its name, how many cards are on it, and
+   a remove. Every column but the name is a fixed width, so the names line up
+   into something you can read down, including past the None row at the foot,
+   which has no grip, no swatch and no remove and holds all three open with
+   spacers.
 ----------------------------------------------------------------------------- */
 
 .kb-scale-rows {
@@ -1899,6 +1901,48 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+/* A rung is draggable, so it needs the same "this is in the air" state the
+   default column editor uses. */
+.kb-scale-row.kb-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+  border-color: var(--color-border);
+}
+
+/* None is not on the ladder, so it is set apart rather than sitting flush with
+   the rungs above it. */
+.kb-scale-row-none {
+  margin-top: 4px;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  padding-top: 10px;
+}
+
+/* Holds the grip column open on the None row, which has nothing to drag. */
+.kb-scale-grip-spacer {
+  visibility: hidden;
+}
+
+/* What is riding on this rung, so a rung you are about to remove says what
+   removing it would cost before you click it. Right of the name and left of
+   the remove, which is where the eye already is on the way to that button. */
+.kb-scale-count {
+  flex: 0 0 auto;
+  min-width: 68px;
+  text-align: right;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+/* Holds the remove column open on the None row, which cannot be removed. */
+.kb-scale-remove-spacer {
+  flex: 0 0 auto;
+  width: 26px;
 }
 
 .kb-scale-swatch {

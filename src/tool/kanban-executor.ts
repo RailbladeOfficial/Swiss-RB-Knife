@@ -65,6 +65,9 @@ import {
   clampInt,
   createCard,
   deleteCard,
+  effortNames,
+  findEffortLevel,
+  findPriorityLevel,
   flushSave,
   getBoard,
   getCard,
@@ -76,6 +79,7 @@ import {
   normalizeMoment,
   orderedCardTags,
   parseDay,
+  priorityNames,
   renderAll,
   resequence,
   stageOrderWarning,
@@ -86,7 +90,6 @@ import {
 } from "./kanban";
 import {
   DEFAULT_TAG_COLOR,
-  EFFORTS,
   MAX_CARDS_PER_BOARD,
   MAX_COLUMNS_PER_BOARD,
   MAX_COMMENTS_PER_CARD,
@@ -94,7 +97,6 @@ import {
   MAX_DESC_LEN,
   MAX_SUBTASKS_PER_CARD,
   MAX_TITLE_LEN,
-  PRIORITIES,
   STAGES,
   authorLabel,
 } from "./kanban-model";
@@ -212,16 +214,36 @@ function agentStringList(params: Record<string, unknown>, key: string): string[]
   return value as string[];
 }
 
-/** Reads and checks an "effort", the same way priority is read and checked.
- *  Undefined means the request did not mention it, which is different from
- *  "none" and must leave whatever the card already had alone. */
-function agentEffort(params: Record<string, unknown>): Effort | undefined {
-  const effort = agentString(params, "effort");
-  if (effort === undefined) return undefined;
-  if (!EFFORTS.includes(effort as Effort)) {
-    throw new AgentError(`"effort" must be one of: ${EFFORTS.join(", ")}.`);
+/**
+ * Reads a level an agent named on one of the two scales.
+ *
+ * Undefined means the request did not mention it, which is different from the
+ * unset level and must leave whatever the card already had alone.
+ *
+ * BY NAME, not by id. The two ladders are built per install now, so the five
+ * shipped words are no longer the answer and the id of a level somebody added
+ * here is a generated one no agent could guess. findPriorityLevel takes either,
+ * and the refusal lists the names this install actually has, so an agent that
+ * gets it wrong is told what to say instead.
+ */
+function agentPriority(params: Record<string, unknown>): Priority | undefined {
+  const raw = agentString(params, "priority");
+  if (raw === undefined) return undefined;
+  const level = findPriorityLevel(raw);
+  if (level === null) {
+    throw new AgentError(`"priority" must be one of: ${priorityNames().join(", ")}.`);
   }
-  return effort as Effort;
+  return level;
+}
+
+function agentEffort(params: Record<string, unknown>): Effort | undefined {
+  const raw = agentString(params, "effort");
+  if (raw === undefined) return undefined;
+  const level = findEffortLevel(raw);
+  if (level === null) {
+    throw new AgentError(`"effort" must be one of: ${effortNames().join(", ")}.`);
+  }
+  return level;
 }
 
 function agentPosition(params: Record<string, unknown>): NewCardPosition {
@@ -479,7 +501,11 @@ function agentGetBoard(board: Board): Record<string, unknown> {
         name: tag.name,
         category: agentTagCategory(board, tag.categoryId)?.name ?? "",
       })),
-    priorities: PRIORITIES,
+    // The names, not the ids: what this install's ladders are called is the
+    // only part of them an agent can see or say. Both scales, since an agent
+    // may set either.
+    priorities: priorityNames(),
+    efforts: effortNames(),
     cardCount: live.length,
     archivedCount: archivedCardsOnBoard(board.id).length,
     overdueCount: live.filter((c) => isOverdue(c, todayStr)).length,
@@ -493,10 +519,7 @@ function agentListCards(board: Board, params: Record<string, unknown>): Record<s
   const column = columnName ? agentColumn(board, columnName) : null;
   const tagName = agentString(params, "tag");
   const tag = tagName ? agentTag(board, tagName) : null;
-  const priority = agentString(params, "priority");
-  if (priority !== undefined && !PRIORITIES.includes(priority as Priority)) {
-    throw new AgentError(`"priority" must be one of: ${PRIORITIES.join(", ")}.`);
-  }
+  const priority = agentPriority(params);
   const effort = agentEffort(params);
   const query = agentString(params, "query");
   const overdueOnly = agentBool(params, "overdue") === true;
@@ -545,10 +568,7 @@ function agentCreateCard(
   if (subtaskTexts?.length) assertExtra(req, "manageSubtasks", "Adding subtasks");
   const tags = tagNames?.map((name) => agentTag(board, name)) ?? [];
 
-  const priority = agentString(params, "priority");
-  if (priority !== undefined && !PRIORITIES.includes(priority as Priority)) {
-    throw new AgentError(`"priority" must be one of: ${PRIORITIES.join(", ")}.`);
-  }
+  const priority = agentPriority(params);
   const effort = agentEffort(params);
 
   const card = createCard(board, column.id, title, agentPosition(params));
@@ -562,7 +582,7 @@ function agentCreateCard(
   card.createdBy = { kind: "agent", by: req.connectionId, label: req.connectionLabel };
   const description = agentString(params, "description");
   if (description !== undefined) card.description = trimTo(description, MAX_DESC_LEN);
-  if (priority !== undefined) card.priority = priority as Priority;
+  if (priority !== undefined) card.priority = priority;
   if (effort !== undefined) card.effort = effort;
   card.tagIds = [...new Set(tags.map((t) => t.id))];
   if (due !== undefined) card.dates.due = due;
@@ -591,13 +611,8 @@ function agentUpdateCard(
   }
   const description = agentString(params, "description");
   if (description !== undefined) card.description = trimTo(description, MAX_DESC_LEN);
-  const priority = agentString(params, "priority");
-  if (priority !== undefined) {
-    if (!PRIORITIES.includes(priority as Priority)) {
-      throw new AgentError(`"priority" must be one of: ${PRIORITIES.join(", ")}.`);
-    }
-    card.priority = priority as Priority;
-  }
+  const priority = agentPriority(params);
+  if (priority !== undefined) card.priority = priority;
   const effort = agentEffort(params);
   if (effort !== undefined) card.effort = effort;
   stampCard(card);

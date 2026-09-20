@@ -229,6 +229,24 @@ fn card_ref() -> Value {
     })
 }
 
+/// A level on one of the two scales, named rather than enumerated.
+///
+/// These used to be a fixed `enum` of the five rungs the app shipped with.
+/// Both ladders are built per install now: how many rungs there are, what they
+/// are called and what their ids are is a question only the running app can
+/// answer, so an enum compiled in here would reject a level that exists and
+/// offer levels that do not. `kanban_get_board` returns both lists, and the app
+/// refuses an unknown one by naming the ones it has.
+fn level_ref(scale: &'static str) -> Value {
+    json!({
+        "type": "string",
+        "description": format!(
+            "A {scale} level, by name. This board's levels are in kanban_get_board, \
+             under \"{scale}s\"; \"none\" is no level at all."
+        )
+    })
+}
+
 fn schema(properties: Value, required: &[&str]) -> Value {
     json!({
         "type": "object",
@@ -256,8 +274,8 @@ const TOOLS: &[ToolSpec] = &[
                 json!({
                     "column": { "type": "string", "description": "Only cards in this column, by title or id." },
                     "tag": { "type": "string", "description": "Only cards carrying this tag, by name or id." },
-                    "priority": { "type": "string", "enum": ["none", "trivial", "low", "medium", "high", "critical"] },
-                    "effort": { "type": "string", "enum": ["none", "tiny", "small", "medium", "large", "huge"] },
+                    "priority": level_ref("priority"),
+                    "effort": level_ref("effort"),
                     "archived": { "type": "boolean", "description": "Include archived cards. Default false." },
                     "overdue": { "type": "boolean", "description": "Only cards past their due date." },
                     "query": { "type": "string", "description": "Only cards whose title or description contains this text." },
@@ -285,8 +303,8 @@ const TOOLS: &[ToolSpec] = &[
                     "title": { "type": "string", "description": "Required. The card's title." },
                     "description": { "type": "string", "description": "Markdown." },
                     "column": { "type": "string", "description": "Column title or id. Defaults to the first column." },
-                    "priority": { "type": "string", "enum": ["none", "trivial", "low", "medium", "high", "critical"] },
-                    "effort": { "type": "string", "enum": ["none", "tiny", "small", "medium", "large", "huge"] },
+                    "priority": level_ref("priority"),
+                    "effort": level_ref("effort"),
                     "tags": { "type": "array", "items": { "type": "string" }, "description": "Existing tags, by name or id. Needs the assign-tags permission." },
                     "due": { "type": "string", "description": "Due date as YYYY-MM-DD, a day only. Needs the set-dates permission." },
                     "subtasks": { "type": "array", "items": { "type": "string" } },
@@ -307,8 +325,8 @@ const TOOLS: &[ToolSpec] = &[
                     "card": card_ref(),
                     "title": { "type": "string" },
                     "description": { "type": "string", "description": "Markdown. Replaces the whole description." },
-                    "priority": { "type": "string", "enum": ["none", "trivial", "low", "medium", "high", "critical"] },
-                    "effort": { "type": "string", "enum": ["none", "tiny", "small", "medium", "large", "huge"] }
+                    "priority": level_ref("priority"),
+                    "effort": level_ref("effort")
                 }),
                 &["card"],
             )

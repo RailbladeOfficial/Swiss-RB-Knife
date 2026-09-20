@@ -328,10 +328,10 @@ test("board-overridable settings are read through the resolver, never off the de
     // The two scales. Tool-wide on purpose: a level called "Huge" on one board
     // and "Epic" on another would make a card's chip mean different things
     // depending on where you were standing.
-    "priorityColors",
-    "priorityLabels",
-    "effortColors",
-    "effortLabels",
+    "priorityLevels",
+    "priorityNoneLabel",
+    "effortLevels",
+    "effortNoneLabel",
   ];
 
   /* A short list may touch the defaults directly, because handling the defaults
@@ -724,65 +724,137 @@ test("a section the stored order has never seen lands where the default puts it"
   );
 });
 
-test("the priority ladder runs lowest to highest and every rung has a color", () => {
-  const src = ts();
-  const ladder = [
-    ...kbSlice("export const PRIORITIES", "];").matchAll(/"([a-z]+)"/g),
-  ].map((m) => m[1]);
-  assert.deepEqual(ladder, ["none", "trivial", "low", "medium", "high", "critical"]);
+/** The rungs of a shipped ladder, in order, as {id, name, color}. */
+function shippedLadder(name) {
+  return [
+    ...kbSlice(`export const ${name}`, "];").matchAll(
+      /\{ id: "([a-z]+)", name: "([^"]+)", color: "(#[0-9a-f]{6})" \}/g,
+    ),
+  ].map((m) => ({ id: m[1], name: m[2], color: m[3] }));
+}
 
-  const labels = kbSlice("export const DEFAULT_PRIORITY_LABELS", "};");
-  const colors = kbSlice("export const DEFAULT_PRIORITY_COLORS", "};");
+test("the shipped priority ladder runs lowest to highest and every rung is named and colored", () => {
+  /* The ids are load-bearing in a way the names are not: a card written by any
+     earlier version stores one of them, and normalizeScaleLevels reads the v0.7
+     label and color maps by these same keys. Renaming one here would strand
+     every card on it. */
+  const ladder = shippedLadder("DEFAULT_PRIORITY_LEVELS");
+  assert.deepEqual(
+    ladder.map((l) => l.id),
+    ["trivial", "low", "medium", "high", "critical"],
+  );
   for (const level of ladder) {
-    assert.match(labels, new RegExp(`\\b${level}:`), `${level} has no label`);
-    assert.match(colors, new RegExp(`\\b${level}: "#[0-9a-f]{6}"`), `${level} has no color`);
+    assert.ok(level.name, `${level.id} has no name`);
+    assert.ok(level.color, `${level.id} has no color`);
   }
 
-  // Trivial sits outside the urgency ramp, so it is the one blue rung.
-  const trivial = /trivial: "(#[0-9a-f]{6})"/.exec(colors);
-  assert.ok(trivial, "trivial has no color");
-  const n = parseInt(trivial[1].slice(1), 16);
-  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  assert.ok(b > r && b > g, `trivial should read as blue, got ${trivial[1]}`);
-});
-
-test("the effort ladder is lightest to heaviest and every rung is named", () => {
-  /* Effort mirrors Priority's shape on purpose: five rungs plus "none" for
-     unset. If the two ever stop matching, a card's two chips start meaning
-     different kinds of thing and the modal that edits both breaks on one. */
-  const ladder = [
-    ...kbSlice("export const EFFORTS", "];").matchAll(/"([a-z]+)"/g),
-  ].map((m) => m[1]);
-  assert.deepEqual(ladder, ["none", "tiny", "small", "medium", "large", "huge"]);
-  assert.equal(ladder[0], "none", "the unset rung has to be first, the way Priority's is");
-
-  const labels = kbSlice("export const DEFAULT_EFFORT_LABELS", "};");
-  const colors = kbSlice("export const DEFAULT_EFFORT_COLORS", "};");
-  for (const level of ladder) {
-    assert.match(labels, new RegExp(`\\b${level}:`), `${level} has no label`);
-    assert.match(colors, new RegExp(`\\b${level}: "#[0-9a-f]{6}"`), `${level} has no color`);
-  }
-});
-
-test("a renamed level is shown under its new name everywhere", () => {
-  /* The rungs are settable now, so reading DEFAULT_*_LABELS to DRAW one shows
-     the shipped name and silently ignores the rename. Only the accessors and
-     the reset target may touch the defaults. */
-  const src = ts();
-  const exempt = ["function priorityLabel(", "function effortLabel(", "function scaleSpec("].map(
-    (marker) => {
-      const at = src.indexOf(marker);
-      assert.notEqual(at, -1, `could not find ${marker}`);
-      return [at, src.indexOf("\n}", at)];
-    },
+  // "none" is the absence of a level, so it must never appear AS one.
+  assert.ok(
+    !ladder.some((l) => l.id === "none"),
+    "the unset rung is not on the ladder: see THE TWO SCALES",
   );
 
-  const strays = [];
-  for (const m of src.matchAll(/DEFAULT_(?:PRIORITY|EFFORT)_LABELS\[/g)) {
-    if (exempt.some(([from, to]) => m.index > from && m.index < to)) continue;
-    strays.push(src.slice(m.index - 40, m.index + 40).replace(/\s+/g, " "));
+  // Trivial sits outside the urgency ramp, so it is the one blue rung.
+  const trivial = ladder.find((l) => l.id === "trivial");
+  assert.ok(trivial, "trivial is missing");
+  const n = parseInt(trivial.color.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  assert.ok(b > r && b > g, `trivial should read as blue, got ${trivial.color}`);
+});
+
+test("the shipped effort ladder is lightest to heaviest and every rung is named", () => {
+  /* Effort mirrors Priority's shape on purpose. If the two ever stop matching,
+     a card's two chips start meaning different kinds of thing and the one
+     editor that serves both breaks on one of them. */
+  const ladder = shippedLadder("DEFAULT_EFFORT_LEVELS");
+  assert.deepEqual(
+    ladder.map((l) => l.id),
+    ["tiny", "small", "medium", "large", "huge"],
+  );
+  for (const level of ladder) {
+    assert.ok(level.name, `${level.id} has no name`);
+    assert.ok(level.color, `${level.id} has no color`);
   }
-  assert.deepEqual(strays, [], "these draw a shipped name instead of the renamed one");
+  assert.ok(
+    !ladder.some((l) => l.id === "none"),
+    "the unset rung is not on the ladder: see THE TWO SCALES",
+  );
+});
+
+test("a level a card is on cannot be dropped on the way in from disk", () => {
+  /* normalizeLevelId keeps whatever a card was written with, ON PURPOSE. The
+     two ways a card can carry a level the loaded settings do not list are a
+     settings file that failed to read (which blocks writing settings but not
+     boards) and a half-restored snapshot, and both are cases where checking it
+     against the ladder would blank the card and write that back out. */
+  const model = kbSlice("export function normalizeLevelId", "\n}");
+  assert.ok(
+    !/priorityLevels|effortLevels|kbSettings/.test(model),
+    "normalizeLevelId reads the ladder, which would drop a card's level on load",
+  );
+});
+
+test("a scale is drawn from the ladder this install has, never from the shipped one", () => {
+  /* The ladders are BUILT now, so reading DEFAULT_*_LEVELS to draw a rung shows
+     the five that shipped: the shipped name instead of the rename, levels this
+     install has deleted, and none of the ones it has added. Only the places
+     whose job IS the shipped ladder may name it, which is normalization (the
+     v0.7 migration and the fallback), the editor's spec, and Reset. */
+  const src = ts();
+  const exempt = [
+    "function normalizeScaleLevels(",
+    "function scaleSpec(",
+    "function scaleIsDefault(",
+    // Reset is a listener inside this one, and so is the count of what it
+    // would strand, which has to be measured against the shipped ids.
+    "function getScaleModal(",
+  ].map((marker) => {
+    const at = src.indexOf(marker);
+    assert.notEqual(at, -1, `could not find ${marker}`);
+    return [at, src.indexOf("\n}", at)];
+  });
+
+  const strays = [];
+  for (const m of src.matchAll(/DEFAULT_(?:PRIORITY|EFFORT)_LEVELS/g)) {
+    if (exempt.some(([from, to]) => m.index > from && m.index < to)) continue;
+    /* A DECLARATION is not a draw: the ladders themselves, the import lists
+       that carry them, and the settings defaults that start as a copy of them
+       all have to name them. */
+    const line = src
+      .slice(src.lastIndexOf("\n", m.index) + 1, src.indexOf("\n", m.index))
+      .trim();
+    const declaration =
+      /^export const DEFAULT_(?:PRIORITY|EFFORT)_LEVELS/.test(line) ||
+      /^DEFAULT_(?:PRIORITY|EFFORT)_LEVELS,$/.test(line) ||
+      /^(?:priority|effort)Levels: DEFAULT_(?:PRIORITY|EFFORT)_LEVELS\.map/.test(line);
+    if (declaration) continue;
+    strays.push(line);
+  }
+  assert.deepEqual(strays, [], "these draw the shipped ladder instead of the one in settings");
+});
+
+test("a level renamed or deleted in Preferences reaches every picker", () => {
+  /* Each of these used to be built from a fixed constant, which was correct
+     while the rungs were fixed. A picker built once at startup, or from the
+     shipped list, offers levels this install has removed and misses the ones it
+     has added. They all go through the two choice builders now. */
+  const src = ts();
+  for (const marker of ["priorityChoices", "effortChoices"]) {
+    assert.ok(src.includes(`export function ${marker}(`), `${marker} does not exist`);
+  }
+
+  const drawn = [
+    ["src/tool/kanban-card-face.ts", "the board's right-click menus"],
+    ["src/tool/kanban-card.ts", "the card modal's two selects"],
+    ["src/tool/whiteboard.ts", "the Send to Kanban form"],
+  ];
+  for (const [file, what] of drawn) {
+    const text = read(file);
+    assert.ok(
+      text.includes("priorityChoices(") && text.includes("effortChoices("),
+      `${what} does not build its levels from the live ladder`,
+    );
+  }
 });
 
 test("the card modal does not borrow a class the board face owns", () => {

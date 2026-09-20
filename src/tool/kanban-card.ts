@@ -67,6 +67,8 @@ import {
   duplicateCard,
   effective,
   effectiveForCard,
+  effortChoices,
+  effortColorOf,
   effortLabel,
   flushSave,
   formatDate,
@@ -76,7 +78,6 @@ import {
   getColumn,
   hasTimeOfDay,
   kbConfirm,
-  kbSettings,
   moveCardToBoard,
   moveCardToColumn,
   normalizeColorMode,
@@ -87,7 +88,10 @@ import {
   openBoardSetup,
   openTagEditor,
   orderedCardTags,
+  priorityChoices,
+  priorityColorOf,
   priorityLabel,
+  type LevelChoice,
   readableTextOn,
   renderAll,
   requestDeleteCard,
@@ -101,7 +105,6 @@ import {
 import {
   ADVANCE_LABELS,
   CARD_COLORS,
-  EFFORTS,
   MAX_ATTACHMENTS,
   MAX_ATTACHMENT_BYTES,
   MAX_COMMENTS_PER_CARD,
@@ -109,7 +112,6 @@ import {
   MAX_DESC_LEN,
   MAX_SUBTASKS_PER_CARD,
   MAX_TITLE_LEN,
-  PRIORITIES,
   STAGES,
   STAGE_LABELS,
   attachmentKind,
@@ -608,16 +610,11 @@ function renderCardReadonlyValues(card: Card): void {
 
   set("kbCardColumnDisplay", column?.title ?? "Unknown column");
   set("kbCardBoardDisplay", board?.name ?? "Unknown board");
-  set(
-    "kbCardPriorityDisplay",
-    priorityLabel(card.priority),
-    card.priority === "none" ? undefined : kbSettings.priorityColors[card.priority],
-  );
-  set(
-    "kbCardEffortDisplay",
-    effortLabel(card.effort),
-    card.effort === "none" ? undefined : kbSettings.effortColors[card.effort],
-  );
+  // Undefined for "none" and for a level this install no longer has: both read
+  // as unset, and painting the second one would need a color there is no rung
+  // to take it from. See normalizeLevelId in kanban.ts.
+  set("kbCardPriorityDisplay", priorityLabel(card.priority), priorityColorOf(card.priority) ?? undefined);
+  set("kbCardEffortDisplay", effortLabel(card.effort), effortColorOf(card.effort) ?? undefined);
 }
 
 /** The counts on the Subtasks and Comments tabs, so a tab says whether it is
@@ -680,25 +677,31 @@ export function renderCardPlacement(card: Card): void {
   }
   columnSelect.value = card.columnId;
 
-  const prioritySelect = document.getElementById("kbCardPrioritySelect") as HTMLSelectElement;
-  prioritySelect.replaceChildren();
-  for (const level of PRIORITIES) {
-    const option = document.createElement("option");
-    option.value = level;
-    option.textContent = priorityLabel(level);
-    prioritySelect.appendChild(option);
-  }
-  prioritySelect.value = card.priority;
+  /* Both ladders are rebuilt on every open. They used to be built from a
+     constant, which was fine while the rungs were fixed; a level added since
+     this card was last opened has to be in the list. */
+  fillLevelSelect("kbCardPrioritySelect", priorityChoices(), card.priority);
+  fillLevelSelect("kbCardEffortSelect", effortChoices(), card.effort);
+}
 
-  const effortSelect = document.getElementById("kbCardEffortSelect") as HTMLSelectElement;
-  effortSelect.replaceChildren();
-  for (const level of EFFORTS) {
+/** One scale into one select.
+ *
+ *  A card carrying a level this install no longer has lands on the first
+ *  option, which is the absence of a level: the rest of the card already reads
+ *  it as unset, so a select left showing nothing would be the one place
+ *  claiming otherwise. Nothing is written by this; the card keeps the id until
+ *  somebody actually picks something. */
+function fillLevelSelect(id: string, choices: LevelChoice[], current: string): void {
+  const select = document.getElementById(id) as HTMLSelectElement;
+  select.replaceChildren();
+  for (const choice of choices) {
     const option = document.createElement("option");
-    option.value = level;
-    option.textContent = effortLabel(level);
-    effortSelect.appendChild(option);
+    option.value = choice.id;
+    option.textContent = choice.label;
+    select.appendChild(option);
   }
-  effortSelect.value = card.effort;
+  select.value = current;
+  if (select.selectedIndex === -1) select.selectedIndex = 0;
 }
 
 /* -----------------------------------------------------------------------------

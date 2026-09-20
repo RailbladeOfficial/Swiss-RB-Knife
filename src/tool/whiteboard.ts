@@ -64,9 +64,10 @@ import {
   addImageCardFromElsewhere,
   attachImageToCard,
   findCardsOnBoard,
-  effortLabel,
-  priorityLabel,
+  effortChoices,
+  priorityChoices,
   type IncomingOptions,
+  type LevelChoice,
   contrastRatio,
   hexToRgb,
   isHexColor,
@@ -77,8 +78,7 @@ import {
 } from "./kanban";
 import {
   MAX_TITLE_LEN,
-  EFFORTS,
-  PRIORITIES,
+  NO_LEVEL,
   type Effort,
   type Priority,
 } from "./kanban-model";
@@ -3124,6 +3124,17 @@ function requestSend(): void {
   else openSend();
 }
 
+/** One scale into one select, in ladder order with the unset rung first. */
+function fillLevelSelect(select: HTMLSelectElement, choices: LevelChoice[]): void {
+  select.replaceChildren();
+  for (const choice of choices) {
+    const option = document.createElement("option");
+    option.value = choice.id;
+    option.textContent = choice.label;
+    select.appendChild(option);
+  }
+}
+
 function openSend(tab?: SendTab, onlyNote?: string): void {
   endEditing();
   closeColorPop();
@@ -3138,8 +3149,13 @@ function openSend(tab?: SendTab, onlyNote?: string): void {
   sendCardId = null;
   sendCardSearch.value = "";
   sendTagIds = new Set();
-  sendPriority.value = "none";
-  sendEffort.value = "none";
+  /* Both ladders are refilled on every open rather than once at startup: the
+     levels are built per install now, and a scale edited in Kanban since this
+     tool loaded would otherwise offer rungs that no longer exist. */
+  fillLevelSelect(sendPriority, priorityChoices());
+  fillLevelSelect(sendEffort, effortChoices());
+  sendPriority.value = NO_LEVEL;
+  sendEffort.value = NO_LEVEL;
   sendDue.value = "";
   sendDescription.value = "";
   sendAdvanced.open = false;
@@ -3334,10 +3350,13 @@ function renderCardResults(): void {
 function sendOptions(): IncomingOptions {
   const priority = sendPriority.value as Priority;
   const effort = sendEffort.value as Effort;
+  // Checked against the ladder rather than a constant. applyIncomingOptions
+  // checks again on the far side; this is what stops the field being sent at
+  // all when it is the unset rung.
   return {
     tagIds: [...sendTagIds],
-    priority: PRIORITIES.includes(priority) ? priority : undefined,
-    effort: EFFORTS.includes(effort) ? effort : undefined,
+    priority: priority && priority !== NO_LEVEL ? priority : undefined,
+    effort: effort && effort !== NO_LEVEL ? effort : undefined,
     due: sendDue.value || undefined,
     description: sendDescription.value.trim() || undefined,
   };
@@ -3517,18 +3536,6 @@ function wireSendModal(): void {
   sendDescription = document.getElementById("wbSendDescription") as HTMLTextAreaElement;
   sendTagsEl = document.getElementById("wbSendTags")!;
 
-  for (const level of PRIORITIES) {
-    const opt = document.createElement("option");
-    opt.value = level;
-    opt.textContent = priorityLabel(level);
-    sendPriority.appendChild(opt);
-  }
-  for (const level of EFFORTS) {
-    const opt = document.createElement("option");
-    opt.value = level;
-    opt.textContent = effortLabel(level);
-    sendEffort.appendChild(opt);
-  }
   sendCardSearch.addEventListener("input", renderCardResults);
   // A typed title changes how many cards a text send makes.
   sendTitle.addEventListener("input", updateSendButtons);

@@ -111,8 +111,10 @@ import type {
   KanbanIndex,
   KbSettings,
   KbStatus,
+  LevelId,
   NewCardPosition,
   Priority,
+  ScaleLevel,
   SortField,
   SortRule,
   Stage,
@@ -125,13 +127,11 @@ import {
   CARD_SECTIONS,
   CARD_SECTION_LABELS,
   DARK_INK,
-  DEFAULT_EFFORT_COLORS,
-  DEFAULT_EFFORT_LABELS,
-  DEFAULT_PRIORITY_COLORS,
-  DEFAULT_PRIORITY_LABELS,
+  DEFAULT_EFFORT_LEVELS,
+  DEFAULT_NONE_LABEL,
+  DEFAULT_PRIORITY_LEVELS,
   DEFAULT_SETTINGS,
   DEFAULT_TAG_COLOR,
-  EFFORTS,
   LIGHT_INK,
   MAX_ATTACHMENTS,
   MAX_ATTACHMENT_BYTES,
@@ -140,9 +140,11 @@ import {
   MAX_COMMENTS_PER_CARD,
   MAX_COMMENT_LEN,
   MAX_DESC_LEN,
+  MAX_LEVEL_NAME_LEN,
+  MAX_SCALE_LEVELS,
   MAX_SUBTASKS_PER_CARD,
   MAX_TITLE_LEN,
-  PRIORITIES,
+  NO_LEVEL,
   SAVE_DEBOUNCE_MS,
   STAGES,
   STAGE_LABELS,
@@ -1036,51 +1038,99 @@ export function normalizeTextColor(raw: unknown): CardTextColor {
   return raw === "light" || raw === "dark" ? raw : "auto";
 }
 
+/**
+ * A card's stored level, KEPT AS WRITTEN rather than checked against the
+ * ladder that happens to be loaded.
+ *
+ * This deliberately does not ask whether the level still exists. Cards are
+ * normalized as each board file is read, and dropping an id the settings file
+ * does not currently list would blank the card's priority on load and write
+ * that back out on the next edit. The two ways to reach that state are exactly
+ * the two where the data must survive: a settings file that failed to read
+ * (which blocks writing settings, but not boards), and a snapshot restore that
+ * brings back one file and not the other.
+ *
+ * So an unknown id is carried, and the DISPLAY side answers for it: it draws
+ * no chip and sorts as unset, which reads exactly like "not set" while the id
+ * is still in the file. Put the level back and the cards wearing it come back
+ * with it.
+ */
+export function normalizeLevelId(raw: unknown): LevelId {
+  if (typeof raw !== "string") return NO_LEVEL;
+  const trimmed = raw.trim().slice(0, 64);
+  return trimmed || NO_LEVEL;
+}
+
 export function normalizePriority(raw: unknown): Priority {
-  return PRIORITIES.includes(raw as Priority) ? (raw as Priority) : "none";
+  return normalizeLevelId(raw);
 }
 
-/** One color per priority level, filling in from the defaults rather than
- *  rejecting a partial map: a settings file written before a level existed is
- *  simply missing it. */
 export function normalizeEffort(raw: unknown): Effort {
-  return EFFORTS.includes(raw as Effort) ? (raw as Effort) : "none";
+  return normalizeLevelId(raw);
 }
 
-function normalizePriorityColors(raw: unknown): Record<Priority, string> {
-  const src = (raw ?? {}) as Partial<Record<Priority, string>>;
-  const out = {} as Record<Priority, string>;
-  for (const level of PRIORITIES) {
-    out[level] = normalizeColor(src[level], DEFAULT_PRIORITY_COLORS[level]);
+/**
+ * One scale's ladder, from whichever shape the settings file is in.
+ *
+ * TWO SHAPES, because v0.7 wrote a pair of maps keyed by the five fixed rungs
+ * and this writes a list. The legacy pair is read into the shipped ladder by
+ * id, which is what makes a rename or a recolor made before this survive: the
+ * ids never changed, only the shape around them did.
+ *
+ * A row with no usable id is dropped rather than given one, because an invented
+ * id matches no card and would draw an empty rung nothing could be on. A file
+ * with no usable rows at all falls back to the defaults, on the grounds that a
+ * tool whose Priority picker offers only "None" is broken rather than
+ * configured.
+ */
+function normalizeScaleLevels(
+  rawLevels: unknown,
+  legacyLabels: unknown,
+  legacyColors: unknown,
+  defaults: readonly ScaleLevel[],
+): ScaleLevel[] {
+  const out: ScaleLevel[] = [];
+  const seen = new Set<string>([NO_LEVEL]);
+
+  const take = (id: unknown, name: unknown, color: unknown, fallback: ScaleLevel | null): void => {
+    if (typeof id !== "string") return;
+    const levelId = id.trim().slice(0, 64);
+    if (!levelId || seen.has(levelId)) return;
+    if (out.length >= MAX_SCALE_LEVELS) return;
+    seen.add(levelId);
+    const trimmed = typeof name === "string" ? name.trim().slice(0, MAX_LEVEL_NAME_LEN) : "";
+    out.push({
+      id: levelId,
+      name: trimmed || fallback?.name || levelId,
+      color: normalizeColor(color, fallback?.color ?? DEFAULT_TAG_COLOR),
+    });
+  };
+
+  if (Array.isArray(rawLevels)) {
+    for (const row of rawLevels) {
+      if (!row || typeof row !== "object") continue;
+      const level = row as Partial<ScaleLevel>;
+      take(level.id, level.name, level.color, defaults.find((d) => d.id === level.id) ?? null);
+    }
+  } else {
+    const labels = (legacyLabels ?? {}) as Record<string, unknown>;
+    const colors = (legacyColors ?? {}) as Record<string, unknown>;
+    for (const level of defaults) take(level.id, labels[level.id], colors[level.id], level);
   }
-  return out;
+
+  return out.length > 0 ? out : defaults.map((l) => ({ ...l }));
 }
 
-/** A renamed rung, or the shipped name when the rename is missing, blank or not
- *  a string. Trimmed and capped, because these are drawn in a chip on a card
- *  and a 400-character "priority" would push the rest of the card off screen. */
-function normalizeLevelLabels<K extends string>(
-  raw: unknown,
-  keys: readonly K[],
-  fallback: Record<K, string>,
-): Record<K, string> {
-  const src = (raw ?? {}) as Partial<Record<K, string>>;
-  const out = {} as Record<K, string>;
-  for (const key of keys) {
-    const value = src[key];
-    const trimmed = typeof value === "string" ? value.trim().slice(0, 24) : "";
-    out[key] = trimmed || fallback[key];
-  }
-  return out;
-}
-
-function normalizeEffortColors(raw: unknown): Record<Effort, string> {
-  const src = (raw ?? {}) as Partial<Record<Effort, string>>;
-  const out = {} as Record<Effort, string>;
-  for (const level of EFFORTS) {
-    out[level] = normalizeColor(src[level], DEFAULT_EFFORT_COLORS[level]);
-  }
-  return out;
+/** What the absence of a level is called. v0.7 kept this in the labels map
+ *  under the reserved id, so that is where it is looked for when the new field
+ *  is missing. */
+function normalizeNoneLabel(raw: unknown, legacyLabels: unknown): string {
+  const direct = typeof raw === "string" ? raw.trim().slice(0, MAX_LEVEL_NAME_LEN) : "";
+  if (direct) return direct;
+  const legacy = (legacyLabels ?? {}) as Record<string, unknown>;
+  const old = legacy[NO_LEVEL];
+  const trimmed = typeof old === "string" ? old.trim().slice(0, MAX_LEVEL_NAME_LEN) : "";
+  return trimmed || DEFAULT_NONE_LABEL;
 }
 
 export function normalizeSettings(raw: Partial<KbSettings>): KbSettings {
@@ -1096,10 +1146,28 @@ export function normalizeSettings(raw: Partial<KbSettings>): KbSettings {
         : DEFAULT_SETTINGS.defaultColumns,
     defaultBoardName:
       typeof raw.defaultBoardName === "string" ? raw.defaultBoardName.slice(0, 120) : "",
-    priorityColors: normalizePriorityColors(raw.priorityColors),
-    priorityLabels: normalizeLevelLabels(raw.priorityLabels, PRIORITIES, DEFAULT_PRIORITY_LABELS),
-    effortColors: normalizeEffortColors(raw.effortColors),
-    effortLabels: normalizeLevelLabels(raw.effortLabels, EFFORTS, DEFAULT_EFFORT_LABELS),
+    // The two legacy maps are read here and nowhere else. They are not fields
+    // on KbSettings any more, so they arrive as strays on the parsed object.
+    priorityLevels: normalizeScaleLevels(
+      raw.priorityLevels,
+      (raw as Record<string, unknown>).priorityLabels,
+      (raw as Record<string, unknown>).priorityColors,
+      DEFAULT_PRIORITY_LEVELS,
+    ),
+    priorityNoneLabel: normalizeNoneLabel(
+      raw.priorityNoneLabel,
+      (raw as Record<string, unknown>).priorityLabels,
+    ),
+    effortLevels: normalizeScaleLevels(
+      raw.effortLevels,
+      (raw as Record<string, unknown>).effortLabels,
+      (raw as Record<string, unknown>).effortColors,
+      DEFAULT_EFFORT_LEVELS,
+    ),
+    effortNoneLabel: normalizeNoneLabel(
+      raw.effortNoneLabel,
+      (raw as Record<string, unknown>).effortLabels,
+    ),
   };
 }
 
@@ -1560,19 +1628,136 @@ export function resequence(boardId: string): void {
    with the state that holds it.
 ----------------------------------------------------------------------------- */
 
-/** What a priority is CALLED on this install. Reads the setting, which starts
- *  as a copy of the shipped names and can be renamed per level.
- *
- *  Every place that shows a rung to a person goes through here. Reading
- *  DEFAULT_PRIORITY_LABELS directly would show the shipped name and quietly
- *  ignore the rename, which is the bug this function exists to prevent. */
-export function priorityLabel(level: Priority): string {
-  return kbSettings.priorityLabels[level] || DEFAULT_PRIORITY_LABELS[level];
+/* -----------------------------------------------------------------------------
+   READING A SCALE
+   -----------------------------------------------------------------------------
+   The ladders live in settings and settings are live state, so none of this is
+   model: see standards section 9, and THE TWO SCALES in kanban-model.ts for
+   what a ladder is.
+
+   EVERY PLACE THAT SHOWS A RUNG GOES THROUGH HERE. Reading the shipped
+   defaults directly would show the shipped name and quietly ignore a rename,
+   which is the bug these functions exist to prevent, and now it would also
+   show rungs this install has deleted.
+
+   AN UNKNOWN ID IS "UNSET", not an error. normalizeLevelId keeps whatever a
+   card was written with; this is the other half of that bargain, and it is why
+   every lookup here answers for an id no ladder lists rather than asserting.
+----------------------------------------------------------------------------- */
+
+export function priorityLevels(): ScaleLevel[] {
+  return kbSettings.priorityLevels;
 }
 
-/** The same, for Effort. */
+export function effortLevels(): ScaleLevel[] {
+  return kbSettings.effortLevels;
+}
+
+/** The rung itself, or null for NO_LEVEL and for an id this install has no
+ *  rung for. */
+export function priorityLevelOf(level: Priority): ScaleLevel | null {
+  return kbSettings.priorityLevels.find((l) => l.id === level) ?? null;
+}
+
+export function effortLevelOf(level: Effort): ScaleLevel | null {
+  return kbSettings.effortLevels.find((l) => l.id === level) ?? null;
+}
+
+/** What a priority is CALLED on this install. */
+export function priorityLabel(level: Priority): string {
+  return priorityLevelOf(level)?.name ?? kbSettings.priorityNoneLabel;
+}
+
 export function effortLabel(level: Effort): string {
-  return kbSettings.effortLabels[level] || DEFAULT_EFFORT_LABELS[level];
+  return effortLevelOf(level)?.name ?? kbSettings.effortNoneLabel;
+}
+
+/** A rung's color, or null where there is no rung to take one from. Null is
+ *  the answer for "none" as well as for an unknown id: the absence of a level
+ *  has no color, or every unset card would be painted gray as though gray were
+ *  a level. */
+export function priorityColorOf(level: Priority): string | null {
+  return priorityLevelOf(level)?.color ?? null;
+}
+
+export function effortColorOf(level: Effort): string | null {
+  return effortLevelOf(level)?.color ?? null;
+}
+
+/** Where a level sits on its ladder, for sorting. 0 is unset, which is what
+ *  both NO_LEVEL and an unknown id come out as, so an unset card sorts below
+ *  every rung rather than in the middle of them. */
+export function priorityRank(level: Priority): number {
+  return kbSettings.priorityLevels.findIndex((l) => l.id === level) + 1;
+}
+
+export function effortRank(level: Effort): number {
+  return kbSettings.effortLevels.findIndex((l) => l.id === level) + 1;
+}
+
+/** One rung as a picker draws it. */
+export interface LevelChoice {
+  id: LevelId;
+  label: string;
+  color: string | null;
+}
+
+/** What a picker offers: the absence of a level first, then the ladder from
+ *  lowest to highest. Built fresh on each call, because the ladder can be
+ *  edited between one open and the next. */
+export function priorityChoices(): LevelChoice[] {
+  return [
+    { id: NO_LEVEL, label: kbSettings.priorityNoneLabel, color: null },
+    ...kbSettings.priorityLevels.map((l) => ({ id: l.id, label: l.name, color: l.color })),
+  ];
+}
+
+export function effortChoices(): LevelChoice[] {
+  return [
+    { id: NO_LEVEL, label: kbSettings.effortNoneLabel, color: null },
+    ...kbSettings.effortLevels.map((l) => ({ id: l.id, label: l.name, color: l.color })),
+  ];
+}
+
+/**
+ * A level NAMED from outside the app, as an agent names one, resolved to its
+ * id. Null means no such level.
+ *
+ * BY NAME FIRST, because a name is the only part of a level anyone outside can
+ * see: the ids were readable while they were the five shipped words, and a
+ * level made on this screen has a generated one nobody could guess. By id
+ * second, so a request written against an older build, or copied out of a
+ * card's own record, still lands.
+ *
+ * The reserved id is accepted under its own name too, whatever that has been
+ * renamed to, so "unset" reads the way the pickers show it.
+ */
+function findLevel(levels: ScaleLevel[], noneLabel: string, raw: string): LevelId | null {
+  const needle = raw.trim().toLowerCase();
+  if (!needle) return null;
+  if (needle === NO_LEVEL || needle === noneLabel.toLowerCase()) return NO_LEVEL;
+  const byName = levels.find((l) => l.name.toLowerCase() === needle);
+  if (byName) return byName.id;
+  return levels.find((l) => l.id.toLowerCase() === needle)?.id ?? null;
+}
+
+export function findPriorityLevel(raw: string): LevelId | null {
+  return findLevel(kbSettings.priorityLevels, kbSettings.priorityNoneLabel, raw);
+}
+
+export function findEffortLevel(raw: string): LevelId | null {
+  return findLevel(kbSettings.effortLevels, kbSettings.effortNoneLabel, raw);
+}
+
+/** What an outside caller may say, lowest rung to highest, with the unset rung
+ *  first. Used for the agent's board summary and for the error it gets back
+ *  when it names something else. */
+export function priorityNames(): string[] {
+  return priorityChoices().map((c) => c.label);
+}
+
+export function effortNames(): string[] {
+  return effortChoices().map((c) => c.label);
 }
 
 /* =============================================================================
@@ -1678,9 +1863,9 @@ export function cardColorMode(card: Card, board: Board | null): CardColorMode {
 export function resolveCardColor(card: Card, board: Board | null): string | null {
   const mode = cardColorMode(card, board);
   if (mode === "manual") return card.color;
-  if (mode === "priority") {
-    return card.priority === "none" ? null : kbSettings.priorityColors[card.priority];
-  }
+  // Null for "none" and for a level this install no longer has: both mean the
+  // card has no priority to be painted by.
+  if (mode === "priority") return priorityColorOf(card.priority);
   if (!board) return null;
   for (const tag of orderedCardTags(card, board)) {
     const color = tagColor(tag, board.tagCategories);
@@ -1967,6 +2152,13 @@ export function topOpenKanbanModal(): Modal | null {
     _boardSetupModal,
     _newBoardModal,
     _cardModal,
+    // Both scale screens, which were missing. The consequence was small and
+    // real: Reset opens a confirm, and kbConfirm closes whatever it finds open
+    // here so it REPLACES it. Finding nothing, it stacked on top of the scale
+    // editor and the confirm's own reopen then opened a modal that had never
+    // closed. Delete first, since it opens from the editor.
+    _scaleDeleteModal,
+    _scaleModal,
     _setupModal,
   ];
   return stack.find((m) => m?.isOpen) ?? null;
@@ -2495,9 +2687,9 @@ function sortValue(card: Card, field: SortField, board: Board): number | string 
   }
   switch (field) {
     case "priority":
-      return PRIORITIES.indexOf(card.priority);
+      return priorityRank(card.priority);
     case "effort":
-      return EFFORTS.indexOf(card.effort);
+      return effortRank(card.effort);
     case "number":
       return card.number;
     case "name":
@@ -4976,14 +5168,29 @@ function renderDefaultColumns(): void {
 /* -----------------------------------------------------------------------------
    THE SCALE EDITOR
    -----------------------------------------------------------------------------
-   Priority and Effort are the same shape: a fixed set of rungs, each with a
-   name and a color. One editor serves both, told which one it is looking at,
+   Priority and Effort are the same shape: an ordered ladder of rungs, each with
+   a name and a color. One editor serves both, told which one it is looking at,
    the way the tag editors are told which vocabulary they are on.
 
-   THE RUNGS THEMSELVES ARE NOT EDITABLE, only their names and colors. Adding or
-   removing a rung would change what every existing card means, and a card set
-   to a level that stopped existing has no honest answer. Renaming one is safe
-   because the id underneath never moves.
+   THE RUNGS ARE NOW EDITABLE, which they were not. This screen used to rename
+   and recolor five fixed levels and say so in its own comment: adding or
+   removing one would change what every existing card means, and a card set to
+   a level that stopped existing has no honest answer. The second half of that
+   is still true. The first was an argument for ANSWERING the question, not for
+   refusing it, and five was only ever the number this app happened to pick.
+
+   SO DELETE ASKS. It counts the cards on the rung across every board and, when
+   there are any, makes you name the rung they move to before it will do
+   anything. That is the same bargain the tag editor strikes, one level up: a
+   tag delete says how many cards carry it, and the gentler alternative is
+   offered rather than assumed.
+
+   ADD AND REORDER need no such ceremony. A new rung starts empty, and moving
+   one changes the order things sort in and nothing about what any card says.
+
+   EDITS WRITE STRAIGHT THROUGH to the live setting, the way every other
+   preference in this tool does. There is no Save on this screen and no draft
+   to reconcile.
 ----------------------------------------------------------------------------- */
 
 type ScaleKind = "priority" | "effort";
@@ -4991,58 +5198,91 @@ type ScaleKind = "priority" | "effort";
 /** Which scale the shared modal is currently editing. */
 let scaleEditKind: ScaleKind = "priority";
 
+/** The row being dragged, by index, or null. Mirrors the default-columns
+ *  editor, which is the other reorderable list in this modal. */
+let scaleDragIndex: number | null = null;
+
 interface ScaleSpec {
+  kind: ScaleKind;
   title: string;
   blurb: string;
-  levels: readonly string[];
-  labels: Record<string, string>;
-  colors: Record<string, string>;
-  defaultLabels: Record<string, string>;
-  defaultColors: Record<string, string>;
+  /** The live array, not a copy. */
+  levels: ScaleLevel[];
+  /** Replaces it, since a reorder and a delete both rebuild the list. */
+  setLevels: (next: ScaleLevel[]) => void;
+  noneLabel: string;
+  setNoneLabel: (next: string) => void;
+  defaults: readonly ScaleLevel[];
+  /** What a card on this scale stores, for counting before a delete. */
+  levelOf: (card: Card) => LevelId;
+  setLevelOf: (card: Card, level: LevelId) => void;
 }
 
-/** The live settings objects, not copies: an edit writes straight through to
- *  the setting it is editing, the way every other preference in this tool
- *  does. */
 function scaleSpec(kind: ScaleKind): ScaleSpec {
   return kind === "priority"
     ? {
+        kind,
         title: "Priority",
         blurb:
-          "How urgent a card is. The ORDER of the levels is fixed, because that order is what " +
-          "the color ramp and the sorting mean. Their names and colors are yours.",
-        levels: PRIORITIES,
-        labels: kbSettings.priorityLabels,
-        colors: kbSettings.priorityColors,
-        defaultLabels: DEFAULT_PRIORITY_LABELS,
-        defaultColors: DEFAULT_PRIORITY_COLORS,
+          "How urgent a card is, lowest at the top. Add levels, take them away, drag them into " +
+          "the order you rank them in, and rename and recolor each one. None is the absence of a " +
+          "level rather than one of them, so it has no color and cannot be removed.",
+        levels: kbSettings.priorityLevels,
+        setLevels: (next) => {
+          kbSettings.priorityLevels = next;
+        },
+        noneLabel: kbSettings.priorityNoneLabel,
+        setNoneLabel: (next) => {
+          kbSettings.priorityNoneLabel = next;
+        },
+        defaults: DEFAULT_PRIORITY_LEVELS,
+        levelOf: (card) => card.priority,
+        setLevelOf: (card, level) => {
+          card.priority = level;
+        },
       }
     : {
+        kind,
         title: "Effort",
         blurb:
-          "How heavy a card is, separately from how urgent. Rename these to whatever your team " +
-          "already says: points, t-shirt sizes, or hours.",
-        levels: EFFORTS,
-        labels: kbSettings.effortLabels,
-        colors: kbSettings.effortColors,
-        defaultLabels: DEFAULT_EFFORT_LABELS,
-        defaultColors: DEFAULT_EFFORT_COLORS,
+          "How heavy a card is, separately from how urgent, lightest at the top. Make these say " +
+          "whatever your team already says: points, t-shirt sizes, hours, or three rungs instead " +
+          "of five. None is the absence of a level rather than one of them.",
+        levels: kbSettings.effortLevels,
+        setLevels: (next) => {
+          kbSettings.effortLevels = next;
+        },
+        noneLabel: kbSettings.effortNoneLabel,
+        setNoneLabel: (next) => {
+          kbSettings.effortNoneLabel = next;
+        },
+        defaults: DEFAULT_EFFORT_LEVELS,
+        levelOf: (card) => card.effort,
+        setLevelOf: (card, level) => {
+          card.effort = level;
+        },
       };
 }
 
-/** The badge on each Customize row: whether anything differs from what shipped,
- *  so the row says whether it is worth opening. */
+/** True when the ladder is exactly what shipped: same ids, same order, same
+ *  names, same colors, and None still called None. */
+function scaleIsDefault(spec: ScaleSpec): boolean {
+  if (spec.noneLabel !== DEFAULT_NONE_LABEL) return false;
+  if (spec.levels.length !== spec.defaults.length) return false;
+  return spec.levels.every((level, i) => {
+    const shipped = spec.defaults[i]!;
+    return level.id === shipped.id && level.name === shipped.name && level.color === shipped.color;
+  });
+}
+
+/** The badge on each Customize row, and the note at the foot of the editor. It
+ *  says how far from the shipped scale this one has moved, so the row says
+ *  whether it is worth opening. */
 function scaleSummary(kind: ScaleKind): string {
   const spec = scaleSpec(kind);
-  const renamed = spec.levels.filter((l) => spec.labels[l] !== spec.defaultLabels[l]).length;
-  const recolored = spec.levels.filter(
-    (l) => l !== "none" && spec.colors[l] !== spec.defaultColors[l],
-  ).length;
-  if (renamed === 0 && recolored === 0) return "Default";
-  const parts: string[] = [];
-  if (renamed > 0) parts.push(renamed + " renamed");
-  if (recolored > 0) parts.push(recolored + " recolored");
-  return parts.join(", ");
+  if (scaleIsDefault(spec)) return "Default";
+  const count = spec.levels.length;
+  return `${count} ${count === 1 ? "level" : "levels"}, customized`;
 }
 
 function renderScaleSummaries(): void {
@@ -5052,7 +5292,33 @@ function renderScaleSummaries(): void {
   if (effort) effort.textContent = scaleSummary("effort");
 }
 
-/** One row per rung: its color, and its name as an editable field. */
+/** Every card on this level, across every board. Board contents are all in
+ *  memory (see loadRecords), so this is a scan of the one array rather than a
+ *  read of every file. Archived cards are counted too: they still carry the
+ *  level, and leaving them out would make the number a lie the moment one was
+ *  brought back. */
+function cardsOnLevel(spec: ScaleSpec, levelId: LevelId): Card[] {
+  return cards.filter((c) => spec.levelOf(c) === levelId);
+}
+
+/** How many boards those cards are spread over, so the confirm can say
+ *  "across 3 boards" rather than leaving you to guess whether this is local. */
+function boardsOnLevel(list: Card[]): number {
+  return new Set(list.map((c) => c.boardId)).size;
+}
+
+/** A fresh id for a new rung. Not derived from the name: renaming is meant to
+ *  be free, and an id that started as a slug of the name would quietly invite
+ *  the two to be treated as the same thing. */
+function newLevelId(): string {
+  return newId();
+}
+
+/** One row per rung, in ladder order, plus the None row at the foot.
+ *
+ *  NONE LAST HERE, though a picker offers it first. On a ladder drawn lowest to
+ *  highest, "no level at all" sits below the lowest rung, and putting it at the
+ *  top would read as the first rung of the scale. */
 function renderScaleEditor(): void {
   const spec = scaleSpec(scaleEditKind);
   document.getElementById("kbScaleTitle")!.textContent = spec.title;
@@ -5061,63 +5327,306 @@ function renderScaleEditor(): void {
   const host = document.getElementById("kbScaleRows")!;
   host.replaceChildren();
 
-  const restamp = () => {
+  const restamp = (): void => {
     document.getElementById("kbScaleNote")!.textContent = scaleSummary(scaleEditKind);
     renderScaleSummaries();
   };
 
-  for (const level of spec.levels) {
+  const commitEdit = (): void => {
+    markSettings();
+    renderAll();
+    restamp();
+  };
+
+  spec.levels.forEach((level, index) => {
     const row = document.createElement("div");
     row.className = "kb-scale-row";
+    row.draggable = true;
+    row.dataset.index = String(index);
 
-    /* "None" keeps its name field and loses its color, because it is the
-       ABSENCE of a level rather than a level: painting it would make every
-       unset card look deliberately gray. A spacer holds the column so the
-       names below it still line up. */
-    if (level === "none") {
-      const spacer = document.createElement("span");
-      spacer.className = "kb-scale-swatch-spacer";
-      spacer.title = "None has no color: it is the absence of a level.";
-      row.appendChild(spacer);
-    } else {
-      const color = document.createElement("input");
-      color.type = "color";
-      color.className = "kb-scale-swatch";
-      color.value = spec.colors[level];
-      color.addEventListener("input", () => {
-        spec.colors[level] = color.value.toLowerCase();
-        markSettings();
-        renderAll();
-        restamp();
-      });
-      row.appendChild(color);
-    }
+    const grip = document.createElement("span");
+    grip.className = "kb-column-grip";
+    grip.textContent = "\u2833";
+    grip.title = "Drag to reorder. The order is the ranking.";
+    row.appendChild(grip);
+
+    const color = document.createElement("input");
+    color.type = "color";
+    color.className = "kb-scale-swatch";
+    color.value = level.color;
+    color.addEventListener("input", () => {
+      level.color = color.value.toLowerCase();
+      commitEdit();
+    });
+    row.appendChild(color);
 
     const name = document.createElement("input");
     name.type = "text";
     name.className = "kb-scale-name";
-    name.maxLength = 24;
+    name.maxLength = MAX_LEVEL_NAME_LEN;
     name.spellcheck = false;
-    name.value = spec.labels[level];
-    name.placeholder = spec.defaultLabels[level];
-    const commit = () => {
-      // Blank falls back to the shipped name rather than leaving a rung nameless,
-      // which would draw an empty chip nothing could identify.
-      const next = name.value.trim().slice(0, 24) || spec.defaultLabels[level];
+    name.value = level.name;
+    name.placeholder = spec.defaults.find((d) => d.id === level.id)?.name ?? "Level";
+    const commitName = (): void => {
+      /* Blank falls back to the shipped name for a rung that has one, and to a
+         placeholder for one that does not. A nameless rung would draw an empty
+         chip nothing could identify, and no card could be taken off it because
+         nothing in the picker could be pointed at. */
+      const shipped = spec.defaults.find((d) => d.id === level.id)?.name;
+      const next = name.value.trim().slice(0, MAX_LEVEL_NAME_LEN) || shipped || "Level";
       name.value = next;
-      spec.labels[level] = next;
-      markSettings();
-      renderAll();
-      restamp();
+      if (next === level.name) return;
+      level.name = next;
+      commitEdit();
     };
-    name.addEventListener("change", commit);
-    name.addEventListener("blur", commit);
+    name.addEventListener("change", commitName);
+    name.addEventListener("blur", commitName);
     row.appendChild(name);
 
+    const used = cardsOnLevel(spec, level.id).length;
+    const count = document.createElement("span");
+    count.className = "kb-scale-count";
+    count.textContent = used === 0 ? "" : `${used} ${used === 1 ? "card" : "cards"}`;
+    row.appendChild(count);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "kb-icon-btn";
+    remove.textContent = "\u00d7";
+    remove.title = "Remove this level";
+    remove.addEventListener("click", () => requestDeleteLevel(spec.kind, level.id));
+    row.appendChild(remove);
+
+    /* Read the order back off the DOM on drop, the same way the default column
+       editor does, so a release anywhere over the list lands it. */
+    row.addEventListener("dragstart", () => {
+      scaleDragIndex = index;
+      row.classList.add("kb-dragging");
+    });
+    row.addEventListener("dragend", () => {
+      row.classList.remove("kb-dragging");
+      scaleDragIndex = null;
+      const order = Array.from(host.querySelectorAll<HTMLElement>(".kb-scale-row[data-index]")).map(
+        (el) => Number(el.dataset.index),
+      );
+      const current = spec.levels;
+      if (order.length !== current.length) return;
+      spec.setLevels(order.map((i) => current[i]!));
+      markSettings();
+      renderAll();
+      renderScaleEditor();
+    });
+    row.addEventListener("dragover", (e) => {
+      if (scaleDragIndex === null || scaleDragIndex === index) return;
+      e.preventDefault();
+      const dragged = host.querySelector<HTMLElement>(
+        `.kb-scale-row[data-index="${scaleDragIndex}"]`,
+      );
+      if (!dragged) return;
+      const rect = row.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      host.insertBefore(dragged, before ? row : row.nextSibling);
+    });
+
     host.appendChild(row);
-  }
+  });
+
+  /* THE NONE ROW. No grip, no color, no delete: it is not on the ladder and
+     cannot be moved off, colored, or taken away. A spacer holds each of those
+     columns open so the names still line up into something you can read down. */
+  const noneRow = document.createElement("div");
+  noneRow.className = "kb-scale-row kb-scale-row-none";
+
+  const gripGap = document.createElement("span");
+  gripGap.className = "kb-column-grip kb-scale-grip-spacer";
+  noneRow.appendChild(gripGap);
+
+  const swatchGap = document.createElement("span");
+  swatchGap.className = "kb-scale-swatch-spacer";
+  swatchGap.title = "None has no color: it is the absence of a level.";
+  noneRow.appendChild(swatchGap);
+
+  const noneName = document.createElement("input");
+  noneName.type = "text";
+  noneName.className = "kb-scale-name";
+  noneName.maxLength = MAX_LEVEL_NAME_LEN;
+  noneName.spellcheck = false;
+  noneName.value = spec.noneLabel;
+  noneName.placeholder = DEFAULT_NONE_LABEL;
+  const commitNone = (): void => {
+    const next = noneName.value.trim().slice(0, MAX_LEVEL_NAME_LEN) || DEFAULT_NONE_LABEL;
+    noneName.value = next;
+    if (next === spec.noneLabel) return;
+    spec.setNoneLabel(next);
+    commitEdit();
+  };
+  noneName.addEventListener("change", commitNone);
+  noneName.addEventListener("blur", commitNone);
+  noneRow.appendChild(noneName);
+
+  const noneUsed = cardsOnLevel(spec, NO_LEVEL).length;
+  const noneCount = document.createElement("span");
+  noneCount.className = "kb-scale-count";
+  noneCount.textContent = noneUsed === 0 ? "" : `${noneUsed} ${noneUsed === 1 ? "card" : "cards"}`;
+  noneRow.appendChild(noneCount);
+
+  const noneGap = document.createElement("span");
+  noneGap.className = "kb-scale-remove-spacer";
+  noneRow.appendChild(noneGap);
+
+  host.appendChild(noneRow);
+
+  const add = document.getElementById("kbScaleAddBtn") as HTMLButtonElement;
+  const full = spec.levels.length >= MAX_SCALE_LEVELS;
+  add.disabled = full;
+  add.title = full
+    ? `This scale is at its limit of ${MAX_SCALE_LEVELS} levels.`
+    : "Add a level at the top of the ladder";
 
   restamp();
+}
+
+/** A new rung, added at the TOP because the ladder is drawn lowest to highest
+ *  and a new level is usually one you are adding above what you already have.
+ *  Named for its position so it is identifiable before you have renamed it. */
+function addScaleLevel(): void {
+  const spec = scaleSpec(scaleEditKind);
+  if (spec.levels.length >= MAX_SCALE_LEVELS) {
+    flash(`A scale holds at most ${MAX_SCALE_LEVELS} levels.`, "error");
+    return;
+  }
+  spec.setLevels([
+    ...spec.levels,
+    { id: newLevelId(), name: `Level ${spec.levels.length + 1}`, color: DEFAULT_TAG_COLOR },
+  ]);
+  markSettings();
+  renderAll();
+  renderScaleEditor();
+}
+
+/* -----------------------------------------------------------------------------
+   REMOVING A RUNG
+   -----------------------------------------------------------------------------
+   The cards on it have to go somewhere, and the app cannot pick for you: the
+   rung below is a guess, and so is None. So the count comes first, and where
+   they land is a choice you make before the delete button does anything.
+
+   COUNTED ACROSS EVERY BOARD, because the scale is one thing shared by all of
+   them. Deleting "High" from a Preferences screen while four boards are using
+   it is exactly the case where a local-looking screen must not be trusted to
+   only have local consequences.
+
+   ITS OWN MODAL rather than kbConfirm, which draws text and two buttons. The
+   destination is the point of this confirm, and a yes/no that quietly picked a
+   destination for you would be the thing this whole screen exists to avoid.
+----------------------------------------------------------------------------- */
+
+let _scaleDeleteModal: Modal | null = null;
+let scaleDeleteKind: ScaleKind = "priority";
+let scaleDeleteLevelId: LevelId = "";
+
+function requestDeleteLevel(kind: ScaleKind, levelId: LevelId): void {
+  const spec = scaleSpec(kind);
+  if (spec.levels.length <= 1) {
+    flash("A scale keeps at least one level. Rename this one instead.", "error");
+    return;
+  }
+  scaleDeleteKind = kind;
+  scaleDeleteLevelId = levelId;
+  getScaleModal().close({ handoff: true });
+  getScaleDeleteModal().open();
+}
+
+function renderScaleDelete(): void {
+  const spec = scaleSpec(scaleDeleteKind);
+  const level = spec.levels.find((l) => l.id === scaleDeleteLevelId);
+  const affected = level ? cardsOnLevel(spec, level.id) : [];
+
+  document.getElementById("kbScaleDeleteTitle")!.textContent = level
+    ? `Remove "${level.name}"?`
+    : "Remove level?";
+
+  const boardCount = boardsOnLevel(affected);
+  document.getElementById("kbScaleDeleteMessage")!.textContent =
+    affected.length === 0
+      ? "No card is on this level, so nothing else changes."
+      : `${affected.length} ${affected.length === 1 ? "card is" : "cards are"} on this level, ` +
+        `across ${boardCount} ${boardCount === 1 ? "board" : "boards"}. ` +
+        `Every one of them moves to the level you pick.`;
+
+  /* The destination picker is hidden when nothing is on the rung. There is
+     nothing to move, and asking anyway would suggest there was. */
+  const field = document.getElementById("kbScaleDeleteMoveField")!;
+  field.style.display = affected.length === 0 ? "none" : "";
+
+  const select = document.getElementById("kbScaleDeleteMove") as HTMLSelectElement;
+  select.replaceChildren();
+  for (const choice of [
+    { id: NO_LEVEL, label: spec.noneLabel },
+    ...spec.levels.filter((l) => l.id !== scaleDeleteLevelId).map((l) => ({ id: l.id, label: l.name })),
+  ]) {
+    const option = document.createElement("option");
+    option.value = choice.id;
+    option.textContent = choice.label;
+    select.appendChild(option);
+  }
+  // The rung below, which is the nearest honest neighbor, rather than None:
+  // "this was a High" is better preserved as "Medium" than as "unset". The
+  // bottom rung has nothing below it and falls back to None.
+  const at = spec.levels.findIndex((l) => l.id === scaleDeleteLevelId);
+  const below = at > 0 ? spec.levels[at - 1]!.id : NO_LEVEL;
+  select.value = below;
+}
+
+function getScaleDeleteModal(): Modal {
+  if (_scaleDeleteModal) return _scaleDeleteModal;
+  _scaleDeleteModal = new Modal(document.getElementById("kbScaleDeleteBackdrop")!, {
+    closeOnEsc: true,
+    onOpen: () => renderScaleDelete(),
+  });
+
+  const back = (): void => {
+    _scaleDeleteModal!.close({ handoff: true });
+    getScaleModal().open();
+  };
+
+  document.getElementById("kbScaleDeleteCancelBtn")!.addEventListener("click", back);
+  document.getElementById("kbScaleDeleteBack")!.addEventListener("click", back);
+
+  document.getElementById("kbScaleDeleteConfirmBtn")!.addEventListener("click", () => {
+    const spec = scaleSpec(scaleDeleteKind);
+    const level = spec.levels.find((l) => l.id === scaleDeleteLevelId);
+    if (!level) {
+      back();
+      return;
+    }
+    const select = document.getElementById("kbScaleDeleteMove") as HTMLSelectElement;
+    const destination = select.value || NO_LEVEL;
+
+    const affected = cardsOnLevel(spec, level.id);
+    const touched = new Set<string>();
+    for (const card of affected) {
+      spec.setLevelOf(card, destination);
+      touched.add(card.boardId);
+    }
+    // Per board, so only the files that actually changed are queued. A card's
+    // own updatedAt is deliberately not stamped: this is a rename of the scale
+    // it sits on, not an edit anybody made to the card.
+    for (const boardId of touched) markBoard(boardId);
+
+    spec.setLevels(spec.levels.filter((l) => l.id !== level.id));
+    markSettings();
+    renderAll();
+
+    flash(
+      affected.length === 0
+        ? `"${level.name}" removed.`
+        : `"${level.name}" removed. ${affected.length} ${affected.length === 1 ? "card" : "cards"} moved.`,
+    );
+    back();
+  });
+
+  return _scaleDeleteModal;
 }
 
 function openScaleEditor(kind: ScaleKind): void {
@@ -5140,25 +5649,48 @@ function getScaleModal(): Modal {
     openSetupOnTab("preferences");
   });
   document.getElementById("kbScaleClose")!.addEventListener("click", () => _scaleModal!.close());
+  document.getElementById("kbScaleAddBtn")!.addEventListener("click", () => addScaleLevel());
 
   document.getElementById("kbScaleResetBtn")!.addEventListener("click", () => {
     const spec = scaleSpec(scaleEditKind);
+    /* The cards on a rung that is about to stop existing are the whole reason
+       the delete button asks, so a reset that could take several rungs away at
+       once has to say the same thing. Counted against the SHIPPED ids, since
+       those are the rungs that will exist afterwards. */
+    const shipped = new Set(spec.defaults.map((d) => d.id));
+    const stranded = cards.filter((c) => {
+      const level = spec.levelOf(c);
+      return level !== NO_LEVEL && !shipped.has(level);
+    }).length;
+
     kbConfirm(
       {
         title: "Reset " + spec.title + " to default?",
         message:
-          "Every name and color on this scale goes back to what shipped with the app. No card " +
-          "changes level: only what the levels are called and how they look.",
+          `The ${spec.title.toLowerCase()} scale goes back to the five levels that shipped with ` +
+          "the app, with their names, their colors and their order. " +
+          (stranded === 0
+            ? "Every card keeps the level it is on."
+            : `${stranded} ${stranded === 1 ? "card is" : "cards are"} on a level that is not one ` +
+              `of them and ${stranded === 1 ? "becomes" : "become"} unset.`),
         confirmLabel: "Reset",
         // kbConfirm REPLACES what it was opened from, so dismissing it without
         // this would drop you on the board instead of back on the scale.
         reopen: () => getScaleModal().open(),
       },
       () => {
-        for (const level of spec.levels) {
-          spec.labels[level] = spec.defaultLabels[level];
-          spec.colors[level] = spec.defaultColors[level];
+        const shippedIds = new Set(spec.defaults.map((d) => d.id));
+        const touched = new Set<string>();
+        for (const card of cards) {
+          const level = spec.levelOf(card);
+          if (level === NO_LEVEL || shippedIds.has(level)) continue;
+          spec.setLevelOf(card, NO_LEVEL);
+          touched.add(card.boardId);
         }
+        for (const boardId of touched) markBoard(boardId);
+
+        spec.setLevels(spec.defaults.map((l) => ({ ...l })));
+        spec.setNoneLabel(DEFAULT_NONE_LABEL);
         markSettings();
         renderAll();
         renderScaleEditor();
@@ -7557,8 +8089,11 @@ export interface IncomingOptions {
  *  in use, are left off rather than refusing the send. */
 function applyIncomingOptions(card: Card, board: Board, options: IncomingOptions | undefined): void {
   if (!options) return;
-  if (options.priority && PRIORITIES.includes(options.priority)) card.priority = options.priority;
-  if (options.effort && EFFORTS.includes(options.effort)) card.effort = options.effort;
+  // Checked against the ladder rather than carried, unlike a card's own stored
+  // level: this is a value arriving from outside, and a rung that does not
+  // exist is a mistake at the source rather than history to preserve.
+  if (options.priority && priorityLevelOf(options.priority)) card.priority = options.priority;
+  if (options.effort && effortLevelOf(options.effort)) card.effort = options.effort;
   // A due date is a day. A value that is not one is left off rather than
   // stored as something the card cannot read back.
   if (options.due && /^\d{4}-\d{2}-\d{2}$/.test(options.due) && parseDay(options.due)) {

@@ -45,6 +45,8 @@ import {
   describeDays,
   duplicateCard,
   effective,
+  effortChoices,
+  effortColorOf,
   effortLabel,
   formatDate,
   furthestStage,
@@ -52,10 +54,11 @@ import {
   handleCardClick,
   isOverdue,
   kbConfirm,
-  kbSettings,
   moveCardToBoard,
   moveCardToColumn,
   orderedCardTags,
+  priorityChoices,
+  priorityColorOf,
   priorityLabel,
   pruneCardSelection,
   readableTextOn,
@@ -70,8 +73,6 @@ import {
   trimTo,
 } from "./kanban";
 import {
-  EFFORTS,
-  PRIORITIES,
   authorLabel,
 } from "./kanban-model";
 import { boardConfig, type AgentToken } from "./kanban-agents";
@@ -141,7 +142,11 @@ export function buildCardEl(board: Board, card: Card, todayStr: string): HTMLEle
     top.appendChild(mark);
   }
 
-  if (card.priority !== "none") {
+  /* Read off the ladder rather than checked against "none", because a level
+     this install no longer has is just as unset as one that was never set: it
+     has no name to draw and no color to draw it in. See normalizeLevelId. */
+  const priorityColor = priorityColorOf(card.priority);
+  if (priorityColor) {
     const chip = document.createElement("span");
     chip.className = "kb-card-priority";
     chip.textContent = priorityLabel(card.priority);
@@ -149,9 +154,8 @@ export function buildCardEl(board: Board, card: Card, todayStr: string): HTMLEle
     // Painted its own level color even when the card is not colored by
     // priority: the chip is the readout, and it has to mean the same thing
     // whatever the card around it is doing.
-    const color = kbSettings.priorityColors[card.priority];
-    chip.style.background = color;
-    chip.style.color = readableTextOn(color);
+    chip.style.background = priorityColor;
+    chip.style.color = readableTextOn(priorityColor);
     top.appendChild(chip);
   }
 
@@ -164,14 +168,15 @@ export function buildCardEl(board: Board, card: Card, todayStr: string): HTMLEle
      carries its color as a border and its text, so it is legible without
      shouting. Hidden at "none", like priority: an unset estimate is not an
      estimate of nothing. */
-  if (card.effort !== "none") {
+  const effortColor = effortColorOf(card.effort);
+  if (effortColor) {
     const chip = document.createElement("span");
     chip.className = "kb-card-effort";
     chip.textContent = effortLabel(card.effort);
     chip.title = `Effort: ${effortLabel(card.effort)}`;
     // Only the text color is set: the border reads currentColor, so one value
     // paints both and they cannot drift apart.
-    chip.style.color = kbSettings.effortColors[card.effort];
+    chip.style.color = effortColor;
     top.appendChild(chip);
   }
 
@@ -523,29 +528,34 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
     done(live.length);
   };
 
-  const priorityItems: MenuItem[] = PRIORITIES.map((p) => ({
-    label: priorityLabel(p),
+  /* Built from the ladder as it stands, on every open. These used to come from
+     a constant, which was fine while the rungs were fixed; now a level added a
+     minute ago has to be in the menu a minute ago. */
+  const priorityItems: MenuItem[] = priorityChoices().map((p) => ({
+    label: p.label,
+    swatch: p.color ?? undefined,
     keepOpen: true,
     onClick: () =>
       overSelection(
         (card) => {
-          card.priority = p;
+          card.priority = p.id;
           stampCard(card);
         },
-        (n) => flash(`${n} cards set to ${priorityLabel(p)}.`),
+        (n) => flash(`${n} cards set to ${p.label}.`),
       ),
   }));
 
-  const effortItems: MenuItem[] = EFFORTS.map((eff) => ({
-    label: effortLabel(eff),
+  const effortItems: MenuItem[] = effortChoices().map((eff) => ({
+    label: eff.label,
+    swatch: eff.color ?? undefined,
     keepOpen: true,
     onClick: () =>
       overSelection(
         (card) => {
-          card.effort = eff;
+          card.effort = eff.id;
           stampCard(card);
         },
-        (n) => flash(`${n} cards set to ${effortLabel(eff)}.`),
+        (n) => flash(`${n} cards set to ${eff.label}.`),
       ),
   }));
 
@@ -745,12 +755,13 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
 function boardCardMenu(card: Card): MenuItem[] {
   const board = getBoard(card.boardId);
 
-  const priorityItems: MenuItem[] = PRIORITIES.map((p) => ({
-    label: priorityLabel(p),
-    disabled: card.priority === p,
+  const priorityItems: MenuItem[] = priorityChoices().map((p) => ({
+    label: p.label,
+    swatch: p.color ?? undefined,
+    disabled: card.priority === p.id,
     keepOpen: true,
     onClick: () => {
-      card.priority = p;
+      card.priority = p.id;
       stampCard(card);
       renderAll();
     },
@@ -760,12 +771,13 @@ function boardCardMenu(card: Card): MenuItem[] {
      that can do more to eleven cards than to one reads as a bug in whichever
      of the two you found second. Both are on the card face, so both are things
      you can look at and want to change without opening anything. */
-  const effortItems: MenuItem[] = EFFORTS.map((eff) => ({
-    label: effortLabel(eff),
-    disabled: card.effort === eff,
+  const effortItems: MenuItem[] = effortChoices().map((eff) => ({
+    label: eff.label,
+    swatch: eff.color ?? undefined,
+    disabled: card.effort === eff.id,
     keepOpen: true,
     onClick: () => {
-      card.effort = eff;
+      card.effort = eff.id;
       stampCard(card);
       renderAll();
     },

@@ -55,95 +55,96 @@ export interface Tag {
 }
 
 /* -----------------------------------------------------------------------------
-   PRIORITY
+   THE TWO SCALES
    -----------------------------------------------------------------------------
-   A fixed ladder rather than a user-defined vocabulary, unlike tags. Priority
-   only means anything if the levels mean the same thing everywhere: "High" on
-   one board and "High" on another have to be comparable, or sorting and
-   coloring by it says nothing. The COLORS are configurable, because those are
-   presentation; the rungs are not.
+   PRIORITY is how urgent a card is. EFFORT is how heavy it is, which is a
+   different question: the most urgent thing on a board is often the smallest,
+   and the biggest is often the one nobody has scheduled. A board that can only
+   say "critical" cannot tell those apart, so they are two ladders rather than
+   one.
+
+   BOTH ARE NOW BUILT, not fixed. They shipped as five rungs each and stayed
+   that way on the argument that a shared scale only means something if "High"
+   means the same everywhere. That argument holds for one scale being shared,
+   which it still is: these live in the tool's settings and no board overrides
+   them. It never held for the NUMBER five, which was only ever the number this
+   app happened to pick. Three is a real answer, and so is fifteen.
+
+   AN ID IS NOT A NAME. Cards store the id, which is made once and never moves;
+   the name and the color are what you edit. That is what makes renaming
+   "High" to "Now" a rename rather than a silent reassignment of every card.
+
+   ORDER IS RANK, lowest to highest, and it is the array's own order. Sorting
+   by Priority and painting a card by it both read the position, so dragging a
+   rung up the list is the whole of what reordering means.
+
+   "NONE" IS NOT A RUNG. It is the absence of one: never in the array, never
+   deletable, never colored, and always offered first in a picker. A card with
+   no priority set must not be painted gray as though gray were a priority.
+   Only its NAME is settable, which is why the label sits in settings beside
+   the ladder rather than in it.
+
+   REMOVING A RUNG IS THE HARD CASE, and it is handled where the cards are
+   (see THE SCALE EDITOR in kanban.ts), not here. A card set to a level that
+   stopped existing has no honest answer, so the editor counts what is on the
+   rung across every board and makes you say where those cards go before it
+   will delete it.
 ----------------------------------------------------------------------------- */
 
-export type Priority = "none" | "trivial" | "low" | "medium" | "high" | "critical";
+/** A rung's id, or NO_LEVEL. Priority and Effort are the same shape and the
+ *  same code serves both; the two aliases below exist so a signature still
+ *  says which scale it is talking about. */
+export type LevelId = string;
+export type Priority = LevelId;
+export type Effort = LevelId;
 
-/** Lowest to highest, and the order the picker offers them in. */
-export const PRIORITIES: readonly Priority[] = [
-  "none",
-  "trivial",
-  "low",
-  "medium",
-  "high",
-  "critical",
-];
+/** The absence of a level. Reserved: no rung may be given this id. */
+export const NO_LEVEL = "none";
 
-/** The names shipped with the app. What a board actually shows comes from
- *  settings, which start as a copy of this and can be renamed. */
-export const DEFAULT_PRIORITY_LABELS: Record<Priority, string> = {
-  none: "None",
-  trivial: "Trivial",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  critical: "Critical",
-};
+/** One rung. */
+export interface ScaleLevel {
+  id: string;
+  name: string;
+  color: string;
+}
 
-/** Green through red, skipping "none", which is the absence of a priority and
- *  so has no color: a card with no priority set must not be painted gray as if
- *  gray were a priority. */
+/** What the absence of a level is called until someone renames it. */
+export const DEFAULT_NONE_LABEL = "None";
+
 /** Blue, then green through red. Blue rather than a paler green for Trivial
  *  because it sits OUTSIDE the urgency ramp: "worth doing, not worth ranking"
  *  is a different statement from "low urgency", and a colder hue says that
- *  without needing a legend. */
-export const DEFAULT_PRIORITY_COLORS: Record<Priority, string> = {
-  none: "#6b7280",
-  trivial: "#3e8ce8",
-  low: "#30a46c",
-  medium: "#e0a11b",
-  high: "#e5651f",
-  critical: "#e5484d",
-};
+ *  without needing a legend.
+ *
+ *  The ids are the five this app shipped with, and they are load-bearing: a
+ *  card written by any earlier version stores one of them. */
+export const DEFAULT_PRIORITY_LEVELS: readonly ScaleLevel[] = [
+  { id: "trivial", name: "Trivial", color: "#3e8ce8" },
+  { id: "low", name: "Low", color: "#30a46c" },
+  { id: "medium", name: "Medium", color: "#e0a11b" },
+  { id: "high", name: "High", color: "#e5651f" },
+  { id: "critical", name: "Critical", color: "#e5484d" },
+];
 
-/* -----------------------------------------------------------------------------
-   EFFORT
-   -----------------------------------------------------------------------------
-   How HEAVY a card is, which is a different question from how urgent it is.
-   Kept as its own scale rather than folded into Priority because the two
-   disagree constantly: the most urgent thing on a board is often the smallest,
-   and the biggest is often the one nobody has scheduled. A board that can only
-   say "critical" cannot tell those apart.
+/** A single hue getting darker rather than Priority's green-to-red ramp.
+ *  Effort is not a warning, and painting a big card red would read as an alarm
+ *  next to a board whose reds already mean "urgent". */
+export const DEFAULT_EFFORT_LEVELS: readonly ScaleLevel[] = [
+  { id: "tiny", name: "Tiny", color: "#9db8d8" },
+  { id: "small", name: "Small", color: "#6f97c9" },
+  { id: "medium", name: "Medium", color: "#4a76b8" },
+  { id: "large", name: "Large", color: "#33569a" },
+  { id: "huge", name: "Huge", color: "#233a72" },
+];
 
-   FIVE RUNGS PLUS "none", mirroring Priority exactly, so a card with no
-   estimate reads as unset rather than as the middle. Both the LABELS and the
-   COLORS are settable, unlike Priority's rungs, which were fixed because the
-   ramp is the meaning. Effort's names are genuinely a house style: a team that
-   says "points" and a team that says "t-shirts" mean the same five things.
------------------------------------------------------------------------------ */
+/** Long enough that nobody sensible meets it, short enough that the pickers
+ *  stay pickers: a right-click submenu scrolls past 10.5 rows, and a scale
+ *  that needs more than this is a tag category wearing a ladder's clothes. */
+export const MAX_SCALE_LEVELS = 50;
 
-export type Effort = "none" | "tiny" | "small" | "medium" | "large" | "huge";
-
-/** Lightest to heaviest, and the order the picker offers them in. */
-export const EFFORTS: readonly Effort[] = ["none", "tiny", "small", "medium", "large", "huge"];
-
-export const DEFAULT_EFFORT_LABELS: Record<Effort, string> = {
-  none: "None",
-  tiny: "Tiny",
-  small: "Small",
-  medium: "Medium",
-  large: "Large",
-  huge: "Huge",
-};
-
-/** A single hue getting darker rather than Priority's green-to-red ramp. Effort
- *  is not a warning, and painting a big card red would read as an alarm next to
- *  a board whose reds already mean "urgent". */
-export const DEFAULT_EFFORT_COLORS: Record<Effort, string> = {
-  none: "#6b7280",
-  tiny: "#9db8d8",
-  small: "#6f97c9",
-  medium: "#4a76b8",
-  large: "#33569a",
-  huge: "#233a72",
-};
+/** A rung's name is drawn in a chip on a card face. A 400-character one would
+ *  push the rest of the card off the screen. */
+export const MAX_LEVEL_NAME_LEN = 24;
 
 /**
  * Where a card's color comes from.
@@ -595,13 +596,14 @@ export interface KbSettings extends BoardScopedSettings {
   defaultColumns: string;
   /** Prefilled into the New Board form. Empty means no suggestion. */
   defaultBoardName: string;
-  /** One color per priority level. Global rather than per board: a level has
-   *  to look the same everywhere or it stops being a shared scale. */
-  priorityColors: Record<Priority, string>;
-  /** Renamed rungs. Starts as a copy of the shipped names. */
-  priorityLabels: Record<Priority, string>;
-  effortColors: Record<Effort, string>;
-  effortLabels: Record<Effort, string>;
+  /** The Priority ladder, lowest to highest. Global rather than per board: a
+   *  level has to mean and look the same everywhere or it stops being a shared
+   *  scale. See THE TWO SCALES. */
+  priorityLevels: ScaleLevel[];
+  /** What "no priority set" is called. Not a rung; see THE TWO SCALES. */
+  priorityNoneLabel: string;
+  effortLevels: ScaleLevel[];
+  effortNoneLabel: string;
 }
 
 /** How the board gallery is ordered.
@@ -771,8 +773,11 @@ export const DEFAULT_SETTINGS: KbSettings = {
   overdueWarn: true,
   defaultColumns: SYSTEM_DEFAULT_COLUMNS,
   defaultBoardName: "",
-  priorityColors: { ...DEFAULT_PRIORITY_COLORS },
-  priorityLabels: { ...DEFAULT_PRIORITY_LABELS },
-  effortColors: { ...DEFAULT_EFFORT_COLORS },
-  effortLabels: { ...DEFAULT_EFFORT_LABELS },
+  // Cloned per level, not just per array: these are edited in place by the
+  // scale editor, and a shallow copy would let an edit reach the shipped
+  // defaults that Reset to Default reads back from.
+  priorityLevels: DEFAULT_PRIORITY_LEVELS.map((l) => ({ ...l })),
+  priorityNoneLabel: DEFAULT_NONE_LABEL,
+  effortLevels: DEFAULT_EFFORT_LEVELS.map((l) => ({ ...l })),
+  effortNoneLabel: DEFAULT_NONE_LABEL,
 };
