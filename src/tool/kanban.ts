@@ -186,6 +186,7 @@ import {
   _cardModal,
   allAttachments,
   cloneAttachments,
+  closeTagSearch,
   discardPendingComment,
   forgetAttachmentFiles,
   missingAttachments,
@@ -194,6 +195,8 @@ import {
   renderCardPlacement,
   setAttachmentsRoot,
   sweepBoardAttachments,
+  wireTagSearch,
+  type TagPickSpec,
   _lightboxModal,
 } from "./kanban-card";
 // The Agents tab in Board Setup, out of this file for the same reason.
@@ -3436,51 +3439,17 @@ export function handleCardClick(card: Card, e: MouseEvent): boolean {
 ============================================================================= */
 
 function renderFilterBar(board: Board): void {
-  // Forced open whenever a filter is on, so a board showing three of forty
-  // cards can never look like a board with three cards.
-  const show = filterBarOpen || anyFilterActive();
-  filterBar.style.display = show ? "" : "none";
-  if (!show) return;
+  /* The button closes the bar whether or not a filter is on. It used to be
+     forced open by an active filter, on the grounds that a board showing three
+     of forty cards must not look like a board with three cards. The count
+     beside the board name says "3 of 40" and the button stays lit, which is the
+     same promise kept without holding a strip open that you have finished
+     with. */
+  filterBar.style.display = filterBarOpen ? "" : "none";
+  if (!filterBarOpen) return;
 
   filterBar.replaceChildren();
-
-  const live = liveCardsOnBoard(board.id);
-  const usedTagIds = new Set(live.flatMap((c) => c.tagIds));
-
-  for (const category of board.tagCategories) {
-    if (category.status === "retired") continue;
-    // Only tags that are actually ON a card on this board. A filter offering
-    // forty tags that would all return nothing is noise, not power.
-    const catTags = board.tags.filter(
-      (t) => t.categoryId === category.id && (usedTagIds.has(t.id) || filterTagIds.has(t.id)),
-    );
-    if (catTags.length === 0) continue;
-
-    const group = document.createElement("div");
-    group.className = "kb-filter-group";
-
-    const label = document.createElement("span");
-    label.className = "kb-filter-label";
-    label.textContent = category.name;
-    group.appendChild(label);
-
-    for (const tag of catTags) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "kb-filter-chip";
-      btn.textContent = tag.name;
-      const on = filterTagIds.has(tag.id);
-      btn.classList.toggle("active", on);
-      paintTagChip(btn, tagColor(tag, board.tagCategories), on);
-      btn.addEventListener("click", () => {
-        if (filterTagIds.has(tag.id)) filterTagIds.delete(tag.id);
-        else filterTagIds.add(tag.id);
-        renderBoardView();
-      });
-      group.appendChild(btn);
-    }
-    filterBar.appendChild(group);
-  }
+  filterBar.appendChild(buildFilterTagGroup(board));
 
   const dueGroup = document.createElement("div");
   dueGroup.className = "kb-filter-group kb-filter-group-due";
@@ -3520,6 +3489,148 @@ function renderFilterBar(board: Board): void {
     renderBoardView();
   });
   filterBar.appendChild(clear);
+}
+
+/* -----------------------------------------------------------------------------
+   THE TAG SIDE OF THE FILTER
+   -----------------------------------------------------------------------------
+   Every tag in use on the board used to be drawn here as a chip, grouped by
+   category. That is a picker on a board with four tags and a wall on a board
+   with a Versions category holding a year of releases: the strip grew taller
+   than the columns it was filtering, and the two tags actually switched on were
+   lost among the thirty that were not.
+
+   So this is the card's tag row doing the same job one level up. The chips are
+   what you have CHOSEN and nothing else, and choosing is the search box and the
+   drill-down beside them, the same pair of controls in the same order as on a
+   card. Nobody has to learn a second way to pick a tag.
+
+   NO CREATE HERE, unlike on a card. A tag no card wears filters to nothing, so
+   offering to make one would be offering an empty board.
+----------------------------------------------------------------------------- */
+
+/** The tags this board's filter may offer: the ones actually on a card, plus
+ *  whatever is already switched on so it can be switched off again. A filter
+ *  offering forty tags that would all return nothing is noise, not power. */
+function filterableTagIds(board: Board): Set<string> {
+  const used = new Set(liveCardsOnBoard(board.id).flatMap((c) => c.tagIds));
+  for (const id of filterTagIds) used.add(id);
+  return used;
+}
+
+function filterTagPickSpec(board: Board): TagPickSpec {
+  const offerable = filterableTagIds(board);
+  return {
+    board,
+    has: (tagId) => filterTagIds.has(tagId),
+    toggle: (tag) => {
+      if (filterTagIds.has(tag.id)) filterTagIds.delete(tag.id);
+      else filterTagIds.add(tag.id);
+    },
+    after: () => renderBoardView(),
+    offer: (tag) => offerable.has(tag.id),
+    emptyText: "No card on this board carries a tag.",
+  };
+}
+
+function buildFilterTagGroup(board: Board): HTMLElement {
+  const group = document.createElement("div");
+  group.className = "kb-filter-group kb-filter-group-tags";
+
+  const label = document.createElement("span");
+  label.className = "kb-filter-label";
+  label.textContent = "Tags";
+  group.appendChild(label);
+
+  // In rank order, the same order the chips take on a card face, so a tag sits
+  // in the same place whichever of the two you are reading.
+  const chosen: Tag[] = [];
+  for (const category of board.tagCategories) {
+    for (const tag of board.tags) {
+      if (tag.categoryId === category.id && filterTagIds.has(tag.id)) chosen.push(tag);
+    }
+  }
+
+  for (const tag of chosen) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "kb-tag-chip-btn";
+    chip.textContent = tag.name;
+    chip.title = `${tag.name}, click to stop filtering by it`;
+    paintTagChip(chip, tagColor(tag, board.tagCategories), true);
+    chip.addEventListener("click", () => {
+      filterTagIds.delete(tag.id);
+      renderBoardView();
+    });
+    group.appendChild(chip);
+  }
+
+  if (chosen.length === 0) {
+    const none = document.createElement("span");
+    none.className = "kb-tag-none";
+    none.textContent = "Any";
+    group.appendChild(none);
+  }
+
+  const search = document.createElement("input");
+  search.type = "text";
+  search.className = "kb-tag-search";
+  search.placeholder = "Find a tag";
+  search.spellcheck = false;
+  search.autocomplete = "off";
+  search.title = "Type to filter the list, Enter to apply.";
+  group.appendChild(search);
+
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "kb-tag-add-btn";
+  add.textContent = "+";
+  add.title = "Filter by a tag, by category";
+  add.addEventListener("click", (e) => {
+    closeTagSearch();
+    // A function rather than a list: every row is keepOpen, so the panel
+    // redraws its own ticks and counts as they are clicked.
+    openMenu(e.currentTarget as HTMLElement, () => filterTagMenu(board));
+  });
+  group.appendChild(add);
+
+  wireTagSearch(search, filterTagPickSpec(board));
+  return group;
+}
+
+/** The drill-down behind the +. One submenu per category, its tags inside,
+ *  ticked where the filter has them on. */
+function filterTagMenu(board: Board): MenuItem[] {
+  const offerable = filterableTagIds(board);
+  const items: MenuItem[] = [];
+
+  for (const category of board.tagCategories) {
+    if (category.status === "retired") continue;
+    const catTags = board.tags.filter((t) => t.categoryId === category.id && offerable.has(t.id));
+    if (catTags.length === 0) continue;
+
+    const on = catTags.filter((t) => filterTagIds.has(t.id)).length;
+    items.push({
+      label: on > 0 ? `${category.name} (${on})` : category.name,
+      submenu: catTags.map((tag) => ({
+        // A tick rather than a checkbox, the same mark the card's tag menu
+        // uses, so the two read as one control in two places.
+        label: `${filterTagIds.has(tag.id) ? "\u2713 " : "\u2007 "}${tag.name}`,
+        swatch: tagColor(tag, board.tagCategories) ?? undefined,
+        keepOpen: true,
+        onClick: () => {
+          if (filterTagIds.has(tag.id)) filterTagIds.delete(tag.id);
+          else filterTagIds.add(tag.id);
+          renderBoardView();
+        },
+      })),
+    });
+  }
+
+  if (items.length === 0) {
+    items.push({ label: "No card on this board carries a tag", disabled: true });
+  }
+  return items;
 }
 
 /* =============================================================================

@@ -465,6 +465,21 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   padding: 3px 10px;
 }
 
+/* The tag side borrows the card modal's controls wholesale, so it needs no
+   sizes of its own: only the tighter gap, because a chip, a search box and a
+   + are three different shapes and the group's 5px reads as a gap between
+   unrelated things rather than one control. */
+.kb-filter-group-tags {
+  gap: 4px;
+}
+
+/* The search box is narrower here than on a card. It sits on one line with the
+   Due group and the clear button, and the card's 118px pushed them to wrap on
+   a narrow window before a single tag had been chosen. */
+.kb-filter-group-tags .kb-tag-search {
+  width: 96px;
+}
+
 /* =============================================================================
    COLUMNS
 ============================================================================= */

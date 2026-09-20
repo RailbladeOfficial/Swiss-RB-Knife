@@ -2388,8 +2388,34 @@ function renderCardTags(card: Card): void {
   });
   tools.appendChild(manage);
 
-  wireTagSearch(search, card);
+  wireTagSearch(search, cardTagPickSpec(card));
 }
+
+/** The card's answer to "what am I picking for". Every active tag on its board
+ *  is offered, and a name that matches nothing opens the tag editor with it
+ *  filled in. A card whose board has gone is given an empty vocabulary rather
+ *  than being refused, because the row above it still has to draw. */
+function cardTagPickSpec(card: Card): TagPickSpec {
+  const board = getBoard(card.boardId);
+  return {
+    board: board ?? EMPTY_TAG_BOARD,
+    has: (tagId) => card.tagIds.includes(tagId),
+    toggle: (tag) => {
+      if (card.tagIds.includes(tag.id)) {
+        card.tagIds = card.tagIds.filter((id) => id !== tag.id);
+      } else {
+        card.tagIds.push(tag.id);
+      }
+      stampCard(card);
+    },
+    after: () => renderCardTags(card),
+    create: (name) => newTagFromCard(card, name),
+  };
+}
+
+/** Stands in for a board that has gone while its card modal was open. Only the
+ *  two vocabulary fields are read by the picker. */
+const EMPTY_TAG_BOARD = { tagCategories: [], tags: [] } as unknown as Board;
 
 /** The gear on the Manage Tags button. Inline so it takes the theme's colors
  *  the way every other icon in the app does. */
@@ -2438,21 +2464,53 @@ function openBoardTagsFromCard(card: Card): void {
    point of typing rather than picking: the moment you find a tag missing is
    the moment you were going to add it, and until now that meant leaving the
    card for Board Setup and finding your way back.
+
+   TOLD WHAT IT IS PICKING FOR, rather than handed a card. The board's filter
+   bar wants exactly this control over a set of tag ids, and the alternative
+   was a second copy of the positioning, the outside-click teardown and the
+   arrow-key cursor. That is the pair this codebase has already paid to keep
+   in step by hand twice. The three ways the two callers differ are the three
+   optional members of the spec below.
 ----------------------------------------------------------------------------- */
+
+/**
+ * What a tag search is picking for.
+ *
+ * `has` and `toggle` rather than a mutable set, because the card writes
+ * through stampCard and the filter writes through a redraw. The picker has no
+ * business knowing which.
+ */
+export interface TagPickSpec {
+  /** Whose vocabulary is offered. */
+  board: Board;
+  has: (tagId: string) => boolean;
+  toggle: (tag: Tag) => void;
+  /** Redraws whatever owns the picker, once a tag has gone on or come off. */
+  after: () => void;
+  /** Narrows what is offered. A tag already on is offered regardless, so it
+   *  can always be taken back off. Omitted means every active tag. */
+  offer?: (tag: Tag) => boolean;
+  /** What a typed name matching nothing offers to do. Omitted means it offers
+   *  nothing, which is right for the filter bar: filtering by a tag no card
+   *  wears finds nothing, so making one there is a dead end. */
+  create?: (name: string) => void;
+  /** The empty state, for when nothing at all can be offered. */
+  emptyText?: string;
+}
 
 let tagSearchPanel: HTMLElement | null = null;
 let tagSearchCleanup: (() => void) | null = null;
 
 /** Takes the panel down. Safe to call when nothing is open. */
-function closeTagSearch(): void {
+export function closeTagSearch(): void {
   tagSearchCleanup?.();
   tagSearchCleanup = null;
   tagSearchPanel?.remove();
   tagSearchPanel = null;
 }
 
-function wireTagSearch(input: HTMLInputElement, card: Card): void {
-  const open = (): void => openTagSearch(input, card);
+export function wireTagSearch(input: HTMLInputElement, spec: TagPickSpec): void {
+  const open = (): void => openTagSearch(input, spec);
   input.addEventListener("focus", open);
   input.addEventListener("click", open);
   input.addEventListener("input", open);
@@ -2465,7 +2523,7 @@ function wireTagSearch(input: HTMLInputElement, card: Card): void {
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      openTagSearch(input, card);
+      openTagSearch(input, spec);
       moveTagSearchCursor(e.key === "ArrowDown" ? 1 : -1);
       return;
     }
@@ -2481,7 +2539,7 @@ function wireTagSearch(input: HTMLInputElement, card: Card): void {
       return;
     }
     const name = input.value.trim();
-    if (name) newTagFromCard(card, name);
+    if (name) spec.create?.(name);
   });
 }
 
@@ -2501,9 +2559,8 @@ function moveTagSearchCursor(delta: number): void {
   rows[next].scrollIntoView({ block: "nearest" });
 }
 
-function openTagSearch(input: HTMLInputElement, card: Card): void {
-  const board = getBoard(card.boardId);
-  if (!board) return;
+function openTagSearch(input: HTMLInputElement, spec: TagPickSpec): void {
+  const board = spec.board;
 
   const needle = input.value.trim().toLowerCase();
   const categories = board.tagCategories;
@@ -2525,7 +2582,8 @@ function openTagSearch(input: HTMLInputElement, card: Card): void {
     const catTags = board.tags.filter(
       (t) =>
         t.categoryId === category.id &&
-        (t.status === "active" || card.tagIds.includes(t.id)) &&
+        (t.status === "active" || spec.has(t.id)) &&
+        (spec.offer === undefined || spec.offer(t) || spec.has(t.id)) &&
         (!needle ||
           t.name.toLowerCase().includes(needle) ||
           category.name.toLowerCase().includes(needle)),
@@ -2541,7 +2599,7 @@ function openTagSearch(input: HTMLInputElement, card: Card): void {
 
     for (const tag of catTags) {
       matches += 1;
-      const on = card.tagIds.includes(tag.id);
+      const on = spec.has(tag.id);
       const rowBtn = document.createElement("button");
       rowBtn.type = "button";
       rowBtn.className = "kb-tag-dd-row";
@@ -2573,14 +2631,9 @@ function openTagSearch(input: HTMLInputElement, card: Card): void {
       }
 
       rowBtn.addEventListener("click", () => {
-        if (card.tagIds.includes(tag.id)) {
-          card.tagIds = card.tagIds.filter((id) => id !== tag.id);
-        } else {
-          card.tagIds.push(tag.id);
-        }
-        stampCard(card);
+        spec.toggle(tag);
         closeTagSearch();
-        renderCardTags(card);
+        spec.after();
       });
       group.appendChild(rowBtn);
     }
@@ -2591,10 +2644,10 @@ function openTagSearch(input: HTMLInputElement, card: Card): void {
   if (matches === 0 && !typed) {
     const empty = document.createElement("span");
     empty.className = "kb-tag-dd-empty";
-    empty.textContent = "This board has no tags yet.";
+    empty.textContent = spec.emptyText ?? "This board has no tags yet.";
     panel.appendChild(empty);
   }
-  if (typed) {
+  if (typed && spec.create) {
     /* Offered whether or not something matched: "Bug" matching "Bugfix" is not
        a reason to refuse to make "Bug". An exact name that already exists is
        the one case where it would only produce a rejection, so it is left out. */
@@ -2604,7 +2657,7 @@ function openTagSearch(input: HTMLInputElement, card: Card): void {
       create.type = "button";
       create.className = "kb-tag-dd-create";
       create.textContent = `Create "${typed}"\u2026`;
-      create.addEventListener("click", () => newTagFromCard(card, typed));
+      create.addEventListener("click", () => spec.create!(typed));
       panel.appendChild(create);
     }
   }
