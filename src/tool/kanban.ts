@@ -5314,11 +5314,13 @@ function newLevelId(): string {
   return newId();
 }
 
-/** One row per rung, in ladder order, plus the None row at the foot.
+/** The None row, then one row per rung in ladder order, lowest first.
  *
- *  NONE LAST HERE, though a picker offers it first. On a ladder drawn lowest to
- *  highest, "no level at all" sits below the lowest rung, and putting it at the
- *  top would read as the first rung of the scale. */
+ *  THE SAME ORDER A PICKER OFFERS, which is also the order this screen drew
+ *  before the rungs became editable. Reading the editor and reading the
+ *  drop-down should not be two different exercises, and reversing one of them
+ *  so that Critical sat at the top would make every drag land somewhere other
+ *  than where it looked. */
 function renderScaleEditor(): void {
   const spec = scaleSpec(scaleEditKind);
   document.getElementById("kbScaleTitle")!.textContent = spec.title;
@@ -5337,6 +5339,51 @@ function renderScaleEditor(): void {
     renderAll();
     restamp();
   };
+
+  /* THE NONE ROW. No grip, no color, no delete: it is not on the ladder and
+     cannot be moved off, colored, or taken away. A spacer holds each of those
+     columns open so the names still line up into something you can read down. */
+  const noneRow = document.createElement("div");
+  noneRow.className = "kb-scale-row kb-scale-row-none";
+
+  const gripGap = document.createElement("span");
+  gripGap.className = "kb-column-grip kb-scale-grip-spacer";
+  noneRow.appendChild(gripGap);
+
+  const swatchGap = document.createElement("span");
+  swatchGap.className = "kb-scale-swatch-spacer";
+  swatchGap.title = "None has no color: it is the absence of a level.";
+  noneRow.appendChild(swatchGap);
+
+  const noneName = document.createElement("input");
+  noneName.type = "text";
+  noneName.className = "kb-scale-name";
+  noneName.maxLength = MAX_LEVEL_NAME_LEN;
+  noneName.spellcheck = false;
+  noneName.value = spec.noneLabel;
+  noneName.placeholder = DEFAULT_NONE_LABEL;
+  const commitNone = (): void => {
+    const next = noneName.value.trim().slice(0, MAX_LEVEL_NAME_LEN) || DEFAULT_NONE_LABEL;
+    noneName.value = next;
+    if (next === spec.noneLabel) return;
+    spec.setNoneLabel(next);
+    commitEdit();
+  };
+  noneName.addEventListener("change", commitNone);
+  noneName.addEventListener("blur", commitNone);
+  noneRow.appendChild(noneName);
+
+  const noneUsed = cardsOnLevel(spec, NO_LEVEL).length;
+  const noneCount = document.createElement("span");
+  noneCount.className = "kb-scale-count";
+  noneCount.textContent = noneUsed === 0 ? "" : `${noneUsed} ${noneUsed === 1 ? "card" : "cards"}`;
+  noneRow.appendChild(noneCount);
+
+  const noneGap = document.createElement("span");
+  noneGap.className = "kb-scale-remove-spacer";
+  noneRow.appendChild(noneGap);
+
+  host.appendChild(noneRow);
 
   spec.levels.forEach((level, index) => {
     const row = document.createElement("div");
@@ -5431,64 +5478,20 @@ function renderScaleEditor(): void {
     host.appendChild(row);
   });
 
-  /* THE NONE ROW. No grip, no color, no delete: it is not on the ladder and
-     cannot be moved off, colored, or taken away. A spacer holds each of those
-     columns open so the names still line up into something you can read down. */
-  const noneRow = document.createElement("div");
-  noneRow.className = "kb-scale-row kb-scale-row-none";
-
-  const gripGap = document.createElement("span");
-  gripGap.className = "kb-column-grip kb-scale-grip-spacer";
-  noneRow.appendChild(gripGap);
-
-  const swatchGap = document.createElement("span");
-  swatchGap.className = "kb-scale-swatch-spacer";
-  swatchGap.title = "None has no color: it is the absence of a level.";
-  noneRow.appendChild(swatchGap);
-
-  const noneName = document.createElement("input");
-  noneName.type = "text";
-  noneName.className = "kb-scale-name";
-  noneName.maxLength = MAX_LEVEL_NAME_LEN;
-  noneName.spellcheck = false;
-  noneName.value = spec.noneLabel;
-  noneName.placeholder = DEFAULT_NONE_LABEL;
-  const commitNone = (): void => {
-    const next = noneName.value.trim().slice(0, MAX_LEVEL_NAME_LEN) || DEFAULT_NONE_LABEL;
-    noneName.value = next;
-    if (next === spec.noneLabel) return;
-    spec.setNoneLabel(next);
-    commitEdit();
-  };
-  noneName.addEventListener("change", commitNone);
-  noneName.addEventListener("blur", commitNone);
-  noneRow.appendChild(noneName);
-
-  const noneUsed = cardsOnLevel(spec, NO_LEVEL).length;
-  const noneCount = document.createElement("span");
-  noneCount.className = "kb-scale-count";
-  noneCount.textContent = noneUsed === 0 ? "" : `${noneUsed} ${noneUsed === 1 ? "card" : "cards"}`;
-  noneRow.appendChild(noneCount);
-
-  const noneGap = document.createElement("span");
-  noneGap.className = "kb-scale-remove-spacer";
-  noneRow.appendChild(noneGap);
-
-  host.appendChild(noneRow);
-
   const add = document.getElementById("kbScaleAddBtn") as HTMLButtonElement;
   const full = spec.levels.length >= MAX_SCALE_LEVELS;
   add.disabled = full;
   add.title = full
     ? `This scale is at its limit of ${MAX_SCALE_LEVELS} levels.`
-    : "Add a level at the top of the ladder";
+    : "Add a level as the highest rung, then drag it where you want it";
 
   restamp();
 }
 
-/** A new rung, added at the TOP because the ladder is drawn lowest to highest
- *  and a new level is usually one you are adding above what you already have.
- *  Named for its position so it is identifiable before you have renamed it. */
+/** A new rung, added as the HIGHEST, which is the end of the list as this
+ *  screen draws it: it lands where you can see it rather than somewhere you
+ *  have to go looking, and dragging is one gesture away. Named for its position
+ *  so it is identifiable before you have renamed it. */
 function addScaleLevel(): void {
   const spec = scaleSpec(scaleEditKind);
   if (spec.levels.length >= MAX_SCALE_LEVELS) {

@@ -79,10 +79,10 @@ export interface Tag {
    rung up the list is the whole of what reordering means.
 
    "NONE" IS NOT A RUNG. It is the absence of one: never in the array, never
-   deletable, never colored, and always offered first in a picker. A card with
-   no priority set must not be painted gray as though gray were a priority.
-   Only its NAME is settable, which is why the label sits in settings beside
-   the ladder rather than in it.
+   deletable, never colored, and always offered first, both in a picker and in
+   the editor. A card with no priority set must not be painted gray as though
+   gray were a priority. Only its NAME is settable, which is why the label sits
+   in settings beside the ladder rather than in it.
 
    REMOVING A RUNG IS THE HARD CASE, and it is handled where the cards are
    (see THE SCALE EDITOR in kanban.ts), not here. A card set to a level that

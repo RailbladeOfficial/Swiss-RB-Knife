@@ -1915,12 +1915,12 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 }
 
 /* None is not on the ladder, so it is set apart rather than sitting flush with
-   the rungs above it. */
+   the rungs below it. */
 .kb-scale-row-none {
-  margin-top: 4px;
-  border-top: 1px solid var(--color-border);
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
   border-radius: 0;
-  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 /* Holds the grip column open on the None row, which has nothing to drag. */
