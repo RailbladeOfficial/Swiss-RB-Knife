@@ -67,7 +67,9 @@ test("the whiteboard file is snapshotted, not treated as a throwaway draft", () 
 
 test("a card title from the whiteboard is cut to Kanban's own limit, not a copy of it", () => {
   const ts = read(TS);
-  assert.match(ts, /\bMAX_TITLE_LEN\b[\s\S]*?from "\.\/kanban"/, "whiteboard.ts does not import Kanban's title limit");
+  /* From kanban-model.ts since 0.8.0, the leaf Kanban keeps its shapes and
+     fixed vocabulary in. Still Kanban's number, still not a copy. */
+  assert.match(ts, /\bMAX_TITLE_LEN\b[\s\S]*?from "\.\/kanban-model"/, "whiteboard.ts does not import Kanban's title limit");
   assert.doesNotMatch(ts, /const MAX_TITLE_LEN\b/, "whiteboard.ts keeps its own title limit, which can drift");
 });
 

@@ -61,7 +61,9 @@ import {
   type AgentLogEntry,
   type AgentToken,
 } from "./kanban-agents";
-import type { Board } from "./kanban";
+import type {
+  Board,
+} from "./kanban-model";
 import {
   boardEditId,
   formatDate,

@@ -32,6 +32,7 @@ import { read, slice, htmlIds } from "./_source.mjs";
    genuinely about one file names that file directly, as the agent ones do. */
 const KANBAN_FILES = [
   "src/tool/kanban.ts",
+  "src/tool/kanban-model.ts",
   "src/tool/kanban-card.ts",
   "src/tool/kanban-card-face.ts",
   "src/tool/kanban-stats.ts",

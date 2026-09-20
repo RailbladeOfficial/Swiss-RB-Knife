@@ -55,23 +55,9 @@ import type {
   CardSection,
   Tag,
   TagCategory,
-} from "./kanban";
+} from "./kanban-model";
 import {
-  ADVANCE_LABELS,
-  CARD_COLORS,
-  EFFORTS,
-  MAX_ATTACHMENTS,
-  MAX_ATTACHMENT_BYTES,
-  MAX_COMMENTS_PER_CARD,
-  MAX_COMMENT_LEN,
-  MAX_DESC_LEN,
-  MAX_SUBTASKS_PER_CARD,
-  MAX_TITLE_LEN,
-  PRIORITIES,
-  STAGES,
-  STAGE_LABELS,
   applySolidColor,
-  attachmentKind,
   boards,
   cardColorMode,
   cards,
@@ -112,6 +98,22 @@ import {
   tagColor,
   topOpenKanbanModal,
 } from "./kanban";
+import {
+  ADVANCE_LABELS,
+  CARD_COLORS,
+  EFFORTS,
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  MAX_COMMENTS_PER_CARD,
+  MAX_COMMENT_LEN,
+  MAX_DESC_LEN,
+  MAX_SUBTASKS_PER_CARD,
+  MAX_TITLE_LEN,
+  PRIORITIES,
+  STAGES,
+  STAGE_LABELS,
+  attachmentKind,
+} from "./kanban-model";
 
 /* -----------------------------------------------------------------------------
    THE CARD MODAL'S OWN STATE

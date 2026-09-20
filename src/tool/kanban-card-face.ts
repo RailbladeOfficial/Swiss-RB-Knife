@@ -32,12 +32,9 @@ import type {
   CardAuthor,
   Tag,
   TagCategory,
-} from "./kanban";
+} from "./kanban-model";
 import {
-  EFFORTS,
-  PRIORITIES,
   applySolidColor,
-  authorLabel,
   boards,
   cards,
   clearCardSelection,
@@ -72,6 +69,11 @@ import {
   tagColor,
   trimTo,
 } from "./kanban";
+import {
+  EFFORTS,
+  PRIORITIES,
+  authorLabel,
+} from "./kanban-model";
 import { boardConfig, type AgentToken } from "./kanban-agents";
 import { agentConfig } from "./kanban-agents-tab";
 import { attachCardDragHandlers } from "./kanban-dnd";

@@ -21,9 +21,8 @@ import type {
   Card,
   Column,
   Stage,
-} from "./kanban";
+} from "./kanban-model";
 import {
-  STAGE_LABELS,
   clearCardSelection,
   columnsEl,
   getCard,
@@ -36,6 +35,9 @@ import {
   stampOnArrival,
   touchBoard,
 } from "./kanban";
+import {
+  STAGE_LABELS,
+} from "./kanban-model";
 
 export let dragCardId: string | null = null;
 let dragColumnId: string | null = null;

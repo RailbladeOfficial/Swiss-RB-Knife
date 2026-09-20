@@ -24,10 +24,9 @@ import { today } from "../core/timestamp";
 import type {
   Board,
   Card,
-} from "./kanban";
+} from "./kanban-model";
 import {
   archivedCardsOnBoard,
-  authorLabel,
   createdDay,
   dayDiff,
   describeDays,
@@ -38,6 +37,9 @@ import {
   liveCardsOnBoard,
   stageOrderWarning,
 } from "./kanban";
+import {
+  authorLabel,
+} from "./kanban-model";
 import { buildTagChip } from "./kanban-card-face";
 import { getCardModal, openCard } from "./kanban-card";
 

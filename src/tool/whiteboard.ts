@@ -60,18 +60,13 @@ import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, isTextEntry, type MenuItem } from "../menu/menu";
 import { appConfirm, backgroundMenu, flash, navigateToTool, flushOnQuit } from "../core/shell";
 import {
-  MAX_TITLE_LEN,
-  EFFORTS,
-  PRIORITIES,
   addCardsFromElsewhere,
   addImageCardFromElsewhere,
   attachImageToCard,
   findCardsOnBoard,
   effortLabel,
   priorityLabel,
-  type Effort,
   type IncomingOptions,
-  type Priority,
   contrastRatio,
   hexToRgb,
   isHexColor,
@@ -80,6 +75,13 @@ import {
   type IncomingCard,
   type KanbanTarget,
 } from "./kanban";
+import {
+  MAX_TITLE_LEN,
+  EFFORTS,
+  PRIORITIES,
+  type Effort,
+  type Priority,
+} from "./kanban-model";
 
 /* =============================================================================
    TYPES AND LIMITS

@@ -55,22 +55,10 @@ import type {
   Subtask,
   Tag,
   TagCategory,
-} from "./kanban";
+} from "./kanban-model";
 import {
-  DEFAULT_TAG_COLOR,
-  EFFORTS,
-  MAX_CARDS_PER_BOARD,
-  MAX_COLUMNS_PER_BOARD,
-  MAX_COMMENTS_PER_CARD,
-  MAX_COMMENT_LEN,
-  MAX_DESC_LEN,
-  MAX_SUBTASKS_PER_CARD,
-  MAX_TITLE_LEN,
-  PRIORITIES,
-  STAGES,
   archivedCardsOnBoard,
   arrivalStage,
-  authorLabel,
   cardMatchesText,
   cards,
   cardsInColumn,
@@ -96,6 +84,20 @@ import {
   touchBoard,
   trimTo,
 } from "./kanban";
+import {
+  DEFAULT_TAG_COLOR,
+  EFFORTS,
+  MAX_CARDS_PER_BOARD,
+  MAX_COLUMNS_PER_BOARD,
+  MAX_COMMENTS_PER_CARD,
+  MAX_COMMENT_LEN,
+  MAX_DESC_LEN,
+  MAX_SUBTASKS_PER_CARD,
+  MAX_TITLE_LEN,
+  PRIORITIES,
+  STAGES,
+  authorLabel,
+} from "./kanban-model";
 
 /** One request, as the gate hands it over. */
 interface AgentRequest {
