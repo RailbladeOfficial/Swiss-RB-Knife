@@ -106,6 +106,13 @@ import { formatBackupName } from "../core/tool-backups";
 // The bottom thousand lines of this file until 0.8.0; see that file's header
 // for why the loop between the two is safe.
 import { listenForAgentRequests } from "./kanban-executor";
+// Picking a card or a column up and putting it down.
+import {
+  attachCardDragHandlers,
+  attachCardDropTarget,
+  attachColumnDragHandlers,
+  dragCardId,
+} from "./kanban-dnd";
 // The two read-only numbers screens.
 import {
   _boardStatsModal,
@@ -999,7 +1006,7 @@ let gallerySummary: HTMLElement;
 let boardBgLayer: HTMLElement;
 let boardTitleEl: HTMLElement;
 let boardCountsEl: HTMLElement;
-let columnsEl: HTMLElement;
+export let columnsEl: HTMLElement;
 let columnsEmpty: HTMLElement;
 let cardSearchInput: HTMLInputElement;
 let filterBar: HTMLElement;
@@ -2944,7 +2951,7 @@ function openBoardFromGallery(boardId: string): void {
   showKbView("board", board.id);
 }
 
-function renderBoardView(): void {
+export function renderBoardView(): void {
   const board = getBoard(currentBoardId);
   if (!board) {
     showKbView("boards");
@@ -3228,7 +3235,7 @@ function sortCards(list: Card[], rules: SortRule[], board: Board): Card[] {
 /** The rules in force for a column: its own, or the board's default when it has
  *  none of its own. `null` on the column means "follow the board"; an empty
  *  array means "manual, whatever the board says". */
-function rulesForColumn(board: Board, column: Column): SortRule[] {
+export function rulesForColumn(board: Board, column: Column): SortRule[] {
   return column.sort ?? effective(board).defaultSort ?? [];
 }
 
@@ -4017,16 +4024,16 @@ function reopenQuickAdd(board: Board, column: Column, position: NewCardPosition)
    not there when the action runs rather than a stale object being written back.
 ----------------------------------------------------------------------------- */
 
-let selectedCardIds = new Set<string>();
+export let selectedCardIds = new Set<string>();
 /** Where the next Shift+click measures from. */
 let selectionAnchorId: string | null = null;
 
 /** The selected cards that still exist, in board order. */
-function selectedCards(): Card[] {
+export function selectedCards(): Card[] {
   return cards.filter((c) => selectedCardIds.has(c.id) && !c.archived);
 }
 
-function clearCardSelection(redraw = true): void {
+export function clearCardSelection(redraw = true): void {
   if (selectedCardIds.size === 0) return;
   selectedCardIds.clear();
   selectionAnchorId = null;
@@ -4984,279 +4991,6 @@ export function buildTagChip(
 }
 
 /* =============================================================================
-   DRAG AND DROP
-   -----------------------------------------------------------------------------
-   HTML5 drag and drop, moving the real element live rather than drawing a
-   placeholder: the card you are dragging IS the preview, so what you see
-   during the drag is exactly what you get after it.
-
-   The commit happens on `dragend`, never on `drop`. dragend fires whatever
-   happens (dropped on a column, dropped on the padding, dropped outside the
-   window, canceled with Escape), so it is the only hook that cannot leave the
-   already-reordered DOM disagreeing with the stored order. That exact bug is
-   what the same note in sidebar-edit.ts is about.
-============================================================================= */
-
-let dragCardId: string | null = null;
-let dragColumnId: string | null = null;
-/** The other selected cards travelling with the one under the pointer, in the
- *  order they were in. Empty for an ordinary one-card drag. */
-let dragPassengerIds: string[] = [];
-
-/**
- * DRAGGING A SELECTION.
- *
- * Picking up a card that is part of a selection picks up the whole selection,
- * because that is what selecting them was for. The card under the pointer is
- * the one the browser drags; the rest are moved to sit under it as it goes, so
- * the group stays together and lands where the pointer says.
- *
- * IN THE ORDER THEY WERE IN, not the order they were clicked. A selection built
- * by Ctrl+clicking around a column is still a set of cards with an arrangement
- * on the board, and scrambling that on arrival would make a multi-card drag
- * something you have to tidy up after.
- *
- * Dragging a card that is NOT in the selection drops the selection first: it is
- * an action on that one card, and carrying an unrelated selection into it is
- * how a drag moves eleven things you had forgotten were picked.
- */
-function attachCardDragHandlers(board: Board, el: HTMLElement, card: Card): void {
-  el.addEventListener("dragstart", (e) => {
-    // Without this the column underneath also starts dragging when its own
-    // draggable flag happens to be set.
-    e.stopPropagation();
-
-    if (selectedCardIds.size > 1 && selectedCardIds.has(card.id)) {
-      dragPassengerIds = selectedCards()
-        .filter((c) => c.id !== card.id)
-        .map((c) => c.id);
-    } else {
-      clearCardSelection(false);
-      dragPassengerIds = [];
-    }
-
-    dragCardId = card.id;
-    el.classList.add("kb-dragging");
-    for (const id of dragPassengerIds) cardElement(id)?.classList.add("kb-dragging-with");
-    e.dataTransfer?.setData("text/plain", card.id);
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-  });
-
-  el.addEventListener("dragend", (e) => {
-    e.stopPropagation();
-    el.classList.remove("kb-dragging");
-    for (const id of dragPassengerIds) cardElement(id)?.classList.remove("kb-dragging-with");
-    dragCardId = null;
-    dragPassengerIds = [];
-    commitCardOrderFromDom(board);
-    // The selection survives the drag. Eleven cards just moved together and
-    // the next thing you do is as likely to be about the same eleven.
-    if (selectedCardIds.size > 0) renderBoardView();
-  });
-}
-
-/** One card's element on the board, or null when it is not drawn. */
-function cardElement(cardId: string): HTMLElement | null {
-  return columnsEl.querySelector<HTMLElement>(`.kb-card[data-card-id="${CSS.escape(cardId)}"]`);
-}
-
-/** The first card in `body` whose midpoint is below `y`, i.e. the one the
- *  dragged card should be inserted before. null means "past the last one". */
-function cardBeforePoint(body: HTMLElement, y: number): HTMLElement | null {
-  /* The cards travelling WITH the dragged one are excluded too. They are being
-     moved to follow it, so measuring the drop point against them would have
-     the insertion point chase the group as it goes. */
-  const others = Array.from(
-    body.querySelectorAll<HTMLElement>(".kb-card:not(.kb-dragging):not(.kb-dragging-with)"),
-  );
-  for (const el of others) {
-    const rect = el.getBoundingClientRect();
-    if (y < rect.top + rect.height / 2) return el;
-  }
-  return null;
-}
-
-function attachCardDropTarget(body: HTMLElement): void {
-  body.addEventListener("dragover", (e) => {
-    if (!dragCardId) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-
-    const dragged = columnsEl.querySelector<HTMLElement>(
-      `.kb-card[data-card-id="${CSS.escape(dragCardId)}"]`,
-    );
-    if (!dragged) return;
-
-    // The "nothing here yet" line is a sibling of the cards, so it has to get
-    // out of the way or the dragged card lands under it.
-    body.querySelector(".kb-column-empty")?.remove();
-
-    const before = cardBeforePoint(body, e.clientY);
-    if (before) body.insertBefore(dragged, before);
-    else body.appendChild(dragged);
-
-    /* The rest of the selection is parked directly under the card being
-       dragged, in board order, so the group arrives as a block rather than
-       scattered through whatever was already in the column. Done here rather
-       than on drop because the drop point is only known from the last dragover
-       the pointer produced. */
-    let after: HTMLElement = dragged;
-    for (const id of dragPassengerIds) {
-      const passenger = cardElement(id);
-      if (!passenger || passenger === dragged) continue;
-      after.after(passenger);
-      after = passenger;
-    }
-  });
-
-  // Needed only so the browser accepts the drop at all; the work is in dragend.
-  body.addEventListener("drop", (e) => e.preventDefault());
-}
-
-/** Reads the board's live DOM order back into the cards. Also applies the
- *  one side effect a move is allowed to have: stamping the stage date that
- *  the column a card lands in stamps. */
-function commitCardOrderFromDom(board: Board): void {
-  let changed = false;
-  const stamped: Stage[] = [];
-  /** Columns whose sort a drop just turned off, named so the toast can say so. */
-  const unsorted: string[] = [];
-
-  for (const body of columnsEl.querySelectorAll<HTMLElement>(".kb-column-body")) {
-    const columnId = body.dataset.columnId;
-    if (!columnId) continue;
-    const column = getColumn(board, columnId);
-    const ids = Array.from(body.querySelectorAll<HTMLElement>(".kb-card")).map(
-      (el) => el.dataset.cardId ?? "",
-    );
-
-    /* A card dropped into a SORTED column is a statement about where that one
-       card goes, and the sort would move it somewhere else the instant it
-       landed. The drop wins and the sort comes off, out loud: silently
-       ignoring the drop and silently keeping the sort both look like the drag
-       failed. Checked before the loop below writes the new order, because that
-       is what the sort would be fighting. */
-    if (column && rulesForColumn(board, column).length > 0 && ids.includes(dragCardId ?? "")) {
-      column.sort = [];
-      unsorted.push(column.title);
-    }
-
-    ids.forEach((id, index) => {
-      const card = getCard(id);
-      if (!card) return;
-      const movedColumn = card.columnId !== columnId;
-      if (!movedColumn && card.order === index) return;
-
-      changed = true;
-      card.columnId = columnId;
-      card.order = index;
-      card.updatedAt = Date.now();
-
-      if (movedColumn && column) {
-        const stage = stampOnArrival(board, column, card);
-        if (stage) stamped.push(stage);
-      }
-    });
-  }
-
-  if (unsorted.length > 0) {
-    flash(`${unsorted.join(" and ")} is back to manual order.`);
-    touchBoard(board);
-    if (!changed) renderBoardView();
-  }
-  if (!changed) return;
-  resequence(board.id);
-  touchBoard(board);
-  if (stamped.length === 1) {
-    flash(`Stamped the card's ${STAGE_LABELS[stamped[0]]} date.`);
-  } else if (stamped.length > 1) {
-    flash(`Stamped ${stamped.length} cards' stage dates.`);
-  }
-  // Re-render rather than trusting the dragged DOM: the WIP badges, the
-  // "nothing here yet" lines and the stage chips all changed underneath.
-  renderBoardView();
-}
-
-/** Columns drag from their grip only. Setting `draggable` for the life of the
- *  press (rather than always) is what keeps a card drag from being swallowed
- *  by its column: only one of the two is ever draggable at a time. */
-function attachColumnDragHandlers(
-  board: Board,
-  el: HTMLElement,
-  grip: HTMLElement,
-  column: Column,
-): void {
-  grip.addEventListener("pointerdown", () => {
-    el.draggable = true;
-    // The release is listened for on the DOCUMENT, not on the grip. A press
-    // that never became a drag, and whose pointer wandered off the grip before
-    // being released, would otherwise never fire the grip's own pointerup and
-    // leave the column draggable for good, quietly hijacking text selection
-    // inside it from then on.
-    document.addEventListener(
-      "pointerup",
-      () => {
-        el.draggable = false;
-      },
-      { once: true },
-    );
-  });
-
-  el.addEventListener("dragstart", (e) => {
-    if (!el.draggable) return;
-    dragColumnId = column.id;
-    el.classList.add("kb-column-dragging");
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-  });
-
-  el.addEventListener("dragend", () => {
-    el.draggable = false;
-    el.classList.remove("kb-column-dragging");
-    if (!dragColumnId) return;
-    dragColumnId = null;
-    commitColumnOrderFromDom(board);
-  });
-
-  el.addEventListener("dragover", (e) => {
-    if (!dragColumnId || dragColumnId === column.id) return;
-    e.preventDefault();
-    const dragged = columnsEl.querySelector<HTMLElement>(
-      `.kb-column[data-column-id="${CSS.escape(dragColumnId)}"]`,
-    );
-    if (!dragged) return;
-    const rect = el.getBoundingClientRect();
-    const before = e.clientX < rect.left + rect.width / 2;
-    columnsEl.insertBefore(dragged, before ? el : el.nextSibling);
-  });
-}
-
-function commitColumnOrderFromDom(board: Board): void {
-  const order = Array.from(columnsEl.querySelectorAll<HTMLElement>(".kb-column")).map(
-    (el) => el.dataset.columnId ?? "",
-  );
-  const byId = new Map(board.columns.map((c) => [c.id, c]));
-  const next: Column[] = [];
-  for (const id of order) {
-    const col = byId.get(id);
-    if (col) {
-      next.push(col);
-      byId.delete(id);
-    }
-  }
-  // Anything the DOM did not name (should be nothing) keeps its old place at
-  // the end rather than being dropped.
-  next.push(...byId.values());
-
-  const unchanged =
-    next.length === board.columns.length && next.every((c, i) => c.id === board.columns[i].id);
-  if (unchanged) return;
-
-  board.columns = next;
-  touchBoard(board);
-  renderBoardView();
-}
-
-/* =============================================================================
    FILTER BAR
 ============================================================================= */
 
@@ -5558,7 +5292,7 @@ export function arrivalStage(column: Column): Stage | null {
  *  The one stamper for every way a card changes column, so a drag and a move
  *  from the card or its menu cannot disagree about what is stamped, or how
  *  precisely. */
-function stampOnArrival(board: Board, column: Column, card: Card): Stage | null {
+export function stampOnArrival(board: Board, column: Column, card: Card): Stage | null {
   if (!effective(board).autoCompleteOnDone) return null;
   const stage = arrivalStage(column);
   if (!stage || card.dates[stage]) return null;

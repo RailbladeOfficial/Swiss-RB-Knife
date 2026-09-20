@@ -252,6 +252,7 @@ test("the import loops this project has are the ones we know about", () => {
          the first agent request. */
       "src/tool/kanban-agents-tab",
       "src/tool/kanban-card",
+      "src/tool/kanban-dnd",
       "src/tool/kanban-executor",
       "src/tool/kanban-stats",
       "src/tool/rng",

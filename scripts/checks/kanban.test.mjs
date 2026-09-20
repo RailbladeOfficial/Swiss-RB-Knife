@@ -34,6 +34,7 @@ const KANBAN_FILES = [
   "src/tool/kanban.ts",
   "src/tool/kanban-card.ts",
   "src/tool/kanban-stats.ts",
+  "src/tool/kanban-dnd.ts",
   "src/tool/kanban-agents-tab.ts",
   "src/tool/kanban-executor.ts",
 ];
