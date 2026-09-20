@@ -253,6 +253,7 @@ test("the import loops this project has are the ones we know about", () => {
       "src/tool/kanban-agents-tab",
       "src/tool/kanban-card",
       "src/tool/kanban-executor",
+      "src/tool/kanban-stats",
       "src/tool/rng",
       "src/tool/time-tracker",
       "src/tool/tts-repeater",

@@ -36,6 +36,7 @@ import { devError, flash } from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { closeMenu, openMenu, type MenuItem } from "../menu/menu";
 import { formatBytes } from "../core/format";
+import { openCardStats } from "./kanban-stats";
 import { newId } from "../core/ids";
 import { localDay, today } from "../core/timestamp";
 import {
@@ -98,7 +99,6 @@ import {
   normalizeTextColor,
   nowStamp,
   openBoardSetup,
-  openCardStats,
   openTagEditor,
   orderedCardTags,
   paintTagChip,
