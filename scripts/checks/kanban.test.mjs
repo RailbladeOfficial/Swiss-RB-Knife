@@ -857,26 +857,59 @@ test("a level renamed or deleted in Preferences reaches every picker", () => {
   }
 });
 
-test("a card that leaves the done column is upcoming again", () => {
-  /* The Completed stamp is written once on arrival in a done column and is
-     never cleared, so a card dragged back out to In Progress still carries it.
-     Reading the stamp to decide what is upcoming would leave that card out of
-     the Next Due count for good, which is the one case the user asked to have
-     covered. isUpcoming reads the COLUMN, which moves with the card. */
+test("there is one answer to whether a card is finished", () => {
+  /* There were two and they disagreed. isOverdue read the Completed stamp; the
+     Next Due count read the stamp OR the column, which is not the same as
+     reading the column: the stamp is never cleared, so a card dragged back out
+     of Done stayed finished anyway and the case that was asked for was still
+     not covered. One test now, and the due family all calls it. */
   const src = ts();
-  const at = src.indexOf("function isUpcoming(");
-  assert.notEqual(at, -1, "isUpcoming does not exist");
+  const at = src.indexOf("export function isFinished(");
+  assert.notEqual(at, -1, "isFinished does not exist");
   const body = src.slice(at, src.indexOf("\n}", at));
-  assert.match(body, /inDoneColumn\(card\)/, "isUpcoming does not ask which column the card is in");
 
-  const doneAt = src.indexOf("function inDoneColumn(");
-  assert.notEqual(doneAt, -1, "inDoneColumn does not exist");
-  const done = src.slice(doneAt, src.indexOf("\n}", doneAt));
-  assert.match(done, /isDone === true/, "inDoneColumn is not reading the column");
+  // The column decides where there is one, so a move out of Done is a move
+  // back into the counts.
+  assert.match(body, /isDone === true/, "isFinished never looks at the column");
+  // And the stamp is reached only after establishing that there is no done
+  // column to ask instead.
+  const columnGuard = body.indexOf("columns.some");
+  const stampRead = body.indexOf("dates.completed", columnGuard);
+  assert.ok(columnGuard !== -1, "isFinished does not check whether the board has a done column");
+  assert.ok(stampRead !== -1, "isFinished has no fallback for a board with no done column");
+});
+
+test("everything that asks whether a card is done by its due date asks isFinished", () => {
+  /* The bug this replaced was one of these reading dates.completed beside the
+     column check rather than instead of it. A direct read here is that bug
+     coming back, whichever of the four it is in. */
+  const src = ts();
+  const callers = ["export function isOverdue(", "function isUpcoming("];
+  for (const marker of callers) {
+    const at = src.indexOf(marker);
+    assert.notEqual(at, -1, `could not find ${marker}`);
+    const body = src.slice(at, src.indexOf("\n}", at));
+    assert.match(body, /isFinished\(card\)/, `${marker} does not ask isFinished`);
+    assert.ok(
+      !/dates\.completed/.test(body),
+      `${marker} reads the Completed stamp directly, beside or instead of isFinished`,
+    );
+  }
+
+  // The "Next 7 days" filter is the same question and used to read the stamp.
+  const dueAt = src.indexOf("function cardMatchesDue(");
+  const due = src.slice(dueAt, src.indexOf("\n}", dueAt));
   assert.ok(
-    !/dates\.completed/.test(done),
-    "inDoneColumn reads the stamp, which a move out of the column does not clear",
+    !/dates\.completed/.test(due),
+    "a due filter reads the Completed stamp instead of isFinished",
   );
+
+  // And so is the Due Soon stat, which lives in the other file.
+  const stats = read("src/tool/kanban-stats.ts");
+  const soonAt = stats.indexOf("const dueSoon =");
+  assert.notEqual(soonAt, -1, "the Due Soon stat has moved");
+  const soon = stats.slice(soonAt, stats.indexOf("}).length;", soonAt));
+  assert.match(soon, /isFinished\(c\)/, "the Due Soon stat does not ask isFinished");
 });
 
 test("a warning switched off still lets its filter find the cards", () => {

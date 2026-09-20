@@ -33,6 +33,7 @@ import {
   formatDate,
   furthestStage,
   getTag,
+  isFinished,
   isOverdue,
   liveCardsOnBoard,
   stageOrderWarning,
@@ -263,12 +264,24 @@ export function computeBoardStats(board: Board, todayStr: string): StatRow[] {
   const all = [...live, ...archived];
   const rows: StatRow[] = [];
 
+  /* THREE DIFFERENT QUESTIONS, deliberately, and each row asks the one its
+     label names.
+
+     "In a done column" is about the column and says so.
+
+     "Started, not finished" is a STAGE STAMP row: it pairs a started stamp with
+     the absence of a completed one, and swapping half of it for the column
+     would make it ask two things at once.
+
+     The two DUE rows ask whether a card is still work you have to do by a date,
+     which is the question isFinished answers, and the same one isOverdue and
+     the Next Due count ask. See isFinished in kanban.ts. */
   const doneColumns = new Set(board.columns.filter((c) => c.isDone).map((c) => c.id));
   const inDone = live.filter((c) => doneColumns.has(c.columnId)).length;
   const started = live.filter((c) => furthestStage(c) >= 0 && !c.dates.completed).length;
   const overdue = live.filter((c) => isOverdue(c, todayStr)).length;
   const dueSoon = live.filter((c) => {
-    if (!c.dates.due || c.dates.completed) return false;
+    if (!c.dates.due || isFinished(c)) return false;
     const diff = dayDiff(todayStr, c.dates.due);
     return diff !== null && diff >= 0 && diff <= 7;
   }).length;

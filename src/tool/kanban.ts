@@ -1933,6 +1933,33 @@ export function archivedCardsOnBoard(boardId: string): Card[] {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+/**
+ * Whether a card is FINISHED. One answer, used by both due warnings.
+ *
+ * There were two, and they disagreed. isOverdue read the Completed stamp;
+ * the Next Due count read the stamp OR the column. The stamp is written once
+ * when a card arrives in a done column and is never cleared (Undo Stage exists
+ * because nothing else clears it), so reading it means a card dragged back out
+ * to In Progress stays "finished" for good. That is the one case #239 asked to
+ * have covered, and with both tests in an OR it was still not covered: the
+ * stamp won anyway.
+ *
+ * SO THE COLUMN DECIDES, where the board has one that means done. It is the
+ * statement you can see at a glance, and it is the one that moves when the card
+ * moves. A card parked in In Progress is not done however its dates read.
+ *
+ * THE STAMP IS THE FALLBACK, and only for a board with no done column at all.
+ * Those boards model finishing with the stamp and nothing else, and reading the
+ * column there would mean nothing on them is ever finished, so every past-due
+ * card would shout forever.
+ */
+export function isFinished(card: Card): boolean {
+  const board = getBoard(card.boardId);
+  if (!board) return !!card.dates.completed;
+  if (!board.columns.some((c) => c.isDone)) return !!card.dates.completed;
+  return getColumn(board, card.columnId)?.isDone === true;
+}
+
 /** True when the card has a due date that has already passed and it is not
  *  finished. A completed card past its due date is late, not overdue: there is
  *  nothing left to do about it, so it should not keep shouting. */
@@ -1942,26 +1969,9 @@ export function isOverdue(card: Card, todayStr: string = today()): boolean {
   // A board that has switched due dates off has nothing to be late for, and
   // nagging about a date it will not show you is worse than not nagging.
   if (!effectiveForCard(card).showDue) return false;
-  if (card.dates.completed) return false;
+  if (isFinished(card)) return false;
   const diff = dayDiff(todayStr, card.dates.due);
   return diff !== null && diff < 0;
-}
-
-/**
- * True when the card sits in a column that means done.
- *
- * THE COLUMN, not the Completed stamp, and the difference is the point. A stamp
- * is written once when a card arrives in a done column and is never cleared, so
- * a card dragged back out to In Progress still carries it. Reading the stamp
- * would leave that card permanently out of the Next Due count, which is exactly
- * the case where it has to come back.
- *
- * isOverdue reads the stamp instead, deliberately: "this was finished late" is
- * a fact about history that a later move does not undo.
- */
-function inDoneColumn(card: Card): boolean {
-  const board = getBoard(card.boardId);
-  return board ? getColumn(board, card.columnId)?.isDone === true : false;
 }
 
 /**
@@ -1975,7 +1985,7 @@ function inDoneColumn(card: Card): boolean {
 function isUpcoming(card: Card, todayStr: string): boolean {
   if (card.archived || !card.dates.due) return false;
   if (!effectiveForCard(card).showDue) return false;
-  if (card.dates.completed || inDoneColumn(card)) return false;
+  if (isFinished(card)) return false;
   const diff = dayDiff(todayStr, card.dates.due);
   return diff !== null && diff >= 0;
 }
@@ -2130,7 +2140,7 @@ function cardMatchesDue(card: Card, todayStr: string, nextDueDay: string | null)
         nextDueDay !== null && card.dates.due === nextDueDay && isUpcoming(card, todayStr)
       );
     case "soon": {
-      if (!card.dates.due || card.dates.completed) return false;
+      if (!card.dates.due || isFinished(card)) return false;
       const diff = dayDiff(todayStr, card.dates.due);
       return diff !== null && diff <= 7;
     }
@@ -2568,7 +2578,7 @@ function buildBoardTile(board: Board): HTMLElement {
   {
     const todayStr = today();
     const overdue = live.filter((c) => isOverdue(c, todayStr)).length;
-    const done = live.filter(inDoneColumn).length;
+    const done = live.filter((c) => getColumn(board, c.columnId)?.isDone === true).length;
     const bits = [`${live.length} ${live.length === 1 ? "card" : "cards"}`, `${done} done`];
     if (overdue > 0) bits.push(`${overdue} overdue`);
     stats.textContent = bits.join(" · ");
