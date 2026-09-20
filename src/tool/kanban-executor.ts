@@ -34,6 +34,15 @@ import { devError } from "../core/dev-log";
 import { newId } from "../core/ids";
 import { today } from "../core/timestamp";
 import { permissionLabel } from "./kanban-agents";
+// openCardId and cardEditing say whether the user has this card open and is
+// typing in it, which is what an agent write has to refuse. They moved to the
+// card modal's own file in 0.8.0; renderCardModal and allAttachments with them.
+import {
+  allAttachments,
+  cardEditing,
+  openCardId,
+  renderCardModal,
+} from "./kanban-card";
 import type {
   Board,
   Card,
@@ -59,11 +68,9 @@ import {
   MAX_TITLE_LEN,
   PRIORITIES,
   STAGES,
-  allAttachments,
   archivedCardsOnBoard,
   arrivalStage,
   authorLabel,
-  cardEditing,
   cardMatchesText,
   cards,
   cardsInColumn,
@@ -79,11 +86,9 @@ import {
   liveCardsOnBoard,
   moveCardToColumn,
   normalizeMoment,
-  openCardId,
   orderedCardTags,
   parseDay,
   renderAll,
-  renderCardModal,
   resequence,
   stageOrderWarning,
   stampCard,
