@@ -582,6 +582,18 @@ export interface BoardScopedSettings {
    *  do work to dates. A board whose due dates are off is already excluded by
    *  isOverdue; this is the separate question of whether to shout about them. */
   overdueWarn: boolean;
+  /** Whether this board's NEXT due cards get counted in the tool header.
+   *
+   *  ITS OWN SWITCH rather than a second meaning for overdueWarn. The two say
+   *  different things: "a card is late" is a problem and "a card is coming up"
+   *  is a plan, and a board can reasonably want to be told one and not the
+   *  other. Folding them together would also have meant renaming a switch
+   *  people already know.
+   *
+   *  NO PULSE, unlike overdue. The sidebar pulse means something needs you
+   *  now; a card due in nine days does not, and a tool that pulses whenever
+   *  any board has any future due date would pulse permanently. */
+  nextDueWarn: boolean;
 }
 
 /** Everything in BoardScopedSettings is a DEFAULT that a board may override.
@@ -771,6 +783,7 @@ export const DEFAULT_SETTINGS: KbSettings = {
   // Off, so a card opens as something to read. Editing is a thing you ask for.
   openCardsInEditMode: false,
   overdueWarn: true,
+  nextDueWarn: true,
   defaultColumns: SYSTEM_DEFAULT_COLUMNS,
   defaultBoardName: "",
   // Cloned per level, not just per array: these are edited in place by the

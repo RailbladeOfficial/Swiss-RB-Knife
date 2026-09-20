@@ -857,6 +857,83 @@ test("a level renamed or deleted in Preferences reaches every picker", () => {
   }
 });
 
+test("a card that leaves the done column is upcoming again", () => {
+  /* The Completed stamp is written once on arrival in a done column and is
+     never cleared, so a card dragged back out to In Progress still carries it.
+     Reading the stamp to decide what is upcoming would leave that card out of
+     the Next Due count for good, which is the one case the user asked to have
+     covered. isUpcoming reads the COLUMN, which moves with the card. */
+  const src = ts();
+  const at = src.indexOf("function isUpcoming(");
+  assert.notEqual(at, -1, "isUpcoming does not exist");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /inDoneColumn\(card\)/, "isUpcoming does not ask which column the card is in");
+
+  const doneAt = src.indexOf("function inDoneColumn(");
+  assert.notEqual(doneAt, -1, "inDoneColumn does not exist");
+  const done = src.slice(doneAt, src.indexOf("\n}", doneAt));
+  assert.match(done, /isDone === true/, "inDoneColumn is not reading the column");
+  assert.ok(
+    !/dates\.completed/.test(done),
+    "inDoneColumn reads the stamp, which a move out of the column does not clear",
+  );
+});
+
+test("a warning switched off still lets its filter find the cards", () => {
+  /* The switches in Board Setup decide whether a board SHOUTS, not what is
+     true about its cards. The Overdue chip has always read isOverdue, which
+     has never consulted overdueWarn; the Next due chip has to match, so the
+     filter asks nextDue with respectWarn off and the notice asks with it on. */
+  const src = ts();
+  const at = src.indexOf("function nextDueDayFor(");
+  assert.notEqual(at, -1, "nextDueDayFor does not exist");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /nextDue\([^)]*,\s*false\)/, "the filter respects the warning switch");
+
+  const overdue = src.slice(
+    src.indexOf("export function isOverdue("),
+    src.indexOf("\n}", src.indexOf("export function isOverdue(")),
+  );
+  assert.ok(!/overdueWarn/.test(overdue), "isOverdue has started consulting the warning switch");
+});
+
+test("the next due date is worked out once a render, not once a card", () => {
+  /* It was worked out inside the per-card test, which is a scan of every card
+     in the tool for every card being drawn: a board at its 5,000 ceiling turned
+     one repaint into twenty-five million comparisons, and the filter that
+     causes it is one click away from the header. */
+  const src = ts();
+  const at = src.indexOf("function cardMatchesDue(");
+  assert.notEqual(at, -1, "cardMatchesDue does not exist");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.ok(
+    !/nextDue\(/.test(body),
+    "cardMatchesDue computes the next due date itself, once per card",
+  );
+  assert.match(body, /nextDueDay/, "cardMatchesDue is not handed the date");
+});
+
+test("the sidebar pulse counts every board, whatever board you are standing on", () => {
+  /* The header text is scoped to the board in front of you; the pulse is not.
+     A per-board pulse would hide a board on fire while you stood on a quiet
+     one, which is the one thing the pulse is for. */
+  const src = ts();
+  const at = src.indexOf("function refreshOverdueAttention(");
+  assert.notEqual(at, -1, "refreshOverdueAttention does not exist");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(
+    body,
+    /setToolAttention\("productivity", "kanban", overdueCount\(null, todayStr\) > 0\)/,
+    "the pulse is counted from something other than every board",
+  );
+  // And Next Due never pulses: a card due in nine days does not need you now.
+  const pulseLine = body.slice(body.indexOf("setToolAttention"));
+  assert.ok(
+    !/nextDue/.test(pulseLine.slice(0, pulseLine.indexOf(";"))),
+    "an upcoming due date pulses the sidebar",
+  );
+});
+
 test("the card modal does not borrow a class the board face owns", () => {
   /* .kb-card-top is the card face's header strip on the BOARD. The modal
      declared its own rule under that name lower down the same stylesheet, which

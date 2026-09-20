@@ -403,6 +403,46 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 }
 
 /* =============================================================================
+   THE DUE NOTICE
+   -----------------------------------------------------------------------------
+   The two warnings in the tool header. They sit inside .tool-header-notice and
+   inherit its color and weight, so they read as that notice rather than as a
+   pair of buttons that happen to be in the header. What marks them as clickable
+   is the underline and the cursor, the way a link does it, because a real
+   button outline up there would compete with the header's own actions.
+============================================================================= */
+
+.kb-due-notice-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.kb-due-notice-btn:hover {
+  text-decoration-style: solid;
+}
+
+/* On means "this is the filter you are looking through". A solid underline
+   rather than a color change, because the notice's color already means
+   something (it is the tool's warning color) and repainting it would say the
+   warning had changed rather than that a filter was on. */
+.kb-due-notice-btn.active {
+  text-decoration-style: solid;
+  text-decoration-thickness: 2px;
+}
+
+.kb-due-notice-sep {
+  margin: 0 8px;
+  opacity: 0.55;
+}
+
+/* =============================================================================
    FILTER BAR
 ============================================================================= */
 

@@ -288,7 +288,8 @@ export let currentBoardId: string | null = null;
  *  opening a card is a detour, walking out to the gallery is a departure. */
 let filterText = "";
 let filterTagIds = new Set<string>();
-let filterDue: "any" | "overdue" | "soon" | "none" = "any";
+type DueFilter = "any" | "overdue" | "nextdue" | "soon" | "none";
+let filterDue: DueFilter = "any";
 let filterBarOpen = false;
 
 
@@ -1003,6 +1004,7 @@ function normalizeScoped(raw: Partial<BoardScopedSettings>, base: BoardScopedSet
     defaultSort: normalizeSortRules(raw.defaultSort) ?? base.defaultSort,
     openCardsInEditMode: bool(raw.openCardsInEditMode, base.openCardsInEditMode),
     overdueWarn: bool(raw.overdueWarn, base.overdueWarn),
+    nextDueWarn: bool(raw.nextDueWarn, base.nextDueWarn),
   };
 }
 
@@ -1212,6 +1214,7 @@ export function normalizeOverrides(raw: unknown): Partial<BoardScopedSettings> {
     "showDue",
     "openCardsInEditMode",
     "overdueWarn",
+    "nextDueWarn",
   ] as const;
   for (const key of bools) {
     if (typeof src[key] === "boolean") out[key] = src[key];
@@ -1902,6 +1905,7 @@ export function effective(board: Board | null): BoardScopedSettings {
     defaultSort: kbSettings.defaultSort,
     openCardsInEditMode: kbSettings.openCardsInEditMode,
     overdueWarn: kbSettings.overdueWarn,
+    nextDueWarn: kbSettings.nextDueWarn,
   };
   if (!board) return base;
   return { ...base, ...board.overrides };
@@ -1941,6 +1945,99 @@ export function isOverdue(card: Card, todayStr: string = today()): boolean {
   if (card.dates.completed) return false;
   const diff = dayDiff(todayStr, card.dates.due);
   return diff !== null && diff < 0;
+}
+
+/**
+ * True when the card sits in a column that means done.
+ *
+ * THE COLUMN, not the Completed stamp, and the difference is the point. A stamp
+ * is written once when a card arrives in a done column and is never cleared, so
+ * a card dragged back out to In Progress still carries it. Reading the stamp
+ * would leave that card permanently out of the Next Due count, which is exactly
+ * the case where it has to come back.
+ *
+ * isOverdue reads the stamp instead, deliberately: "this was finished late" is
+ * a fact about history that a later move does not undo.
+ */
+function inDoneColumn(card: Card): boolean {
+  const board = getBoard(card.boardId);
+  return board ? getColumn(board, card.columnId)?.isDone === true : false;
+}
+
+/**
+ * True when the card is work still ahead of you with a date on it: it has a
+ * due date, its board shows due dates, it is not archived, it is not finished,
+ * and that date has not passed.
+ *
+ * OVERDUE IS NOT UPCOMING. A late card is its own warning, and letting it also
+ * be "the next thing due" would peg the next-due date in the past forever.
+ */
+function isUpcoming(card: Card, todayStr: string): boolean {
+  if (card.archived || !card.dates.due) return false;
+  if (!effectiveForCard(card).showDue) return false;
+  if (card.dates.completed || inDoneColumn(card)) return false;
+  const diff = dayDiff(todayStr, card.dates.due);
+  return diff !== null && diff >= 0;
+}
+
+/**
+ * The soonest due date still ahead, and the cards sitting on it.
+ *
+ * THE DATE FIRST, then everything on it, which is what makes the sentence
+ * "Next 3 Cards Due in 9 days" true rather than "the next 3 cards". Five cards
+ * due October 1st, one on September 29th and three on September 25th gives
+ * three cards and nine days, not the three soonest in a row.
+ *
+ * `boardId` null asks across every board, which is what the gallery shows.
+ */
+interface NextDue {
+  day: string;
+  cards: Card[];
+  /** Whole days from today. 0 is today. */
+  inDays: number;
+}
+
+/**
+ * `respectWarn` is what the NOTICE is asking and the FILTER is not. The switch
+ * in Board Setup decides whether a board shouts at you, not what is true about
+ * its cards, so a filter you picked by hand still finds them on a board that
+ * has chosen to stay quiet. The overdue half already worked this way: the
+ * Overdue chip reads isOverdue, which has never consulted overdueWarn.
+ */
+function nextDue(
+  boardId: string | null,
+  todayStr: string,
+  respectWarn: boolean = true,
+): NextDue | null {
+  // ONE pass, collecting as it goes and dropping what it has the moment a
+  // sooner date turns up. Two passes meant reading every card's effective
+  // settings twice, and those are rebuilt per call.
+  let day: string | null = null;
+  let on: Card[] = [];
+  for (const card of cards) {
+    if (boardId !== null && card.boardId !== boardId) continue;
+    if (respectWarn && !effectiveForCard(card).nextDueWarn) continue;
+    if (!isUpcoming(card, todayStr)) continue;
+    const due = card.dates.due!;
+    if (day === null || due < day) {
+      day = due;
+      on = [card];
+    } else if (due === day) {
+      on.push(card);
+    }
+  }
+  if (day === null) return null;
+  return { day, cards: on, inDays: dayDiff(todayStr, day) ?? 0 };
+}
+
+/** How many cards are past due, on one board or across all of them. */
+function overdueCount(boardId: string | null, todayStr: string): number {
+  return cards.filter(
+    (c) =>
+      (boardId === null || c.boardId === boardId) &&
+      effectiveForCard(c).overdueWarn &&
+      isOverdue(c, todayStr),
+  ).length;
 }
 
 /** Index of the furthest stage this card has reached, or -1 for none. */
@@ -1998,7 +2095,24 @@ function cardMatchesTags(card: Card): boolean {
   return true;
 }
 
-function cardMatchesDue(card: Card, todayStr: string): boolean {
+/**
+ * The due date the "Next due" filter is measured against, worked out ONCE for
+ * a whole render and handed down.
+ *
+ * It used to be worked out inside the per-card test, which is a scan of every
+ * card in the tool for every card being drawn. A board at its 5,000 ceiling
+ * turned one repaint into twenty-five million comparisons, and the filter that
+ * caused it is one click away from the header.
+ *
+ * Null means either that the filter is not on or that there is nothing
+ * upcoming, and the test below handles both the same way.
+ */
+function nextDueDayFor(boardId: string | null, todayStr: string): string | null {
+  if (filterDue !== "nextdue") return null;
+  return nextDue(boardId, todayStr, false)?.day ?? null;
+}
+
+function cardMatchesDue(card: Card, todayStr: string, nextDueDay: string | null): boolean {
   switch (filterDue) {
     case "any":
       return true;
@@ -2006,6 +2120,15 @@ function cardMatchesDue(card: Card, todayStr: string): boolean {
       return !card.dates.due;
     case "overdue":
       return isOverdue(card, todayStr);
+    /* Overdue cards are included here even though they are not what the count
+       was measured from. The warning answers "when is the next thing due"; the
+       filter answers "what do I need to look at", and something already late is
+       the first thing on that list. Stated on the card in those words. */
+    case "nextdue":
+      if (isOverdue(card, todayStr)) return true;
+      return (
+        nextDueDay !== null && card.dates.due === nextDueDay && isUpcoming(card, todayStr)
+      );
     case "soon": {
       if (!card.dates.due || card.dates.completed) return false;
       const diff = dayDiff(todayStr, card.dates.due);
@@ -2014,11 +2137,11 @@ function cardMatchesDue(card: Card, todayStr: string): boolean {
   }
 }
 
-function cardMatchesFilters(card: Card, todayStr: string): boolean {
+function cardMatchesFilters(card: Card, todayStr: string, nextDueDay: string | null): boolean {
   return (
     cardMatchesText(card, filterText) &&
     cardMatchesTags(card) &&
-    cardMatchesDue(card, todayStr)
+    cardMatchesDue(card, todayStr, nextDueDay)
   );
 }
 
@@ -2027,6 +2150,10 @@ function clearFilters(): void {
   filterTagIds.clear();
   filterDue = "any";
   filterBarOpen = false;
+  // The gallery's own one goes with them. Both are session state that belongs
+  // to a screen you have just left, and a gallery still filtered to overdue
+  // boards from a visit ten minutes ago looks like a gallery missing boards.
+  galleryDue = "any";
   if (cardSearchInput) cardSearchInput.value = "";
 }
 
@@ -2201,27 +2328,109 @@ export function renderAll(): void {
   refreshOverdueAttention();
 }
 
+/* -----------------------------------------------------------------------------
+   THE DUE NOTICE
+   -----------------------------------------------------------------------------
+   Two warnings in one strip: what is already late, and what is coming up next.
+   Both are clickable, and clicking one is a shortcut for a filter you could set
+   by hand rather than a special mode. One click on, one click off.
+
+   SCOPED TO WHAT YOU ARE LOOKING AT. On a board it counts that board's cards,
+   because a number that counts six other boards is not a number you can act on
+   from here, and clicking it would have nothing to filter to. In the gallery it
+   counts everything, and a click filters the GALLERY down to the boards that
+   have those cards.
+
+   THE PULSE STAYS TOOL-WIDE, and only for overdue. A per-board pulse would hide
+   a board on fire while you stood on a quiet one, which is the one thing the
+   pulse is for. And a pulse means "this needs you now": something due in nine
+   days does not, so Next Due is counted in the header and never pulses.
+
+   IT DOES NOT OPEN THE FILTER STRIP. The notice is the control, it shows its
+   own on state, and clicking it again puts it back. Forcing the strip open
+   would undo the thing #238 just fixed.
+----------------------------------------------------------------------------- */
+
+/** Which boards the gallery is showing, when a due warning has been clicked
+ *  there. Session state, like the board filters, and cleared the same way. */
+let galleryDue: "any" | "overdue" | "nextdue" = "any";
+
+/** The board the notice is speaking about, or null for the whole tool. */
+function noticeScopeBoardId(): string | null {
+  return currentView === "board" ? currentBoardId : null;
+}
+
+function nextDueText(due: NextDue): string {
+  const n = due.cards.length;
+  const what = n === 1 ? "Next Card Due" : `Next ${n} Cards Due`;
+  if (due.inDays === 0) return `${what} Today`;
+  return `${what} in ${due.inDays} ${due.inDays === 1 ? "day" : "days"}`;
+}
+
 /** Flags the tool while anything is past its due date, through the same
  *  sidebar pulse + header notice Auto-Backup and Budget use, so "something
- *  needs you" reads the same wherever it comes from. */
+ *  needs you" reads the same wherever it comes from. Then draws the strip. */
 function refreshOverdueAttention(): void {
   const todayStr = today();
-  /* Counted board by board, because the warning is a board's own answer now. A
+  /* Counted board by board, because the warning is a board's own answer. A
      board with it off contributes nothing even while its cards are genuinely
      overdue, which is the point: it is a board nobody wants shouted at about. */
-  const overdue = cards.filter(
-    (c) => effectiveForCard(c).overdueWarn && isOverdue(c, todayStr),
-  ).length;
+  setToolAttention("productivity", "kanban", overdueCount(null, todayStr) > 0);
 
-  setToolAttention("productivity", "kanban", overdue > 0);
+  const scope = noticeScopeBoardId();
+  const overdue = overdueCount(scope, todayStr);
+  const upcoming = nextDue(scope, todayStr);
+
+  headerNotice.replaceChildren();
+  if (overdue === 0 && upcoming === null) {
+    headerNoticeWrap.style.display = "none";
+    return;
+  }
+  headerNoticeWrap.style.display = "";
+
+  const active = scope === null ? galleryDue : filterDue;
+
+  const part = (text: string, which: "overdue" | "nextdue", hint: string): void => {
+    if (headerNotice.childElementCount > 0) {
+      const dot = document.createElement("span");
+      dot.className = "kb-due-notice-sep";
+      dot.textContent = "\u00b7";
+      headerNotice.appendChild(dot);
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "kb-due-notice-btn";
+    btn.textContent = text;
+    const on = active === which;
+    btn.classList.toggle("active", on);
+    btn.title = on ? "Click to stop filtering by this" : hint;
+    btn.addEventListener("click", () => {
+      const next = on ? "any" : which;
+      if (scope === null) galleryDue = next;
+      else filterDue = next;
+      // renderAll rather than the one pane, because this strip is part of what
+      // needs redrawing: the button that was just clicked has to come back
+      // lit, and the other one has to come back unlit.
+      renderAll();
+    });
+    headerNotice.appendChild(btn);
+  };
 
   if (overdue > 0) {
-    headerNoticeWrap.style.display = "";
-    headerNotice.textContent =
-      overdue === 1 ? "1 card is past its due date" : `${overdue} cards are past their due date`;
-  } else {
-    headerNoticeWrap.style.display = "none";
-    headerNotice.textContent = "";
+    part(
+      overdue === 1 ? "1 card is past due" : `${overdue} cards are past due`,
+      "overdue",
+      scope === null ? "Show only boards with overdue cards" : "Show only the overdue cards",
+    );
+  }
+  if (upcoming) {
+    part(
+      nextDueText(upcoming),
+      "nextdue",
+      scope === null
+        ? "Show only boards with cards due next, or overdue"
+        : "Show the cards due next, and anything overdue",
+    );
   }
 }
 
@@ -2236,11 +2445,13 @@ function renderGallery(): void {
   applyBoardSortMode();
 
   const needle = boardSearchInput.value.trim().toLowerCase();
+  const todayStr = today();
   const visible = boards.filter(
     (b) =>
-      !needle ||
-      b.name.toLowerCase().includes(needle) ||
-      b.description.toLowerCase().includes(needle),
+      (!needle ||
+        b.name.toLowerCase().includes(needle) ||
+        b.description.toLowerCase().includes(needle)) &&
+      boardMatchesGalleryDue(b, todayStr),
   );
 
   boardGrid.replaceChildren();
@@ -2260,10 +2471,34 @@ function renderGallery(): void {
       "No boards yet. Make one and give it a background so you can tell it apart at a glance.";
   } else if (visible.length === 0) {
     boardsEmpty.style.display = "";
-    boardsEmpty.textContent = "No board matches that search.";
+    boardsEmpty.textContent =
+      galleryDue === "any"
+        ? "No board matches that search."
+        : needle
+          ? "No board matches that search and that warning."
+          : "No board has those cards any more.";
   } else {
     boardsEmpty.style.display = "none";
   }
+}
+
+/**
+ * Whether a board survives the warning that was clicked in the gallery.
+ *
+ * A BOARD MATCHES IF ANY OF ITS CARDS DO, which is the only reading that makes
+ * sense a level up: the gallery shows boards, so "show me the overdue" there
+ * means "show me the boards I would find them on". The card-level rules are the
+ * same ones the board view uses, so the two never disagree about what counts.
+ *
+ * The general version of this, a real filter for the gallery rather than one
+ * reachable only by clicking a warning, is #249.
+ */
+function boardMatchesGalleryDue(board: Board, todayStr: string): boolean {
+  if (galleryDue === "any") return true;
+  if (overdueCount(board.id, todayStr) > 0) return true;
+  // "Next due" includes overdue, the same way the board filter does, so the
+  // check above already covers half of it.
+  return galleryDue === "nextdue" && nextDue(board.id, todayStr) !== null;
 }
 
 /** One gallery tile. A div rather than a button because it contains a real
@@ -2333,10 +2568,7 @@ function buildBoardTile(board: Board): HTMLElement {
   {
     const todayStr = today();
     const overdue = live.filter((c) => isOverdue(c, todayStr)).length;
-    const done = live.filter((c) => {
-      const col = getColumn(board, c.columnId);
-      return col?.isDone === true;
-    }).length;
+    const done = live.filter(inDoneColumn).length;
     const bits = [`${live.length} ${live.length === 1 ? "card" : "cards"}`, `${done} done`];
     if (overdue > 0) bits.push(`${overdue} overdue`);
     stats.textContent = bits.join(" · ");
@@ -2529,7 +2761,8 @@ function backgroundSrc(bg: BoardBackground): string {
 function renderBoardCounts(board: Board): void {
   const todayStr = today();
   const live = liveCardsOnBoard(board.id);
-  const shown = live.filter((c) => cardMatchesFilters(c, todayStr)).length;
+  const nextDueDay = nextDueDayFor(board.id, todayStr);
+  const shown = live.filter((c) => cardMatchesFilters(c, todayStr, nextDueDay)).length;
   const archived = archivedCardsOnBoard(board.id).length;
 
   // Said beside the total rather than as its own piece, because it is a part
@@ -2598,8 +2831,11 @@ function renderColumns(board: Board): void {
   }
   columnsEmpty.style.display = "none";
 
+  // Once for the whole board, beside todayStr and for the same reason: every
+  // column filters against it, and it is a scan of the tool's cards.
+  const nextDueDay = nextDueDayFor(board.id, todayStr);
   for (const column of board.columns) {
-    columnsEl.appendChild(buildColumn(board, column, todayStr));
+    columnsEl.appendChild(buildColumn(board, column, todayStr, nextDueDay));
   }
 
   /* Put back what was there. A column holding less than it did (a card was
@@ -3187,7 +3423,12 @@ function renderSortEditor(): void {
   add.disabled = add.children.length <= 1;
 }
 
-function buildColumn(board: Board, column: Column, todayStr: string): HTMLElement {
+function buildColumn(
+  board: Board,
+  column: Column,
+  todayStr: string,
+  nextDueDay: string | null,
+): HTMLElement {
   const el = document.createElement("section");
   el.className = "kb-column";
   el.dataset.columnId = column.id;
@@ -3195,7 +3436,7 @@ function buildColumn(board: Board, column: Column, todayStr: string): HTMLElemen
   if (column.isDone) el.classList.add("kb-column-done");
 
   const all = cardsInColumn(board.id, column.id);
-  const visible = visibleCardsInColumn(board, column, todayStr);
+  const visible = visibleCardsInColumn(board, column, todayStr, nextDueDay);
   const rules = rulesForColumn(board, column);
   // The WIP number counts every card in the column, not the filtered subset:
   // a limit that moved when you typed in a search box would be worthless.
@@ -3541,10 +3782,14 @@ export function clearCardSelection(redraw = true): void {
  *  hidden by a filter) leave the selection. Doesn't redraw; the caller does. */
 export function pruneCardSelection(): void {
   const todayStr = today();
+  const nextDueDay = nextDueDayFor(currentBoardId, todayStr);
   for (const id of selectedCardIds) {
     const card = getCard(id);
     const onScreen =
-      !!card && !card.archived && card.boardId === currentBoardId && cardMatchesFilters(card, todayStr);
+      !!card &&
+      !card.archived &&
+      card.boardId === currentBoardId &&
+      cardMatchesFilters(card, todayStr, nextDueDay);
     if (!onScreen) selectedCardIds.delete(id);
   }
   if (selectionAnchorId && !selectedCardIds.has(selectionAnchorId)) selectionAnchorId = null;
@@ -3574,7 +3819,10 @@ function extendCardSelection(card: Card): void {
     toggleCardSelection(card);
     return;
   }
-  const column = visibleCardsInColumn(board, col, today());
+  // Its own, rather than one handed down: this is one shift-click, not a loop
+  // over every column on the board.
+  const todayStr = today();
+  const column = visibleCardsInColumn(board, col, todayStr, nextDueDayFor(board.id, todayStr));
   const from = column.findIndex((c) => c.id === anchor.id);
   const to = column.findIndex((c) => c.id === card.id);
   if (from === -1 || to === -1) {
@@ -3598,10 +3846,17 @@ function extendCardSelection(card: Card): void {
  *  so the cards between two clicks are always the cards between them on screen.
  *  Selecting through a card you cannot see would be a selection you cannot
  *  check. */
-function visibleCardsInColumn(board: Board, column: Column, todayStr: string): Card[] {
+function visibleCardsInColumn(
+  board: Board,
+  column: Column,
+  todayStr: string,
+  nextDueDay: string | null,
+): Card[] {
   // Filtered first, then sorted: sorting cards that are not on screen would
   // only cost time, and the order of what IS shown is the same either way.
-  const shown = cardsInColumn(board.id, column.id).filter((c) => cardMatchesFilters(c, todayStr));
+  const shown = cardsInColumn(board.id, column.id).filter((c) =>
+    cardMatchesFilters(c, todayStr, nextDueDay),
+  );
   return sortCards(shown, rulesForColumn(board, column), board);
 }
 
@@ -3650,9 +3905,12 @@ function renderFilterBar(board: Board): void {
   dueLabel.textContent = "Due";
   dueGroup.appendChild(dueLabel);
 
-  const DUE_OPTIONS: { value: typeof filterDue; label: string }[] = [
+  const DUE_OPTIONS: { value: DueFilter; label: string }[] = [
     { value: "any", label: "Any" },
     { value: "overdue", label: "Overdue" },
+    // Beside Overdue, because the header notice sets this one and that click
+    // has to be something you could also have done by hand.
+    { value: "nextdue", label: "Next due" },
     { value: "soon", label: "Next 7 days" },
     { value: "none", label: "No due date" },
   ];
@@ -4719,6 +4977,11 @@ const BOARD_OVERRIDE_GROUPS: OverrideRow[][] = [
     key: "overdueWarn",
     label: "Warn on Overdue Cards",
     info: "Whether this board's overdue cards pulse the Kanban sidebar icon and get counted in the tool header. A board that keeps due dates it does not work to can stop shouting about them without losing the dates.",
+    },
+    {
+    key: "nextDueWarn",
+    label: "Warn on the Next Cards Due",
+    info: "Whether this board's soonest upcoming due date gets counted in the tool header. Separate from the overdue warning, because a card coming up is a plan and a card that is late is a problem. This one never pulses the sidebar: nothing about it needs you right now.",
     },
   ],
   // What happens when you use a board.
@@ -7125,6 +7388,9 @@ function bindPreferenceControls(): void {
   bindToggle("kbOverdueWarnToggle", "kbOverdueWarnLabel", (v) => {
     kbSettings.overdueWarn = v;
   });
+  bindToggle("kbNextDueWarnToggle", "kbNextDueWarnLabel", (v) => {
+    kbSettings.nextDueWarn = v;
+  });
   bindToggle(
     "kbShowCardDeleteToggle",
     "kbShowCardDeleteLabel",
@@ -7680,6 +7946,7 @@ function applySettingsToForm(): void {
   setToggle("kbShowDatesToggle", "kbShowDatesLabel", kbSettings.showDates);
   setToggle("kbShowNumbersToggle", "kbShowNumbersLabel", kbSettings.showNumbers);
   setToggle("kbOverdueWarnToggle", "kbOverdueWarnLabel", kbSettings.overdueWarn);
+  setToggle("kbNextDueWarnToggle", "kbNextDueWarnLabel", kbSettings.nextDueWarn);
   setToggle("kbShowCardDeleteToggle", "kbShowCardDeleteLabel", kbSettings.showCardDelete);
   setToggle("kbShowStagesToggle", "kbShowStagesLabel", kbSettings.showStages);
   setToggle("kbShowDueToggle", "kbShowDueLabel", kbSettings.showDue);
