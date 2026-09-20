@@ -24,7 +24,15 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { flash, devError, shortPath, flushOnQuit } from "../core/shell";
+import {
+  devError,
+  flash,
+  flushOnQuit,
+  getSoundOptions,
+  playSoundUrl,
+  resolveSoundUrl,
+  shortPath,
+} from "../core/shell";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu } from "../menu/menu";
 import { renderToolBackups, readToolBackup } from "../core/tool-backups";
@@ -93,6 +101,17 @@ type TTSettings = {
   // closing the app mid-interruption doesn't lose what you meant to go back
   // to. See the LIVE BREAK-IN section.
   pausedTasks: PausedTask[];
+  // A doot as an End Time already typed into the form comes up. See the END
+  // TIME WARNING section.
+  endWarning: EndWarningSettings;
+};
+
+type EndWarningSettings = {
+  enabled: boolean;
+  /** How many minutes ahead of the End Time the first doot lands. */
+  leadMinutes: number;
+  /** A cue id from getSoundOptions(), or "none". */
+  soundId: string;
 };
 
 /* =============================================================================
@@ -130,6 +149,11 @@ let settings: TTSettings = {
   lastCsvImportAt: "",
   breakInUseMinutes: false,
   pausedTasks: [],
+  endWarning: {
+    enabled: false,
+    leadMinutes: 5,
+    soundId: "timer:timer-chime-long",
+  },
 };
 
 let settingsSaveTimer: number | null = null;
@@ -531,6 +555,45 @@ function applyPayPeriodVisibility(): void {
   subsettings.style.maxHeight = settings.payPeriod.enabled ? "200px" : "0";
 }
 
+function applyEndWarningVisibility(): void {
+  const subsettings = document.getElementById("ttEndWarnSubsettings")!;
+  subsettings.style.maxHeight = settings.endWarning.enabled ? "200px" : "0";
+}
+
+/** Every cue the app ships, grouped the way the Countdown Timer's alarm picker
+ *  groups them, with Silent above the groups because it belongs to none.
+ *
+ *  Refilled each time Setup opens rather than once at startup: the sound pack
+ *  can be changed from App Settings in between, and a list built before that
+ *  would offer cues that are no longer installed. */
+function populateEndWarningSounds(): void {
+  const select = document.getElementById("ttEndWarnSound") as HTMLSelectElement;
+  select.replaceChildren();
+
+  const silent = document.createElement("option");
+  silent.value = "none";
+  silent.textContent = "Silent";
+  select.appendChild(silent);
+
+  for (const group of getSoundOptions()) {
+    const groupEl = document.createElement("optgroup");
+    groupEl.label = group.label;
+    for (const option of group.options) {
+      const el = document.createElement("option");
+      el.value = option.id;
+      el.textContent = option.name;
+      groupEl.appendChild(el);
+    }
+    select.appendChild(groupEl);
+  }
+
+  select.value = settings.endWarning.soundId;
+  // A cue whose pack has been uninstalled leaves nothing selected. Shown as
+  // Silent, which is what it will actually do, but NOT written back: put the
+  // pack back and the sound the setting still names comes back with it.
+  if (select.selectedIndex === -1) select.value = "none";
+}
+
 function applyPayPeriodButtons(): void {
   const container = document.getElementById("payPeriodPresets")!;
   container.style.display = settings.payPeriod.enabled ? "flex" : "none";
@@ -559,6 +622,13 @@ function applyTTSettings(): void {
   document.getElementById("breakInMinutesLabel")!.textContent =
     settings.breakInUseMinutes ? "On" : "Off";
 
+  (document.getElementById("ttEndWarnToggle") as HTMLInputElement).checked =
+    settings.endWarning.enabled;
+  document.getElementById("ttEndWarnLabel")!.textContent =
+    settings.endWarning.enabled ? "On" : "Off";
+  (document.getElementById("ttEndWarnLead") as HTMLInputElement).value =
+    String(settings.endWarning.leadMinutes);
+
   (document.getElementById("payPeriodToggle") as HTMLInputElement).checked =
     settings.payPeriod.enabled;
   document.getElementById("payPeriodLabel")!.textContent =
@@ -571,6 +641,7 @@ function applyTTSettings(): void {
 
   applyPayPeriodVisibility();
   applyPayPeriodButtons();
+  applyEndWarningVisibility();
   refreshCsvImportStatusUI();
   refreshBreakInUI();
 }
@@ -595,6 +666,7 @@ async function writeSettingsNow(): Promise<void> {
     lastCsvImportAt: settings.lastCsvImportAt,
     breakInUseMinutes: settings.breakInUseMinutes,
     pausedTasks: settings.pausedTasks,
+    endWarning: settings.endWarning,
   };
   try {
     await saveToolJson("time-tracker", "settings", own);
@@ -651,6 +723,9 @@ async function loadSettings(): Promise<void> {
       if (Array.isArray(own.pausedTasks)) {
         settings.pausedTasks = own.pausedTasks.filter(isValidPausedTask);
       }
+      if (own.endWarning && typeof own.endWarning === "object") {
+        settings.endWarning = normalizeEndWarning(own.endWarning as Record<string, unknown>);
+      }
     } else if ("quickDelete" in shared || "payPeriod" in shared) {
       // Legacy keys found in settings.json and no own-file yet: migrate.
       saveSettings();
@@ -660,6 +735,21 @@ async function loadSettings(): Promise<void> {
   } catch (err) {
     devError("Settings load failed:", err);
   }
+}
+
+/** Clamped on the way in from disk, not only on the way in from the input.
+ *  A hand-edited settings file can name a lead of 100000, and the number input
+ *  does not stop a value being typed either, so the two limits have to agree
+ *  and both have to be enforced here. */
+function normalizeEndWarning(raw: Record<string, unknown>): EndWarningSettings {
+  const lead = Number(raw.leadMinutes);
+  return {
+    enabled: raw.enabled === true,
+    leadMinutes: Number.isFinite(lead)
+      ? Math.min(MAX_END_WARN_LEAD_MIN, Math.max(MIN_END_WARN_LEAD_MIN, Math.round(lead)))
+      : DEFAULT_END_WARN_LEAD_MIN,
+    soundId: typeof raw.soundId === "string" && raw.soundId ? raw.soundId : "none",
+  };
 }
 
 function isValidActivity(a: unknown): a is Activity {
@@ -1019,6 +1109,156 @@ function updateDurationPreview(
     tick();
     durationPreviewTimer = window.setInterval(tick, 1000);
   }
+}
+
+/* =============================================================================
+   END TIME WARNING
+   -----------------------------------------------------------------------------
+   An End Time typed into the form before it has happened is a plan: "I am
+   stopping at 11:30." Nothing was watching it, so the only thing that made the
+   plan real was remembering it, which is the whole problem the plan was
+   written down to solve.
+
+   TWO DOOTS, not one. The lead warning is the one you can act on, because five
+   minutes is long enough to finish a sentence and short enough to still be
+   about this task. The one at the End Time itself is the one that is true. A
+   lead warning on its own leaves 11:30 unmarked, which is the moment that
+   actually matters.
+
+   ARMED WHEN THE TARGET CHANGES, and a stage already behind you at that moment
+   is marked spent rather than fired. Typing an end two minutes out with a five
+   minute lead should not doot the instant you leave the field, and typing one
+   that has already passed should not doot at all.
+
+   APP-WIDE, not only while Time Tracker is on screen. The point is that you
+   are somewhere else when it lands.
+============================================================================= */
+
+const MIN_END_WARN_LEAD_MIN = 1;
+/** Four hours. Beyond that it is not a warning about this task, and the number
+ *  input carries the same pair of limits (see standards section 10). */
+const MAX_END_WARN_LEAD_MIN = 240;
+const DEFAULT_END_WARN_LEAD_MIN = 5;
+
+/** Every 15 seconds. A doot up to 15 seconds late on a five minute warning is
+ *  not a warning that failed, and a per-second timer that reads two input
+ *  fields for eight hours a day is not worth that accuracy. */
+const END_WARN_TICK_MS = 15_000;
+
+type EndWarnStage = "lead" | "due";
+
+/** The End Time currently being watched, as "YYYY-MM-DDTHH:MM:SS", and which
+ *  of its two doots have been used up. Both are spent when the target itself
+ *  is what changed, which is what re-arms the warning. */
+let endWarnTarget = "";
+let endWarnSpent = new Set<EndWarnStage>();
+let endWarnTimer: number | null = null;
+
+/**
+ * The moment the form's End Date and End Time name, or null when they do not
+ * name one yet.
+ *
+ * The End DATE is read the same way the duration preview and Add Entry read
+ * it: the field itself once it has been touched directly, otherwise the start
+ * date, rolled forward a day when the end clock reads earlier than the start
+ * clock. A form saying 23:00 to 01:00 means tomorrow morning, and a warning
+ * that fired against this morning would be twenty-two hours out.
+ */
+function formEndMoment(
+  startDatePicker: HTMLInputElement,
+  startInput: HTMLInputElement,
+  endDatePicker: HTMLInputElement,
+  endInput: HTMLInputElement,
+): Date | null {
+  const end = normalizeTime(endInput.value.trim());
+  if (!end) return null;
+
+  const startDate = startDatePicker.value || today();
+  const start = normalizeTime(startInput.value.trim());
+  let endDate = endDateManuallySet ? endDatePicker.value || startDate : startDate;
+  if (!endDateManuallySet && start && parseTime(end) < parseTime(start)) {
+    endDate = addDaysToDate(startDate, 1);
+  }
+
+  const at = new Date(`${endDate}T${end}`);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/** Plays the configured cue once. Silent when set to None, or when the pack
+ *  that owned the chosen cue is no longer installed. */
+function playEndWarning(): void {
+  if (settings.endWarning.soundId === "none") return;
+  const url = resolveSoundUrl(settings.endWarning.soundId);
+  if (url) void playSoundUrl(url);
+}
+
+/** One tick. Cheap enough to run unconditionally: two field reads and a date
+ *  parse, which is less work than the duration preview does every second while
+ *  a clock is running. */
+function checkEndWarning(
+  startDatePicker: HTMLInputElement,
+  startInput: HTMLInputElement,
+  endDatePicker: HTMLInputElement,
+  endInput: HTMLInputElement,
+): void {
+  const at = settings.endWarning.enabled
+    ? formEndMoment(startDatePicker, startInput, endDatePicker, endInput)
+    : null;
+  const key = at ? at.toISOString() : "";
+
+  if (key !== endWarnTarget) {
+    endWarnTarget = key;
+    endWarnSpent = new Set();
+    if (!at) return;
+    // Arming, not firing. Whatever is already behind this moment is spent, so
+    // an end time typed in the past says nothing and one typed inside the lead
+    // window still speaks at the time itself.
+    const leadMs = settings.endWarning.leadMinutes * 60_000;
+    const left = at.getTime() - Date.now();
+    if (left <= leadMs) endWarnSpent.add("lead");
+    if (left <= 0) endWarnSpent.add("due");
+    return;
+  }
+
+  if (!at) return;
+  const left = at.getTime() - Date.now();
+
+  if (left <= 0 && !endWarnSpent.has("due")) {
+    endWarnSpent.add("due");
+    endWarnSpent.add("lead");
+    // Silent toast: the cue below is this event's sound, and the toast's own
+    // would land on top of it as a second, unasked-for doot.
+    flash(`End Time reached: ${formatTime(normalizeTime(endInput.value.trim()))}.`, "success", 8000, true);
+    playEndWarning();
+    return;
+  }
+
+  if (left <= settings.endWarning.leadMinutes * 60_000 && !endWarnSpent.has("lead")) {
+    endWarnSpent.add("lead");
+    const mins = Math.max(1, Math.round(left / 60_000));
+    flash(
+      `End Time in ${mins} ${mins === 1 ? "minute" : "minutes"}: ${formatTime(normalizeTime(endInput.value.trim()))}.`,
+      "success",
+      8000,
+      true,
+    );
+    playEndWarning();
+  }
+}
+
+/** Starts the watch, and rearms it at once so a toggle or a retyped End Time
+ *  is picked up without waiting out a tick. */
+function startEndWarningWatch(
+  startDatePicker: HTMLInputElement,
+  startInput: HTMLInputElement,
+  endDatePicker: HTMLInputElement,
+  endInput: HTMLInputElement,
+): void {
+  const tick = (): void =>
+    checkEndWarning(startDatePicker, startInput, endDatePicker, endInput);
+  if (endWarnTimer) clearInterval(endWarnTimer);
+  endWarnTimer = window.setInterval(tick, END_WARN_TICK_MS);
+  tick();
 }
 
 /* =============================================================================
@@ -3242,6 +3482,7 @@ function getTTSetupModal(): Modal {
         renderActivitiesList();
         renderProjectsList();
         applyTTSettings();
+        populateEndWarningSounds();
       },
     });
 
@@ -4773,9 +5014,16 @@ export function initTimeTracker(): void {
     doSaveDraft();
     doRender();
   }
+  function doCheckEndWarning() {
+    checkEndWarning(datePicker, startInput, endDatePicker, endInput);
+  }
   // Module-level activity rename/delete mutate entries and need to refresh the
   // ledger; expose doRender to them without leaking DOM refs out of init.
   renderCurrentView = doRender;
+
+  /* The watch starts with the tool, not with the view: the point of a warning
+     about an End Time is that you are in another tool when it lands. */
+  startEndWarningWatch(datePicker, startInput, endDatePicker, endInput);
 
   /* -------------------------------------------------------------------------
      EVENT LISTENERS: INPUT PANEL
@@ -5097,6 +5345,46 @@ export function initTimeTracker(): void {
     saveSettings();
     // The Break-In modal is never open at the same time as Setup, so there is
     // nothing on screen to re-render here; the next open reads the new mode.
+  });
+
+  /* ── END TIME WARNING ──
+     Each of the three rearms the watch straight away, so a toggle flipped
+     while an End Time is already sitting in the form takes effect now rather
+     than at the end of the release you next restart in. */
+  document.getElementById("ttEndWarnToggle")!.addEventListener("change", (e) => {
+    settings.endWarning.enabled = (e.target as HTMLInputElement).checked;
+    document.getElementById("ttEndWarnLabel")!.textContent =
+      settings.endWarning.enabled ? "On" : "Off";
+    applyEndWarningVisibility();
+    saveSettings();
+    doCheckEndWarning();
+  });
+
+  document.getElementById("ttEndWarnLead")!.addEventListener("change", (e) => {
+    const field = e.target as HTMLInputElement;
+    // Clamped here as well as on load: a number input does not stop an
+    // out-of-range value being typed into it.
+    const typed = Math.round(Number(field.value));
+    const lead = Number.isFinite(typed)
+      ? Math.min(MAX_END_WARN_LEAD_MIN, Math.max(MIN_END_WARN_LEAD_MIN, typed))
+      : DEFAULT_END_WARN_LEAD_MIN;
+    field.value = String(lead);
+    settings.endWarning.leadMinutes = lead;
+    saveSettings();
+    doCheckEndWarning();
+  });
+
+  document.getElementById("ttEndWarnSound")!.addEventListener("change", (e) => {
+    settings.endWarning.soundId = (e.target as HTMLSelectElement).value;
+    saveSettings();
+  });
+
+  document.getElementById("ttEndWarnTest")!.addEventListener("click", () => {
+    if (settings.endWarning.soundId === "none") {
+      flash("The warning is set to Silent.", "success");
+      return;
+    }
+    playEndWarning();
   });
 
   document.getElementById("payPeriodToggle")!.addEventListener("change", (e) => {

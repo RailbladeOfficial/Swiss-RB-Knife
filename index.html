@@ -4527,6 +4527,38 @@
               </div>
             </div>
 
+            <!-- END TIME WARNING
+                 A doot as an End Time you have already typed comes up. Off by
+                 default: an app that starts making noise on its own is one
+                 people switch off wholesale. -->
+            <div class="settings-row">
+              <span title="Plays a sound as an End Time you have typed comes up, and again when it arrives.">End Time Warning:</span>
+              <div class="toggle-with-label">
+                <span id="ttEndWarnLabel">Off</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="ttEndWarnToggle" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div id="ttEndWarnSubsettings" class="subsettings">
+              <div class="settings-row">
+                <span>Warn Before:</span>
+                <div class="toggle-with-label">
+                  <input type="number" id="ttEndWarnLead" min="1" max="240" step="1" value="5" />
+                  <span>minutes</span>
+                </div>
+              </div>
+              <div class="settings-row">
+                <span>Sound:</span>
+                <div class="toggle-with-label">
+                  <select id="ttEndWarnSound" class="settings-select"></select>
+                  <button id="ttEndWarnTest" class="modal-cancel-btn" title="Play the warning">Test</button>
+                </div>
+              </div>
+            </div>
+
             <div class="settings-row">
               <span title="Off: break-ins ask when the interruption ended. On: they ask how many minutes it took.">Break-In Length in Minutes:</span>
               <div class="toggle-with-label">
