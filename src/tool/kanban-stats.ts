@@ -28,7 +28,6 @@ import type {
 import {
   archivedCardsOnBoard,
   authorLabel,
-  buildTagChip,
   createdDay,
   dayDiff,
   describeDays,
@@ -39,6 +38,7 @@ import {
   liveCardsOnBoard,
   stageOrderWarning,
 } from "./kanban";
+import { buildTagChip } from "./kanban-card-face";
 import { getCardModal, openCard } from "./kanban-card";
 
 export let _cardStatsModal: Modal | null = null;

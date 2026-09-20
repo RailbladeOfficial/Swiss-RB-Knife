@@ -37,6 +37,7 @@ import { Modal, ModalTabs } from "../modal/modal";
 import { closeMenu, openMenu, type MenuItem } from "../menu/menu";
 import { formatBytes } from "../core/format";
 import { openCardStats } from "./kanban-stats";
+import { paintTagChip, cardOwnerMenu } from "./kanban-card-face";
 import { newId } from "../core/ids";
 import { localDay, today } from "../core/timestamp";
 import {
@@ -73,7 +74,6 @@ import {
   attachmentKind,
   boards,
   cardColorMode,
-  cardOwnerMenu,
   cards,
   createdMoment,
   dayDiff,
@@ -101,7 +101,6 @@ import {
   openBoardSetup,
   openTagEditor,
   orderedCardTags,
-  paintTagChip,
   priorityLabel,
   readableTextOn,
   renderAll,
