@@ -509,11 +509,6 @@
   opacity: 0.5;
 }
 
-.cd-effect-row .toggle-switch input:disabled + .toggle-slider {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .cd-alarm-row {
   display: flex;
   align-items: center;

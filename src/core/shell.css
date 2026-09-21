@@ -1146,6 +1146,14 @@ input[type="checkbox"]:not(.toggle-switch input):checked::before {
 .toggle-switch input:checked + .toggle-slider::before {
   transform: translateX(20px);
 }
+/* A switch that cannot be used right now, such as one waiting on a hidden
+   tool. Faded and refusing the pointer, so it reads as locked rather than
+   as a switch that ignores the click. Was Countdown's own rule until
+   Whiteboard needed the same thing. */
+.toggle-switch input:disabled + .toggle-slider {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 .toggle-with-label {
   display: flex;

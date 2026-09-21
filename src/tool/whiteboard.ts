@@ -3610,6 +3610,13 @@ let boardColorSel: HTMLSelectElement;
 let boardColorInput: HTMLInputElement;
 let boardCustomRow: HTMLElement;
 
+/** Grayed out rather than hidden, the same as Countdown's Time Tracker row:
+ *  the setting is kept and applies again the moment Kanban is shown. */
+function syncKanbanSetting(): void {
+  homeToggle.disabled = !kanbanOn();
+  homeNote.hidden = kanbanOn();
+}
+
 /** Every control in Setup, put back to what the settings say. Run on every
  *  open, so a control can never show a value that is not the one in use. */
 function applySettingsToForm(): void {
@@ -3617,10 +3624,7 @@ function applySettingsToForm(): void {
   gridLabel.textContent = settings.grid ? "Enabled" : "Disabled";
   homeToggle.checked = settings.homeAfterSend;
   homeLabel.textContent = settings.homeAfterSend ? "Enabled" : "Disabled";
-  // Grayed out rather than hidden, the same as Countdown's Time Tracker row:
-  // the setting is kept and applies again the moment Kanban is shown.
-  homeToggle.disabled = !kanbanOn();
-  homeNote.hidden = kanbanOn();
+  syncKanbanSetting();
   selTextToggle.checked = settings.selectionStylesText;
   selTextLabel.textContent = settings.selectionStylesText ? "Enabled" : "Disabled";
   boardColorSel.value = settings.boardColor;
@@ -4055,6 +4059,14 @@ export function initWhiteboard(): void {
       repaintForTheme();
     });
   }).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+
+  // Hiding or showing Kanban has to reach the button and Setup at once, not
+  // on the next visit: Settings opens over the whiteboard, so both may be on
+  // screen when it happens.
+  window.addEventListener("sidebarchange", () => {
+    updateChrome();
+    syncKanbanSetting();
+  });
 
   updateChrome();
   void load();
