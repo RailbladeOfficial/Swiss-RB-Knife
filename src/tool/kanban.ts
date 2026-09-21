@@ -4010,7 +4010,10 @@ function filterTagPickSpec(board: Board): TagPickSpec {
       if (filterTagIds.has(tag.id)) filterTagIds.delete(tag.id);
       else filterTagIds.add(tag.id);
     },
-    after: () => renderBoardView(),
+    after: () => {
+      renderBoardView();
+      return document.querySelector<HTMLInputElement>(".kb-filter-group-tags .kb-tag-search");
+    },
     offer: (tag) => offerable.has(tag.id),
     emptyText: "No card on this board carries a tag.",
   };

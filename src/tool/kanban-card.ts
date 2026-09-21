@@ -2415,7 +2415,10 @@ function cardTagPickSpec(card: Card): TagPickSpec {
       }
       stampCard(card);
     },
-    after: () => renderCardTags(card),
+    after: () => {
+      renderCardTags(card);
+      return document.querySelector<HTMLInputElement>("#kbCardTagTools .kb-tag-search");
+    },
     create: (name) => newTagFromCard(card, name),
   };
 }
@@ -2492,8 +2495,10 @@ export interface TagPickSpec {
   board: Board;
   has: (tagId: string) => boolean;
   toggle: (tag: Tag) => void;
-  /** Redraws whatever owns the picker, once a tag has gone on or come off. */
-  after: () => void;
+  /** Redraws whatever owns the picker, once a tag has gone on or come off,
+   *  and hands back the search box it drew in place of the old one so the
+   *  cursor can go back into it. */
+  after: () => HTMLInputElement | null;
   /** Narrows what is offered. A tag already on is offered regardless, so it
    *  can always be taken back off. Omitted means every active tag. */
   offer?: (tag: Tag) => boolean;
@@ -2637,10 +2642,18 @@ function openTagSearch(input: HTMLInputElement, spec: TagPickSpec): void {
         rowBtn.appendChild(badge);
       }
 
+      // Picking a tag is an edit, not a way out, so the cursor stays in the
+      // box for the next one (#253). Mousedown is what moves focus, so it is
+      // stopped there and the input never blurs.
+      rowBtn.addEventListener("mousedown", (e) => e.preventDefault());
       rowBtn.addEventListener("click", () => {
         spec.toggle(tag);
         closeTagSearch();
-        spec.after();
+        /* The owner redraws, which replaces the input, so focus goes to the
+           new one. Its focus handler puts the list back up with the ticks
+           updated, the way a keepOpen menu row does. preventScroll because a
+           scroll anywhere under the list closes it. */
+        spec.after()?.focus({ preventScroll: true });
       });
       group.appendChild(rowBtn);
     }
