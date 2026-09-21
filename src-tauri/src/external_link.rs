@@ -1,26 +1,27 @@
 /* =============================================================================
    EXTERNAL LINKS: opening a web page in the user's browser, UNELEVATED
    -----------------------------------------------------------------------------
-   This app runs elevated (requireAdministrator, see build.rs), and that is what
-   broke every link that leaves it: the About modal's GitHub link, the "new
+   This app runs elevated (requireAdministrator, see build.rs). In 0.7.0 every
+   link that leaves it stopped opening: the About modal's GitHub link, the "new
    version available" link, and every web link in the README.
 
    All three went through the opener plugin, which hands the URL to
-   ShellExecute from THIS process. From an elevated process that means the
-   browser is asked to open at high integrity, and a browser that is already
-   running at the user's normal integrity will not take a hand-off from it:
-   Windows keeps processes at different integrity levels apart, so the link
-   does nothing at all. Nothing reports it either, because the call "worked".
-   Whether it bites depends on whether a browser is already open, which is why
-   it could work one day and not the next with no change to the app.
+   ShellExecute from THIS process. In 0.7.0 that stopped reaching the browser,
+   and nothing reported it. The most likely explanation is the integrity gap:
+   a browser already running at the user's normal integrity will not take a
+   hand-off from an elevated process. That is NOT proven. The same route worked
+   in 0.6.1, run just as elevated, and the link code is the same in both, so
+   whatever changed underneath it was not found. What is established is that
+   the route below works where that one stopped.
 
-   THE FIX IS TO ASK EXPLORER. Explorer is already running at the user's normal
+   THE ROUTE IS EXPLORER. Explorer is already running at the user's normal
    integrity, and the desktop exposes a scripting object whose ShellExecute
-   runs inside Explorer's process rather than ours. The browser then starts
-   (or is handed the URL) exactly as if the link had been clicked on the
-   desktop. This is the approach Microsoft's own shell team describes for
-   launching something unelevated from an elevated process; the chain below is
-   that approach, one COM hop at a time.
+   runs inside Explorer's process rather than ours. The browser then starts (or
+   is handed the URL) as if the link had been clicked on the desktop, and comes
+   to the front because this app hands its foreground right on first (see
+   pass_on_the_foreground). This is the approach Microsoft's own shell team
+   describes for launching something unelevated from an elevated process; the
+   chain below is that approach, one COM hop at a time.
 
    FALLS BACK TO THE OLD PATH if any hop fails, for instance if Explorer is not
    running or has been replaced by another shell. That is never worse than
@@ -41,6 +42,8 @@ pub fn open_external_url(url: String) -> Result<(), String> {
 
     #[cfg(windows)]
     {
+        pass_on_the_foreground();
+
         // COM wants its own apartment, and the command may run on a thread
         // that already has one of a different kind. A short-lived thread of our
         // own is the only way to be sure what we are initializing.
@@ -54,6 +57,31 @@ pub fn open_external_url(url: String) -> Result<(), String> {
     }
 
     tauri_plugin_opener::open_url(&url, None::<&str>).map_err(|e| e.to_string())
+}
+
+/// Lets whichever process ends up showing the link come to the front.
+///
+/// Windows only lets the process you are using put a window in front of you.
+/// The old route launched the browser straight from this process, and a
+/// process started by the foreground one inherits that right, which is why the
+/// browser used to come to the front. Going through Explorer breaks that chain:
+/// Explorer, or the browser it hands the link to, is not the process you
+/// clicked in, so Windows refuses it the foreground and flashes its taskbar
+/// button instead.
+///
+/// This hands our right on, explicitly, just before the hand-off. It works
+/// because the click that got us here made this app the foreground process, and
+/// it is spent on the next window that takes the foreground (or times out), so
+/// it cannot be saved up and used later. ANY rather than one process id because
+/// we do not know which process that is: Explorer may start a new browser, or
+/// pass the link to one that is already running. Best-effort: if Windows says
+/// no, the link still opens, just behind.
+#[cfg(windows)]
+fn pass_on_the_foreground() {
+    use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY};
+    unsafe {
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
+    }
 }
 
 /// The URL, trimmed, if it is a web or mail link. Anything else is refused

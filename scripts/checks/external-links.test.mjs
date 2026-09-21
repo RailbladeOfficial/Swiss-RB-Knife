@@ -49,3 +49,18 @@ test("the Rust side refuses anything that is not a web or mail link", () => {
     "a URL reaches the shell before it is checked",
   );
 });
+
+test("the foreground right is handed on before the link is", () => {
+  // Without it the browser opens but stays behind, flashing on the taskbar:
+  // Explorer, not this app, is what starts it, and Windows only lets the
+  // process you are using bring a window to the front.
+  const rs = read("src-tauri/src/external_link.rs");
+  const body = rs.slice(rs.indexOf("pub fn open_external_url"), rs.indexOf("fn pass_on_the_foreground"));
+  const handOn = body.indexOf("pass_on_the_foreground()");
+  assert.ok(handOn !== -1, "the foreground right is never handed on");
+  assert.ok(
+    handOn < body.indexOf("shell_execute_via_explorer"),
+    "the foreground right is handed on after the link, when it is too late to help",
+  );
+  assert.match(rs, /AllowSetForegroundWindow\(ASFW_ANY\)/, "the hand-on no longer calls AllowSetForegroundWindow");
+});
