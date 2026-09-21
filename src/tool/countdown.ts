@@ -2088,7 +2088,7 @@ function syncSetupUI(): void {
   showTrackerToggle.disabled = !trackerAvailable;
   trackerNoteEl.textContent = trackerAvailable
     ? "Adds a per-session button that files it as a Time Tracker entry."
-    : "Unavailable: Time Tracker is hidden in Settings › Sidebar.";
+    : "Unavailable: Time Tracker is hidden in Settings › Preferences › Home/Sidebar.";
 
   displayCustomRow.style.display = display.look === "custom" ? "" : "none";
   displayEffectsRow.style.display = display.look === "custom" ? "none" : "";
