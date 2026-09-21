@@ -150,7 +150,7 @@ const ANCHOR_GAP = 4;
  *  in one category would read as having ten. Half a row hanging off the
  *  bottom edge is the only thing on screen that says keep going, which is why
  *  the scrollbar can be hidden without leaving the list a trap. */
-const MAX_ROWS = 10.5;
+const MAX_ROWS = 8.5;
 
 /**
  * Caps a rendered level at MAX_ROWS and lets the rest scroll.
@@ -158,7 +158,15 @@ const MAX_ROWS = 10.5;
  * MEASURED, not a fixed pixel figure. A row's height comes from its padding
  * and its font size, both of which are theme-facing CSS, and a hardcoded
  * max-height here would quietly become nine and a half rows the day either
- * changes. The first row on screen is asked how tall it is instead.
+ * changes.
+ *
+ * And measured WHERE THE ROWS ACTUALLY ARE, not as row height times ten and a
+ * half. Separators take up height too, so that sum landed the cut short by a
+ * separator's worth each time one came before it: with the right number of
+ * rule lines above, the cut fell on a row's edge and the half row that says
+ * "there is more" disappeared (the Whiteboard's grouped menus did exactly
+ * this). The cut is placed through the middle of the row itself instead, so
+ * whatever sits above it, the half row is always a half row.
  *
  * Also the one thing keeping a long menu inside the window: before this, a
  * level taller than the viewport was placed at the top edge and simply ran
@@ -171,13 +179,8 @@ function capHeight(menu: HTMLElement): void {
   // the taller level we just replaced is what they would measure against.
   menu.style.maxHeight = "";
 
-  /* The Back row is excluded deliberately. It carries extra padding and a
-     rule under it, so measuring that one would leave every submenu's budget
-     a little short. */
-  const row = menu.querySelector<HTMLElement>(".menu-item:not(.menu-item-back)");
-  if (!row) return;
-
-  const rowHeight = row.getBoundingClientRect().height;
+  const rows = menu.querySelectorAll<HTMLElement>(":scope > .menu-item");
+  if (rows.length === 0) return;
   const style = getComputedStyle(menu);
 
   /** The panel's own padding and border: what surrounds the rows. */
@@ -188,12 +191,29 @@ function capHeight(menu: HTMLElement): void {
     parseFloat(style.borderBottomWidth);
 
   /* Read rather than assumed, because this file does not own menu.css and a
-     global reset could turn up later. Under border-box the frame comes out
-     of max-height and has to be added back, or the bottom row loses its
-     padding; under content-box it sits outside and the window budget has to
-     make room for it instead. */
+     global reset could turn up later. Under border-box, max-height is
+     measured from the outer edge, which is where the cut below is measured
+     from; under content-box the top padding and border sit outside it, and
+     the window budget has to make room for the frame instead. */
   const borderBox = style.boxSizing === "border-box";
-  const budget = rowHeight * MAX_ROWS + (borderBox ? frame : 0);
+
+  /* The row the cut goes through: the eleventh, for ten and a half. A level
+     with no such row is short enough to show whole, so only the window caps
+     it. Back counts as a row here, because it takes a row's space. */
+  const whole = Math.floor(MAX_ROWS);
+  const cutRow = rows[whole];
+  let budget = Infinity;
+  if (cutRow) {
+    const box = menu.getBoundingClientRect();
+    const at = cutRow.getBoundingClientRect();
+    // From the panel's outer top edge to the line through that row.
+    // scrollTop because a rebuilt level may still be scrolled when measured.
+    const cut = at.top - box.top + menu.scrollTop + at.height * (MAX_ROWS - whole);
+    budget = borderBox
+      ? cut
+      : cut - parseFloat(style.paddingTop) - parseFloat(style.borderTopWidth);
+  }
+  const rowHeight = rows[0].getBoundingClientRect().height;
   /* Never taller than the window either, however few rows that comes to. It
      is also the only thing stopping a long level running off the bottom edge
      with no way to reach the rest: before this there was no cap at all. */

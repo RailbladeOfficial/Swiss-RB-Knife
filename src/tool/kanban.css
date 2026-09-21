@@ -546,7 +546,7 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 6px;
-  /* The Kanban Columns switch in Settings > Display > Scrollbars, for this
+  /* The Kanban Board/Columns switch in Settings > Display > Scrollbars, for this
      sideways scroll and every column's cards inside it. See SCROLLBARS in
      shell.css. */
   --sb: var(--sb-columns);
