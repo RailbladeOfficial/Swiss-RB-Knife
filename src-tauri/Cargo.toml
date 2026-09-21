@@ -87,6 +87,11 @@ windows = { version = "0.61", features = [
     "Win32_Security",
     "Win32_Security_Authorization",
     "Win32_Storage_FileSystem",
+    # Opening links unelevated (see src/external_link.rs): the desktop's
+    # scripting object is reached over COM, and its ShellExecute takes VARIANTs.
+    "Win32_System_Com",
+    "Win32_System_Ole",
+    "Win32_System_Variant",
     "Win32_System_IO",
     "Win32_System_Pipes",
     "Win32_System_RemoteDesktop",

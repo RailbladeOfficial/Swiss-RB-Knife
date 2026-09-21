@@ -36,7 +36,8 @@
    wanted a new line.
 ============================================================================= */
 
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternal } from "./external-link";
+import { devError } from "./dev-log";
 
 /** Schemes a link in user text is allowed to carry. Everything else renders as
  *  plain text, which is the honest outcome: the words are still there and the
@@ -371,7 +372,10 @@ export function bindRichTextLinks(container: HTMLElement): void {
     const link = (target as HTMLElement | null)?.closest?.<HTMLElement>("[data-rt-href]");
     const href = link?.dataset.rtHref;
     if (!href || !SAFE_LINK_SCHEME.test(href)) return;
-    void openUrl(href).catch(() => {});
+    // Logged rather than toasted: this file sits below the shell and cannot
+    // reach flash() without a load-order loop. The Rust side already falls
+    // back to the old route before it gives up, so this is rare.
+    void openExternal(href).catch((e) => devError("[rich-text] link did not open", e));
   };
   container.addEventListener("click", (e) => {
     if ((e.target as HTMLElement)?.closest?.("[data-rt-href]")) e.preventDefault();

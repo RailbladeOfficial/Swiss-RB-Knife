@@ -17,7 +17,7 @@
 ============================================================================= */
 
 import { invoke } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { bindExternalLinks, openExternal } from "./external-link";
 import { Modal, ModalTabs } from "../modal/modal";
 import {
   settings,
@@ -39,6 +39,20 @@ import {
 import { showLockScreen } from "./lockscreen";
 import { showDataFolderGate } from "./data-version";
 import { showImportResult } from "./data-transfer";
+
+/** Says a link could not be opened, and why. A link that silently does nothing
+ *  is how #252 went unnoticed, so a failure here is always a toast. */
+function reportLinkFailure(reason: unknown): void {
+  flash(`Couldn't open that link: ${reason}`, "error", 8000);
+}
+
+function openLink(url: string): void {
+  openExternal(url).catch(reportLinkFailure);
+}
+
+// Every target="_blank" link in the app, the README's included. The opener
+// plugin used to do this itself; see external-link.ts for why it no longer does.
+bindExternalLinks(reportLinkFailure);
 
 const LICENSE_ACCEPTED_KEY = "shell-license-accepted-version";
 const CHANGELOG_SEEN_KEY = "shell-changelog-seen-version";
@@ -120,7 +134,7 @@ aboutBackdrop.addEventListener("click", (e) => {
     )
       return;
     e.preventDefault();
-    if (anchor.href) openUrl(anchor.href);
+    if (anchor.href) openLink(anchor.href);
   }
 });
 
@@ -250,7 +264,7 @@ function refreshUpdateUI(): void {
 // delegated link handler, wire it directly.)
 homeUpdateLink.addEventListener("click", (e) => {
   e.preventDefault();
-  if (_updateInfo?.htmlUrl) openUrl(_updateInfo.htmlUrl);
+  if (_updateInfo?.htmlUrl) openLink(_updateInfo.htmlUrl);
 });
 
 /** Runs the version check, then updates state + UI. Never throws: any failure
@@ -362,7 +376,7 @@ function maybeAnnounceUpdate(): Promise<void> {
 
 updateNotifyGoBtn.addEventListener("click", () => {
   updateNotifyModal.close();
-  if (_updateInfo?.htmlUrl) openUrl(_updateInfo.htmlUrl);
+  if (_updateInfo?.htmlUrl) openLink(_updateInfo.htmlUrl);
 });
 
 updateNotifyLaterBtn.addEventListener("click", () => updateNotifyModal.close());

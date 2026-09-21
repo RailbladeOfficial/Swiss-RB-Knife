@@ -29,6 +29,7 @@ use argon2::{
 
 mod agent_gate;
 mod data_archive;
+mod external_link;
 mod db;
 mod session_watch;
 mod tools;
@@ -1670,7 +1671,12 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(db::Db::default())
-        .plugin(tauri_plugin_opener::init())
+        // The plugin's injected click script is turned OFF. It sent every
+        // target="_blank" link straight to the plugin's own open_url, which
+        // runs from this elevated process and so cannot reach a browser the
+        // user already has open. The front end sends those links to
+        // open_external_url instead; see external_link.rs.
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .plugin(tauri_plugin_dialog::init())
         // tauri-plugin-fs intentionally NOT registered. Nothing in the
         // frontend uses it (all file I/O goes through custom commands), so
@@ -1774,6 +1780,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             // Shell-level commands
+            external_link::open_external_url,
             merge_settings,
             load_settings,
             save_tool_file,
