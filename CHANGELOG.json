@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.7.1",
+    "date": "2026-09-21",
+    "changes": {
+      "features": {
+
+      },
+      "improvements": {
+        
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Fixed an issue where external links stopped working. Whoops."
+        ]
+      }
+    }
+  },
+  {
     "version": "0.7.0",
     "date": "2026-09-16",
     "changes": {
