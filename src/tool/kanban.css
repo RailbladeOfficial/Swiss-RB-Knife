@@ -405,36 +405,45 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 /* =============================================================================
    THE DUE NOTICE
    -----------------------------------------------------------------------------
-   The two warnings in the tool header. They sit inside .tool-header-notice and
-   inherit its color and weight, so they read as that notice rather than as a
-   pair of buttons that happen to be in the header. What marks them as clickable
-   is the underline and the cursor, the way a link does it, because a real
-   button outline up there would compete with the header's own actions.
+   The two warnings in the tool header. They are buttons for the keyboard's
+   sake but they read as LINKS, the same way the About modal's links do: no
+   underline, no background, and the text moving to the hover color is the whole
+   of the affordance.
+
+   Two classes deep on purpose. Several themes style every button:hover with a
+   background, and a single class loses that on source order, which is what put
+   a highlight behind these the first time round.
 ============================================================================= */
 
-.kb-due-notice-btn {
+.tool-header-notice .kb-due-notice-btn,
+.tool-header-notice .kb-due-notice-btn:hover,
+.tool-header-notice .kb-due-notice-btn:focus,
+.tool-header-notice .kb-due-notice-btn:active {
   background: none;
   border: none;
+  box-shadow: none;
   padding: 0;
   font: inherit;
+  text-decoration: none;
+}
+
+.tool-header-notice .kb-due-notice-btn {
   color: inherit;
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 3px;
+  transition: color var(--hover-transition);
 }
 
-.kb-due-notice-btn:hover {
-  text-decoration-style: solid;
+/* On means "this is the filter you are looking through", and hover means you
+   are about to be: both take the link hover color, so a lit one reads as
+   already pressed rather than as a different kind of warning. */
+.tool-header-notice .kb-due-notice-btn:hover,
+.tool-header-notice .kb-due-notice-btn.active {
+  color: var(--color-btn-hover);
 }
 
-/* On means "this is the filter you are looking through". A solid underline
-   rather than a color change, because the notice's color already means
-   something (it is the tool's warning color) and repainting it would say the
-   warning had changed rather than that a filter was on. */
-.kb-due-notice-btn.active {
-  text-decoration-style: solid;
-  text-decoration-thickness: 2px;
+.tool-header-notice .kb-due-notice-btn:focus-visible {
+  outline: 1px dotted currentColor;
+  outline-offset: 2px;
 }
 
 .kb-due-notice-sep {
