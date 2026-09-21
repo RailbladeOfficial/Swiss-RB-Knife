@@ -24,7 +24,7 @@
 ============================================================================= */
 
 import { flash } from "../core/shell";
-import { attachMenu, type MenuItem } from "../menu/menu";
+import { attachMenu, isTextEntry, type MenuItem } from "../menu/menu";
 import { richTextToPlain } from "../core/rich-text";
 import type {
   Board,
@@ -69,6 +69,7 @@ import {
   selectedCardIds,
   selectedCards,
   stampCard,
+  stepCardSelection,
   tagColor,
   trimTo,
 } from "./kanban";
@@ -501,15 +502,73 @@ function setCardOwner(card: Card, owner: CardAuthor | undefined): void {
  * it runs, so a card deleted between opening the menu and clicking an entry is
  * simply not in the list rather than a stale object written back to the board.
  */
-/* Escape drops the selection, which is the one gesture every list in every
-   program agrees on. Bound once, on the document, and only doing anything when
-   there IS a selection, so it never competes with a modal's own Escape. */
+/* The selection's keys, bound once on the document and only doing anything
+   when there IS a selection on a board that is on screen.
+
+     Escape         drops the selection, the one gesture every list in every
+                    program agrees on. Never competes with a modal's own Escape.
+     Delete         asks to delete the selection, the same confirm the menu's
+                    Delete Cards opens. Delete only, not Backspace: Backspace is
+                    the key you are already leaning on while editing text, and
+                    a stray one should not be a step away from losing cards.
+     Shift+Up/Down  grows (or shrinks) the range one card per press.
+
+   Delete and the arrows stand down while typing, while a modal is open, and
+   while another tool is showing, since the selection outlives none of those
+   being what you are looking at. */
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape" || selectedCardIds.size === 0) return;
-  if (currentView !== "board") return;
-  e.preventDefault();
-  clearCardSelection();
+  if (selectedCardIds.size === 0 || currentView !== "board") return;
+  if (e.key === "Escape") {
+    e.preventDefault();
+    clearCardSelection();
+    return;
+  }
+  if (document.body.dataset.activeTool !== "productivity/kanban") return;
+  if (document.body.classList.contains("modal-open")) return;
+  if (isTextEntry(e.target)) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "Delete" && !e.shiftKey) {
+    e.preventDefault();
+    confirmDeleteSelection();
+    return;
+  }
+  if (e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    if (stepCardSelection(e.key === "ArrowUp" ? -1 : 1)) e.preventDefault();
+  }
 });
+
+/** Deletes everything selected, once confirmed. Shared by the menu's Delete
+ *  Cards and the Delete key, so the two can never ask different questions. */
+function confirmDeleteSelection(): void {
+  const live = selectedCards();
+  if (live.length === 0) return;
+  const noun = live.length === 1 ? "card" : "cards";
+  const remove = (): void => {
+    for (const card of live) deleteCard(card);
+    pruneCardSelection();
+    renderAll();
+    flash(`${live.length} ${noun} deleted.`);
+  };
+  /* ALWAYS confirmed, whatever the per-card setting says. That setting is
+     about the friction of deleting one card you are looking at; this is
+     several at once, some of them scrolled out of view, and it names the
+     count because that is the number worth checking before agreeing. */
+  kbConfirm(
+    {
+      title: `Delete ${live.length} ${noun}?`,
+      message:
+        `${live.length === 1 ? "This card" : `${live.length} cards`} and everything on ` +
+        `${live.length === 1 ? "it goes" : "them go"} for good. ` +
+        `Archive instead if you only want ${live.length === 1 ? "it" : "them"} off the board.`,
+      confirmLabel: `Delete ${live.length}`,
+      /* Nothing to go back to, and said so rather than left out: this came
+         off the board, so dismissing it lands on the board, which is where it
+         started. */
+      reopen: undefined,
+    },
+    remove,
+  );
+}
 
 function bulkCardMenu(selection: Card[]): MenuItem[] {
   const count = selection.length;
@@ -721,33 +780,7 @@ function bulkCardMenu(selection: Card[]): MenuItem[] {
     {
       label: "Delete Cards",
       danger: true,
-      onClick: () => {
-        const live = selectedCards();
-        const remove = (): void => {
-          for (const card of live) deleteCard(card);
-          pruneCardSelection();
-          renderAll();
-          flash(`${live.length} cards deleted.`);
-        };
-        /* ALWAYS confirmed, whatever the per-card setting says. That setting is
-           about the friction of deleting one card you are looking at; this is
-           several at once, some of them scrolled out of view, and it names the
-           count because that is the number worth checking before agreeing. */
-        kbConfirm(
-          {
-            title: `Delete ${live.length} cards?`,
-            message:
-              `${live.length} cards and everything on them go for good. ` +
-              `Archive instead if you only want them off the board.`,
-            confirmLabel: `Delete ${live.length}`,
-            /* Nothing to go back to, and said so rather than left out: this
-               came off a right-click on the board, so dismissing it lands on
-               the board, which is where it started. */
-            reopen: undefined,
-          },
-          remove,
-        );
-      },
+      onClick: confirmDeleteSelection,
     },
   ];
 }

@@ -3797,6 +3797,11 @@ export function reopenQuickAdd(board: Board, column: Column, position: NewCardPo
 export let selectedCardIds = new Set<string>();
 /** Where the next Shift+click measures from. */
 let selectionAnchorId: string | null = null;
+/** The moving end of the range: the card the last Shift+click or Shift+arrow
+ *  landed on. Shift+Up/Down steps this one card and redraws the range from the
+ *  anchor to it, the way a spreadsheet does, so stepping back the other way
+ *  shrinks the range instead of starting a second one. */
+let selectionFocusId: string | null = null;
 
 /** The selected cards that still exist, in board order. */
 export function selectedCards(): Card[] {
@@ -3807,6 +3812,7 @@ export function clearCardSelection(redraw = true): void {
   if (selectedCardIds.size === 0) return;
   selectedCardIds.clear();
   selectionAnchorId = null;
+  selectionFocusId = null;
   if (redraw) renderBoardView();
 }
 
@@ -3826,6 +3832,7 @@ export function pruneCardSelection(): void {
     if (!onScreen) selectedCardIds.delete(id);
   }
   if (selectionAnchorId && !selectedCardIds.has(selectionAnchorId)) selectionAnchorId = null;
+  if (selectionFocusId && !selectedCardIds.has(selectionFocusId)) selectionFocusId = null;
 }
 
 /** Ctrl+click: this card joins or leaves the selection, and becomes the anchor
@@ -3835,6 +3842,7 @@ function toggleCardSelection(card: Card): void {
   if (selectedCardIds.has(card.id)) selectedCardIds.delete(card.id);
   else selectedCardIds.add(card.id);
   selectionAnchorId = card.id;
+  selectionFocusId = card.id;
   renderBoardView();
 }
 
@@ -3846,32 +3854,70 @@ function extendCardSelection(card: Card): void {
     toggleCardSelection(card);
     return;
   }
+  const column = shownColumnOf(card);
+  const from = column ? column.findIndex((c) => c.id === anchor.id) : -1;
+  const to = column ? column.findIndex((c) => c.id === card.id) : -1;
+  if (!column || from === -1 || to === -1) {
+    toggleCardSelection(card);
+    return;
+  }
+  selectRun(column, from, to);
+  renderBoardView();
+}
+
+/**
+ * Shift+Up / Shift+Down: the moving end of the range steps one card that way,
+ * and the range is redrawn from the anchor to it. One card per press, and it
+ * stops at the top or bottom of the column rather than wrapping.
+ *
+ * Returns false when there is nothing to step from (no selection, or the anchor
+ * has gone), so the key is left alone.
+ */
+export function stepCardSelection(direction: 1 | -1): boolean {
+  const anchor = selectionAnchorId ? getCard(selectionAnchorId) : null;
+  if (!anchor || anchor.archived) return false;
+  const column = shownColumnOf(anchor);
+  if (!column) return false;
+  const from = column.findIndex((c) => c.id === anchor.id);
+  if (from === -1) return false;
+  /* A focus in another column is left over from a Ctrl+click there, so the run
+     starts again from the anchor rather than measuring across columns. */
+  let at = column.findIndex((c) => c.id === selectionFocusId);
+  if (at === -1) at = from;
+  const next = Math.max(0, Math.min(column.length - 1, at + direction));
+  selectRun(column, from, next);
+  renderBoardView();
+  // The card just reached, kept in view so a long run down a column can be
+  // followed without reaching for the scroll wheel.
+  document
+    .querySelector<HTMLElement>(`[data-card-id="${selectionFocusId}"]`)
+    ?.scrollIntoView({ block: "nearest" });
+  return true;
+}
+
+/** The column a card sits in, as it is shown right now, or null when either
+ *  the board or the column has gone. Its own today, rather than one handed
+ *  down: this is one gesture, not a loop over every column on the board. */
+function shownColumnOf(card: Card): Card[] | null {
   const board = getBoard(card.boardId);
   const col = board ? getColumn(board, card.columnId) : null;
-  if (!board || !col) {
-    toggleCardSelection(card);
-    return;
-  }
-  // Its own, rather than one handed down: this is one shift-click, not a loop
-  // over every column on the board.
+  if (!board || !col) return null;
   const todayStr = today();
-  const column = visibleCardsInColumn(board, col, todayStr, nextDueDayFor(board.id, todayStr));
-  const from = column.findIndex((c) => c.id === anchor.id);
-  const to = column.findIndex((c) => c.id === card.id);
-  if (from === -1 || to === -1) {
-    toggleCardSelection(card);
-    return;
-  }
-  /* Replaces the range rather than adding to it, so overshooting is fixed by
-     clicking the right card instead of clearing and starting again. Cards
-     picked out individually with Ctrl elsewhere are kept: only this column's
-     run is rewritten. */
+  return visibleCardsInColumn(board, col, todayStr, nextDueDayFor(board.id, todayStr));
+}
+
+/** Selects the cards from `from` to `to` in `column`, and the moving end is `to`.
+ *  Replaces the column's range rather than adding to it, so overshooting is
+ *  fixed by clicking (or stepping back to) the right card instead of clearing
+ *  and starting again. Cards picked out individually with Ctrl elsewhere are
+ *  kept: only this column's run is rewritten. */
+function selectRun(column: Card[], from: number, to: number): void {
   for (const c of column) selectedCardIds.delete(c.id);
   for (let i = Math.min(from, to); i <= Math.max(from, to); i++) {
     const c = column[i];
     if (c) selectedCardIds.add(c.id);
   }
-  renderBoardView();
+  selectionFocusId = column[to]?.id ?? null;
 }
 
 /** The cards a column is SHOWING, filters and sort included, in the order they
