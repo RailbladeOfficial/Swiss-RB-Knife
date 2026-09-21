@@ -1,7 +1,7 @@
 /* =============================================================================
    KANBAN CARD FACE: a card as the board draws it
    -----------------------------------------------------------------------------
-   The tile. Its title, its chips, its cover picture, its due date, its
+   The tile. Its title, its chips, its attachment count, its due date, its
    progress, its colors, and the menu you get by right-clicking it.
 
    THE OTHER HALF OF A CARD, and the pairing is the point:

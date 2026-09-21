@@ -20,8 +20,9 @@
 
    WHAT CAME WITH IT that might look like it should not: attachmentsRoot and
    the attachment file plumbing. Attachments are a card's files, added and
-   removed on this screen; the board only asks which ones a card has, for the
-   cover image. Board BACKGROUNDS are the opposite and stayed with the board.
+   removed on this screen; the board only asks how many a card has, for the
+   count on its tile. Board BACKGROUNDS are the opposite and stayed with the
+   board.
 
    THE LOOP with kanban.ts is deliberate, and the same one the other three
    files have. Nothing here reads a value from kanban.ts as this file LOADS;
