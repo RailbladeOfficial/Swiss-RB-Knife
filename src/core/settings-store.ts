@@ -32,6 +32,21 @@ export type SidebarSortMode = "classic" | "az" | "za" | "recent" | "used" | "cus
 
 export const SIDEBAR_SORT_MODES: SidebarSortMode[] = ["classic", "az", "za", "recent", "used", "custom"];
 
+/** The places a scrollbar can be switched on, each on its own. Where two
+ *  overlap, the innermost wins: a text box inside a modal follows Text Boxes,
+ *  and a modal follows Modals rather than App Overall. */
+export type ScrollbarArea = "app" | "modals" | "columns" | "menus" | "text";
+
+export const SCROLLBAR_AREAS: ScrollbarArea[] = ["app", "modals", "columns", "menus", "text"];
+
+/** Keeps the known areas from whatever was stored, once each and in the
+ *  fixed order. An unknown name is dropped rather than failing the whole
+ *  list, so an area retired in a later version costs nothing. */
+export function normalizeScrollbarAreas(raw: unknown): ScrollbarArea[] {
+  if (!Array.isArray(raw)) return [];
+  return SCROLLBAR_AREAS.filter((area) => raw.includes(area));
+}
+
 export type ShellSettings = {
   fontScale: number;
   hour12: boolean;
@@ -164,6 +179,9 @@ export type ShellSettings = {
    *  order and pin state survive switching it on and back off, and a tool's
    *  category can be re-assigned in ALL_TOOLS without a settings migration. */
   toolCategories: boolean;
+  /** Which areas show a scrollbar. Empty by default: every scrollbar in the
+   *  app is hidden unless its area is listed here. */
+  scrollbars: ScrollbarArea[];
 };
 
 export const DEFAULT_SETTINGS: ShellSettings = {
@@ -207,6 +225,7 @@ export const DEFAULT_SETTINGS: ShellSettings = {
   sidebarItems: [],
   sidebarSort: "classic",
   toolCategories: false,
+  scrollbars: [],
 };
 
 /** The live settings object. Exported as a `let` so importers see reassignments

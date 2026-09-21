@@ -34,18 +34,14 @@
      row height is this file's padding and font size and a number written here
      as well would be a second copy of it to keep in step.
 
-     NO SCROLLBAR, which is the part worth explaining. A scrollbar on a panel
-     this narrow is a visible chunk of its width, drawn by the platform in
-     colors no theme here controls, on something that is on screen for about a
-     second. The half row hanging off the bottom edge is what says there is
-     more, and it says it without costing any width. The wheel, the trackpad
-     and a drag all still scroll normally. */
+     NO SCROLLBAR unless Settings > Display > Scrollbars turns on Menus. A
+     scrollbar on a panel this narrow is a visible chunk of its width, on
+     something that is on screen for about a second. The half row hanging off
+     the bottom edge is what says there is more, and it says it without
+     costing any width. The wheel, the trackpad and a drag all still scroll
+     normally. */
   overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.menu::-webkit-scrollbar {
-  display: none;
+  --sb: var(--sb-menus);
 }
 
 /* A capped flex column shrinks its children to fit rather than overflowing,

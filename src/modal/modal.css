@@ -51,6 +51,9 @@ body.modal-open {
   justify-content: center;
   opacity: 0;
   transition: opacity 0.2s ease;
+  /* The Modals switch in Settings > Display > Scrollbars. See SCROLLBARS in
+     shell.css. */
+  --sb: var(--sb-modals);
 }
 
 .modal-backdrop.open {

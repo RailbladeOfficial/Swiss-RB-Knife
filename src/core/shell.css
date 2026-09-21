@@ -41,12 +41,69 @@ body {
   overflow: hidden; /* The inner scroll areas handle scrolling */
 }
 
-/* Hide all scrollbars while keeping scrolling functional */
-* {
-  scrollbar-width: none;
+/* =============================================================================
+   SCROLLBARS
+   -----------------------------------------------------------------------------
+   Hidden everywhere by default, with scrolling still working. Settings >
+   Display > Scrollbars turns them on per area, and scrollbars.ts marks each
+   area that is on with a `scrollbars-<area>` class on body.
+
+   --sb is the switch, and it is INHERITED, which is the whole design. body
+   starts it at the App Overall answer; each area's outermost element (a modal
+   backdrop, the Kanban columns strip, a menu, a text box) resets it to its own
+   answer, and everything inside takes the nearest one. So a text box in a
+   modal in the app follows Text Boxes, with no rule having to switch off the
+   two areas around it. The area hooks sit with the area's own CSS.
+
+   scrollbar-width set to `none` also silences every ::-webkit-scrollbar rule
+   below, so those only ever draw where an area is on. Left at `auto`,
+   WebView2 hands the drawing to them, which is what lets a theme give its
+   scrollbar a real look (Nostalgia's arrow buttons) rather than two colors.
+============================================================================= */
+
+body {
+  --sb-app: none;
+  --sb-modals: none;
+  --sb-columns: none;
+  --sb-menus: none;
+  --sb-text: none;
+  --sb: var(--sb-app);
 }
-*::-webkit-scrollbar {
-  display: none;
+body.scrollbars-app { --sb-app: auto; }
+body.scrollbars-modals { --sb-modals: auto; }
+body.scrollbars-columns { --sb-columns: auto; }
+body.scrollbars-menus { --sb-menus: auto; }
+body.scrollbars-text { --sb-text: auto; }
+
+textarea,
+[contenteditable="true"] {
+  --sb: var(--sb-text);
+}
+
+* {
+  scrollbar-width: var(--sb, none);
+}
+
+/* The shared look, built from the theme's own colors so every theme gets a
+   scrollbar that belongs to it. A theme wanting more than colors restyles
+   these in its own sheet. The transparent border insets the thumb from the
+   edge, so it reads as a rounded pill floating in its track. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-muted);
 }
 
 /* =============================================================================

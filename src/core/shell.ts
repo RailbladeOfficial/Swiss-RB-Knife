@@ -97,6 +97,7 @@ import {
 import {
   DEFAULT_SETTINGS,
   SIDEBAR_SORT_MODES,
+  normalizeScrollbarAreas,
   type ShellSettings,
   type SidebarItemState,
   type SidebarSortMode,
@@ -151,6 +152,7 @@ import {
   openSidebarEditModal,
   setPinned,
 } from "./sidebar-edit";
+import { applyScrollbars } from "./scrollbars";
 import { attachMenu, openMenu, isTextEntry, type MenuItem } from "../menu/menu";
 import { openEditMenu, setEditMenuNotify } from "../menu/edit-menu";
 // Re-exported so tool files keep importing it from "./shell", their existing
@@ -1868,6 +1870,7 @@ export function applySettings(): void {
   solidModalsToggle.checked = settings.solidModals;
   solidModalsLabel.textContent = settings.solidModals ? "On" : "Off";
   document.body.classList.toggle("solid-modals", settings.solidModals);
+  applyScrollbars();
   dateFormatToggle.checked = settings.americanDates;
   dateFormatLabel.textContent = settings.americanDates
     ? "MM-DD-YYYY"
@@ -2276,6 +2279,7 @@ async function loadSettings(): Promise<void> {
         typeof merged.toolCategories === "boolean"
           ? merged.toolCategories
           : DEFAULT_SETTINGS.toolCategories,
+      scrollbars: normalizeScrollbarAreas(merged.scrollbars),
     });
   } catch (err) {
     /* Opens on defaults, so the app is usable. It does NOT then write them

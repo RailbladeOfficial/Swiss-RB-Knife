@@ -3113,6 +3113,14 @@
               </div>
             </div>
 
+            <div class="settings-row">
+              <div class="settings-label-col">
+                <span>Scrollbars:</span>
+                <span id="scrollbarsBadge" class="settings-status-badge"></span>
+              </div>
+              <button id="scrollbarsEditBtn" class="settings-action-btn">Customize</button>
+            </div>
+
             <!-- The same three stages F11 cycles through. Deliberately NOT a
                  saved preference: Spacious already hides the top bar, which is
                  this window's only close button and only drag handle, so
@@ -3399,6 +3407,99 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       SCROLLBARS
+       Opened from Settings > Display, so it has a Back arrow to there.
+  ====================================================================== -->
+  <div id="scrollbarsBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal scrollbars-modal">
+      <div class="modal-header">
+        <button id="scrollbarsBack" class="nav-back-btn modal-header-left" title="Back to Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <span>Scrollbars</span>
+        <button id="scrollbarsClose" class="modal-close-btn modal-header-right" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+        <div class="setup-preferences-list">
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span>App Overall:</span>
+              <button type="button" class="info-trigger-btn settings-info-btn"
+                data-tooltip="The sidebar, Home, and every tool page. Anything not covered by the rows below.">&#8505;</button>
+            </div>
+            <div class="toggle-with-label">
+              <span class="scrollbars-state">Hidden</span>
+              <label class="toggle-switch">
+                <input type="checkbox" data-scrollbar-area="app" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span>Modals:</span>
+              <button type="button" class="info-trigger-btn settings-info-btn"
+                data-tooltip="Every modal and settings window, including this one.">&#8505;</button>
+            </div>
+            <div class="toggle-with-label">
+              <span class="scrollbars-state">Hidden</span>
+              <label class="toggle-switch">
+                <input type="checkbox" data-scrollbar-area="modals" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span>Kanban Columns:</span>
+              <button type="button" class="info-trigger-btn settings-info-btn"
+                data-tooltip="The cards inside each Kanban column, and the board scrolling sideways.">&#8505;</button>
+            </div>
+            <div class="toggle-with-label">
+              <span class="scrollbars-state">Hidden</span>
+              <label class="toggle-switch">
+                <input type="checkbox" data-scrollbar-area="columns" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span>Menus:</span>
+              <button type="button" class="info-trigger-btn settings-info-btn"
+                data-tooltip="Right-click menus, drop-down menus, and the Find a tag list.">&#8505;</button>
+            </div>
+            <div class="toggle-with-label">
+              <span class="scrollbars-state">Hidden</span>
+              <label class="toggle-switch">
+                <input type="checkbox" data-scrollbar-area="menus" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label-col">
+              <span>Text Boxes:</span>
+              <button type="button" class="info-trigger-btn settings-info-btn"
+                data-tooltip="Multi-line text fields, such as a card description or a note.">&#8505;</button>
+            </div>
+            <div class="toggle-with-label">
+              <span class="scrollbars-state">Hidden</span>
+              <label class="toggle-switch">
+                <input type="checkbox" data-scrollbar-area="text" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <p class="subhint">Scrolling works everywhere either way. Scrollbars take the current theme's look.</p>
       </div>
     </div>
   </div>

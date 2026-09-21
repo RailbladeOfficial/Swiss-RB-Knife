@@ -737,3 +737,66 @@ body:not(.solid-modals) .modal {
   --gs-radius:      0px;
   --gs-radius-sm:   0px;
 }
+
+/* =============================================================================
+   SCROLLBARS
+   -----------------------------------------------------------------------------
+   The Windows 2000 bar, when Settings > Display > Scrollbars shows one: 16px,
+   an arrow button at each end, a raised square thumb, and the track in the
+   one-pixel white and gray dither 9x used for it. Everything that decides
+   WHETHER a scrollbar shows is in shell.css; this only restyles the look.
+
+   The buttons press in the way a 9x button did: the bevel flips and the
+   arrow stays put. The sidebar keeps its own slim bar (#navList in
+   shell.css), because a 16px bar would eat a third of the collapsed rail.
+============================================================================= */
+
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: #d4d0c8;
+  background-image: conic-gradient(#ffffff 25%, transparent 0 50%, #ffffff 0 75%, transparent 0);
+  background-size: 2px 2px;
+}
+
+::-webkit-scrollbar-thumb,
+::-webkit-scrollbar-button:single-button {
+  background-color: #d4d0c8;
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    inset -1px -1px 0 #404040,
+    inset 1px 1px 0 #ffffff,
+    inset -2px -2px 0 #808080,
+    inset 2px 2px 0 #dfdfdf;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #d4d0c8;
+}
+
+::-webkit-scrollbar-button:single-button {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+::-webkit-scrollbar-button:single-button:active {
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #808080;
+}
+
+::-webkit-scrollbar-button:single-button:vertical:decrement { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'%3E%3Cpolygon points='4,10 8,6 12,10' fill='%23000000'/%3E%3C/svg%3E"); }
+::-webkit-scrollbar-button:single-button:vertical:increment { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'%3E%3Cpolygon points='4,6 8,10 12,6' fill='%23000000'/%3E%3C/svg%3E"); }
+::-webkit-scrollbar-button:single-button:horizontal:decrement { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'%3E%3Cpolygon points='10,4 6,8 10,12' fill='%23000000'/%3E%3C/svg%3E"); }
+::-webkit-scrollbar-button:single-button:horizontal:increment { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'%3E%3Cpolygon points='6,4 10,8 6,12' fill='%23000000'/%3E%3C/svg%3E"); }
+
+::-webkit-scrollbar-corner {
+  background: #d4d0c8;
+}

@@ -231,6 +231,7 @@ test("the import loops this project has are the ones we know about", () => {
     [
       "src/core/docs",
       "src/core/lockscreen",
+      "src/core/scrollbars",
       "src/core/shell",
       "src/core/sidebar-edit",
       "src/sound/sound",
