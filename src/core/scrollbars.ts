@@ -19,13 +19,27 @@
 
 import { Modal } from "../modal/modal";
 import { SCROLLBAR_AREAS, type ScrollbarArea } from "./settings-store";
-import { openSettingsOnTab, saveSettings, settings, settingsModal } from "./shell";
+import { isToolVisible, openSettingsOnTab, saveSettings, settings, settingsModal } from "./shell";
 
 const scrollbarsBackdrop = document.getElementById("scrollbarsBackdrop")!;
 const scrollbarsBadge = document.getElementById("scrollbarsBadge")!;
 const areaToggles = Array.from(
   scrollbarsBackdrop.querySelectorAll<HTMLInputElement>("input[data-scrollbar-area]"),
 );
+
+/** The areas that belong to one tool, by that tool's sidebar key. Their rows
+ *  are left out while the tool is hidden, since there is nothing of it on
+ *  screen for the switch to act on. The stored choice is kept, so showing the
+ *  tool again brings the row back as it was. */
+const AREA_TOOL: Partial<Record<ScrollbarArea, string>> = {
+  whiteboard: "productivity/whiteboard",
+  columns: "productivity/kanban",
+};
+
+function areaOffered(area: ScrollbarArea): boolean {
+  const tool = AREA_TOOL[area];
+  return tool === undefined || isToolVisible(tool);
+}
 
 /** Puts the stored choice on the page: a body class per area that is on, the
  *  modal's switches, and the badge beside Customize. Safe to call any time. */
@@ -35,13 +49,20 @@ export function applyScrollbars(): void {
     document.body.classList.toggle(`scrollbars-${area}`, on.has(area));
   }
   for (const toggle of areaToggles) {
-    const shown = on.has(toggle.dataset.scrollbarArea as ScrollbarArea);
+    const area = toggle.dataset.scrollbarArea as ScrollbarArea;
+    const shown = on.has(area);
     toggle.checked = shown;
     const label = toggle.closest(".toggle-with-label")?.querySelector(".scrollbars-state");
     if (label) label.textContent = shown ? "Shown" : "Hidden";
+    const row = toggle.closest<HTMLElement>(".settings-row");
+    if (row) row.style.display = areaOffered(area) ? "" : "none";
   }
+  // Counted over the rows actually listed, so the badge never claims an area
+  // the modal does not show.
+  const offered = SCROLLBAR_AREAS.filter(areaOffered);
+  const count = offered.filter((area) => on.has(area)).length;
   scrollbarsBadge.textContent =
-    on.size === 0 ? "All hidden" : on.size === SCROLLBAR_AREAS.length ? "All shown" : `${on.size} shown`;
+    count === 0 ? "All hidden" : count === offered.length ? "All shown" : `${count} shown`;
 }
 
 for (const toggle of areaToggles) {

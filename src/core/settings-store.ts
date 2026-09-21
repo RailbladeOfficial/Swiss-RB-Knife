@@ -35,9 +35,11 @@ export const SIDEBAR_SORT_MODES: SidebarSortMode[] = ["classic", "az", "za", "re
 /** The places a scrollbar can be switched on, each on its own. Where two
  *  overlap, the innermost wins: a text box inside a modal follows Text Boxes,
  *  and a modal follows Modals rather than App Overall. */
-export type ScrollbarArea = "app" | "modals" | "columns" | "menus" | "text";
+export type ScrollbarArea = "app" | "modals" | "menus" | "text" | "whiteboard" | "columns";
 
-export const SCROLLBAR_AREAS: ScrollbarArea[] = ["app", "modals", "columns", "menus", "text"];
+/** In the order the Scrollbars modal lists them: the app-wide areas first,
+ *  then the ones that belong to a single tool. */
+export const SCROLLBAR_AREAS: ScrollbarArea[] = ["app", "modals", "menus", "text", "whiteboard", "columns"];
 
 /** Keeps the known areas from whatever was stored, once each and in the
  *  fixed order. An unknown name is dropped rather than failing the whole

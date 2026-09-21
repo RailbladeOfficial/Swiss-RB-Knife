@@ -50,7 +50,7 @@ body {
 
    --sb is the switch, and it is INHERITED, which is the whole design. body
    starts it at the App Overall answer; each area's outermost element (a modal
-   backdrop, the Kanban columns strip, a menu, a text box) resets it to its own
+   backdrop, the Kanban columns strip, the Whiteboard's canvas, a menu, a text box) resets it to its own
    answer, and everything inside takes the nearest one. So a text box in a
    modal in the app follows Text Boxes, with no rule having to switch off the
    two areas around it. The area hooks sit with the area's own CSS.
@@ -67,6 +67,7 @@ body {
   --sb-columns: none;
   --sb-menus: none;
   --sb-text: none;
+  --sb-whiteboard: none;
   --sb: var(--sb-app);
 }
 body.scrollbars-app { --sb-app: auto; }
@@ -74,6 +75,7 @@ body.scrollbars-modals { --sb-modals: auto; }
 body.scrollbars-columns { --sb-columns: auto; }
 body.scrollbars-menus { --sb-menus: auto; }
 body.scrollbars-text { --sb-text: auto; }
+body.scrollbars-whiteboard { --sb-whiteboard: auto; }
 
 textarea,
 [contenteditable="true"] {

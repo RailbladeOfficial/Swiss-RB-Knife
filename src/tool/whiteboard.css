@@ -336,6 +336,9 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   position: absolute;
   inset: 0;
   overflow: auto;
+  /* The Whiteboard switch in Settings > Display > Scrollbars. See SCROLLBARS
+     in shell.css. */
+  --sb: var(--sb-whiteboard);
 }
 
 /* Sized in whiteboard.ts from SURFACE_W and SURFACE_H, the one place they live. */
