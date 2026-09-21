@@ -15,6 +15,10 @@
 .duration-preview-wrap {
   flex: 1;
   display: flex;
+  /* A column so the End countdown can sit under the duration box. With only
+     the one box in it, a column centers it exactly as the row did. */
+  flex-direction: column;
+  gap: 8px;
   align-items: center;
   justify-content: center;
   min-width: 150px;
@@ -55,6 +59,35 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.75;
+}
+
+/* THE END COUNTDOWN. The same box as the duration above it, so the two read as
+   a pair, in the theme's button color rather than the muted text the duration
+   uses. The duration is always Start to End, and this is always End minus Now,
+   and two numbers counting in the same color right on top of each other would
+   invite reading one as the other. */
+.tt-end-countdown {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--color-btn);
+  min-width: 150px;
+  padding: 6px 20px;
+  margin: 0 6px;
+  border: 1px solid var(--color-btn);
+  border-radius: 14px;
+  background: var(--color-bg);
+  text-align: center;
+}
+
+.tt-end-countdown.visible {
+  display: flex;
+}
+
+.tt-end-countdown .tt-duration-time {
+  font-size: 1.1rem;
 }
 
 /* =============================================================================

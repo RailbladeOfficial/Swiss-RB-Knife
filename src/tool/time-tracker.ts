@@ -1246,6 +1246,62 @@ function checkEndWarning(
   }
 }
 
+/* -----------------------------------------------------------------------------
+   THE END COUNTDOWN
+   -----------------------------------------------------------------------------
+   The warning tells you when the End Time is close. This shows how close it
+   is all the way there: End minus Now, under the duration box, ticking every
+   second, and only while the warning is on and the End Time is still ahead.
+
+   ITS OWN ONE-SECOND TIMER, separate from the warning's fifteen-second one. A
+   clock that visibly skips fifteen seconds at a time reads as broken, while
+   the doot has no such problem. The timer only runs while there is something
+   to count down to, and stops the moment there is not.
+----------------------------------------------------------------------------- */
+
+let endCountdownTimer: number | null = null;
+
+function refreshEndCountdown(
+  startDatePicker: HTMLInputElement,
+  startInput: HTMLInputElement,
+  endDatePicker: HTMLInputElement,
+  endInput: HTMLInputElement,
+): void {
+  const el = document.getElementById("ttEndCountdown")!;
+
+  /** Draws once. False means there is nothing to count down to. */
+  const draw = (): boolean => {
+    const at = settings.endWarning.enabled
+      ? formEndMoment(startDatePicker, startInput, endDatePicker, endInput)
+      : null;
+    // Rounded UP, so the clock reads 00:00:01 in the last second rather than
+    // showing zero while the End Time has not quite arrived.
+    const left = at ? Math.ceil((at.getTime() - Date.now()) / 1000) : 0;
+    if (!at || left <= 0) {
+      el.classList.remove("visible");
+      el.replaceChildren();
+      return false;
+    }
+    const { time, days } = formatPreviewDuration(left);
+    el.innerHTML =
+      `<span class="tt-duration-time">${time}</span>` +
+      `<span class="tt-duration-days">${days > 0 ? `+${days}d, ` : ""}until end</span>`;
+    el.classList.add("visible");
+    return true;
+  };
+
+  if (endCountdownTimer) {
+    clearInterval(endCountdownTimer);
+    endCountdownTimer = null;
+  }
+  if (!draw()) return;
+  endCountdownTimer = window.setInterval(() => {
+    if (draw()) return;
+    if (endCountdownTimer) clearInterval(endCountdownTimer);
+    endCountdownTimer = null;
+  }, 1000);
+}
+
 /** Starts the watch, and rearms it at once so a toggle or a retyped End Time
  *  is picked up without waiting out a tick. */
 function startEndWarningWatch(
@@ -1254,8 +1310,13 @@ function startEndWarningWatch(
   endDatePicker: HTMLInputElement,
   endInput: HTMLInputElement,
 ): void {
-  const tick = (): void =>
+  const tick = (): void => {
     checkEndWarning(startDatePicker, startInput, endDatePicker, endInput);
+    // Settings and the draft both load after this starts, so the countdown is
+    // re-read here too rather than only when a field changes. Otherwise an End
+    // Time restored from the draft would sit uncounted until you touched it.
+    refreshEndCountdown(startDatePicker, startInput, endDatePicker, endInput);
+  };
   if (endWarnTimer) clearInterval(endWarnTimer);
   endWarnTimer = window.setInterval(tick, END_WARN_TICK_MS);
   tick();
@@ -4976,6 +5037,7 @@ export function initTimeTracker(): void {
   }
   function doUpdateDurationPreview() {
     updateDurationPreview(startInput, endInput, durationPreview, datePicker, endDatePicker);
+    refreshEndCountdown(datePicker, startInput, endDatePicker, endInput);
     // Whether the clock is "running" is exactly the state the duration preview
     // already recomputes on, so piggy-backing here means every path that
     // touches a time field (Now buttons, typing, blur, Clear, draft restore)
@@ -5016,6 +5078,7 @@ export function initTimeTracker(): void {
   }
   function doCheckEndWarning() {
     checkEndWarning(datePicker, startInput, endDatePicker, endInput);
+    refreshEndCountdown(datePicker, startInput, endDatePicker, endInput);
   }
   // Module-level activity rename/delete mutate entries and need to refresh the
   // ledger; expose doRender to them without leaking DOM refs out of init.
