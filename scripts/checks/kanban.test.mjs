@@ -967,6 +967,24 @@ test("the sidebar pulse counts every board, whatever board you are standing on",
   );
 });
 
+test("a submenu whose label carries a count is found again by a key", () => {
+  /* A keepOpen click rebuilds the whole menu and walks back to the submenu you
+     were in by matching rows. A label like "Types (2)" changes on exactly the
+     click that triggered the rebuild, so the walk found nothing and the menu
+     closed: ticking a tag shut the tag menu (#233). Any submenu row whose label
+     is built with a count in it has to carry a stable key. */
+  const src = ts();
+  const strays = [];
+  for (const m of src.matchAll(/label:[^\n]*\(\$\{[^\n]*\n((?:[^\n]*\n){0,5}?)\s*submenu:/g)) {
+    if (!/\bkey:/.test(m[1])) strays.push(m[0].split("\n")[0].trim());
+  }
+  assert.deepEqual(strays, [], "these submenu rows change label on a keepOpen click and have no key");
+
+  const menu = read("src/menu/menu.ts");
+  assert.match(menu, /\(i\.key \?\? i\.label\) === step/, "the drill-down is still matched by label alone");
+  assert.match(menu, /trail\.push\(item\.key \?\? item\.label/, "the drill-down does not record the key");
+});
+
 test("the card modal does not borrow a class the board face owns", () => {
   /* .kb-card-top is the card face's header strip on the BOARD. The modal
      declared its own rule under that name lower down the same stylesheet, which

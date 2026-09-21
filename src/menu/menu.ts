@@ -88,6 +88,15 @@ export interface MenuItem {
   keepOpen?: boolean;
   /** Turns the row into a drill-down into these items. See DRILL-DOWN below. */
   submenu?: MenuItem[];
+  /** What the menu remembers this submenu row BY, when its label is not
+   *  stable. Defaults to the label.
+   *
+   *  A keepOpen click rebuilds the whole tree and walks back to where you were
+   *  by matching rows. A label that carries a live count, like "Types (2)",
+   *  changes on exactly the click that triggered the rebuild, so the walk found
+   *  nothing and the menu closed: ticking a tag shut the tag menu. Give such a
+   *  row a key that does not change, such as the id of the thing it stands for. */
+  key?: string;
   /** Renders in the danger color. For destructive rows (Delete, Remove). */
   danger?: boolean;
   /** A color chip before the label, as #rrggbb. For rows that stand for
@@ -274,12 +283,13 @@ export function openMenu(anchor: MenuAnchor, items: MenuItems): void {
   // reads a bare stack of buttons with no indication they belong together.
   menu.setAttribute("role", "menu");
 
-  /* WHERE WE ARE, HELD AS LABELS RATHER THAN AS THE ROWS THEMSELVES.
+  /* WHERE WE ARE, HELD AS KEYS RATHER THAN AS THE ROWS THEMSELVES.
      The drill-down path used to be the actual MenuItem arrays, passed down as
      the level to go back to. That cannot survive a rebuild: a keepOpen row
      inside a submenu produces a whole new tree, and the arrays we were
-     holding belong to the old one. Labels are what the two trees have in
-     common, so the path is re-walked rather than remembered. */
+     holding belong to the old one. So the path is re-walked by something the
+     two trees have in common: each row's key, which is its label unless the
+     label changes on the click itself (see MenuItem.key). */
   const trail: string[] = [];
 
   /** The level `trail` points at, built fresh from the caller each time.
@@ -287,8 +297,8 @@ export function openMenu(anchor: MenuAnchor, items: MenuItems): void {
    *  honest answer for a category whose last tag was just deleted. */
   const levelAt = (): MenuItem[] | null => {
     let level = buildOnce();
-    for (const label of trail) {
-      const row = level.find((i) => !i.separator && i.label === label && i.submenu);
+    for (const step of trail) {
+      const row = level.find((i) => !i.separator && (i.key ?? i.label) === step && i.submenu);
       if (!row?.submenu || row.submenu.length === 0) return null;
       level = row.submenu;
     }
@@ -362,7 +372,7 @@ export function openMenu(anchor: MenuAnchor, items: MenuItems): void {
         chevron.setAttribute("aria-hidden", "true");
         btn.append(text, chevron);
         btn.addEventListener("click", () => {
-          trail.push(item.label ?? "");
+          trail.push(item.key ?? item.label ?? "");
           render();
         });
       } else if (item.swatch) {

@@ -2764,6 +2764,10 @@ export function cardTagMenu(
     const on = catTags.filter((t) => card.tagIds.includes(t.id)).length;
     items.push({
       label: on > 0 ? `${category.name} (${on})` : category.name,
+      // The count in the label changes on the very tick that rebuilds the
+      // menu, so the drill-down has to be found again by something that does
+      // not. Without this, ticking a tag closed the menu.
+      key: `tagcat:${category.id}`,
       submenu: catTags.map((tag) => ({
         // A tick rather than a checkbox: MenuItem draws plain text, and the
         // mark has to survive being read at a glance in a list of twenty.

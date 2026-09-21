@@ -4072,6 +4072,9 @@ function filterTagMenu(board: Board): MenuItem[] {
     const on = catTags.filter((t) => filterTagIds.has(t.id)).length;
     items.push({
       label: on > 0 ? `${category.name} (${on})` : category.name,
+      // Same reason as the card's tag menu: the count changes on the click
+      // that rebuilds the panel, and the drill-down has to survive it.
+      key: `tagcat:${category.id}`,
       submenu: catTags.map((tag) => ({
         // A tick rather than a checkbox, the same mark the card's tag menu
         // uses, so the two read as one control in two places.
