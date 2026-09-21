@@ -58,7 +58,14 @@ import {
 import { formatBackupName, readToolBackup, renderToolBackups } from "../core/tool-backups";
 import { Modal, ModalTabs } from "../modal/modal";
 import { attachMenu, isTextEntry, type MenuItem } from "../menu/menu";
-import { appConfirm, backgroundMenu, flash, navigateToTool, flushOnQuit } from "../core/shell";
+import {
+  appConfirm,
+  backgroundMenu,
+  flash,
+  isToolVisible,
+  navigateToTool,
+  flushOnQuit,
+} from "../core/shell";
 import {
   addCardsFromElsewhere,
   addImageCardFromElsewhere,
@@ -2866,7 +2873,8 @@ function updateChrome(): void {
   undoBtn.disabled = !editingId && undoStack.length === 0;
   redoBtn.disabled = !editingId && redoStack.length === 0;
   clearBtn.disabled = isEmpty();
-  sendOpenBtn.disabled = isEmpty();
+  sendOpenBtn.disabled = isEmpty() || !kanbanOn();
+  sendOpenBtn.title = kanbanOn() ? "Send to Kanban (K)" : "The Kanban module is turned off";
   noticeWrap.style.display = blocked ? "" : "none";
 }
 
@@ -3114,11 +3122,20 @@ function cutTitle(line: string): string {
   return title;
 }
 
+/** Whether Kanban is on the sidebar. Hidden means turned off: every way into
+ *  Send to Kanban is grayed out or left out while it is, the way Countdown
+ *  treats a hidden Time Tracker. Asked each time rather than held, so
+ *  showing Kanban again brings them all back with nothing to reset. */
+function kanbanOn(): boolean {
+  return isToolVisible("productivity/kanban");
+}
+
 /** Send to Kanban from the keyboard: the modal when there is somewhere to send
  *  and something to send, and a toast saying which is missing when not. */
 function requestSend(): void {
   const targets = kanbanTargets();
-  if (isEmpty()) flash("There's nothing on the whiteboard to send.", "error");
+  if (!kanbanOn()) flash("The Kanban module is turned off.", "error");
+  else if (isEmpty()) flash("There's nothing on the whiteboard to send.", "error");
   else if (targets === null) flash("Kanban is still loading.", "error");
   else if (targets.length === 0) flash("There are no Kanban boards yet.", "error");
   else openSend();
@@ -3585,6 +3602,7 @@ let setupModal: Modal;
 let gridToggle: HTMLInputElement;
 let gridLabel: HTMLElement;
 let homeToggle: HTMLInputElement;
+let homeNote: HTMLElement;
 let homeLabel: HTMLElement;
 let selTextToggle: HTMLInputElement;
 let selTextLabel: HTMLElement;
@@ -3599,6 +3617,10 @@ function applySettingsToForm(): void {
   gridLabel.textContent = settings.grid ? "Enabled" : "Disabled";
   homeToggle.checked = settings.homeAfterSend;
   homeLabel.textContent = settings.homeAfterSend ? "Enabled" : "Disabled";
+  // Grayed out rather than hidden, the same as Countdown's Time Tracker row:
+  // the setting is kept and applies again the moment Kanban is shown.
+  homeToggle.disabled = !kanbanOn();
+  homeNote.hidden = kanbanOn();
   selTextToggle.checked = settings.selectionStylesText;
   selTextLabel.textContent = settings.selectionStylesText ? "Enabled" : "Disabled";
   boardColorSel.value = settings.boardColor;
@@ -3675,6 +3697,7 @@ function wireSetup(): void {
   gridLabel = document.getElementById("wbGridLabel")!;
   homeToggle = document.getElementById("wbHomeToggle") as HTMLInputElement;
   homeLabel = document.getElementById("wbHomeLabel")!;
+  homeNote = document.getElementById("wbHomeNote")!;
   selTextToggle = document.getElementById("wbSelTextToggle") as HTMLInputElement;
   selTextLabel = document.getElementById("wbSelTextLabel")!;
   boardColorSel = document.getElementById("wbBoardColorSelect") as HTMLSelectElement;
@@ -3750,7 +3773,7 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
           onClick: () => setNoteStyle(id, { size: sz }),
         })),
       },
-      { label: "Send to Kanban…", onClick: () => openSend("text", id) },
+      ...(kanbanOn() ? [{ label: "Send to Kanban…", onClick: () => openSend("text", id) }] : []),
       { separator: true },
       { label: "Delete", danger: true, onClick: () => deleteNote(id) },
     ];
@@ -3774,8 +3797,12 @@ function surfaceMenu(e: MouseEvent): MenuItem[] | null {
     },
     { label: "Delete", danger: true, disabled: !selection, onClick: deleteSelection },
     { separator: true },
-    { label: "Send to Kanban…", disabled: isEmpty(), onClick: () => openSend() },
-    { label: "Send Selection to Kanban…", disabled: !selection, onClick: () => openSend("image") },
+    ...(kanbanOn()
+      ? [
+          { label: "Send to Kanban…", disabled: isEmpty(), onClick: () => openSend() },
+          { label: "Send Selection to Kanban…", disabled: !selection, onClick: () => openSend("image") },
+        ]
+      : []),
     { label: "Clear Whiteboard…", danger: true, disabled: isEmpty(), onClick: requestClear },
     // A menu on a background carries the app-wide rows, or it has removed them.
     { separator: true },

@@ -817,3 +817,10 @@ body[data-active-tool="productivity/whiteboard"] #productivity-tool-whiteboard {
   margin: 0 2px;
   color: var(--color-text-muted);
 }
+
+/* A Setup label with a note under it, for a setting that can be unavailable. */
+.wb-setting-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
