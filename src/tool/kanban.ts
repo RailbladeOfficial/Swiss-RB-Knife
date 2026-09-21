@@ -193,6 +193,7 @@ import {
   forgetAttachmentFiles,
   missingAttachments,
   moveAttachmentsToBoard,
+  openCard,
   openCardId,
   renderCardPlacement,
   setAttachmentsRoot,
@@ -3671,6 +3672,12 @@ function openQuickAdd(
   save.textContent = "Add";
   row.appendChild(save);
 
+  const saveAndEdit = document.createElement("button");
+  saveAndEdit.type = "button";
+  saveAndEdit.textContent = "Add/Edit";
+  saveAndEdit.title = "Add the card and open it to fill in the rest";
+  row.appendChild(saveAndEdit);
+
   const cancel = document.createElement("button");
   cancel.type = "button";
   cancel.className = "modal-cancel-btn";
@@ -3696,12 +3703,28 @@ function openQuickAdd(
     reopenQuickAdd(board, column, next);
   }
 
+  /* Ends the run of captures rather than reopening the form: the card modal
+     takes the screen, and a form waiting behind it would still hold focus
+     claims and an Escape handler for a list you have stopped typing. */
+  function commitAndOpen(): void {
+    const title = input.value.trim();
+    if (!title) {
+      input.focus();
+      return;
+    }
+    const created = createCard(board, column.id, title, position);
+    if (!created) return;
+    renderBoardView();
+    openCard(created.id, undefined, true);
+  }
+
   function close(): void {
     form.remove();
     if (addBtn) addBtn.style.display = "";
   }
 
   save.addEventListener("click", commit);
+  saveAndEdit.addEventListener("click", commitAndOpen);
   cancel.addEventListener("click", close);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {

@@ -519,7 +519,11 @@ function cancelCardEdit(): void {
   renderAll();
 }
 
-export function openCard(cardId: string, tab?: KbCardTab): void {
+/** `edit` opens it ready to type into even on a board that opens cards for
+ *  reading. The quick-add form's Add/Edit button is the caller: the card was
+ *  made a moment ago for the sole purpose of filling it in, so landing on the
+ *  reading face would be one pointless click. */
+export function openCard(cardId: string, tab?: KbCardTab, edit = false): void {
   const card = getCard(cardId);
   if (!card) return;
   // An inline comment editor belongs to the card it was opened on. Clearing it
@@ -545,7 +549,7 @@ export function openCard(cardId: string, tab?: KbCardTab): void {
      here. */
   cardEditSnapshot = null;
   cardAlwaysEditing = effectiveForCard(card).openCardsInEditMode;
-  setCardEditing(cardAlwaysEditing);
+  setCardEditing(cardAlwaysEditing || edit);
 
   getCardModal().open();
   // Asked once per open, in the background: a file can vanish between sessions
