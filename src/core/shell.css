@@ -2460,9 +2460,15 @@ input[type="checkbox"]:not(.toggle-switch input):checked::before {
   color: var(--color-success);
 }
 
+/* Hovering borrows the toast plate, so it has to borrow the toast's ink too.
+   These kept --color-success / --color-danger from the resting state, which is
+   the mid-tone picked to sit on a PANEL, not on a saturated toast background:
+   on Light that was green-on-green at 3.4:1, and it got worse the richer the
+   plate became. The *-text tokens are the ones designed for that background. */
 .sound-pack-preview-btn.success:hover {
   background: var(--color-toast-success-bg);
   border-color: var(--color-success);
+  color: var(--color-toast-success-text);
 }
 
 .sound-pack-preview-btn.error {
@@ -2472,6 +2478,7 @@ input[type="checkbox"]:not(.toggle-switch input):checked::before {
 .sound-pack-preview-btn.error:hover {
   background: var(--color-toast-error-bg);
   border-color: var(--color-danger);
+  color: var(--color-toast-error-text);
 }
 
 .sound-pack-preview-btn:disabled {

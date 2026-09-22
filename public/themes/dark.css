@@ -1,3 +1,21 @@
+/* =============================================================================
+   DARK
+   -----------------------------------------------------------------------------
+   The chrome here is deliberately colorless: near-black surfaces, gray buttons,
+   indigo reserved for the things that have to catch the eye. That part is the
+   theme's identity and is left alone.
+
+   What is NOT identity is the semantic layer. Success, danger, the four panel
+   accents, the toasts and Game Stats' win/loss used to be desaturated along
+   with everything else, which meant a "saved" toast came up gray, the Totals
+   panel stripe was a stone brown indistinguishable from a border, and a danger
+   button sat at ~3:1 against its own panel. Those slots carry meaning, not
+   mood, so they now take the same values the Midnight family uses, which is the
+   standard the five default themes share. The greens, reds and ambers below are
+   byte-identical to midnight-*.css on purpose; only the tones tuned to this
+   theme's darker plate (the toast backgrounds) differ.
+============================================================================= */
+
 :root {
   --color-bg:                  #0a0a0a;
   --color-panel:               #141414;
@@ -13,31 +31,45 @@
   --color-btn-hover:           #525252;
   --color-btn-text:            #e5e7eb;
 
-  --color-danger:              #b91c1c;
-  --color-danger-subtle:       rgba(185, 28, 28, 0.1);
-  --color-success:             #374151;
+  /* Semantic, shared with the Midnight family. Danger was #b91c1c, which as
+     .danger-btn's text and border sat at ~3:1 on the panel; success was
+     #374151, a gray, so every Kanban done-bar, completed subtask fill and
+     done-column marker rendered colorless. */
+  --color-danger:              #ef4444;
+  --color-danger-subtle:       rgba(239, 68, 68, 0.1);
+  --color-success:             #22c55e;
 
+  /* Input keeps this theme's indigo. View, Totals and Entries take the
+     Midnight categories: Totals was a stone brown that read as an uncolored
+     border, and Entries was the old muddy danger red. */
   --color-accent-input:        #6366f1;
-  --color-accent-view:         #0d9488;
-  --color-accent-totals:       #78716c;
-  --color-accent-entries:      #b91c1c;
+  --color-accent-view:         #14b8a6;
+  --color-accent-totals:       #f59e0b;
+  --color-accent-entries:      #ef4444;
 
   --color-toggle-off:          #374151;
   --color-toggle-on:           #525252;
 
-  /* ── Changelog accents ── Features (indigo) / Improvements (teal) / Bugfixes (crimson, more vivid than the
-     muted --color-accent-entries so it actually pops against this desaturated theme) / tool heading (amber) */
+  /* ── Changelog accents ── Features (indigo) / Improvements (teal) / Bugfixes (red) / tool heading (amber).
+     Improvements was #0d9488, ~2.6:1 as heading text on this plate; Bugfixes
+     was a separate crimson only because --color-accent-entries used to be too
+     muted to reuse. Both now match the accents they name. */
   --color-changelog-features:     #6366f1;
-  --color-changelog-improvements: #0d9488;
-  --color-changelog-bugfixes:     #f43f5e;
+  --color-changelog-improvements: #14b8a6;
+  --color-changelog-bugfixes:     #ef4444;
   --color-changelog-tool:         #d97706;
 
-  --color-toast-success-bg:    #1a2e1a;
-  --color-toast-success-border:#374151;
-  --color-toast-success-text:  #9ca3af;
-  --color-toast-error-bg:      #2a1010;
-  --color-toast-error-border:  #b91c1c;
-  --color-toast-error-text:    #fca5a5;
+  /* Plates deepened rather than copied from Midnight: this theme's page is
+     #0a0a0a, so Midnight's #14532d / #7f1d1d would float. Borders and ink are
+     the shared semantic pair. The success toast used to be a gray border and
+     gray text on a barely-green box, i.e. indistinguishable from a neutral
+     notice. */
+  --color-toast-success-bg:    #10331d;
+  --color-toast-success-border:#22c55e;
+  --color-toast-success-text:  #d1fae5;
+  --color-toast-error-bg:      #3d1414;
+  --color-toast-error-border:  #ef4444;
+  --color-toast-error-text:    #fee2e2;
 
   /* ── Budget chart palette ── Indigo / cyan / amber / rose / soft violet / sky / crimson / emerald */
   --color-chart-1:             #6366f1;
@@ -50,11 +82,11 @@
   --color-chart-8:             #34d399;
 }
 
-/* ── Panel accent slots, desaturated accent borders ── */
+/* ── Panel accent slots ── */
 .panel-accent-input    { border-left: 4px solid #6366f1; }
-.panel-accent-view     { border-left: 4px solid #0d9488; }
-.panel-accent-totals   { border-left: 4px solid #78716c; }
-.panel-accent-entries  { border-left: 4px solid #b91c1c; }
+.panel-accent-view     { border-left: 4px solid #14b8a6; }
+.panel-accent-totals   { border-left: 4px solid #f59e0b; }
+.panel-accent-entries  { border-left: 4px solid #ef4444; }
 
 /* ── Tool / section header, very subtle, near-black ── */
 .tool-view-header,
@@ -131,7 +163,7 @@ body:not(.solid-modals) .modal {
 
 /* ── Preview card accents ── */
 .preview-card.anchor-card { border-color: #6366f1; }
-.preview-card.drag-target  { border-color: #0d9488; }
+.preview-card.drag-target  { border-color: #14b8a6; }
 
 /* ── Attention-signal accents ──
    This theme's --color-btn is a neutral gray (its buttons are deliberately
@@ -204,12 +236,15 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds, near-black, minimal tint to preserve the dark theme's
-   subdued aesthetic. Borders do the accent work. */
-#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, #141414 100%); }
-#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(13, 148, 136, 0.06) 0%, #141414 100%); }
-#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(120, 113, 108, 0.08) 0%, #141414 100%); }
-#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(185, 28, 28, 0.06) 0%, #141414 100%); }
+/* Panel backgrounds, near-black with an accent wash. The tints were 6-8% of
+   colors that were themselves desaturated, which on a #141414 plate came to
+   nothing: the four panels were visually identical and only the stripe told
+   them apart. Same washes the Midnight family uses, one or two points stronger
+   to survive the darker plate. */
+#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(99, 102, 241, 0.10) 0%, #141414 100%); }
+#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(20, 184, 166, 0.09) 0%, #141414 100%); }
+#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, #141414 100%); }
+#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, #141414 100%); }
 
 /* Annual Stats title panel */
 .budget-annual-stats-title-panel { border-left: 4px solid #6366f1; }
@@ -231,10 +266,12 @@ body:not(.solid-modals) .modal {
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }
 
-/* Stats badges */
-.budget-stats-count-good    { color: #2dd4bf; border-color: #2dd4bf; }
-.budget-stats-count-late    { color: #d97706; border-color: #d97706; }
-.budget-stats-count-overdue { color: #fb7185; border-color: #fb7185; }
+/* Stats on-time / late / overdue count badges, semantic status, literal.
+   Good was a teal, which for a badge that means "paid on time" read as another
+   category rather than as a pass. Same trio as the Midnight family. */
+.budget-stats-count-good    { color: #34d399; border-color: #34d399; }
+.budget-stats-count-late    { color: #fbbf24; border-color: #fbbf24; }
+.budget-stats-count-overdue { color: #f87171; border-color: #f87171; }
 
 /* Chart buttons, match the dark theme's understated palette */
 .budget-chart-cycle-btn,
@@ -259,8 +296,11 @@ body:not(.solid-modals) .modal {
 :root {
   --gs-accent:      #6366f1;
   --gs-accent-soft: #a5b4fc;
-  --gs-win:         #2dd4bf;
-  --gs-loss:        #fb7185;
+  /* Routed through the semantic tokens the way the Midnight family does, so a
+     win is the app's green rather than this theme's teal and a loss is the
+     app's red rather than a rose that sat next to the amber "late" badge. */
+  --gs-win:         var(--color-success);
+  --gs-loss:        var(--color-danger);
   --gs-surface:     rgba(99, 102, 241, 0.07);
   --gs-header-bg:   rgba(99, 102, 241, 0.11);
   --gs-grid-line:   #2a2a2a;

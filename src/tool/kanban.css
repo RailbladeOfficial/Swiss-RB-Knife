@@ -2579,10 +2579,19 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
 
 /* The column that means done, marked rather than merely selected: it is a
    property of the set, and you should be able to see which one holds it without
-   reading every button. */
+   reading every button.
+
+   The label used to be --color-btn-text on a solid --color-success fill, which
+   is near-white ink on a mid-green and fails 3:1 in 13 of the 28 themes,
+   including the whole Midnight family and the base sheet. It only ever looked
+   right in themes whose success color happened to be dark. This uses the
+   marked-state idiom already established above for .kb-card-due-done and
+   .kb-card-stage-done, green ink and green border over a wash of the same
+   green, which cannot fail: --color-success is required to be legible as text
+   on a panel anyway, since eight other rules in this file use it that way. */
 .kb-default-column-row .settings-action-btn.active {
-  background: var(--color-success);
-  color: var(--color-btn-text);
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+  color: var(--color-success);
   border-color: var(--color-success);
 }
 

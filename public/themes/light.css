@@ -44,10 +44,16 @@
   --color-changelog-bugfixes:     #dc2626;
   --color-changelog-tool:         #7c3aed;
 
-  --color-toast-success-bg:    #dcfce7;
+  /* Toast plates, one step deeper than the palest tint. The Midnight family's
+     toasts are saturated blocks with a vivid border; the equivalent weight on a
+     light theme is a tint you can actually name, not the faintest one that
+     still counts as green. #dcfce7 / #fee2e2 sat ~3% off the page color, so a
+     toast read as a white card with a thin colored edge. The 200-level tints
+     keep the deep ink well clear of AA (6.6:1 and 6.5:1). */
+  --color-toast-success-bg:    #bbf7d0;
   --color-toast-success-border:#16a34a;
   --color-toast-success-text:  #14532d;
-  --color-toast-error-bg:      #fee2e2;
+  --color-toast-error-bg:      #fecaca;
   --color-toast-error-border:  #dc2626;
   --color-toast-error-text:    #7f1d1d;
 
@@ -296,11 +302,16 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds, panel tone with very subtle accent tints */
-#tracking-tool-budget .panel-accent-input  { background: #f4f7fc; box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6; }
-#tracking-tool-budget .panel-accent-view   { background: #f4f7fc; box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669; }
-#tracking-tool-budget .panel-accent-totals { background: #f4f7fc; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706; }
-#tracking-tool-budget .panel-accent-entries{ background: #f4f7fc; box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08),  inset 3px 0 0 #dc2626; }
+/* Panel backgrounds. These were four flat #f4f7fc slabs told apart only by the
+   inset stripe, while every Midnight theme washes each panel in its own accent.
+   Same 135deg wash here, tuned down: on a near-white plate a 7% tint carries
+   about as far as the 8% one does on Midnight's near-black, so these run 8-10%
+   and still leave the panel reading as a light surface. The stripe and the
+   soft drop shadow are unchanged. */
+#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(59, 130, 246, 0.10) 0%, #f4f7fc 100%); box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08), inset 3px 0 0 #3b82f6; }
+#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(5, 150, 105, 0.09) 0%, #f4f7fc 100%);  box-shadow: 0 1px 4px rgba(5, 150, 105, 0.08),  inset 3px 0 0 #059669; }
+#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(217, 119, 6, 0.10) 0%, #f4f7fc 100%);  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.08),  inset 3px 0 0 #d97706; }
+#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(220, 38, 38, 0.08) 0%, #f4f7fc 100%);  box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08),  inset 3px 0 0 #dc2626; }
 
 /* Annual Stats title panel */
 .budget-annual-stats-title-panel { border-left: 4px solid #3b82f6; background: #f4f7fc; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
@@ -352,8 +363,11 @@ body:not(.solid-modals) .modal {
 :root {
   --gs-accent:      #3b82f6;
   --gs-accent-soft: #1e40af;
-  --gs-win:         #16a34a;
-  --gs-loss:        #dc2626;
+  /* Same values as before, taken from the semantic tokens rather than repeated
+     as literals, so win/loss here cannot drift from --color-success /
+     --color-danger the way Dark's teal-and-rose pair had. */
+  --gs-win:         var(--color-success);
+  --gs-loss:        var(--color-danger);
   --gs-surface:     rgba(59, 130, 246, 0.07);
   --gs-header-bg:   rgba(59, 130, 246, 0.10);
   --gs-grid-line:   #dde5f1;
