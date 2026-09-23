@@ -1278,14 +1278,18 @@ function refreshEndCountdown(
     // showing zero while the End Time has not quite arrived.
     const left = at ? Math.ceil((at.getTime() - Date.now()) / 1000) : 0;
     if (!at || left <= 0) {
-      el.classList.remove("visible");
+      el.classList.remove("visible", "warning");
       el.replaceChildren();
       return false;
     }
     const { time, days } = formatPreviewDuration(left);
     el.innerHTML =
       `<span class="tt-duration-time">${time}</span>` +
-      `<span class="tt-duration-days">${days > 0 ? `+${days}d, ` : ""}until end</span>`;
+      `<span class="tt-duration-days">${days > 0 ? `+${days}d, ` : ""}until end time</span>`;
+    // Inside the lead window the box turns the theme's danger color, so the
+    // warning is visible on the clock itself and not only in the toast that
+    // fires once and goes.
+    el.classList.toggle("warning", left <= settings.endWarning.leadMinutes * 60);
     el.classList.add("visible");
     return true;
   };

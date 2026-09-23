@@ -86,6 +86,13 @@
   display: flex;
 }
 
+/* Inside the lead window, i.e. once the End Time Warning would have fired. The
+   toast speaks once and goes; this keeps saying it until the time arrives. */
+.tt-end-countdown.warning {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
 .tt-end-countdown .tt-duration-time {
   font-size: 1.1rem;
 }
