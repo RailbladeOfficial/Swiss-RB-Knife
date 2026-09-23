@@ -124,6 +124,62 @@ test("the colored stripe on a tool panel is not silently overwritten with gray",
   assert.deepEqual(problems, [], "these panel stripes render gray instead of their color");
 });
 
+test("the dark default themes share one semantic palette", () => {
+  /* Midnight Blue, Green and Red were always built this way: they differ only
+     in their eight neutrals and their five-var accent ramp, and every other
+     :root variable is one shared palette, so a toast, a panel stripe, a
+     changelog heading and a Budget chart carry the same meaning and the same
+     color across the family. Nothing enforced it, and Dark, which is
+     DEFAULT_THEME_ID and therefore what a new install opens on, had drifted
+     well off it: success was a gray, so Kanban's done markers rendered
+     colorless; danger sat at ~2.9:1 as its own button's text; the Totals
+     stripe was a stone brown; and the toasts were gray-on-near-black.
+
+     The symptom this guards is drift, not ugliness. A shared slot edited in
+     one sheet and not the other three does not fail anywhere: the app still
+     paints, the wrong color is a perfectly valid color, and you only find it
+     by opening the same screen on four themes and noticing they disagree.
+
+     Light is deliberately NOT in this list. It holds the same hue and role in
+     every shared slot but cannot hold the same values, because these are tuned
+     for a dark plate and most of them land between 2.0:1 and 3.5:1 on its
+     near-white panel. See the header of light.css. */
+  const FAMILY = ["midnight-blue", "midnight-green", "midnight-red", "dark"];
+
+  // The two groups a theme is allowed to have to itself.
+  const NEUTRALS = ["bg", "panel", "input-bg", "border", "border-dashed", "text", "text-muted", "hover"];
+  const RAMP = ["btn", "accent", "btn-hover", "btn-text", "toggle-on"];
+  const OWN = new Set([...NEUTRALS, ...RAMP].map((n) => `--color-${n}`));
+
+  const rootVars = (id) => {
+    const css = read(`public/themes/${id}.css`);
+    const at = css.indexOf(":root {");
+    const block = css.slice(at, css.indexOf("\n}", at));
+    const out = new Map();
+    for (const m of block.matchAll(/(--color-[a-z0-9-]+):\s*([^;]+);/g)) out.set(m[1], m[2].trim());
+    return out;
+  };
+
+  const [refId, ...rest] = FAMILY;
+  const ref = rootVars(refId);
+  const shared = [...ref.keys()].filter((k) => !OWN.has(k));
+  assert.ok(
+    shared.length >= 20,
+    `parsed only ${shared.length} shared variables from ${refId}.css, the :root block is not being read`,
+  );
+
+  const drift = [];
+  for (const id of rest) {
+    const v = rootVars(id);
+    for (const key of shared) {
+      if (v.get(key) !== ref.get(key)) {
+        drift.push(`${id}.css ${key}: ${v.get(key) ?? "(missing)"}, ${refId}.css has ${ref.get(key)}`);
+      }
+    }
+  }
+  assert.deepEqual(drift, [], "these themes disagree about a color that is supposed to mean one thing");
+});
+
 test("the Special tab stays alphabetical", () => {
   const block = slice("src/theme/theme-ids.ts", 'tab: "special"', "];");
   const labels = [...block.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);

@@ -1,3 +1,38 @@
+/* =============================================================================
+   LIGHT
+   -----------------------------------------------------------------------------
+   THIS THEME MIRRORS THE MIDNIGHT PALETTE, IT DOES NOT COPY IT, AND THAT IS
+   DELIBERATE.
+
+   Midnight Blue, Green, Red and Dark share one semantic palette byte for byte:
+   same success, same danger, same four panel accents, same changelog four, same
+   toasts, same eight chart colors. This theme holds the same hue and the same
+   role in every one of those slots, but at the lightness a near-white plate
+   needs. It cannot hold the same values, because that palette is tuned to sit
+   on a dark panel. Measured against this theme's #f4f7fc panel:
+
+     slot                      family value    here
+     --color-success           2.12:1          3.07:1
+     --color-accent-totals     2.00:1          2.97:1
+     --color-accent-view       2.36:1          3.51:1
+     --color-changelog-tool    2.53:1          5.31:1
+     --color-danger            3.50:1          4.50:1
+
+   The same family values run 4.7:1 to 8.3:1 on Midnight's own panel. They are
+   not richer colors, they are dark-plate colors, and several of these slots are
+   used as ink (Kanban's due-done and stage-done markers, Game Stats' win and
+   loss, the changelog headings), so adopting them literally would make this
+   theme less legible rather than more vivid.
+
+   So the rule here is: match the family on hue and on role, pick the tier that
+   works on a light surface. If you change a shared slot in the Midnight sheets,
+   change this one to the light-plate equivalent of the same hue rather than
+   pasting the value across. The toast plates are the clearest case, a pale
+   ground with deep ink where the family has a deep ground with pale ink.
+   Because of that this theme is excluded from the byte-equality check in
+   themes.test.mjs, which covers the four dark ones only.
+============================================================================= */
+
 /* Surface tones. Panels used to be pure #ffffff on an #f1f5f9 page: both very
    bright, and only a few percent apart, so a screen of cards read as one flat
    sheet of white. These step the whole stack down and lean it toward the
@@ -57,15 +92,20 @@
   --color-toast-error-border:  #dc2626;
   --color-toast-error-text:    #7f1d1d;
 
-  /* ── Budget chart palette ── Blue / teal / amber / red / violet / cyan / pink / green, medium sat for the light plate */
+  /* ── Budget chart palette ── Blue / emerald / amber / red / violet / cyan / orange / mint, one
+     step deeper than the family's so the fills hold on a near-white plate.
+     Slot 7 was pink and slot 8 a green two hairs off slot 2's emerald, which
+     broke the running order the other four themes share and made 2 and 8 hard
+     to tell apart in a pie. They are now the family's orange and mint, read
+     down the dark end instead of the light one. */
   --color-chart-1:             #2563eb;
   --color-chart-2:             #059669;
   --color-chart-3:             #d97706;
   --color-chart-4:             #dc2626;
   --color-chart-5:             #7c3aed;
   --color-chart-6:             #0891b2;
-  --color-chart-7:             #db2777;
-  --color-chart-8:             #16a34a;
+  --color-chart-7:             #ea580c;
+  --color-chart-8:             #15803d;
 }
 
 /* ── Panel accent slots, clean left-border accents on the panel tone ── */

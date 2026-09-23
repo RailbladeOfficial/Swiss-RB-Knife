@@ -5,15 +5,30 @@
    indigo reserved for the things that have to catch the eye. That part is the
    theme's identity and is left alone.
 
-   What is NOT identity is the semantic layer. Success, danger, the four panel
-   accents, the toasts and Game Stats' win/loss used to be desaturated along
-   with everything else, which meant a "saved" toast came up gray, the Totals
-   panel stripe was a stone brown indistinguishable from a border, and a danger
-   button sat at ~3:1 against its own panel. Those slots carry meaning, not
-   mood, so they now take the same values the Midnight family uses, which is the
-   standard the five default themes share. The greens, reds and ambers below are
-   byte-identical to midnight-*.css on purpose; only the tones tuned to this
-   theme's darker plate (the toast backgrounds) differ.
+   What is NOT identity is the semantic layer, and this theme is a full member
+   of the Midnight family there. Midnight Blue, Green and Red differ only in
+   their eight neutrals and their five-var accent ramp; all 26 remaining :root
+   variables are one shared palette, so a toast, a panel stripe, a changelog
+   heading and a Budget chart mean the same thing and look the same whichever
+   of them you are on. This theme now sits inside that rule: the 26 shared
+   variables below are byte-identical to midnight-*.css, and only the neutrals
+   (near-black rather than blue-tinted) and the ramp differ.
+
+   Checked by "the dark default themes share one semantic palette" in
+   themes.test.mjs, so editing a shared slot here without editing the other
+   three fails rather than drifting quietly.
+
+   The ramp is where this theme earns its name: --color-btn is a neutral gray,
+   which is deliberate, and indigo (#6366f1) stands in as the attention color
+   wherever a gray button would say nothing. That is a ramp concern, not a
+   semantic one, so it is untouched and it does not belong in the shared block.
+
+   What this fixed, all of it invisible until you looked for it: success was
+   #374151, a gray, so every Kanban done-bar and done-column marker rendered
+   colorless and the "saved" toast was gray text on a barely-green box; danger
+   was #b91c1c, ~2.9:1 as .danger-btn's own text; the Totals stripe was a stone
+   brown indistinguishable from a border; and the four Budget panel washes were
+   6-8% of already-desaturated colors, so all four panels looked identical.
 ============================================================================= */
 
 :root {
@@ -31,62 +46,60 @@
   --color-btn-hover:           #525252;
   --color-btn-text:            #e5e7eb;
 
-  /* Semantic, shared with the Midnight family. Danger was #b91c1c, which as
-     .danger-btn's text and border sat at ~3:1 on the panel; success was
-     #374151, a gray, so every Kanban done-bar, completed subtask fill and
-     done-column marker rendered colorless. */
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE SHARED SEMANTIC PALETTE
+     Everything from here to the end of :root is the Midnight family's, byte
+     for byte. Do not tune a value here to suit this theme's plate: if one of
+     them is wrong it is wrong in all four sheets, so change all four.
+     ───────────────────────────────────────────────────────────────────────── */
+
   --color-danger:              #ef4444;
   --color-danger-subtle:       rgba(239, 68, 68, 0.1);
   --color-success:             #22c55e;
 
-  /* Input keeps this theme's indigo. View, Totals and Entries take the
-     Midnight categories: Totals was a stone brown that read as an uncolored
-     border, and Entries was the old muddy danger red. */
-  --color-accent-input:        #6366f1;
-  --color-accent-view:         #14b8a6;
+  --color-accent-input:        #2563eb;
+  --color-accent-view:         #10b981;
   --color-accent-totals:       #f59e0b;
   --color-accent-entries:      #ef4444;
 
   --color-toggle-off:          #374151;
+  /* Ramp, not shared: tracks --color-btn-hover the way Midnight's tracks its
+     own --color-btn. */
   --color-toggle-on:           #525252;
 
-  /* ── Changelog accents ── Features (indigo) / Improvements (teal) / Bugfixes (red) / tool heading (amber).
-     Improvements was #0d9488, ~2.6:1 as heading text on this plate; Bugfixes
-     was a separate crimson only because --color-accent-entries used to be too
-     muted to reuse. Both now match the accents they name. */
-  --color-changelog-features:     #6366f1;
-  --color-changelog-improvements: #14b8a6;
+  /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (red) / tool heading (violet) */
+  --color-changelog-features:     #2563eb;
+  --color-changelog-improvements: #10b981;
   --color-changelog-bugfixes:     #ef4444;
-  --color-changelog-tool:         #d97706;
+  --color-changelog-tool:         #a78bfa;
 
-  /* Plates deepened rather than copied from Midnight: this theme's page is
-     #0a0a0a, so Midnight's #14532d / #7f1d1d would float. Borders and ink are
-     the shared semantic pair. The success toast used to be a gray border and
-     gray text on a barely-green box, i.e. indistinguishable from a neutral
-     notice. */
-  --color-toast-success-bg:    #10331d;
+  --color-toast-success-bg:    #14532d;
   --color-toast-success-border:#22c55e;
   --color-toast-success-text:  #d1fae5;
-  --color-toast-error-bg:      #3d1414;
+  --color-toast-error-bg:      #7f1d1d;
   --color-toast-error-border:  #ef4444;
   --color-toast-error-text:    #fee2e2;
 
-  /* ── Budget chart palette ── Indigo / cyan / amber / rose / soft violet / sky / crimson / emerald */
-  --color-chart-1:             #6366f1;
-  --color-chart-2:             #2dd4bf;
-  --color-chart-3:             #d97706;
-  --color-chart-4:             #fb7185;
-  --color-chart-5:             #c4b5fd;
-  --color-chart-6:             #38bdf8;
-  --color-chart-7:             #f43f5e;
+  /* ── Budget chart palette ── Blue / emerald / amber / red / violet / cyan / orange / mint */
+  --color-chart-1:             #3b82f6;
+  --color-chart-2:             #10b981;
+  --color-chart-3:             #f59e0b;
+  --color-chart-4:             #ef4444;
+  --color-chart-5:             #a78bfa;
+  --color-chart-6:             #06b6d4;
+  --color-chart-7:             #fb923c;
   --color-chart-8:             #34d399;
 }
 
-/* ── Panel accent slots ── */
-.panel-accent-input    { border-left: 4px solid #6366f1; }
-.panel-accent-view     { border-left: 4px solid #14b8a6; }
-.panel-accent-totals   { border-left: 4px solid #f59e0b; }
-.panel-accent-entries  { border-left: 4px solid #ef4444; }
+/* ── Panel accent slots ──
+   Driven off the vars rather than restated as literals, the way the Midnight
+   sheets do it. These were four hardcoded hexes, which is exactly how a shared
+   slot drifts: the variable gets updated, the stripe keeps the old color, and
+   nothing anywhere reports it. ── */
+.panel-accent-input    { border-left: 4px solid var(--color-accent-input); }
+.panel-accent-view     { border-left: 4px solid var(--color-accent-view); }
+.panel-accent-totals   { border-left: 4px solid var(--color-accent-totals); }
+.panel-accent-entries  { border-left: 4px solid var(--color-accent-entries); }
 
 /* ── Tool / section header, very subtle, near-black ── */
 .tool-view-header,
@@ -162,8 +175,10 @@ body:not(.solid-modals) .modal {
 .estimate-val { color: #d1d5db; }
 
 /* ── Preview card accents ── */
+/* Anchor is the ramp's indigo (it pairs with .anchor-badge below); drag-target
+   is the shared View accent, so it takes the var. */
 .preview-card.anchor-card { border-color: #6366f1; }
-.preview-card.drag-target  { border-color: #14b8a6; }
+.preview-card.drag-target  { border-color: var(--color-accent-view); }
 
 /* ── Attention-signal accents ──
    This theme's --color-btn is a neutral gray (its buttons are deliberately
@@ -236,15 +251,17 @@ body:not(.solid-modals) .modal {
 
 /* ── Budget Tracker ── */
 
-/* Panel backgrounds, near-black with an accent wash. The tints were 6-8% of
-   colors that were themselves desaturated, which on a #141414 plate came to
-   nothing: the four panels were visually identical and only the stripe told
-   them apart. Same washes the Midnight family uses, one or two points stronger
-   to survive the darker plate. */
-#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, rgba(99, 102, 241, 0.10) 0%, #141414 100%); }
-#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, rgba(20, 184, 166, 0.09) 0%, #141414 100%); }
-#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, #141414 100%); }
-#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, #141414 100%); }
+/* Panel background tints, gradient from an accent wash into the panel color.
+   Same shape as the Midnight sheets, and color-mix on the accent vars for the
+   same reason as the stripes above. Two points stronger than Midnight's 8/7/7/6
+   because this plate is #141414 rather than #0f172a and a 6% wash disappears
+   into it; the tints were previously 6-8% of colors that were themselves
+   desaturated, so all four panels looked identical and only the stripe told
+   them apart. */
+#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-input) 10%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 9%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 9%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-entries) 8%, transparent) 0%, var(--color-panel) 100%); }
 
 /* Annual Stats title panel */
 .budget-annual-stats-title-panel { border-left: 4px solid #6366f1; }
