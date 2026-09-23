@@ -180,6 +180,54 @@ test("the dark default themes share one semantic palette", () => {
   assert.deepEqual(drift, [], "these themes disagree about a color that is supposed to mean one thing");
 });
 
+test("the dark default themes share one body", () => {
+  /* The companion to the palette check above, and the reason the family is
+     cheap to maintain: every rule below :root in these four sheets is written
+     in var() and color-mix() against the ramp, so all four can hold the SAME
+     rules and still look like themselves. Dark used to restate that body in
+     ~40 hardcoded hexes, which is why it drifted in the first place: a value
+     changed in :root and the literal underneath it did not follow, and a stale
+     hex renders perfectly happily.
+
+     If one of these four ever genuinely needs a rule of its own, drop it from
+     FAMILY here rather than letting the bodies quietly diverge. */
+  const FAMILY = ["midnight-blue", "midnight-green", "midnight-red", "dark"];
+  const body = (id) => {
+    const css = read(`public/themes/${id}.css`);
+    const at = css.indexOf(":root {");
+    return css.slice(css.indexOf("\n}", at) + 2);
+  };
+
+  const [refId, ...rest] = FAMILY;
+  const ref = body(refId);
+  assert.ok(ref.includes("--gs-accent:"), `body extraction failed for ${refId}.css`);
+  assert.ok(!ref.includes("--color-bg:"), `body extraction for ${refId}.css swallowed the :root block`);
+
+  for (const id of rest) {
+    assert.equal(
+      body(id),
+      ref,
+      `${id}.css and ${refId}.css no longer share a body, so a rule was edited in one and not the others`,
+    );
+  }
+
+  /* And the bodies are var-driven, which is the property that makes sharing
+     them possible at all: a raw hex below :root paints the same in all four
+     sheets whatever their ramps say, so it is drift waiting to happen.
+
+     Two sets are deliberately literal and stay that way. Budget's .pos/.neg
+     are hardcoded in all 28 sheets, not just these. The stats count badges are
+     a fixed semantic trio (pass / late / overdue) with no variable of their
+     own; giving them one would mean adding three to all 28 sheets to express
+     something no theme wants to vary. Both are documented at their rule. */
+  const DELIBERATE_LITERALS = ["#00FF00", "#FF0000", "#34d399", "#fbbf24", "#f87171"];
+  for (const id of FAMILY) {
+    const hexes = [...body(id).matchAll(/#[0-9a-fA-F]{6}\b/g)].map((m) => m[0]);
+    const unexpected = [...new Set(hexes)].filter((h) => !DELIBERATE_LITERALS.includes(h));
+    assert.deepEqual(unexpected, [], `${id}.css hardcodes colors below :root instead of using the ramp`);
+  }
+});
+
 test("the Special tab stays alphabetical", () => {
   const block = slice("src/theme/theme-ids.ts", 'tab: "special"', "];");
   const labels = [...block.matchAll(/label: "([^"]+)"/g)].map((m) => m[1]);

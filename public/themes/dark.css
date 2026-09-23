@@ -1,56 +1,77 @@
 /* =============================================================================
    DARK
    -----------------------------------------------------------------------------
-   The chrome here is deliberately colorless: near-black surfaces, gray buttons,
-   indigo reserved for the things that have to catch the eye. That part is the
-   theme's identity and is left alone.
+   The fourth member of the Midnight family, and built like one: this sheet is
+   midnight-blue.css with two things swapped, its eight neutrals and its
+   five-var accent ramp. Everything else, the whole shared semantic palette and
+   every rule below :root, is byte-identical to the other three. That is checked
+   by "the dark default themes share one semantic palette" and "the dark default
+   themes share one body" in themes.test.mjs.
 
-   What is NOT identity is the semantic layer, and this theme is a full member
-   of the Midnight family there. Midnight Blue, Green and Red differ only in
-   their eight neutrals and their five-var accent ramp; all 26 remaining :root
-   variables are one shared palette, so a toast, a panel stripe, a changelog
-   heading and a Budget chart mean the same thing and look the same whichever
-   of them you are on. This theme now sits inside that rule: the 26 shared
-   variables below are byte-identical to midnight-*.css, and only the neutrals
-   (near-black rather than blue-tinted) and the ramp differ.
+   WHAT MAKES IT DARK RATHER THAN MIDNIGHT BLUE
+   -----------------------------------------------------------------------------
+   The neutrals are near-black and carry only a whisper of the ramp's hue, where
+   Midnight Blue's are openly navy. And the ramp is indigo rather than blue,
+   which is the mirror of Light: Light pairs blue-tinted near-white surfaces
+   with a blue ramp, this pairs indigo-tinted near-black surfaces with an indigo
+   one. Same structure, opposite direction. Light's hover and accent step
+   DARKER than its button because it sits on white; these step LIGHTER.
 
-   Checked by "the dark default themes share one semantic palette" in
-   themes.test.mjs, so editing a shared slot here without editing the other
-   three fails rather than drifting quietly.
+   WHY THE BUTTONS ARE NO LONGER GRAY
+   -----------------------------------------------------------------------------
+   --color-btn used to be #404040, and this was the only theme of the 28 whose
+   primary control was a gray (0% saturation; the next lowest is Liminal at
+   49%). That was described as restraint, but it was not really: indigo was
+   already threaded through fourteen places in this file, including the Home
+   tool-card icons, the update and tool-header notices, the anchor badge, the
+   Budget view-mode button and the whole Game Stats accent. The gray reached
+   only the buttons and toggles.
 
-   The ramp is where this theme earns its name: --color-btn is a neutral gray,
-   which is deliberate, and indigo (#6366f1) stands in as the attention color
-   wherever a gray button would say nothing. That is a ramp concern, not a
-   semantic one, so it is untouched and it does not belong in the shared block.
-
-   What this fixed, all of it invisible until you looked for it: success was
-   #374151, a gray, so every Kanban done-bar and done-column marker rendered
-   colorless and the "saved" toast was gray text on a barely-green box; danger
-   was #b91c1c, ~2.9:1 as .danger-btn's own text; the Totals stripe was a stone
-   brown indistinguishable from a border; and the four Budget panel washes were
-   6-8% of already-desaturated colors, so all four panels looked identical.
+   It also cost a thirteen-line block whose entire job was routing the sidebar
+   pulse, the "Update Available" line, the tool-header notices, the tool-card
+   icons and the modal links AROUND the gray, by locally redefining --color-btn
+   to indigo on the pulsing element. Every one of those selectors already
+   defaults to var(--color-btn) in landing.css, shell.css and modal.css, so
+   promoting indigo to the ramp deleted the block outright rather than moving
+   it. If you ever put a gray back here, that block has to come back with it.
 ============================================================================= */
 
 :root {
-  --color-bg:                  #0a0a0a;
-  --color-panel:               #141414;
-  --color-input-bg:            #1c1c1c;
-  --color-border:              #2a2a2a;
-  --color-border-dashed:       #3a3a3a;
+  /* ── Neutrals ── near-black, leaning the same way Light's lean toward its
+     blue: equal red and green with blue lifted, so the cast is the ramp's
+     indigo rather than a flat gray. Kept to a whisper (8 points of separation
+     at the page, against Light's 15) because at this end of the scale a tint
+     reads much louder than it measures, and because Void owns pure #000000. */
+  --color-bg:                  #0a0a12;
+  --color-panel:               #14141e;
+  --color-input-bg:            #1c1c28;
+  --color-border:              #2a2a38;
+  --color-border-dashed:       #3a3a4c;
   --color-text:                #d1d5db;
   --color-text-muted:          #6b7280;
-  --color-hover:               #2a2a2a;
+  --color-hover:               #2a2a38;
 
-  --color-btn:                 #404040;
-  --color-accent:              #d1d5db;
-  --color-btn-hover:           #525252;
-  --color-btn-text:            #e5e7eb;
+  /* ── Accent ramp ── indigo, and the one place this theme is allowed its own
+     opinion. #818cf8 and #a5b4fc were already in this file as its link and
+     link-hover colors, so nothing new is invented here, it is just promoted.
+     White on #6366f1 is 4.50:1, which clears AA and beats Light's own primary
+     button (3.45:1). */
+  --color-btn:                 #6366f1;
+  --color-accent:              #a5b4fc;
+  --color-btn-hover:           #818cf8;
+  --color-btn-text:            #ffffff;
 
   /* ─────────────────────────────────────────────────────────────────────────
      THE SHARED SEMANTIC PALETTE
      Everything from here to the end of :root is the Midnight family's, byte
      for byte. Do not tune a value here to suit this theme's plate: if one of
      them is wrong it is wrong in all four sheets, so change all four.
+
+     Note that --color-accent-input and --color-changelog-features stay BLUE
+     while the ramp is indigo. That is not an oversight: Input is a shared
+     category color, the same one Midnight Green and Midnight Red carry next to
+     their green and red ramps. A theme's ramp and the shared categories are
+     allowed to differ, and the family only works because they do.
      ───────────────────────────────────────────────────────────────────────── */
 
   --color-danger:              #ef4444;
@@ -63,9 +84,8 @@
   --color-accent-entries:      #ef4444;
 
   --color-toggle-off:          #374151;
-  /* Ramp, not shared: tracks --color-btn-hover the way Midnight's tracks its
-     own --color-btn. */
-  --color-toggle-on:           #525252;
+  /* Ramp, not shared: tracks --color-btn the way the Midnight sheets' do. */
+  --color-toggle-on:           #6366f1;
 
   /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (red) / tool heading (violet) */
   --color-changelog-features:     #2563eb;
@@ -91,55 +111,51 @@
   --color-chart-8:             #34d399;
 }
 
-/* ── Panel accent slots ──
-   Driven off the vars rather than restated as literals, the way the Midnight
-   sheets do it. These were four hardcoded hexes, which is exactly how a shared
-   slot drifts: the variable gets updated, the stripe keeps the old color, and
-   nothing anywhere reports it. ── */
+/* ── Panel accent slots, accent borders drive off the panel-accent vars ── */
 .panel-accent-input    { border-left: 4px solid var(--color-accent-input); }
 .panel-accent-view     { border-left: 4px solid var(--color-accent-view); }
 .panel-accent-totals   { border-left: 4px solid var(--color-accent-totals); }
 .panel-accent-entries  { border-left: 4px solid var(--color-accent-entries); }
 
-/* ── Tool / section header, very subtle, near-black ── */
+/* ── Tool / section header ── */
 .tool-view-header,
 .section-header {
-  background: #1a1a1a;
-  border-bottom-color: #2a2a2a;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-btn) 12%, transparent), color-mix(in srgb, var(--color-accent-view) 6%, transparent));
+  border-bottom-color: color-mix(in srgb, var(--color-btn) 30%, transparent);
 }
 
 .tool-view-title,
 .section-title {
-  color: #d1d5db;
-  opacity: 0.9;
+  color: var(--color-accent);
 }
 
-/* ── Modal, solid: near-black panel ── */
+/* ── Modal, solid: deep panel ── */
 body.solid-modals .modal {
-  background: #141414;
-  border-color: #2a2a2a;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+  background: var(--color-panel);
+  border-color: color-mix(in srgb, var(--color-btn) 25%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--color-btn) 8%, transparent), 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Modal, translucent: deep frosted black ── */
+/* ── Modal, translucent: frosted glass ── */
 body:not(.solid-modals) .modal {
-  background: rgba(20, 20, 20, 0.25);
+  background: color-mix(in srgb, var(--color-panel) 25%, transparent);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-color: rgba(42, 42, 42, 0.6);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+  border-color: color-mix(in srgb, var(--color-btn) 20%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--color-btn) 8%, transparent), 0 24px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Primary button ── */
+/* ── Primary button, solid accent ── */
 .primary-btn {
-  background: #404040;
-  border-color: #525252;
-  color: #e5e7eb;
+  background: var(--color-btn);
+  border-color: var(--color-btn);
+  color: var(--color-btn-text);
 }
 
 .primary-btn:hover {
-  background: #525252;
-  border-color: #6b7280;
+  background: var(--color-btn-hover);
+  border-color: var(--color-btn-hover);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-btn) 30%, transparent);
 }
 
 /* ── Tab buttons ── */
@@ -150,57 +166,33 @@ body:not(.solid-modals) .modal {
 }
 
 .tab-btn:hover {
-  color: #d1d5db;
-  border-color: #3a3a3a;
-  background: #2a2a2a;
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-btn) 40%, transparent);
+  background: color-mix(in srgb, var(--color-btn) 8%, transparent);
   box-shadow: none;
 }
 
 .tab-btn.active {
-  color: #e5e7eb;
-  border-color: #525252;
-  background: #333333;
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-btn) 50%, transparent);
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
   box-shadow: none;
 }
 
 /* ── Dir buttons ── */
 .dir-btn.active, .prv-btn.active {
-  color: #e5e7eb;
-  border-color: #525252;
-  background: #333333;
+  color: var(--color-accent);
+  border-color: var(--color-btn);
+  background: color-mix(in srgb, var(--color-btn) 12%, transparent);
 }
 
 /* ── Slider ── */
-.slider-val   { color: #d1d5db; }
-.estimate-val { color: #d1d5db; }
+.slider-val    { color: var(--color-accent); }
+.estimate-val  { color: var(--color-accent); }
 
 /* ── Preview card accents ── */
-/* Anchor is the ramp's indigo (it pairs with .anchor-badge below); drag-target
-   is the shared View accent, so it takes the var. */
-.preview-card.anchor-card { border-color: #6366f1; }
+.preview-card.anchor-card { border-color: var(--color-btn); }
 .preview-card.drag-target  { border-color: var(--color-accent-view); }
-
-/* ── Attention-signal accents ──
-   This theme's --color-btn is a neutral gray (its buttons are deliberately
-   understated), but an update/reminder signal needs to actually catch the eye,
-   so the sidebar pulses, the Home "Update Available" line, the tool-header
-   notices, the tool-card icons, and modal links are routed to the theme's
-   indigo accent instead, leaving the gray buttons untouched. The pulses are
-   redirected by redefining --color-btn locally on the pulsing element, which
-   the shared keyframes read. */
-#aboutBtn.update-available,
-.nav-item.attention-pulse,
-.tool-card.attention-pulse {
-  --color-btn: #6366f1;
-  --color-btn-text: #ffffff;
-}
-.tool-card-icon { color: #6366f1; }
-.home-update-notice { color: #6366f1; }
-.tool-header-notice { color: #6366f1; }
-.home-update-notice a { color: #818cf8; }
-.home-update-notice a:hover { color: #a5b4fc; }
-.modal-body a { color: #818cf8; }
-.modal-body a:hover { color: #a5b4fc; }
 
 /* ── Image CCR controls ──
    Filled in so this theme covers the same surface set as the other 23. The
@@ -208,101 +200,98 @@ body:not(.solid-modals) .modal {
    .anchor-badge, which reads as "already selected" on every control; these
    restate them as the quiet outlined chips the rest of the themes use. ── */
 .dir-btn, .prv-btn {
-  background: #1c1c1c;
-  color: #6b7280;
-  border-color: #2a2a2a;
+  background: var(--color-input-bg);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
 }
 
 .dir-btn:hover, .prv-btn:hover {
-  color: #d1d5db;
-  border-color: #404040;
-  background: #2a2a2a;
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-btn) 50%, transparent);
+  background: color-mix(in srgb, var(--color-btn) 10%, transparent);
 }
 
 .drop-zone {
-  border-color: #3a3a3a;
+  border-color: var(--color-border-dashed);
 }
 
 .anchor-badge {
-  background: #6366f1;
-  color: #e5e7eb;
+  background: var(--color-btn);
+  color: var(--color-btn-text);
 }
 
 .preview-card:hover {
-  border-color: #404040;
+  border-color: color-mix(in srgb, var(--color-btn) 60%, transparent);
 }
 
 .img-slider::-webkit-slider-thumb {
-  background: #6366f1;
-  border-color: #0a0a0a;
+  background: var(--color-btn);
+  border-color: var(--color-bg);
 }
 
 .img-slider::-webkit-slider-thumb:hover {
-  background: #818cf8;
+  background: var(--color-btn-hover);
 }
 
 .result-preview-wrap {
-  border-color: #2a2a2a;
+  border-color: color-mix(in srgb, var(--color-btn) 30%, transparent);
 }
 
 .budget-stats-section-heading {
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
+
+/* ── Update-notifier accents ──
+   The Home top-bar "Update Available" line inherits the theme accent
+   (--color-btn); this gives its version link a hover color so the
+   clickable part reacts. */
+.home-update-notice a:hover { color: var(--color-accent); }
 
 /* ── Budget Tracker ── */
 
-/* Panel background tints, gradient from an accent wash into the panel color.
-   Same shape as the Midnight sheets, and color-mix on the accent vars for the
-   same reason as the stripes above. Two points stronger than Midnight's 8/7/7/6
-   because this plate is #141414 rather than #0f172a and a 6% wash disappears
-   into it; the tints were previously 6-8% of colors that were themselves
-   desaturated, so all four panels looked identical and only the stripe told
-   them apart. */
-#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-input) 10%, transparent) 0%, var(--color-panel) 100%); }
-#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 9%, transparent) 0%, var(--color-panel) 100%); }
-#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 9%, transparent) 0%, var(--color-panel) 100%); }
-#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-entries) 8%, transparent) 0%, var(--color-panel) 100%); }
+/* Panel background tints, gradient from an accent wash into the panel color */
+#tracking-tool-budget .panel-accent-input  { background: linear-gradient(135deg, color-mix(in srgb, var(--color-btn) 8%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-view   { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-view) 7%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-totals { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-totals) 7%, transparent) 0%, var(--color-panel) 100%); }
+#tracking-tool-budget .panel-accent-entries{ background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent-entries) 6%, transparent) 0%, var(--color-panel) 100%); }
 
-/* Annual Stats title panel */
-.budget-annual-stats-title-panel { border-left: 4px solid #6366f1; }
-.budget-annual-stats-title { color: #d1d5db; }
+/* Annual Stats title panel, accent left border */
+.budget-annual-stats-title-panel { border-left: 4px solid var(--color-btn); }
+.budget-annual-stats-title { color: var(--color-accent); }
 
-/* Summary tab active */
+/* Summary tab active indicator */
 .budget-summary-tab.active,
-.modal-tab.active { color: #c4b5fd; background: rgba(99, 102, 241, 0.12); border-bottom-color: #6366f1; }
+.modal-tab.active { color: var(--color-accent); background: color-mix(in srgb, var(--color-btn) 12%, transparent); border-bottom-color: var(--color-btn); }
 
-/* View-mode toggle active, indigo accent (was missing; a gray fill wouldn't
-   read as "selected" in an all-gray theme). */
+/* View-mode toggle active, solid accent */
 .budget-view-mode-btn.active {
-  background: #6366f1;
-  color: #ffffff;
-  border-color: #6366f1;
+  background: var(--color-btn);
+  color: var(--color-btn-text);
+  border-color: var(--color-btn);
 }
 
-/* Stats table values */
+/* Stats table positive/negative, semantic, intentionally literal */
 .budget-stats-table td.pos { color: #00FF00; }
 .budget-stats-table td.neg { color: #FF0000; }
 
-/* Stats on-time / late / overdue count badges, semantic status, literal.
-   Good was a teal, which for a badge that means "paid on time" read as another
-   category rather than as a pass. Same trio as the Midnight family. */
+/* Stats on-time / late / overdue count badges, semantic status, literal */
 .budget-stats-count-good    { color: #34d399; border-color: #34d399; }
 .budget-stats-count-late    { color: #fbbf24; border-color: #fbbf24; }
 .budget-stats-count-overdue { color: #f87171; border-color: #f87171; }
 
-/* Chart buttons, match the dark theme's understated palette */
+/* Chart control buttons */
 .budget-chart-cycle-btn,
 .budget-chart-expand-btn,
 .budget-chart-modal-cycle-btn {
-  border-color: #3a3a3a;
-  color: #6b7280;
+  border-color: color-mix(in srgb, var(--color-btn) 35%, transparent);
+  color: var(--color-text-muted);
 }
 .budget-chart-cycle-btn:hover,
 .budget-chart-expand-btn:hover,
 .budget-chart-modal-cycle-btn:hover {
-  background: #2a2a2a;
-  border-color: #525252;
-  color: #d1d5db;
+  background: color-mix(in srgb, var(--color-btn) 10%, transparent);
+  border-color: var(--color-btn);
+  color: var(--color-accent);
 }
 
 /* ── Game Stats ──
@@ -311,15 +300,12 @@ body:not(.solid-modals) .modal {
    table, history cards, chart tooltip). Override the hooks here rather than
    restating a selector per component. */
 :root {
-  --gs-accent:      #6366f1;
-  --gs-accent-soft: #a5b4fc;
-  /* Routed through the semantic tokens the way the Midnight family does, so a
-     win is the app's green rather than this theme's teal and a loss is the
-     app's red rather than a rose that sat next to the amber "late" badge. */
+  --gs-accent:      var(--color-btn);
+  --gs-accent-soft: var(--color-accent);
   --gs-win:         var(--color-success);
   --gs-loss:        var(--color-danger);
-  --gs-surface:     rgba(99, 102, 241, 0.07);
-  --gs-header-bg:   rgba(99, 102, 241, 0.11);
-  --gs-grid-line:   #2a2a2a;
-  --gs-zebra:       rgba(255, 255, 255, 0.025);
+  --gs-surface:     color-mix(in srgb, var(--color-btn) 7%, transparent);
+  --gs-header-bg:   color-mix(in srgb, var(--color-btn) 10%, transparent);
+  --gs-grid-line:   color-mix(in srgb, var(--color-border) 70%, transparent);
+  --gs-zebra:       color-mix(in srgb, var(--color-text) 3%, transparent);
 }
