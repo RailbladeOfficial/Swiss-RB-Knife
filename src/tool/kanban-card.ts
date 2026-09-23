@@ -2255,15 +2255,36 @@ function renderCardSubtasks(card: Card): void {
     });
     row.appendChild(check);
 
-    const text = document.createElement("input");
-    text.type = "text";
+    /* A subtask reads as one line but is often longer than one line's worth of
+       room, and a single-line input hides everything past the right edge. So
+       it is a textarea that grows to its own text, wrapped in the mirror that
+       gives it its height: the wrapper carries a copy of the text in an ::after
+       that takes up the space, and the textarea sits on top of it in the same
+       grid cell. Measuring scrollHeight instead would read zero here, because
+       the Subtasks tab is usually not on screen when this draws. */
+    const grow = document.createElement("div");
+    grow.className = "kb-subtask-grow";
+    grow.dataset.value = subtask.text;
+
+    const text = document.createElement("textarea");
     text.className = "kb-subtask-text";
+    text.rows = 1;
     text.value = subtask.text;
     text.addEventListener("input", () => {
-      subtask.text = text.value.slice(0, 300);
+      // Still one line's worth of meaning: a newline can only arrive by paste,
+      // and it becomes a space rather than a second line nobody asked for.
+      const flat = text.value.replace(/[\r\n]+/g, " ").slice(0, 300);
+      if (flat !== text.value) text.value = flat;
+      subtask.text = flat;
+      grow.dataset.value = flat;
       stampCard(card);
     });
-    row.appendChild(text);
+    // Enter would put a newline in a field whose whole text is one line.
+    text.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") e.preventDefault();
+    });
+    grow.appendChild(text);
+    row.appendChild(grow);
 
     const remove = document.createElement("button");
     remove.type = "button";

@@ -1225,18 +1225,61 @@ body[data-active-tool="productivity/kanban"] #productivity-tool-kanban {
   gap: 4px;
 }
 
+/* Top-aligned, because a subtask that wraps to three lines should keep its
+   tick and its × beside the FIRST line rather than floating at the middle of
+   the block. The nudge is the field's own top padding, so they sit on the
+   text rather than on the edge of the box. */
 .kb-subtask-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
-.kb-subtask-text {
+.kb-subtask-row > input[type="checkbox"] {
+  margin-top: 6px;
+}
+
+.kb-subtask-row > .kb-icon-btn {
+  margin-top: 2px;
+}
+
+/* THE GROWING FIELD. The wrapper holds a hidden copy of the text in its
+   ::after; that copy is what has height, and the textarea is laid over it in
+   the same grid cell and stretched to match. Both faces have to be styled
+   identically or the box ends up the wrong size, which is why the shared
+   properties are declared on the pair in one rule. */
+.kb-subtask-grow {
+  display: grid;
   flex: 1;
   min-width: 0;
+}
+
+.kb-subtask-grow::after {
+  content: attr(data-value) " ";
+  visibility: hidden;
+}
+
+.kb-subtask-grow > .kb-subtask-text,
+.kb-subtask-grow::after {
+  grid-area: 1 / 1 / 2 / 2;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
   font-size: 0.85rem;
+  line-height: 1.4;
+  /* pre-wrap keeps the trailing space in the ::after doing its job: it is what
+     holds a line open while a word is still being typed on it. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kb-subtask-text {
   background: transparent;
-  border-color: transparent;
+  resize: none;
+  overflow: hidden;
 }
 
 .kb-subtask-text:hover,
