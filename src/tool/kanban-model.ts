@@ -718,6 +718,12 @@ export const MAX_SUBTASKS_PER_CARD = 100;
 
 export const MAX_TITLE_LEN = 200;
 export const MAX_DESC_LEN = 8000;
+/** A subtask is a line, not a paragraph, and the row it lives in wraps to hold
+ *  one. The field carries this as its own maxlength so the cap is something you
+ *  meet while typing rather than something applied to text already written. The
+ *  agent path used to cap subtasks at MAX_TITLE_LEN, which quietly made the
+ *  same field two different lengths depending on who filled it. */
+export const MAX_SUBTASK_LEN = 300;
 
 /** Ceilings on the two things a card can now accumulate without bound. A
  *  comment thread and an attachment list are both rendered in full inside one

@@ -96,6 +96,7 @@ import {
   MAX_COMMENT_LEN,
   MAX_DESC_LEN,
   MAX_SUBTASKS_PER_CARD,
+  MAX_SUBTASK_LEN,
   MAX_TITLE_LEN,
   STAGES,
   authorLabel,
@@ -589,7 +590,7 @@ function agentCreateCard(
   if (subtaskTexts?.length) {
     card.subtasks = subtaskTexts
       .slice(0, MAX_SUBTASKS_PER_CARD)
-      .map((text) => ({ id: newId(), text: trimTo(text, MAX_TITLE_LEN), done: false }));
+      .map((text) => ({ id: newId(), text: trimTo(text, MAX_SUBTASK_LEN), done: false }));
   }
   stampCard(card);
   return { created: agentCardDetail(card, board, today()) };
@@ -771,7 +772,7 @@ function agentAddSubtask(
   }
   const subtask: Subtask = {
     id: newId(),
-    text: trimTo(agentRequiredString(params, "text"), MAX_TITLE_LEN),
+    text: trimTo(agentRequiredString(params, "text"), MAX_SUBTASK_LEN),
     done: false,
   };
   card.subtasks.push(subtask);
@@ -796,7 +797,7 @@ function agentSetSubtask(
     throw new AgentError('Nothing to change. Give "done", "text", or both.');
   }
   if (done !== undefined) subtask.done = done;
-  if (text !== undefined) subtask.text = trimTo(text, MAX_TITLE_LEN);
+  if (text !== undefined) subtask.text = trimTo(text, MAX_SUBTASK_LEN);
   stampCard(card);
   return { subtask };
 }

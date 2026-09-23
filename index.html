@@ -9546,8 +9546,10 @@
             </div>
             <div id="kbCardSubtaskList" class="kb-subtask-list"></div>
             <div class="kb-inline-row">
+              <!-- maxlength matches MAX_SUBTASK_LEN in kanban-model.ts, so the
+                   box stops where the subtask it becomes stops. -->
               <input type="text" id="kbCardSubtaskInput" class="kb-wide-input" spellcheck="true" autocomplete="off"
-                placeholder="Add a subtask, then Enter" />
+                maxlength="300" placeholder="Add a subtask, then Enter" />
               <button id="kbCardSubtaskAddBtn">Add</button>
             </div>
           </div>

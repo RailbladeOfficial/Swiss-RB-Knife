@@ -112,6 +112,7 @@ import {
   MAX_COMMENT_LEN,
   MAX_DESC_LEN,
   MAX_SUBTASKS_PER_CARD,
+  MAX_SUBTASK_LEN,
   MAX_TITLE_LEN,
   STAGES,
   STAGE_LABELS,
@@ -311,7 +312,7 @@ export function getCardModal(): Modal {
       flash(`A card holds at most ${MAX_SUBTASKS_PER_CARD} subtasks.`, "error");
       return;
     }
-    card.subtasks.push({ id: newId(), text: text.slice(0, 300), done: false });
+    card.subtasks.push({ id: newId(), text: text.slice(0, MAX_SUBTASK_LEN), done: false });
     subtaskInput.value = "";
     stampCard(card);
     renderCardSubtasks(card);
@@ -2269,11 +2270,14 @@ function renderCardSubtasks(card: Card): void {
     const text = document.createElement("textarea");
     text.className = "kb-subtask-text";
     text.rows = 1;
+    // The field stops you AT the cap. Slicing afterwards let you keep typing
+    // into text that was never going to be kept.
+    text.maxLength = MAX_SUBTASK_LEN;
     text.value = subtask.text;
     text.addEventListener("input", () => {
       // Still one line's worth of meaning: a newline can only arrive by paste,
       // and it becomes a space rather than a second line nobody asked for.
-      const flat = text.value.replace(/[\r\n]+/g, " ").slice(0, 300);
+      const flat = text.value.replace(/[\r\n]+/g, " ").slice(0, MAX_SUBTASK_LEN);
       if (flat !== text.value) text.value = flat;
       subtask.text = flat;
       grow.dataset.value = flat;
