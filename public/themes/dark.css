@@ -53,10 +53,24 @@
 
   /* ── Accent ramp ── indigo, and the one place this theme is allowed its own
      opinion. #818cf8 and #a5b4fc were already in this file as its link and
-     link-hover colors, so nothing new is invented here, it is just promoted.
-     White on #6366f1 is 4.50:1, which clears AA and beats Light's own primary
-     button (3.45:1). */
-  --color-btn:                 #6366f1;
+     link-hover colors, so nothing new is invented there, they are promoted.
+
+     --color-btn is doing two opposing jobs, and the tension is worth knowing
+     before anyone "fixes" this value. It is the FILL a white label sits on,
+     which wants it dark, and it is the INK for the Home tool-card icons and
+     the update / tool-header notices, which on a near-black panel wants it
+     light. Against this panel a white label needs luminance <= 0.1833 and
+     legible ink needs >= 0.2084, so the window is empty: no color of any hue
+     clears 4.5:1 on both. Every choice here is a trade.
+
+     #5b56ee takes the same side of that trade as the rest of the family, a
+     comfortable label over marginal ink: 5.24:1 and 3.49:1, against Midnight
+     Blue's 5.17:1 and 3.45:1. Indigo-500 (#6366f1) split the difference at
+     4.47:1 and 4.09:1, which left the label a hair under the bar. Going the
+     other way to indigo-600 (#4f46e5) reads 6.29:1 on the label but drops the
+     ink to 2.91:1, which walks back most of the reason the gray was replaced
+     in the first place. */
+  --color-btn:                 #5b56ee;
   --color-accent:              #a5b4fc;
   --color-btn-hover:           #818cf8;
   --color-btn-text:            #ffffff;
@@ -85,7 +99,7 @@
 
   --color-toggle-off:          #374151;
   /* Ramp, not shared: tracks --color-btn the way the Midnight sheets' do. */
-  --color-toggle-on:           #6366f1;
+  --color-toggle-on:           #5b56ee;
 
   /* ── Changelog accents ── Features (blue) / Improvements (green) / Bugfixes (red) / tool heading (violet) */
   --color-changelog-features:     #2563eb;
