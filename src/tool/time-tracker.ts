@@ -1140,10 +1140,17 @@ const MIN_END_WARN_LEAD_MIN = 1;
 const MAX_END_WARN_LEAD_MIN = 240;
 const DEFAULT_END_WARN_LEAD_MIN = 5;
 
-/** Every 15 seconds. A doot up to 15 seconds late on a five minute warning is
- *  not a warning that failed, and a per-second timer that reads two input
- *  fields for eight hours a day is not worth that accuracy. */
+/** Every 15 seconds. This is the watch that NOTICES things: a retyped End
+ *  Time, a changed lead, a draft restored at startup. It is not what fires the
+ *  doot, so a per-second timer reading two input fields for eight hours a day
+ *  buys nothing. See ON TIME below. */
 const END_WARN_TICK_MS = 15_000;
+
+/** A doot fires on a one-shot timer set for the moment itself, so the poll
+ *  above never decides when it lands. This is the pad on that timer: a few
+ *  milliseconds past the moment, so the check that follows cannot arrive a
+ *  hair early and find there is nothing to say yet. */
+const END_WARN_LANDING_PAD_MS = 50;
 
 type EndWarnStage = "lead" | "due";
 
@@ -1153,6 +1160,9 @@ type EndWarnStage = "lead" | "due";
 let endWarnTarget = "";
 let endWarnSpent = new Set<EndWarnStage>();
 let endWarnTimer: number | null = null;
+/** The one-shot set for a doot's own moment, when that moment is close enough
+ *  to be the next thing to happen. See ON TIME. */
+let endWarnLanding: number | null = null;
 
 /**
  * The moment the form's End Date and End Time name, or null when they do not
@@ -1194,13 +1204,14 @@ function playEndWarning(): void {
 
 /** One tick. Cheap enough to run unconditionally: two field reads and a date
  *  parse, which is less work than the duration preview does every second while
- *  a clock is running. */
+ *  a clock is running. Hands back the moment it is watching, so the caller can
+ *  set a timer for the next doot rather than waiting out another tick. */
 function checkEndWarning(
   startDatePicker: HTMLInputElement,
   startInput: HTMLInputElement,
   endDatePicker: HTMLInputElement,
   endInput: HTMLInputElement,
-): void {
+): Date | null {
   const at = settings.endWarning.enabled
     ? formEndMoment(startDatePicker, startInput, endDatePicker, endInput)
     : null;
@@ -1209,7 +1220,7 @@ function checkEndWarning(
   if (key !== endWarnTarget) {
     endWarnTarget = key;
     endWarnSpent = new Set();
-    if (!at) return;
+    if (!at) return null;
     // Arming, not firing. Whatever is already behind this moment is spent, so
     // an end time typed in the past says nothing and one typed inside the lead
     // window still speaks at the time itself.
@@ -1217,10 +1228,10 @@ function checkEndWarning(
     const left = at.getTime() - Date.now();
     if (left <= leadMs) endWarnSpent.add("lead");
     if (left <= 0) endWarnSpent.add("due");
-    return;
+    return at;
   }
 
-  if (!at) return;
+  if (!at) return null;
   const left = at.getTime() - Date.now();
 
   if (left <= 0 && !endWarnSpent.has("due")) {
@@ -1230,7 +1241,7 @@ function checkEndWarning(
     // would land on top of it as a second, unasked-for doot.
     flash(`End Time reached: ${formatTime(normalizeTime(endInput.value.trim()))}.`, "success", 8000, true);
     playEndWarning();
-    return;
+    return at;
   }
 
   if (left <= settings.endWarning.leadMinutes * 60_000 && !endWarnSpent.has("lead")) {
@@ -1244,6 +1255,41 @@ function checkEndWarning(
     );
     playEndWarning();
   }
+
+  return at;
+}
+
+/* -----------------------------------------------------------------------------
+   ON TIME
+
+   The poll above runs every 15 seconds, which is the right interval for
+   noticing a changed field and the wrong one for speaking: a warning meant to
+   say "five minutes left" that arrives at 4:47 is a warning you have to do
+   arithmetic on, and the one at the End Time itself is the one that has to be
+   true when it lands.
+
+   So the poll does not fire anything by itself. Once a doot is the next thing
+   due and is within one tick's reach, a one-shot timer is set for that exact
+   moment, and it is that timer which speaks. One timer, re-set at most twice
+   per End Time, sleeping the whole way: the accuracy costs nothing the
+   fifteen-second poll was avoiding.
+
+   The poll is still the safety net underneath it. A machine asleep through the
+   moment wakes to a one-shot that never fired, and the next tick finds the
+   time behind it and says so then.
+----------------------------------------------------------------------------- */
+
+/** Ms until the next doot this watch has left to say, or null when it has
+ *  nothing pending. */
+function msToNextEndWarning(at: Date | null): number | null {
+  if (!at) return null;
+  const left = at.getTime() - Date.now();
+  if (!endWarnSpent.has("lead")) {
+    const toLead = left - settings.endWarning.leadMinutes * 60_000;
+    if (toLead > 0) return toLead;
+  }
+  if (!endWarnSpent.has("due") && left > 0) return left;
+  return null;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1315,11 +1361,22 @@ function startEndWarningWatch(
   endInput: HTMLInputElement,
 ): void {
   const tick = (): void => {
-    checkEndWarning(startDatePicker, startInput, endDatePicker, endInput);
+    const at = checkEndWarning(startDatePicker, startInput, endDatePicker, endInput);
     // Settings and the draft both load after this starts, so the countdown is
     // re-read here too rather than only when a field changes. Otherwise an End
     // Time restored from the draft would sit uncounted until you touched it.
     refreshEndCountdown(startDatePicker, startInput, endDatePicker, endInput);
+
+    // The next doot lands on its own moment rather than on a tick boundary.
+    // Re-decided every tick, because the thing it is waiting for can move.
+    if (endWarnLanding) {
+      clearTimeout(endWarnLanding);
+      endWarnLanding = null;
+    }
+    const next = msToNextEndWarning(at);
+    if (next !== null && next <= END_WARN_TICK_MS) {
+      endWarnLanding = window.setTimeout(tick, next + END_WARN_LANDING_PAD_MS);
+    }
   };
   if (endWarnTimer) clearInterval(endWarnTimer);
   endWarnTimer = window.setInterval(tick, END_WARN_TICK_MS);
