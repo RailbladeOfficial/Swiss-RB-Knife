@@ -423,6 +423,37 @@ test("a back arrow into App Settings lands on the tab its button lives on", () =
   }
 });
 
+test("Escape leaves the field you are typing in before it closes the pop-up", () => {
+  // One press used to do both: Escape in the Kanban tag search, a description
+  // or a comment box blurred the field AND closed the card, so a card being
+  // written vanished on the keystroke meant to step out of one field.
+  //
+  // Two things keep it fixed, and both are easy to undo by accident. The
+  // handler has to read the field off the EVENT, because a field with its own
+  // Escape handler has already blurred itself by the time this runs and
+  // document.activeElement would read as the body. And the blur has to return,
+  // or the close below it runs on the same press anyway.
+  const modal = read("src/modal/modal.ts");
+
+  assert.match(
+    modal,
+    /import \{ isTextEntry \} from "\.\.\/menu\/menu"/,
+    "the one isTextEntry lives in menu.ts; modal.ts must not grow a second",
+  );
+  assert.match(
+    modal,
+    /const from = e\.target;/,
+    "the field must come off the event, not off document.activeElement",
+  );
+
+  const escape = modal.slice(modal.indexOf('if (e.key !== "Escape") return;'));
+  const blur = escape.search(/isTextEntry\(from\)[\s\S]{0,200}from\.blur\(\);\s*return;/);
+  const close = escape.indexOf("top.close();");
+  assert.ok(blur !== -1, "Escape from a text field must blur it and return");
+  assert.ok(close !== -1, "Escape must still close the top-most modal");
+  assert.ok(blur < close, "the blur has to come first, or one press still does both");
+});
+
 test("a pop-up you come back to is still scrolled where you left it", () => {
   // Leaving a pop-up for a child and returning by the back arrow used to drop
   // you at the top: open() zeroed .modal-body on EVERY open, handoff or not.

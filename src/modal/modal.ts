@@ -46,6 +46,8 @@
    and drop it back to the top.
 ============================================================================= */
 
+import { isTextEntry } from "../menu/menu";
+
 export interface ModalOptions {
   /** Close when the dimmed backdrop (outside the panel) is clicked. Default false. */
   closeOnBackdrop?: boolean;
@@ -288,20 +290,48 @@ function syncBodyClass(): void {
 
 /* -----------------------------------------------------------------------------
    Global listeners, bound once, on first open.
-   Escape: close only the top-most modal (if it allows Escape).
+   Escape: leave the field being typed in, else close the top-most modal
+           (if it allows Escape). See ESCAPE below.
    Drag:   grab the top strip (top padding + header row) to move its .modal;
            position is reset on close.
+----------------------------------------------------------------------------- */
+
+/* -----------------------------------------------------------------------------
+   ESCAPE
+
+   One press, one thing. If the press comes from somewhere you are typing, it
+   leaves that field and the modal stays; the next press closes the modal. A
+   press from anywhere else (a button, the body, nothing focused at all) has no
+   field to leave, so it closes straight away.
+
+   Typing in a field and losing the whole card to one keystroke is the thing
+   this prevents, and it is the same everywhere: the tag search, a description,
+   a comment box, a renamed preset.
 ----------------------------------------------------------------------------- */
 
 function bindGlobalListeners(): void {
   if (listenersBound) return;
   listenersBound = true;
 
-  // Escape closes the top-most modal only.
+  // Escape closes the top-most modal only, and only once it has nothing left
+  // to leave. See ESCAPE above.
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     const top = topModal();
-    if (top && top.escEnabled) {
+    if (!top) return;
+
+    // Read the field off the EVENT rather than document.activeElement: a field
+    // with its own Escape handler (the Kanban tag search, an inline rename) has
+    // usually blurred itself by the time this runs, and the modal would then
+    // take the very press that left the field as the press that closes it.
+    const from = e.target;
+    if (isTextEntry(from) && from instanceof HTMLElement && top.contains(from)) {
+      e.preventDefault();
+      from.blur();
+      return;
+    }
+
+    if (top.escEnabled) {
       e.preventDefault();
       top.close();
     }
@@ -435,6 +465,12 @@ export class Modal {
 
   get isOpen(): boolean {
     return openStack.includes(this);
+  }
+
+  /** True when the node sits inside this modal, backdrop included. Used by the
+   *  Escape handler to tell a field in THIS modal from one behind it. */
+  contains(node: Node | null): boolean {
+    return node !== null && this.backdrop.contains(node);
   }
 
   /** Everything inside this modal that scrolls on its own: the body, plus any
