@@ -1154,9 +1154,11 @@ const END_WARN_LANDING_PAD_MS = 50;
 
 type EndWarnStage = "lead" | "due";
 
-/** The End Time currently being watched, as "YYYY-MM-DDTHH:MM:SS", and which
- *  of its two doots have been used up. Both are spent when the target itself
- *  is what changed, which is what re-arms the warning. */
+/** What is currently being watched: the End Time and the lead it is being
+ *  watched with, plus which of its two doots have been used up. A change to
+ *  either half re-arms the pair, which is what makes a lead moved from five
+ *  minutes to one speak at one minute rather than stay silent because the
+ *  five minute doot was already behind it. */
 let endWarnTarget = "";
 let endWarnSpent = new Set<EndWarnStage>();
 let endWarnTimer: number | null = null;
@@ -1215,7 +1217,9 @@ function checkEndWarning(
   const at = settings.endWarning.enabled
     ? formEndMoment(startDatePicker, startInput, endDatePicker, endInput)
     : null;
-  const key = at ? at.toISOString() : "";
+  // The lead is part of the key, not just the moment: changing it changes what
+  // there is left to say about the same End Time.
+  const key = at ? `${at.toISOString()}@${settings.endWarning.leadMinutes}` : "";
 
   if (key !== endWarnTarget) {
     endWarnTarget = key;
@@ -1353,13 +1357,16 @@ function refreshEndCountdown(
 }
 
 /** Starts the watch, and rearms it at once so a toggle or a retyped End Time
- *  is picked up without waiting out a tick. */
+ *  is picked up without waiting out a tick. Hands back its tick, so a settings
+ *  change can run the whole thing rather than half of it: re-reading the form
+ *  without re-setting the landing timer would leave the next doot back on the
+ *  poll's cadence. */
 function startEndWarningWatch(
   startDatePicker: HTMLInputElement,
   startInput: HTMLInputElement,
   endDatePicker: HTMLInputElement,
   endInput: HTMLInputElement,
-): void {
+): () => void {
   const tick = (): void => {
     const at = checkEndWarning(startDatePicker, startInput, endDatePicker, endInput);
     // Settings and the draft both load after this starts, so the countdown is
@@ -1381,6 +1388,7 @@ function startEndWarningWatch(
   if (endWarnTimer) clearInterval(endWarnTimer);
   endWarnTimer = window.setInterval(tick, END_WARN_TICK_MS);
   tick();
+  return tick;
 }
 
 /* =============================================================================
@@ -5137,9 +5145,11 @@ export function initTimeTracker(): void {
     doSaveDraft();
     doRender();
   }
+  /* Through the watch's own tick rather than a second copy of it: a changed
+     lead has to re-set the landing timer as well as re-read the form, or the
+     doot it just re-armed goes back to arriving on a poll boundary. */
   function doCheckEndWarning() {
-    checkEndWarning(datePicker, startInput, endDatePicker, endInput);
-    refreshEndCountdown(datePicker, startInput, endDatePicker, endInput);
+    endWarningTick();
   }
   // Module-level activity rename/delete mutate entries and need to refresh the
   // ledger; expose doRender to them without leaking DOM refs out of init.
@@ -5147,7 +5157,7 @@ export function initTimeTracker(): void {
 
   /* The watch starts with the tool, not with the view: the point of a warning
      about an End Time is that you are in another tool when it lands. */
-  startEndWarningWatch(datePicker, startInput, endDatePicker, endInput);
+  const endWarningTick = startEndWarningWatch(datePicker, startInput, endDatePicker, endInput);
 
   /* -------------------------------------------------------------------------
      EVENT LISTENERS: INPUT PANEL
