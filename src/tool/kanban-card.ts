@@ -78,6 +78,7 @@ import {
   getCard,
   getColumn,
   hasTimeOfDay,
+  isFinished,
   kbConfirm,
   moveCardToBoard,
   moveCardToColumn,
@@ -800,11 +801,18 @@ function renderCardDue(card: Card): void {
   dueNote.classList.remove("kb-stat-alert");
   if (!card.dates.due) {
     dueNote.textContent = "No due date.";
-  } else if (card.dates.completed) {
-    const late = dayDiff(card.dates.due, card.dates.completed);
-    dueNote.textContent =
-      late === null ? "" : late > 0 ? `Finished ${describeDays(late)} late.` : "Finished on time.";
-    if (late !== null && late > 0) dueNote.classList.add("kb-stat-alert");
+  } else if (isFinished(card)) {
+    // isFinished, not the stamp, for the same reason the card face uses it: a
+    // card back out of Done still carries its stamp, and this line would have
+    // said "Finished on time" under a header counting it as past due.
+    const late = card.dates.completed ? dayDiff(card.dates.due, card.dates.completed) : null;
+    if (!card.dates.completed) {
+      dueNote.textContent = "Finished.";
+    } else {
+      dueNote.textContent =
+        late === null ? "" : late > 0 ? `Finished ${describeDays(late)} late.` : "Finished on time.";
+      if (late !== null && late > 0) dueNote.classList.add("kb-stat-alert");
+    }
   } else {
     const diff = dayDiff(today(), card.dates.due);
     if (diff === null) dueNote.textContent = "";

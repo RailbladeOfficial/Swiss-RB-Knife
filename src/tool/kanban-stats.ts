@@ -33,7 +33,7 @@ import {
   formatDate,
   furthestStage,
   getTag,
-  isFinished,
+  isDueSoon,
   isOverdue,
   liveCardsOnBoard,
   stageOrderWarning,
@@ -275,22 +275,27 @@ export function computeBoardStats(board: Board, todayStr: string): StatRow[] {
 
      The two DUE rows ask whether a card is still work you have to do by a date,
      which is the question isFinished answers, and the same one isOverdue and
-     the Next Due count ask. See isFinished in kanban.ts. */
+     the Next Due count ask. Both reach it through a named test of their own,
+     isOverdue and isDueSoon, which the filter chips use as well. See isFinished
+     in kanban.ts. */
   const doneColumns = new Set(board.columns.filter((c) => c.isDone).map((c) => c.id));
   const inDone = live.filter((c) => doneColumns.has(c.columnId)).length;
   const started = live.filter((c) => furthestStage(c) >= 0 && !c.dates.completed).length;
   const overdue = live.filter((c) => isOverdue(c, todayStr)).length;
-  const dueSoon = live.filter((c) => {
-    if (!c.dates.due || isFinished(c)) return false;
-    const diff = dayDiff(todayStr, c.dates.due);
-    return diff !== null && diff >= 0 && diff <= 7;
-  }).length;
+  // Through isDueSoon, the same test the "Next 7 days" filter chip uses. This
+  // row used to count forward only while the chip counted late cards as well,
+  // so one board answered the same question twice with different numbers.
+  const dueSoon = live.filter((c) => isDueSoon(c, todayStr)).length;
 
   rows.push({ label: "Cards on the board", value: String(live.length) });
   rows.push({ label: "In a done column", value: String(inDone) });
   rows.push({ label: "Started, not finished", value: String(started) });
   rows.push({ label: "Overdue", value: String(overdue), alert: overdue > 0 });
-  rows.push({ label: "Due in the next 7 days", value: String(dueSoon) });
+  rows.push({
+    label: "Due in the next 7 days",
+    value: String(dueSoon),
+    note: "late cards included",
+  });
   rows.push({ label: "Archived", value: String(archived.length) });
 
   // Throughput counts COMPLETED STAMPS, not the done column: a card can sit in

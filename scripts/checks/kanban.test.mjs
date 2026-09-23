@@ -904,12 +904,59 @@ test("everything that asks whether a card is done by its due date asks isFinishe
     "a due filter reads the Completed stamp instead of isFinished",
   );
 
-  // And so is the Due Soon stat, which lives in the other file.
+  // And so is the Due Soon stat, which lives in the other file. Both ends of
+  // it go through isDueSoon now, so the test follows them there.
   const stats = read("src/tool/kanban-stats.ts");
   const soonAt = stats.indexOf("const dueSoon =");
   assert.notEqual(soonAt, -1, "the Due Soon stat has moved");
-  const soon = stats.slice(soonAt, stats.indexOf("}).length;", soonAt));
-  assert.match(soon, /isFinished\(c\)/, "the Due Soon stat does not ask isFinished");
+  const soon = stats.slice(soonAt, stats.indexOf(";", soonAt));
+  assert.match(soon, /isDueSoon\(c, todayStr\)/, "the Due Soon stat does not ask isDueSoon");
+});
+
+test("the next 7 days is one question with one answer", () => {
+  /* It was two copies of the test, and they disagreed about a card that was
+     already late: the filter chip counted it, the Board Stats row of the same
+     name did not, so one board said 4 and 1 at the same moment. Found in
+     Testing on #254, fixed as #273. */
+  const src = ts();
+  const at = src.indexOf("export function isDueSoon(");
+  assert.notEqual(at, -1, "isDueSoon does not exist");
+  const body = src.slice(at, src.indexOf("\n}", at));
+  assert.match(body, /isFinished\(card\)/, "isDueSoon does not ask isFinished");
+  assert.ok(
+    !/diff >= 0/.test(body),
+    "isDueSoon has gone forward-only again, which drops the late cards the chip shows",
+  );
+
+  // The chip must not work it out for itself.
+  const dueAt = src.indexOf("function cardMatchesDue(");
+  const due = src.slice(dueAt, src.indexOf("\nfunction cardMatchesFilters", dueAt));
+  const soonCase = due.slice(due.indexOf('case "soon"'));
+  assert.match(soonCase, /isDueSoon\(card, todayStr\)/, "the Next 7 days chip does not ask isDueSoon");
+  assert.ok(!/<= 7/.test(soonCase), "the Next 7 days chip is counting days on its own again");
+});
+
+test("a card says the same thing about its due date as the header does", () => {
+  /* The chip read the Completed stamp by itself, so a card that had been in
+     Done and come back out read "3 days late" in done grey while the strip
+     counted it as past due and the card was painted overdue. The stamp is never
+     cleared, so it carried that for life. #272. */
+  const face = read("src/tool/kanban-card-face.ts");
+  const at = face.indexOf("function buildDueChip(");
+  assert.notEqual(at, -1, "buildDueChip has moved");
+  const body = face.slice(at, face.indexOf("\n}", at));
+  assert.match(body, /isFinished\(card\)/, "the due chip does not ask isFinished");
+  assert.ok(
+    !/if \(card\.dates\.completed\) \{/.test(body),
+    "the due chip decides finished from the stamp again",
+  );
+
+  // The same line inside the card, which had the same bug.
+  const card = read("src/tool/kanban-card.ts");
+  const noteAt = card.indexOf("function renderCardDue(");
+  assert.notEqual(noteAt, -1, "renderCardDue has moved");
+  const note = card.slice(noteAt, card.indexOf("\n}", noteAt));
+  assert.match(note, /isFinished\(card\)/, "the card's due note does not ask isFinished");
 });
 
 test("a warning switched off still lets its filter find the cards", () => {

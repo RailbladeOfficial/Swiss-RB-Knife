@@ -1976,6 +1976,30 @@ export function isOverdue(card: Card, todayStr: string = today()): boolean {
 }
 
 /**
+ * True when the card is still owed and its date lands inside the next week,
+ * LATE INCLUDED.
+ *
+ * ONE ANSWER, TWO PLACES. The "Next 7 days" filter chip and the "Due in the
+ * next 7 days" row in Board Stats are the same question, and they used to be
+ * two copies of it that disagreed: the chip counted a card that was already
+ * late, the stat did not, so the same board answered 4 and 1 at the same
+ * moment. They both come here now.
+ *
+ * A LATE CARD COUNTS, because the question is what is pressing this week and
+ * the thing that was due on Monday is the most pressing of it. That is the same
+ * rule the Next due chip follows. The stat row says so in its note, since a
+ * count of what is "due in the next 7 days" including something overdue is a
+ * sentence you would otherwise have to work out.
+ */
+export function isDueSoon(card: Card, todayStr: string): boolean {
+  if (card.archived || !card.dates.due) return false;
+  if (!effectiveForCard(card).showDue) return false;
+  if (isFinished(card)) return false;
+  const diff = dayDiff(todayStr, card.dates.due);
+  return diff !== null && diff <= 7;
+}
+
+/**
  * True when the card is work still ahead of you with a date on it: it has a
  * due date, its board shows due dates, it is not archived, it is not finished,
  * and that date has not passed.
@@ -2140,11 +2164,8 @@ function cardMatchesDue(card: Card, todayStr: string, nextDueDay: string | null)
       return (
         nextDueDay !== null && card.dates.due === nextDueDay && isUpcoming(card, todayStr)
       );
-    case "soon": {
-      if (!card.dates.due || isFinished(card)) return false;
-      const diff = dayDiff(todayStr, card.dates.due);
-      return diff !== null && diff <= 7;
-    }
+    case "soon":
+      return isDueSoon(card, todayStr);
   }
 }
 

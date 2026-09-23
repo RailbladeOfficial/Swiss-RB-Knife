@@ -52,6 +52,7 @@ import {
   furthestStage,
   getBoard,
   handleCardClick,
+  isFinished,
   isOverdue,
   kbConfirm,
   moveCardToBoard,
@@ -910,9 +911,19 @@ function boardCardMenu(card: Card): MenuItem[] {
   ];
 }
 
-/** The due-date chip, or null when the card has no due date. Says how the date
- *  relates to today rather than only printing it: "in 3 days" is the thing you
- *  wanted to know, and the exact date is on the tooltip for when it is not. */
+/**
+ * The due-date chip, or null when the card has no due date. Says how the date
+ * relates to today rather than only printing it: "in 3 days" is the thing you
+ * wanted to know, and the exact date is on the tooltip for when it is not.
+ *
+ * FINISHED IS isFinished, NOT THE STAMP. The chip used to read the Completed
+ * stamp on its own, so a card that had been in Done and come back out said
+ * "3 days late" in done grey while the strip above counted it as past due and
+ * the card itself was painted in the overdue color. The stamp is never cleared,
+ * so that card carried the contradiction for the rest of its life. The chip now
+ * asks the same question the header asks, and the stamp only chooses the words
+ * once the answer is yes.
+ */
 function buildDueChip(card: Card, todayStr: string): HTMLElement | null {
   if (!card.dates.due) return null;
   const diff = dayDiff(todayStr, card.dates.due);
@@ -924,11 +935,18 @@ function buildDueChip(card: Card, todayStr: string): HTMLElement | null {
     chip.textContent = formatDate(card.dates.due);
     return chip;
   }
-  if (card.dates.completed) {
-    const late = dayDiff(card.dates.due, card.dates.completed);
+  if (isFinished(card)) {
     chip.classList.add("kb-card-due-done");
-    chip.textContent = late !== null && late > 0 ? `${describeDays(late)} late` : "On time";
-    chip.title = `Due ${formatDate(card.dates.due)}, completed ${formatDate(card.dates.completed)}`;
+    // A board with a done column but no stamping has a finished card with no
+    // stamp to measure against, and "On time" would be a claim nothing backs.
+    // The date itself is what is left to say.
+    const late = card.dates.completed ? dayDiff(card.dates.due, card.dates.completed) : null;
+    if (!card.dates.completed) {
+      chip.textContent = formatDate(card.dates.due);
+    } else {
+      chip.textContent = late !== null && late > 0 ? `${describeDays(late)} late` : "On time";
+      chip.title = `Due ${formatDate(card.dates.due)}, completed ${formatDate(card.dates.completed)}`;
+    }
     return chip;
   }
   if (diff < 0) {
