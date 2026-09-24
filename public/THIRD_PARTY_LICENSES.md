@@ -3,7 +3,7 @@
 Swiss RB Knife makes use of the following open-source packages and libraries.
 All credit and gratitude to their respective authors and maintainers.
 
-> **Generated automatically on 2026-09-21.**
+> **Generated automatically on 2026-09-24.**
 > Re-run `node generate-licenses.mjs` (or `npm run build`) to refresh.
 
 ---
@@ -12,28 +12,30 @@ All credit and gratitude to their respective authors and maintainers.
 
 | Package | Version | License |
 |---------|---------|---------|
-| [@esbuild/win32-x64](https://github.com/evanw/esbuild) | 0.25.12 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [@rollup/rollup-win32-x64-gnu](https://github.com/rollup/rollup) | 4.63.3 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [@rollup/rollup-win32-x64-msvc](https://github.com/rollup/rollup) | 4.63.3 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@oxc-project/types](https://github.com/oxc-project/oxc) | 0.151.0 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@rolldown/binding-win32-x64-msvc](https://github.com/rolldown/rolldown) | 1.2.10 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@rolldown/pluginutils](https://github.com/rolldown/plugins) | 1.0.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [@tauri-apps/api](https://github.com/tauri-apps/tauri) | 2.11.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [@tauri-apps/cli](https://github.com/tauri-apps/tauri) | 2.11.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [@tauri-apps/cli-win32-x64-msvc](https://github.com/tauri-apps/tauri) | 2.11.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [@tauri-apps/cli](https://github.com/tauri-apps/tauri) | 2.11.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [@tauri-apps/cli-win32-x64-msvc](https://github.com/tauri-apps/tauri) | 2.11.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [@tauri-apps/plugin-dialog](https://github.com/tauri-apps/plugins-workspace) | 2.7.3 | [MIT OR Apache-2.0](https://spdx.org/licenses/MIT.html) |
 | [@tauri-apps/plugin-opener](https://github.com/tauri-apps/plugins-workspace) | 2.5.5 | [MIT OR Apache-2.0](https://spdx.org/licenses/MIT.html) |
-| [@types/estree](https://github.com/DefinitelyTyped/DefinitelyTyped) | 1.0.9 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped) | 25.9.7 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [esbuild](https://github.com/evanw/esbuild) | 0.25.12 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped) | 25.9.8 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [@typescript/typescript-win32-x64](https://github.com/microsoft/TypeScript) | 7.0.2 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
+| [detect-libc](https://github.com/lovell/detect-libc) | 2.1.2 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [fdir](https://github.com/thecodrr/fdir) | 6.5.0 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [lightningcss](https://github.com/parcel-bundler/lightningcss) | 1.33.0 | [MPL-2.0](https://spdx.org/licenses/MPL-2.0.html) |
+| [lightningcss-win32-x64-msvc](https://github.com/parcel-bundler/lightningcss) | 1.33.0 | [MPL-2.0](https://spdx.org/licenses/MPL-2.0.html) |
 | [nanoid](https://github.com/ai/nanoid) | 3.3.19 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [picocolors](https://github.com/alexeyraspopov/picocolors) | 1.1.1 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [picomatch](https://github.com/micromatch/picomatch) | 4.0.7 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [postcss](https://github.com/postcss/postcss) | 8.5.28 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [rollup](https://github.com/rollup/rollup) | 4.63.3 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [rolldown](https://github.com/rolldown/rolldown) | 1.2.10 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [source-map-js](https://github.com/7rulnik/source-map-js) | 1.2.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
 | [tinyglobby](https://github.com/SuperchupuDev/tinyglobby) | 0.2.17 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [typescript](https://github.com/microsoft/TypeScript) | 5.6.3 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
+| [typescript](https://github.com/microsoft/TypeScript) | 7.0.2 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [undici-types](https://github.com/nodejs/undici) | 7.24.6 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [vite](https://github.com/vitejs/vite) | 6.4.3 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [vite](https://github.com/vitejs/vite) | 8.3.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 
 ---
 
@@ -104,11 +106,11 @@ All credit and gratitude to their respective authors and maintainers.
 | [cargo_metadata](https://github.com/oli-obk/cargo_metadata) | 0.19.2 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cargo_toml](https://gitlab.com/lib.rs/cargo_toml) | 0.22.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cargo-platform](https://github.com/rust-lang/cargo) | 0.1.9 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [cc](https://github.com/rust-lang/cc-rs) | 1.4.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [cc](https://github.com/rust-lang/cc-rs) | 1.4.7 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cesu8](https://github.com/emk/cesu8-rs) | 1.1.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cfb](https://github.com/mdsteele/rust-cfb) | 0.7.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [cfg-expr](https://github.com/EmbarkStudios/cfg-expr) | 0.15.8 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [cfg-if](https://github.com/rust-lang/cfg-if) | 1.0.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [cfg-if](https://github.com/rust-lang/cfg-if) | 1.0.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [chrono](https://github.com/chronotope/chrono) | 0.4.45 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [cipher](https://github.com/RustCrypto/traits) | 0.4.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [color_quant](https://github.com/image-rs/color_quant.git) | 1.1.0 | [MIT](https://spdx.org/licenses/MIT.html) |
@@ -180,7 +182,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [fax](https://github.com/pdf-rs/fax) | 0.2.7 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [fdeflate](https://github.com/image-rs/fdeflate) | 0.3.7 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [field-offset](https://github.com/Diggsey/rust-field-offset) | 0.3.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [find-msvc-tools](https://github.com/rust-lang/cc-rs) | 0.1.12 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [find-msvc-tools](https://github.com/rust-lang/cc-rs) | 0.1.13 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [flate2](https://github.com/rust-lang/flate2-rs) | 1.1.10 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [fnv](https://github.com/servo/rust-fnv) | 1.0.7 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [foldhash](https://github.com/orlp/foldhash) | 0.2.0 | [Zlib](https://spdx.org/licenses/Zlib.html) |
@@ -287,7 +289,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [libfuzzer-sys](https://github.com/rust-fuzz/libfuzzer) | 0.4.13 | [(Apache-2.0 OR MIT) AND NCSA](https://spdx.org/licenses/Apache-2.0.html) |
 | [libloading](https://github.com/nagisa/rust_libloading/) | 0.7.4 | [ISC](https://spdx.org/licenses/ISC.html) |
 | [libm](https://github.com/rust-lang/compiler-builtins) | 0.2.16 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [libredox](https://gitlab.redox-os.org/redox-os/libredox.git) | 0.1.24 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [libredox](https://gitlab.redox-os.org/redox-os/libredox.git) | 0.1.25 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [libsqlite3-sys](https://github.com/rusqlite/rusqlite) | 0.30.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [linux-raw-sys](https://github.com/sunfishcode/linux-raw-sys) | 0.12.1 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [litemap](https://github.com/unicode-org/icu4x) | 0.8.3 | [Unicode-3.0](https://spdx.org/licenses/Unicode-3.0.html) |
@@ -398,7 +400,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [reborrow](https://github.com/sarah-ek/reborrow/) | 0.5.5 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [redox_syscall](https://gitlab.redox-os.org/redox-os/syscall) | 0.5.18 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [redox_users](https://gitlab.redox-os.org/redox-os/users) | 0.4.6 | [MIT](https://spdx.org/licenses/MIT.html) |
-| [redox_users](https://gitlab.redox-os.org/redox-os/users) | 0.5.2 | [MIT](https://spdx.org/licenses/MIT.html) |
+| [redox_users](https://gitlab.redox-os.org/redox-os/users) | 0.5.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [ref-cast](https://github.com/dtolnay/ref-cast) | 1.0.27 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [ref-cast-impl](https://github.com/dtolnay/ref-cast) | 1.0.27 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [regex](https://github.com/rust-lang/regex) | 1.13.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -411,7 +413,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [rusqlite](https://github.com/rusqlite/rusqlite) | 0.32.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [rustc_version](https://github.com/djc/rustc-version-rs) | 0.4.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustc-hash](https://github.com/rust-lang/rustc-hash) | 2.1.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [rustix](https://github.com/bytecodealliance/rustix) | 1.1.4 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [rustix](https://github.com/bytecodealliance/rustix) | 1.1.5 | [Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustls](https://github.com/rustls/rustls) | 0.23.45 | [Apache-2.0 OR ISC OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustls-pki-types](https://github.com/rustls/pki-types) | 1.15.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [rustls-webpki](https://github.com/rustls/webpki) | 0.103.15 | [ISC](https://spdx.org/licenses/ISC.html) |
@@ -459,14 +461,14 @@ All credit and gratitude to their respective authors and maintainers.
 | swiss-rb-knife | 0.7.1 | [AGPL-3.0-or-later](https://spdx.org/licenses/AGPL-3.0-or-later.html) |
 | [syn](https://github.com/dtolnay/syn) | 1.0.109 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [syn](https://github.com/dtolnay/syn) | 2.0.119 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [syn](https://github.com/dtolnay/syn) | 3.0.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [syn](https://github.com/dtolnay/syn) | 3.0.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [sync_wrapper](https://github.com/Actyx/sync_wrapper) | 1.0.2 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [synstructure](https://github.com/mystor/synstructure) | 0.14.0 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [system-deps](https://github.com/gdesmott/system-deps) | 6.2.2 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tao](https://github.com/tauri-apps/tao) | 0.35.3 | [Apache-2.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [tao-macros](https://github.com/tauri-apps/tao) | 0.1.4 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [target-lexicon](https://github.com/bytecodealliance/target-lexicon) | 0.12.16 | [Apache-2.0 WITH LLVM-exception](https://spdx.org/licenses/Apache-2.0.html) |
-| [tauri](https://github.com/tauri-apps/tauri) | 2.11.5 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [tauri](https://github.com/tauri-apps/tauri) | 2.11.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tauri-build](https://github.com/tauri-apps/tauri) | 2.6.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tauri-codegen](https://github.com/tauri-apps/tauri) | 2.6.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tauri-macros](https://github.com/tauri-apps/tauri) | 2.6.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -481,9 +483,9 @@ All credit and gratitude to their respective authors and maintainers.
 | [tempfile](https://github.com/Stebalien/tempfile) | 3.27.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tendril](https://github.com/servo/html5ever) | 0.5.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [thiserror](https://github.com/dtolnay/thiserror) | 1.0.69 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [thiserror](https://github.com/dtolnay/thiserror) | 2.0.20 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [thiserror](https://github.com/dtolnay/thiserror) | 2.0.21 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [thiserror-impl](https://github.com/dtolnay/thiserror) | 1.0.69 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [thiserror-impl](https://github.com/dtolnay/thiserror) | 2.0.20 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
+| [thiserror-impl](https://github.com/dtolnay/thiserror) | 2.0.21 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [tiff](https://github.com/image-rs/image-tiff) | 0.11.3 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [time](https://github.com/time-rs/time) | 0.3.55 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [time-core](https://github.com/time-rs/time) | 0.1.9 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
@@ -520,7 +522,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [unic-common](https://github.com/open-i18n/rust-unic/) | 0.9.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [unic-ucd-ident](https://github.com/open-i18n/rust-unic/) | 0.9.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [unic-ucd-version](https://github.com/open-i18n/rust-unic/) | 0.9.0 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| [unicode-ident](https://github.com/dtolnay/unicode-ident) | 1.0.24 | [(Apache-2.0 OR MIT) AND Unicode-3.0](https://spdx.org/licenses/Apache-2.0.html) |
+| [unicode-ident](https://github.com/dtolnay/unicode-ident) | 1.0.26 | [(Apache-2.0 OR MIT) AND Unicode-3.0](https://spdx.org/licenses/Apache-2.0.html) |
 | [unicode-segmentation](https://github.com/unicode-rs/unicode-segmentation) | 1.13.3 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [universal-hash](https://github.com/RustCrypto/traits) | 0.5.1 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [untrusted](https://github.com/briansmith/untrusted) | 0.9.0 | [ISC](https://spdx.org/licenses/ISC.html) |
