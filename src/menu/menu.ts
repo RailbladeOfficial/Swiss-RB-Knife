@@ -160,8 +160,7 @@ const MAX_ROWS = 8.5;
  * max-height here would quietly become nine and a half rows the day either
  * changes.
  *
- * And measured WHERE THE ROWS ACTUALLY ARE, not as row height times ten and a
- * half. Separators take up height too, so that sum landed the cut short by a
+ * And measured WHERE THE ROWS ACTUALLY ARE, not as row height times MAX_ROWS. Separators take up height too, so that sum landed the cut short by a
  * separator's worth each time one came before it: with the right number of
  * rule lines above, the cut fell on a row's edge and the half row that says
  * "there is more" disappeared (the Whiteboard's grouped menus did exactly
@@ -197,7 +196,7 @@ function capHeight(menu: HTMLElement): void {
      the window budget has to make room for the frame instead. */
   const borderBox = style.boxSizing === "border-box";
 
-  /* The row the cut goes through: the eleventh, for ten and a half. A level
+  /* The row the cut goes through: the ninth, for eight and a half. A level
      with no such row is short enough to show whole, so only the window caps
      it. Back counts as a row here, because it takes a row's space. */
   const whole = Math.floor(MAX_ROWS);

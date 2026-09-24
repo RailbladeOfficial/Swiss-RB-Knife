@@ -138,7 +138,7 @@ export const DEFAULT_EFFORT_LEVELS: readonly ScaleLevel[] = [
 ];
 
 /** Long enough that nobody sensible meets it, short enough that the pickers
- *  stay pickers: a right-click submenu scrolls past 10.5 rows, and a scale
+ *  stay pickers: a right-click submenu scrolls past 8.5 rows, and a scale
  *  that needs more than this is a tag category wearing a ladder's clothes. */
 export const MAX_SCALE_LEVELS = 50;
 

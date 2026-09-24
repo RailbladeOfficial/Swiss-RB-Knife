@@ -29,7 +29,7 @@
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 
-  /* CAPPED AT TEN AND A HALF ROWS, and scrolling past that. The cap itself is
+  /* CAPPED AT EIGHT AND A HALF ROWS, and scrolling past that. The cap itself is
      a max-height menu.ts measures from a real row and sets per level, because
      row height is this file's padding and font size and a number written here
      as well would be a second copy of it to keep in step.
