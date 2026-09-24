@@ -76,7 +76,11 @@ Var NoShortcutMode
 Var WixMode
 Var OldMainBinaryName
 
-Name "${PRODUCTNAME}"
+; SRBK: the version rides in the name, so every screen that names the app says
+; which build this is: the title bar, "Welcome to ... Setup", the Finish page
+; and the uninstaller. Folders, shortcuts and the Apps list use PRODUCTNAME,
+; not this, so none of them gain a version.
+Name "${PRODUCTNAME} v${VERSION}"
 BrandingText "${COPYRIGHT}"
 OutFile "${OUTFILE}"
 
