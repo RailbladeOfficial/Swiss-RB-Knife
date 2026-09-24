@@ -308,6 +308,17 @@ Function PageReinstall
 
   nsis_tauri_utils::SemverCompare "${VERSION}" $R0
   Pop $R0
+  ; SRBK: an upgrade installs over the top, with no page and no uninstall,
+  ; which is the "Do not uninstall" choice this page would have offered and
+  ; the route Tauri's own updater takes. Uninstalling first exists to clear
+  ; out files a new version no longer ships; this install folder is three
+  ; files and every install writes all three. The data lives in AppData and
+  ; is not touched either way. Same version and downgrade still get the page,
+  ; and a WiX install still has to be uninstalled, so it does too.
+  ${If} $R0 = 1
+  ${AndIf} $WixMode <> 1
+    Abort
+  ${EndIf}
   ; Reinstalling the same version
   ${If} $R0 = 0
     StrCpy $R1 "$(alreadyInstalledLong)"
@@ -422,7 +433,8 @@ Function PageLeaveReinstall
   ${EndIf}
 
   reinst_uninstall:
-    ; SRBK: an upgrade or downgrade runs the OTHER version's uninstaller, and
+    ; SRBK: a downgrade runs the OTHER version's uninstaller (an upgrade never
+    ; reaches here, see PageReinstall), and
     ; its window wears that version's artwork, which no build of this one can
     ; change. So it runs silently (see /S below). The choice was already made
     ; on this page, and silent leaves app data alone, which is what a
