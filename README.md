@@ -14,7 +14,7 @@
 
 Swiss RB Knife is an offline-by-default, open-source, personal desktop utility suite: a unified multi-tool of various micro-utilities that I could not find personally useful substitutes for on the interwebs.
 
-From image editing and file management, to productivity tracking and other shitnanigans, there's something in here for everyone's niche workflows. Probably.
+From task, file, and budget management to time and stat tracking, among other shitnanigans, there's something in here for everyone's niche workflows. Probably.
 
 <p align="center">
   <a href="./screenshots/general/home.png" target="_blank">
@@ -193,7 +193,7 @@ Configure source and destination folder pairs and run mirror backups via Windows
 </p>
 
 ### - **Whiteboard**
-Sometimes a thought isn't ready to be a Kanban card yet. Sticky notes fall off the monitor, the notepad by the keyboard gets buried, and the whiteboard app on the work laptop wants you signed into something first. So here's a scratch board that lives right next to everything else. Click anywhere and type, draw around it, circle the thing you keep forgetting, slap a star on whatever actually matters. Boxes, arrows, ellipses, a checklist, bold for the parts that need yelling. Once the brainstorm turns into real work, hit Send to Kanban and each note becomes its own card (a checklist comes over as subtasks) on whichever board and column you pick. Or send the whole board over as one image, if the doodles were the point.
+Sticky notes fall off the monitor, the notepad by the keyboard gets buried, and notepad TXT files become a forgotten trail of todos. That said, sometimes a thought isn't ready to be a Kanban card yet, either. So here's a scratch board that lives right next to everything else. Click anywhere and type, draw around it, circle the thing you keep forgetting, slap a star on whatever actually matters. Boxes, arrows, ellipses, a checklist, bold for the parts that need yelling. Once the brainstorm turns into real work, hit Send to Kanban and each note becomes its own card (a checklist comes over as subtasks) on whichever board and column you pick. Or send the whole board over as one image, if the doodles were on point.
 
 <p align="center">
   <a href="./screenshots/whiteboard/whiteboard-board.png" target="_blank">
@@ -307,7 +307,7 @@ In my QA work, sometimes you just need a random assortment of meaningless files 
 </p>
 
 ### - **Days Between Dates**
-I used to have an app on my phone that told you the number of elapsed days between two dates. Google now tells me I can't have that app anymore because its old. Some online calculators don't get the math right, or cryptically include the start date. I'm about clarity and ease of access. So now we have a tool to quickly calculate the days between dates, with options for including the start date if that really makes you feel warm and fuzzy inside.
+I used to have an app on my phone that told you the number of elapsed days between two dates. Google now tells me I can't have that app anymore because it's old. Some online calculators don't get the math right, or cryptically include the start date. I'm about clarity and ease of access. So now we have a tool to quickly calculate the days between dates, with options for including the start date if that really makes you feel warm and fuzzy inside.
 
 <p align="center">
   <a href="./screenshots/days-between-dates/dbd-main.png" target="_blank">
@@ -333,7 +333,7 @@ Every random number generator I could find online is either buried under three a
   </a>
 </p>
 
-> More tools to be added over time.
+> I'm always adding more shit. Got a cool idea you'd like to see added? Drop me a line.
 
 ---
 
