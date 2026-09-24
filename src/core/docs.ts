@@ -1192,8 +1192,8 @@ function readmeImages(): HTMLImageElement[] {
   );
 }
 
-/** Points the lightbox at one README screenshot: picture, header, and which
- *  of the prev/next arrows still have somewhere to go. */
+/** Points the lightbox at one README screenshot: picture, header, and whether
+ *  the prev/next arrows have anywhere else to go. */
 function showLightboxImage(img: HTMLImageElement): void {
   lightboxSourceImg = img;
   imageLightboxImg.src = img.src;
@@ -1201,10 +1201,11 @@ function showLightboxImage(img: HTMLImageElement): void {
   // No title attribute set here. The mouseenter listener below decides
   // on each hover whether the text is actually truncated right now.
   imageLightboxTitle.removeAttribute("title");
-  const images = readmeImages();
-  const index = images.indexOf(img);
-  imageLightboxPrev.disabled = index <= 0;
-  imageLightboxNext.disabled = index < 0 || index >= images.length - 1;
+  // The carousel wraps, so the arrows only go dead when there is no other
+  // screenshot to wrap to.
+  const alone = readmeImages().length < 2;
+  imageLightboxPrev.disabled = alone;
+  imageLightboxNext.disabled = alone;
 }
 
 function openImageLightbox(img: HTMLImageElement): void {
@@ -1212,14 +1213,16 @@ function openImageLightbox(img: HTMLImageElement): void {
   imageLightboxModal.open();
 }
 
-/** Steps to the previous (-1) or next (+1) README screenshot. Stops at either
- *  end rather than wrapping. The Back arrow then returns to whichever image
- *  the user ended on, since lightboxSourceImg follows along. */
+/** Steps to the previous (-1) or next (+1) README screenshot, wrapping from
+ *  the last back to the first and vice versa. The Back arrow then returns to
+ *  whichever image the user ended on, since lightboxSourceImg follows along. */
 function stepLightbox(direction: -1 | 1): void {
   if (!lightboxSourceImg) return;
   const images = readmeImages();
-  const next = images[images.indexOf(lightboxSourceImg) + direction];
-  if (next) showLightboxImage(next);
+  const index = images.indexOf(lightboxSourceImg);
+  if (index < 0 || images.length < 2) return;
+  const next = images[(index + direction + images.length) % images.length];
+  showLightboxImage(next);
 }
 
 imageLightboxPrev.addEventListener("click", () => stepLightbox(-1));

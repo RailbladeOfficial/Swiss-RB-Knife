@@ -414,8 +414,8 @@
   gap: 10px;
 }
 
-/* Prev/next arrows either side of the picture. Disabled at the first and
-   last screenshot rather than wrapping, same as the Game Stats carousel. */
+/* Prev/next arrows either side of the picture. They wrap around, so they
+   only disable when the README has a single screenshot. */
 .image-lightbox-nav {
   display: inline-flex;
   align-items: center;
