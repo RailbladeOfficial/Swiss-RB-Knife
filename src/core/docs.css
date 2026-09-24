@@ -408,12 +408,44 @@
 .image-lightbox-body {
   flex: 1;
   overflow: auto;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+}
+
+/* Prev/next arrows either side of the picture. Disabled at the first and
+   last screenshot rather than wrapping, same as the Game Stats carousel. */
+.image-lightbox-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.image-lightbox-nav:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-btn) 10%, transparent);
+  border-color: var(--color-btn);
+  color: var(--color-btn-hover);
+}
+
+.image-lightbox-nav:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .image-lightbox-body img {
   display: block;
+  min-width: 0;
   max-width: 100%;
   max-height: 78vh;
   height: auto;

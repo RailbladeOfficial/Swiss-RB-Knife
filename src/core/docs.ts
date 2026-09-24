@@ -94,6 +94,12 @@ const imageLightboxTitle = document.getElementById("imageLightboxTitle")!;
 const imageLightboxImg = document.getElementById(
   "imageLightboxImg",
 ) as HTMLImageElement;
+const imageLightboxPrev = document.getElementById(
+  "imageLightboxPrev",
+) as HTMLButtonElement;
+const imageLightboxNext = document.getElementById(
+  "imageLightboxNext",
+) as HTMLButtonElement;
 
 const licenseAgreementBackdrop = document.getElementById(
   "licenseAgreementBackdrop",
@@ -1176,15 +1182,60 @@ const imageLightboxModal = new Modal(imageLightboxBackdrop, {
   },
 });
 
-function openImageLightbox(img: HTMLImageElement): void {
+/** Every screenshot in the README, in reading order. Read fresh each time
+ *  rather than cached, since the README body is re-rendered on open. */
+function readmeImages(): HTMLImageElement[] {
+  return Array.from(
+    document
+      .getElementById("readmeBody")!
+      .querySelectorAll<HTMLImageElement>("img.md-img"),
+  );
+}
+
+/** Points the lightbox at one README screenshot: picture, header, and which
+ *  of the prev/next arrows still have somewhere to go. */
+function showLightboxImage(img: HTMLImageElement): void {
   lightboxSourceImg = img;
   imageLightboxImg.src = img.src;
   imageLightboxTitle.textContent = img.alt || "Screenshot";
   // No title attribute set here. The mouseenter listener below decides
   // on each hover whether the text is actually truncated right now.
   imageLightboxTitle.removeAttribute("title");
+  const images = readmeImages();
+  const index = images.indexOf(img);
+  imageLightboxPrev.disabled = index <= 0;
+  imageLightboxNext.disabled = index < 0 || index >= images.length - 1;
+}
+
+function openImageLightbox(img: HTMLImageElement): void {
+  showLightboxImage(img);
   imageLightboxModal.open();
 }
+
+/** Steps to the previous (-1) or next (+1) README screenshot. Stops at either
+ *  end rather than wrapping. The Back arrow then returns to whichever image
+ *  the user ended on, since lightboxSourceImg follows along. */
+function stepLightbox(direction: -1 | 1): void {
+  if (!lightboxSourceImg) return;
+  const images = readmeImages();
+  const next = images[images.indexOf(lightboxSourceImg) + direction];
+  if (next) showLightboxImage(next);
+}
+
+imageLightboxPrev.addEventListener("click", () => stepLightbox(-1));
+imageLightboxNext.addEventListener("click", () => stepLightbox(1));
+
+// Left/Right arrow keys do the same while the lightbox is the open modal.
+document.addEventListener("keydown", (e) => {
+  if (!imageLightboxModal.isOpen) return;
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    stepLightbox(-1);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    stepLightbox(1);
+  }
+});
 
 // Native tooltip only when the header text is actually ellipsis-truncated.
 // Checked on hover (not at open time) since scrollWidth/clientWidth aren't
