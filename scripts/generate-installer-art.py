@@ -116,25 +116,27 @@ def build_sidebar() -> Image.Image:
     w, h = 164, 314
     img = nebula((w, h), crop=0.10, darken=0.55)
 
-    paste_icon(img, 96, ((w - 96) // 2, 62))
+    # The whole block is centered vertically rather than hung from the top:
+    # icon, rule, name and copyright come to about 165 of the panel's 314, so
+    # hugging either end leaves a visibly dead third. `top` is where the icon
+    # starts, and everything below it is placed from there.
+    top = 74
+
+    paste_icon(img, 96, ((w - 96) // 2, top))
 
     draw = ImageDraw.Draw(img)
     title = font(FONT_BOLD, 18)
     sub = font(FONT_REG, 10)
 
-    # The whole block is centered vertically rather than hung from the top:
-    # icon, rule, name, tagline come to about 190 of the panel's 314, so
-    # hugging either end leaves a visibly dead third.
-    #
-    # The rule goes ABOVE the name, not between the name and the tagline. Below
-    # it, eight pixels under a baseline, it stops reading as a divider and
-    # starts reading as an underline on the word "Knife".
-    accent_rule(draw, (w - 56) // 2, 176, (w + 56) // 2, 177)
+    # The rule goes ABOVE the name, not between the name and the copyright.
+    # Below it, eight pixels under a baseline, it stops reading as a divider
+    # and starts reading as an underline on the name.
+    accent_rule(draw, (w - 56) // 2, top + 114, (w + 56) // 2, top + 115)
 
+    # The name is one line: at 18px bold it is 124 of the panel's 164.
     for line, y, f, fill in (
-        ("Swiss RB", 190, title, TEXT),
-        ("Knife", 210, title, TEXT),
-        ("A Multi-Tool Application", 240, sub, TEXT_DIM),
+        ("Swiss RB Knife", top + 128, title, TEXT),
+        ("© 2026 Railblade", top + 154, sub, TEXT_DIM),
     ):
         tw = draw.textbbox((0, 0), line, font=f)[2]
         draw.text(((w - tw) // 2, y), line, font=f, fill=fill)
