@@ -92,6 +92,15 @@ export default defineConfig(async () => {
       __BUILD_ID__: JSON.stringify(buildId),
     },
 
+    // Vite warns past 500 kB because a website downloads its chunks. This one
+    // loads from disk inside the app window, so a big bundle costs nothing and
+    // splitting it would only add load-order to get wrong. The main chunk is
+    // about 870 kB; the limit sits well above that and stays a tripwire for
+    // a dependency that suddenly pulls in megabytes.
+    build: {
+      chunkSizeWarningLimit: 2000,
+    },
+
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
     //
     // 1. prevent Vite from obscuring rust errors
