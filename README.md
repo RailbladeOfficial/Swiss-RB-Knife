@@ -67,26 +67,35 @@ And if you use an AI coding agent for dev work while you cosplay as a Product Ow
   <a href="./screenshots/kanban/kanban-board.png" target="_blank">
     <img class="md-img" src="./screenshots/kanban/kanban-board.png" width="100%" alt="Kanban: Board View" />
   </a>
-  <a href="./screenshots/kanban/kanban-board-stats.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-board-stats.png" width="49%" alt="Kanban: Board Stats" />
-  </a>
   <a href="./screenshots/kanban/kanban-card.png" target="_blank">
     <img class="md-img" src="./screenshots/kanban/kanban-card.png" width="49%" alt="Kanban: Card View" />
+  </a>
+  <a href="./screenshots/kanban/kanban-card-attachments.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-card-attachments.png" width="49%" alt="Kanban: Card Attachments, Video Included" />
   </a>
   <a href="./screenshots/kanban/kanban-card-comments.png" target="_blank">
     <img class="md-img" src="./screenshots/kanban/kanban-card-comments.png" width="49%" alt="Kanban: Card Comments" />
   </a>
-  <a href="./screenshots/kanban/kanban-board-setup.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-board-setup.png" width="49%" alt="Kanban: Board Setup" />
+  <a href="./screenshots/kanban/kanban-multi-select.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-multi-select.png" width="49%" alt="Kanban: Multi-Select Actions" />
   </a>
-  <a href="./screenshots/kanban/kanban-setup-tags.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-setup-tags.png" width="49%" alt="Kanban: Setup Modal - Tag Categories" />
+  <a href="./screenshots/kanban/kanban-board-stats.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board-stats.png" width="49%" alt="Kanban: Board Stats" />
   </a>
-  <a href="./screenshots/kanban/kanban-setup-preferences.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-setup-preferences.png" width="49%" alt="Kanban: Setup Modal - Preferences" />
+  <a href="./screenshots/kanban/kanban-board-tags.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board-tags.png" width="49%" alt="Kanban: Board Setup - Tag Categories" />
+  </a>
+  <a href="./screenshots/kanban/kanban-board-overrides.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-board-overrides.png" width="49%" alt="Kanban: Board Setup - Overrides" />
+  </a>
+  <a href="./screenshots/kanban/kanban-setup-defaults.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-setup-defaults.png" width="49%" alt="Kanban: Setup Modal - App-Wide Defaults" />
   </a>
   <a href="./screenshots/kanban/kanban-agents.png" target="_blank">
-    <img class="md-img" src="./screenshots/kanban/kanban-agents.png" width="100%" alt="Kanban: Board Setup - Agents" />
+    <img class="md-img" src="./screenshots/kanban/kanban-agents.png" width="49%" alt="Kanban: Board Setup - Agents" />
+  </a>
+  <a href="./screenshots/kanban/kanban-agents-activity.png" target="_blank">
+    <img class="md-img" src="./screenshots/kanban/kanban-agents-activity.png" width="49%" alt="Kanban: Board Setup - Agent Activity Log" />
   </a>
 </p>
 
@@ -112,29 +121,23 @@ Input Income earned and Expenses incurred. Yeah, your bank statement may tell yo
   <a href="./screenshots/budget-tracker/budget-ledger.png" target="_blank">
     <img class="md-img" src="./screenshots/budget-tracker/budget-ledger.png" width="49%" alt="Budget Tracker: Entry Ledger" />
   </a>
-  <a href="./screenshots/budget-tracker/budget-setup-view-recurring-bills.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-view-recurring-bills.png" width="24%" alt="Budget Tracker: Setup Modal - View Recurring Bills" />
-  </a>
   <a href="./screenshots/budget-tracker/budget-setup-edit-recurring-bill.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-edit-recurring-bill.png" width="24%" alt="Budget Tracker: Setup Modal - Edit Recurring Bill" />
+    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-edit-recurring-bill.png" width="32%" alt="Budget Tracker: Setup Modal - Edit Recurring Bill" />
   </a>
   <a href="./screenshots/budget-tracker/budget-setup-edit-expense-category.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-edit-expense-category.png" width="24%" alt="Budget Tracker: Setup Modal - Edit Expense Category" />
+    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-edit-expense-category.png" width="32%" alt="Budget Tracker: Setup Modal - Edit Expense Category" />
   </a>
   <a href="./screenshots/budget-tracker/budget-setup-settings.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-settings.png" width="24%" alt="Budget Tracker: Setup Modal - Preferences" />
+    <img class="md-img" src="./screenshots/budget-tracker/budget-setup-settings.png" width="32%" alt="Budget Tracker: Setup Modal - Preferences" />
   </a>
   <a href="./screenshots/budget-tracker/budget-annual-stats-1.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-annual-stats-1.png" width="24%" alt="Budget Tracker: Annual Stats, Part 1" />
+    <img class="md-img" src="./screenshots/budget-tracker/budget-annual-stats-1.png" width="32%" alt="Budget Tracker: Annual Stats, Year at a Glance" />
   </a>
   <a href="./screenshots/budget-tracker/budget-annual-stats-2.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-annual-stats-2.png" width="24%" alt="Budget Tracker: Annual Stats, Part 2" />
+    <img class="md-img" src="./screenshots/budget-tracker/budget-annual-stats-2.png" width="32%" alt="Budget Tracker: Annual Stats, Bills and Categories" />
   </a>
   <a href="./screenshots/budget-tracker/budget-annual-stats-3.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-annual-stats-3.png" width="24%" alt="Budget Tracker: Annual Stats, Part 3" />
-  </a>
-  <a href="./screenshots/budget-tracker/budget-annual-stats-4.png" target="_blank">
-    <img class="md-img" src="./screenshots/budget-tracker/budget-annual-stats-4.png" width="24%" alt="Budget Tracker: Annual Stats, Part 4" />
+    <img class="md-img" src="./screenshots/budget-tracker/budget-annual-stats-3.png" width="32%" alt="Budget Tracker: Annual Stats, Month by Month" />
   </a>
 </p>
 
@@ -143,16 +146,16 @@ Log and track time entries with pay period summaries, running totals, and CSV ex
 
 <p align="center">
   <a href="./screenshots/time-tracker/time-tracker-base.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-base.png" width="49%" alt="Time Tracker: Main View" />
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-base.png" width="49%" alt="Time Tracker: Main View, Clock Running" />
   </a>
-  <a href="./screenshots/time-tracker/time-tracker-settings.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-settings.png" width="49%" alt="Time Tracker: Setup Modal - Preferences" />
+  <a href="./screenshots/time-tracker/time-tracker-break-in.png" target="_blank">
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-break-in.png" width="49%" alt="Time Tracker: Break In, with Resume Waiting" />
   </a>
-  <a href="./screenshots/time-tracker/time-tracker-data-entry-1.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-data-entry-1.png" width="49%" alt="Time Tracker: Data Entry" />
+  <a href="./screenshots/time-tracker/time-tracker-break-in-split.png" target="_blank">
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-break-in-split.png" width="49%" alt="Time Tracker: Break-In Tasks" />
   </a>
-  <a href="./screenshots/time-tracker/time-tracker-data-entry-2.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-data-entry-2.png" width="49%" alt="Time Tracker: Setup Modal - Activities" />
+  <a href="./screenshots/time-tracker/time-tracker-summary-panel.png" target="_blank">
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-summary-panel.png" width="49%" alt="Time Tracker: Stats Panel, Last Pay Period" />
   </a>
   <a href="./screenshots/time-tracker/time-tracker-view-entries-1.png" target="_blank">
     <img class="md-img" src="./screenshots/time-tracker/time-tracker-view-entries-1.png" width="49%" alt="Time Tracker: View Entries, Part 1" />
@@ -160,8 +163,11 @@ Log and track time entries with pay period summaries, running totals, and CSV ex
   <a href="./screenshots/time-tracker/time-tracker-view-entries-2.png" target="_blank">
     <img class="md-img" src="./screenshots/time-tracker/time-tracker-view-entries-2.png" width="49%" alt="Time Tracker: View Entries, Part 2" />
   </a>
-  <a href="./screenshots/time-tracker/time-tracker-summary-panel.png" target="_blank">
-    <img class="md-img" src="./screenshots/time-tracker/time-tracker-summary-panel.png" width="49%" alt="Time Tracker: Stats Panel" />
+  <a href="./screenshots/time-tracker/time-tracker-settings.png" target="_blank">
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-settings.png" width="49%" alt="Time Tracker: Setup Modal - Preferences" />
+  </a>
+  <a href="./screenshots/time-tracker/time-tracker-setup-projects.png" target="_blank">
+    <img class="md-img" src="./screenshots/time-tracker/time-tracker-setup-projects.png" width="49%" alt="Time Tracker: Setup Modal - Projects" />
   </a>
 </p>
 
@@ -172,20 +178,35 @@ Configure source and destination folder pairs and run mirror backups via Windows
   <a href="./screenshots/auto-backup/backup-setup.png" target="_blank">
     <img class="md-img" src="./screenshots/auto-backup/backup-setup.png" width="49%" alt="Auto-Backup: Setup" />
   </a>
-  <a href="./screenshots/auto-backup/backup-confirmation.png" target="_blank">
-    <img class="md-img" src="./screenshots/auto-backup/backup-confirmation.png" width="49%" alt="Auto-Backup: Confirm" />
-  </a>
-  <a href="./screenshots/auto-backup/backup-processing.png" target="_blank">
-    <img class="md-img" src="./screenshots/auto-backup/backup-processing.png" width="49%" alt="Auto-Backup: Processing" />
-  </a>
-  <a href="./screenshots/auto-backup/backup-cancelled.png" target="_blank">
-    <img class="md-img" src="./screenshots/auto-backup/backup-cancelled.png" width="49%" alt="Auto-Backup: Cancelled" />
-  </a>
-  <a href="./screenshots/auto-backup/backup-complete.png" target="_blank">
-    <img class="md-img" src="./screenshots/auto-backup/backup-complete.png" width="49%" alt="Auto-Backup: Complete" />
-  </a>
   <a href="./screenshots/auto-backup/backup-presets.png" target="_blank">
     <img class="md-img" src="./screenshots/auto-backup/backup-presets.png" width="49%" alt="Auto-Backup: Presets Modal" />
+  </a>
+  <a href="./screenshots/auto-backup/backup-confirmation.png" target="_blank">
+    <img class="md-img" src="./screenshots/auto-backup/backup-confirmation.png" width="32%" alt="Auto-Backup: Confirm" />
+  </a>
+  <a href="./screenshots/auto-backup/backup-processing.png" target="_blank">
+    <img class="md-img" src="./screenshots/auto-backup/backup-processing.png" width="32%" alt="Auto-Backup: Processing" />
+  </a>
+  <a href="./screenshots/auto-backup/backup-complete.png" target="_blank">
+    <img class="md-img" src="./screenshots/auto-backup/backup-complete.png" width="32%" alt="Auto-Backup: Complete" />
+  </a>
+</p>
+
+### - **Whiteboard**
+Sometimes a thought isn't ready to be a Kanban card yet. Sticky notes fall off the monitor, the notepad by the keyboard gets buried, and the whiteboard app on the work laptop wants you signed into something first. So here's a scratch board that lives right next to everything else. Click anywhere and type, draw around it, circle the thing you keep forgetting, slap a star on whatever actually matters. Boxes, arrows, ellipses, a checklist, bold for the parts that need yelling. Once the brainstorm turns into real work, hit Send to Kanban and each note becomes its own card (a checklist comes over as subtasks) on whichever board and column you pick. Or send the whole board over as one image, if the doodles were the point.
+
+<p align="center">
+  <a href="./screenshots/whiteboard/whiteboard-board.png" target="_blank">
+    <img class="md-img" src="./screenshots/whiteboard/whiteboard-board.png" width="49%" alt="Whiteboard: Sprint Planning Board" />
+  </a>
+  <a href="./screenshots/whiteboard/whiteboard-drawing.png" target="_blank">
+    <img class="md-img" src="./screenshots/whiteboard/whiteboard-drawing.png" width="49%" alt="Whiteboard: Drawing, Pen Colors Open" />
+  </a>
+  <a href="./screenshots/whiteboard/whiteboard-send-to-kanban.png" target="_blank">
+    <img class="md-img" src="./screenshots/whiteboard/whiteboard-send-to-kanban.png" width="49%" alt="Whiteboard: Send to Kanban" />
+  </a>
+  <a href="./screenshots/whiteboard/whiteboard-setup.png" target="_blank">
+    <img class="md-img" src="./screenshots/whiteboard/whiteboard-setup.png" width="49%" alt="Whiteboard: Setup Modal - Preferences" />
   </a>
 </p>
 
@@ -194,7 +215,19 @@ Configure source and destination folder pairs and run mirror backups via Windows
 
 <p align="center">
   <a href="./screenshots/countdown-timer/countdown-timer-main.png" target="_blank">
-    <img class="md-img" src="./screenshots/countdown-timer/countdown-timer-main.png" width="100%" alt="Countdown Timer" />
+    <img class="md-img" src="./screenshots/countdown-timer/countdown-timer-main.png" width="49%" alt="Countdown Timer: Running" />
+  </a>
+  <a href="./screenshots/countdown-timer/countdown-timer-display-view.png" target="_blank">
+    <img class="md-img" src="./screenshots/countdown-timer/countdown-timer-display-view.png" width="49%" alt="Countdown Timer: Display View" />
+  </a>
+  <a href="./screenshots/countdown-timer/countdown-timer-history.png" target="_blank">
+    <img class="md-img" src="./screenshots/countdown-timer/countdown-timer-history.png" width="32%" alt="Countdown Timer: History, Log to Time Tracker" />
+  </a>
+  <a href="./screenshots/countdown-timer/countdown-timer-presets.png" target="_blank">
+    <img class="md-img" src="./screenshots/countdown-timer/countdown-timer-presets.png" width="32%" alt="Countdown Timer: Presets Modal" />
+  </a>
+  <a href="./screenshots/countdown-timer/countdown-timer-setup.png" target="_blank">
+    <img class="md-img" src="./screenshots/countdown-timer/countdown-timer-setup.png" width="32%" alt="Countdown Timer: Setup Modal - Timer" />
   </a>
 </p>
 
@@ -203,28 +236,25 @@ Combine multiple images along a specified side, compress an image to help upload
 
 <p align="center">
   <a href="./screenshots/image-ccr/combine-1.png" target="_blank">
-    <img class="md-img" src="./screenshots/image-ccr/combine-1.png" width="49%" alt="Image CCR: Combine Upload" />
+    <img class="md-img" src="./screenshots/image-ccr/combine-1.png" width="49%" alt="Image CCR: Combine Selection and Order" />
   </a>
   <a href="./screenshots/image-ccr/combine-2.png" target="_blank">
-    <img class="md-img" src="./screenshots/image-ccr/combine-2.png" width="49%" alt="Image CCR: Combine Setup" />
+    <img class="md-img" src="./screenshots/image-ccr/combine-2.png" width="49%" alt="Image CCR: Combine Options and Preview" />
   </a>
   <a href="./screenshots/image-ccr/combine-3.png" target="_blank">
     <img class="md-img" src="./screenshots/image-ccr/combine-3.png" width="100%" alt="Image CCR: Combine Result" />
   </a>
   <a href="./screenshots/image-ccr/compress-1.png" target="_blank">
-    <img class="md-img" src="./screenshots/image-ccr/compress-1.png" width="49%" alt="Image CCR: Compress Upload" />
+    <img class="md-img" src="./screenshots/image-ccr/compress-1.png" width="49%" alt="Image CCR: Compress Setup" />
   </a>
   <a href="./screenshots/image-ccr/compress-2.png" target="_blank">
-    <img class="md-img" src="./screenshots/image-ccr/compress-2.png" width="49%" alt="Image CCR: Compress Setup & Result" />
+    <img class="md-img" src="./screenshots/image-ccr/compress-2.png" width="49%" alt="Image CCR: Compress Result" />
   </a>
   <a href="./screenshots/image-ccr/resize-1.png" target="_blank">
-    <img class="md-img" src="./screenshots/image-ccr/resize-1.png" width="49%" alt="Image CCR: Resize Upload" />
+    <img class="md-img" src="./screenshots/image-ccr/resize-1.png" width="49%" alt="Image CCR: Resize Source Scan" />
   </a>
   <a href="./screenshots/image-ccr/resize-2.png" target="_blank">
-    <img class="md-img" src="./screenshots/image-ccr/resize-2.png" width="49%" alt="Image CCR: Resize Setup" />
-  </a>
-  <a href="./screenshots/image-ccr/resize-3.png" target="_blank">
-    <img class="md-img" src="./screenshots/image-ccr/resize-3.png" width="100%" alt="Image CCR: Resize Results" />
+    <img class="md-img" src="./screenshots/image-ccr/resize-2.png" width="49%" alt="Image CCR: Resize Options and Results" />
   </a>
 </p>
 
@@ -233,7 +263,16 @@ I'm a stats nerd, I like tracking numbers, clearly. That said, I'm getting kinda
 
 <p align="center">
   <a href="./screenshots/game-stats/game-stats-main.png" target="_blank">
-    <img class="md-img" src="./screenshots/game-stats/game-stats-main.png" width="100%" alt="Game Stats" />
+    <img class="md-img" src="./screenshots/game-stats/game-stats-main.png" width="49%" alt="Game Stats: Main View" />
+  </a>
+  <a href="./screenshots/game-stats/game-stats-new-game.png" target="_blank">
+    <img class="md-img" src="./screenshots/game-stats/game-stats-new-game.png" width="49%" alt="Game Stats: Logging a Five Crowns Game" />
+  </a>
+  <a href="./screenshots/game-stats/game-stats-table.png" target="_blank">
+    <img class="md-img" src="./screenshots/game-stats/game-stats-table.png" width="49%" alt="Game Stats: Table Stats" />
+  </a>
+  <a href="./screenshots/game-stats/game-stats-compare.png" target="_blank">
+    <img class="md-img" src="./screenshots/game-stats/game-stats-compare.png" width="49%" alt="Game Stats: Head-to-Head" />
   </a>
 </p>
 
@@ -242,7 +281,13 @@ Ever be sharing your screen during a stream, meeting, or other event, and need t
 
 <p align="center">
   <a href="./screenshots/tts-repeater/tts-repeater-main.png" target="_blank">
-    <img class="md-img" src="./screenshots/tts-repeater/tts-repeater-main.png" width="100%" alt="TTS Repeater" />
+    <img class="md-img" src="./screenshots/tts-repeater/tts-repeater-main.png" width="100%" alt="TTS Repeater: Running" />
+  </a>
+  <a href="./screenshots/tts-repeater/tts-repeater-display-view.png" target="_blank">
+    <img class="md-img" src="./screenshots/tts-repeater/tts-repeater-display-view.png" width="49%" alt="TTS Repeater: Display View" />
+  </a>
+  <a href="./screenshots/tts-repeater/tts-repeater-presets.png" target="_blank">
+    <img class="md-img" src="./screenshots/tts-repeater/tts-repeater-presets.png" width="49%" alt="TTS Repeater: Presets Modal" />
   </a>
 </p>
 
@@ -257,7 +302,7 @@ In my QA work, sometimes you just need a random assortment of meaningless files 
     <img class="md-img" src="./screenshots/dfg/dfg-2.png" width="49%" alt="Dummy File Generator Supported Extension Picker" />
   </a>
   <a href="./screenshots/dfg/dfg-3.png" target="_blank">
-    <img class="md-img" src="./screenshots/dfg/dfg-3.png" width="100%" alt="Dummy File Generator Filled In" />
+    <img class="md-img" src="./screenshots/dfg/dfg-3.png" width="100%" alt="Dummy File Generator Results" />
   </a>
 </p>
 
@@ -266,7 +311,10 @@ I used to have an app on my phone that told you the number of elapsed days betwe
 
 <p align="center">
   <a href="./screenshots/days-between-dates/dbd-main.png" target="_blank">
-    <img class="md-img" src="./screenshots/days-between-dates/dbd-main.png" width="100%" alt="Days Between Dates" />
+    <img class="md-img" src="./screenshots/days-between-dates/dbd-main.png" width="49%" alt="Days Between Dates: Days Elapsed" />
+  </a>
+  <a href="./screenshots/days-between-dates/dbd-include-start.png" target="_blank">
+    <img class="md-img" src="./screenshots/days-between-dates/dbd-include-start.png" width="49%" alt="Days Between Dates: Including the Start Date" />
   </a>
 </p>
 
