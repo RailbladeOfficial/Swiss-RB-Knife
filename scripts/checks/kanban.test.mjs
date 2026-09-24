@@ -1471,6 +1471,11 @@ test("an attachment cannot name a file outside its own board's folder", () => {
   // Dropped, every file stored with its extension reads as missing after a
   // restart; kept unchecked, a hand-edited board could point at any file.
   assert.match(norm, /isStoredNameFor\(a\.id, a\.file\)/, "an attachment's stored filename is dropped or unchecked on load");
+  // And a board that lost those names to 0.7.x gets them back, with the files,
+  // before the load-time sweep looks at the folder.
+  const load = ts().slice(ts().indexOf("async function loadRecords("));
+  assert.match(load.slice(0, load.indexOf("\n}")), /await healBoardAttachments\(board\.id\);\s*sweepBoardAttachments\(board\.id\)/, "boards are swept without first healing attachments that lost their filename");
+  assert.match(rs, /pub fn heal_kanban_attachments\(/, "the heal command is missing");
 
   // Nothing in the attachment surface may accept a path from the WebView. The
   // one command that still does is the IMPORT, whose whole job is to be handed

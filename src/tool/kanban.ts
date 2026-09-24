@@ -78,7 +78,7 @@
      kanban_attachments_dir, import_kanban_attachment, paste_kanban_attachment,
      copy_kanban_attachment, delete_kanban_attachment,
      delete_kanban_board_attachments, sweep_kanban_attachments,
-     revive_kanban_attachments, kanban_attachments_exist,
+     revive_kanban_attachments, heal_kanban_attachments, kanban_attachments_exist,
      open_kanban_attachment
 
    Agent access (see the AGENT OPERATIONS section):
@@ -666,7 +666,41 @@ async function loadRecords(): Promise<void> {
   await loadIndex();
   for (const board of boards) await loadBoardContents(board);
   reconcile();
-  for (const board of boards) sweepBoardAttachments(board.id);
+  for (const board of boards) {
+    await healBoardAttachments(board.id);
+    sweepBoardAttachments(board.id);
+  }
+}
+
+/** Finds the file again for any attachment that has lost its stored filename,
+ *  bringing it back from the retired store if it was moved there, and saves
+ *  the name onto the record. 0.7.x dropped that name on every load and then
+ *  retired the file itself, so a card from then points at a bare id that is
+ *  not on disk. A record that never had a name and still has none is left
+ *  alone: the bare id is where those files really are. */
+async function healBoardAttachments(boardId: string): Promise<void> {
+  const nameless = cards
+    .filter((c) => c.boardId === boardId)
+    .flatMap((c) => allAttachments(c))
+    .filter((a) => a.file === undefined);
+  if (nameless.length === 0) return;
+  try {
+    const names = await invoke<(string | null)[]>("heal_kanban_attachments", {
+      boardId,
+      attachmentIds: nameless.map((a) => a.id),
+    });
+    let changed = false;
+    nameless.forEach((a, i) => {
+      const name = names[i];
+      if (name && name !== a.id) {
+        a.file = name;
+        changed = true;
+      }
+    });
+    if (changed) markBoard(boardId);
+  } catch (err) {
+    devError("[kanban] attachment heal failed", err);
+  }
 }
 
 /** The board list and the default tag vocabulary. */

@@ -1916,6 +1916,7 @@ pub fn run() {
             tools::kanban::open_kanban_attachment,
             tools::kanban::kanban_attachments_exist,
             tools::kanban::revive_kanban_attachments,
+            tools::kanban::heal_kanban_attachments,
             // Kanban agent access
             agent_gate::kanban_agent_reply,
             agent_gate::kanban_agent_status,

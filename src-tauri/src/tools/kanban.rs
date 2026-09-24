@@ -29,7 +29,7 @@
      kanban_attachments_dir, import_kanban_attachment, paste_kanban_attachment,
      copy_kanban_attachment, delete_kanban_attachment,
      delete_kanban_board_attachments, sweep_kanban_attachments,
-     revive_kanban_attachments, kanban_attachments_exist,
+     revive_kanban_attachments, heal_kanban_attachments, kanban_attachments_exist,
      open_kanban_attachment
 ============================================================================= */
 
@@ -1200,6 +1200,44 @@ pub fn revive_kanban_attachments(
         }
     }
     Ok(revived)
+}
+
+/// What each attachment's file is actually called on disk, for records that
+/// lost track of it, bringing it back from the store first if that is where it
+/// went. None where there is no file anywhere.
+///
+/// Repairs the damage 0.7.x did: that version dropped the stored filename on
+/// every load and then retired the file itself as an orphan, so a card was left
+/// pointing at a bare id with its real file in the store under id.ext.
+#[tauri::command]
+pub fn heal_kanban_attachments(
+    app: AppHandle,
+    board_id: String,
+    attachment_ids: Vec<String>,
+) -> Result<Vec<Option<String>>, String> {
+    crate::deny_if_frozen()?;
+    if !valid_board_id(&board_id) {
+        return Err("That board id is not one of ours.".to_string());
+    }
+    let name_of = |id: &str| -> Option<String> {
+        let path = find_attachment(&app, &board_id, id).ok()??;
+        Some(path.file_name()?.to_string_lossy().to_string())
+    };
+    Ok(attachment_ids
+        .iter()
+        .map(|id| {
+            if !valid_attachment_id(id) {
+                return None;
+            }
+            name_of(id).or_else(|| {
+                if revive_attachment(&app, &board_id, id) {
+                    name_of(id)
+                } else {
+                    None
+                }
+            })
+        })
+        .collect())
 }
 
 
