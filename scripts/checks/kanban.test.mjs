@@ -938,7 +938,7 @@ test("the next 7 days is one question with one answer", () => {
 
 test("a card says the same thing about its due date as the header does", () => {
   /* The chip read the Completed stamp by itself, so a card that had been in
-     Done and come back out read "3 days late" in done grey while the strip
+     Done and come back out read "3 days late" in done gray while the strip
      counted it as past due and the card was painted overdue. The stamp is never
      cleared, so it carried that for life. #272. */
   const face = read("src/tool/kanban-card-face.ts");

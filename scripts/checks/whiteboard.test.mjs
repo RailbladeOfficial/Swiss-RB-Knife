@@ -3,7 +3,7 @@
    -----------------------------------------------------------------------------
    Each of these is a way the Whiteboard can go wrong with nothing on screen to
    say so. A pen whose color names a variable no theme defines draws in a flat
-   grey that looks deliberate. A snapshot group quietly set back to none means
+   gray that looks deliberate. A snapshot group quietly set back to none means
    the one Clear the undo stack no longer reaches is gone for good. A Send and
    Clear that clears before Kanban has written is lost text on the one day the
    write fails.
@@ -29,7 +29,7 @@ test("the pen list parsed (guards the checks below)", () => {
 
 test("every pen reads a variable every theme is required to define", () => {
   // RANDOM_VARS is the palette every theme has to supply in full; see
-  // themes.test.mjs. A pen outside it draws in the fallback grey on any theme
+  // themes.test.mjs. A pen outside it draws in the fallback gray on any theme
   // that happens not to define it.
   const palette = slice("src/theme/random-theme.ts", "export const RANDOM_VARS = [", "] as const");
   const missing = inks().filter((i) => !palette.includes(`"${i.cssVar}"`));

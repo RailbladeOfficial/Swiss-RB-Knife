@@ -330,7 +330,7 @@ const WHEEL_PER_STEP = 100;
 /** Spacing of the grid's dots at actual size, in board pixels. */
 const GRID_STEP = 24;
 /** The grid fades out between these on-screen spacings as you zoom out, rather
- *  than crowding into a grey wash. */
+ *  than crowding into a gray wash. */
 const GRID_FADE_FROM = 12;
 const GRID_FADE_TO = 6;
 /** How far past the view the ink is drawn, in screen pixels, so a quick scroll
@@ -2272,7 +2272,7 @@ function onSurfacePointerDown(e: PointerEvent): void {
   if (boxEl && boxEl.dataset.id === editingId) return; // the browser places the caret
 
   /* Everything below decides focus itself, so the browser's own focus change
-     is cancelled. Without this, a click on empty board while typing would both
+     is canceled. Without this, a click on empty board while typing would both
      end the edit and start a new box, which is two things for one click. */
   e.preventDefault();
 
@@ -2399,7 +2399,7 @@ function onSurfacePointerUp(e: PointerEvent): void {
 /** The dot grid is the surface's own background, so it scrolls with the
  *  board natively. Only the zoom changes it: the spacing scales with the
  *  board, the dots grow and shrink a little with it, and the whole grid fades
- *  out as the dots close up rather than turning into a grey wash. */
+ *  out as the dots close up rather than turning into a gray wash. */
 function placeGrid(): void {
   const step = GRID_STEP * zoom;
   const fade = Math.min(1, Math.max(0, (step - GRID_FADE_TO) / (GRID_FADE_FROM - GRID_FADE_TO)));

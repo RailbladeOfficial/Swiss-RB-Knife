@@ -918,7 +918,7 @@ function boardCardMenu(card: Card): MenuItem[] {
  *
  * FINISHED IS isFinished, NOT THE STAMP. The chip used to read the Completed
  * stamp on its own, so a card that had been in Done and come back out said
- * "3 days late" in done grey while the strip above counted it as past due and
+ * "3 days late" in done gray while the strip above counted it as past due and
  * the card itself was painted in the overdue color. The stamp is never cleared,
  * so that card carried the contradiction for the rest of its life. The chip now
  * asks the same question the header asks, and the stamp only chooses the words
