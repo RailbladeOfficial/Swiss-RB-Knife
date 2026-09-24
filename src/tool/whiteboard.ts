@@ -251,7 +251,7 @@ const SIZES: readonly SizeId[] = ["fine", "medium", "bold"];
 const BOARD_COLORS: readonly BoardColor[] = ["theme", "black", "white", "custom"];
 
 const DEFAULT_SETTINGS: WhiteboardSettings = {
-  grid: false,
+  grid: true,
   homeAfterSend: true,
   selectionStylesText: true,
   boardColor: "theme",
@@ -652,7 +652,7 @@ function normalizeSettings(raw: unknown): WhiteboardSettings {
   const t = r.target as Record<string, unknown> | null | undefined;
   const hex = (v: unknown): v is string => isHexColor(v) && /^#[0-9a-f]{6}$/i.test(v as string);
   return {
-    grid: r.grid === true,
+    grid: r.grid !== false,
     homeAfterSend: r.homeAfterSend !== false,
     selectionStylesText: r.selectionStylesText !== false,
     boardColor: BOARD_COLORS.includes(r.boardColor as BoardColor)
