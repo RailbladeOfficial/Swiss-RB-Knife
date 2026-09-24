@@ -564,6 +564,15 @@ FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
 Function un.ConfirmLeave
   SendMessage $DeleteAppDataCheckbox ${BM_GETCHECK} 0 0 $DeleteAppDataCheckboxState
+  ; SRBK: that box deletes the whole data folder, snapshots included, so
+  ; nothing is left to restore from. One stray click should not be enough.
+  ; No is the default button, and No stays on this page with the box as it was.
+  ${If} $DeleteAppDataCheckboxState = 1
+    MessageBox MB_YESNO|MB_ICONEXCLAMATION|MB_DEFBUTTON2 \
+      "Delete application data is checked.$\r$\n$\r$\nThis permanently deletes everything ${PRODUCTNAME} has saved: every Kanban board, the Budget, Time Tracker entries, Game Stats, the Whiteboard, settings, and every snapshot of them. It cannot be undone.$\r$\n$\r$\nUninstall and delete all of it?" \
+      IDYES +2
+    Abort
+  ${EndIf}
 FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_PRE un.SkipIfPassive
 !insertmacro MUI_UNPAGE_CONFIRM
