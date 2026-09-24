@@ -1,5 +1,83 @@
 [
   {
+    "version": "0.8.0",
+    "date": "2026-09-24",
+    "changes": {
+      "features": {
+        "App Overall": [
+          "Added a Scrollbars option under App Settings, Display, allowing visible scrollbars for the app, modals, Kanban columns, Whiteboard, menus and text boxes.",
+          "Scrollbars are drawn in theme, and Nostalgia gets the shitty gray Windows bar from the 90s, because of course it should; wouldn't be very nostalgic if that theme wasn't an absolute eyesore."
+        ],
+        "Time Tracker": [
+          "Added an End Time Warning in Setup, Preferences: put a future End Time in the entry form and get a doot at the warning time and again at the End Time.",
+          "A second box under the duration counts down to the End Time, and goes red once you are inside the warning window."
+        ],
+        "Whiteboard": [
+          "Added new tool that you can type or scribble on like a giant scratchpad, when filling out a Kanban card would take too long and Jeffrey just. won't. stop. mouth-vomiting. todos.",
+          "One very large board that scrolls both ways. Middle-mouse drag pans, Ctrl+scroll zooms, Overview shows the lot, and Go to Notes finds your writing again when you have scrolled off into the abyss.",
+          "Type, Draw and Erase, with shortcut keys. Enter finishes a line and opens the next box below it, so a brain dump becomes one box per task.",
+          "Six pens from the current theme, three sizes, and an eraser that either rubs out ink or takes whole strokes. Giggity.",
+          "Shapes on Q: line, arrow, box, circle, and star. Hold Shift while drawing for a straight line.",
+          "Select an area to delete, cut, copy, paste, move, or restyle whatever is inside it.",
+          "Send to Kanban turns the text boxes you tick into cards on the board and column you pick.",
+          "A box whose lines start with -, *, [ ], or [x] sends as one card with those lines as subtasks.",
+          "Send a drawn area to an existing card as a picture, or tag and prioritize a batch of new ones as you send them.",
+          "Saves itself as you go and keeps hourly snapshots, and Clear asks first and can be undone, because losing a meeting's worth of notes would be... suboptimal. Although not everything out of Jeffrey's mouth is worth preserving, is it?"
+        ]
+      },
+      "improvements": {
+        "App Overall": [
+          "A long right-click menu caps at eight and a half rows and scrolls, so a long menu doesn't take up half the damn screen.",
+          "Went through all 252 toasts and cut the ones that had turned into instructions.",
+          "The integrated tool \"Unavailable\" notes now name where the switch lives: Settings, Preferences, Home/Sidebar.",
+          "Light and Dark now follow the same color rules as the rest of the Main themes.",
+          "The Startup \"Specific Tool\" list builds itself from the app tool list, so a new tool turns up there on its own.",
+          "Upgraded the backend to TypeScript 7 and Vite 8.",
+          "More housecleaning in the src folder.",
+          "Made it possible to cycle through README images via left/right carousel arrows."
+        ],
+        "Kanban": [
+          "Right-click menus stay open when a row only changes priority, effort, owner or tags.",
+          "Priority and Effort are no longer capped at five rungs each. Add levels, remove them, reorder, rename and recolor, up to fifty, if that makes you feel the warm and fuzzies.",
+          "The tool header now says what is next as well as what is late: \"3 cards are past due\" beside \"Next 3 Cards Due in 9 days\", counted for the board you are on or for every board in the gallery.",
+          "Click either warning to filter to those cards, and click it again to clear.",
+          "\"Warn on the Next Cards Due\" is a new per-board switch beside the overdue one, and it never pulses the sidebar.",
+          "The filter strip now picks tags the way a card does, showing the ones you have chosen instead of every tag on the board.",
+          "The Filters button closes the strip while the filter stays on, and the count beside the board name still says 3 of 40.",
+          "The new-card form gained an Add/Edit button that creates the card and opens it.",
+          "Hitting 'delete' on the keyboard with a card or cards selected opens the delete modal for the whole selection.",
+          "Shift-click to select now supports Shift+Up/Down to grow/shrink the selection.",
+          "Picking a tag out of 'Find a tag' leaves the cursor in the box for the next one.",
+          "Long subtasks now wrap instead of running off the edge.",
+          "Consolidated the Kanban source into smaller files instead of one 14,000 line giga-file."
+        ],
+        "Auto-Backup": [
+          "Presets, sources and destinations are now captured in snapshots you can restore from."
+        ],
+        "Countdown Timer": [
+          "Duration presets and logged sessions are now captured in snapshots you can restore from."
+        ],
+        "TTS Repeater": [
+          "Saved presets are now captured in snapshots you can restore from."
+        ]
+      },
+      "bugfixes": {
+        "App Overall": [
+          "Quitting the app could drop the last moment of edits in Kanban, Time Tracker, Game Stats and TTS Repeater. That's not allowed now.",
+          "Escape in a text field left the field and closed the whole pop-up in one press. Bug? Maybe. Annoying? Indubitably.",
+          "Fixed where numbered lists restarted at 1 in rendered card text.",
+          "Adjusted where date pickers' calendar icons were hard to see in dark themes."
+        ],
+        "Kanban": [
+          "Fixed an issue where a card that had been in Done and came back out never warned about its due date again.",
+          "Fixed an issue where \"Next 7 days\" counted late cards in the filter but not in Board Stats, giving two different numbers for the same board.",
+          "Attachments added since v0.7.0 went missing from their cards after a restart. They stay put now.",
+          "Cards that already lost one get it back the next time their board opens, as long as the app hasn't thrown it out for good yet."
+        ]
+      }
+    }
+  },
+  {
     "version": "0.7.1",
     "date": "2026-09-21",
     "changes": {
@@ -84,7 +162,7 @@
           "Added a Data Tab to the tool Setup modal where you can restore the tool from a backup."
         ],
         "RNGesus": [
-          "Added a new tool that allows you to generate a batch of random numbers.",
+          "Added new tool that allows you to generate a batch of random numbers.",
           "Customize criteria, hit Generate, and get a batch of up to 1,000 numbers at a time.",
           "Shows as a grid, or in rows which can be deleted as you work through them."
         ]

@@ -458,7 +458,7 @@ All credit and gratitude to their respective authors and maintainers.
 | [strsim](https://github.com/rapidfuzz/strsim-rs) | 0.11.1 | [MIT](https://spdx.org/licenses/MIT.html) |
 | [subtle](https://github.com/dalek-cryptography/subtle) | 2.6.1 | [BSD-3-Clause](https://spdx.org/licenses/BSD-3-Clause.html) |
 | [swift-rs](https://github.com/Brendonovich/swift-rs) | 1.0.8 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
-| swiss-rb-knife | 0.7.1 | [AGPL-3.0-or-later](https://spdx.org/licenses/AGPL-3.0-or-later.html) |
+| swiss-rb-knife | 0.8.0 | [AGPL-3.0-or-later](https://spdx.org/licenses/AGPL-3.0-or-later.html) |
 | [syn](https://github.com/dtolnay/syn) | 1.0.109 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [syn](https://github.com/dtolnay/syn) | 2.0.119 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
 | [syn](https://github.com/dtolnay/syn) | 3.0.6 | [Apache-2.0 OR MIT](https://spdx.org/licenses/Apache-2.0.html) |
