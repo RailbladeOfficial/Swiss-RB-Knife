@@ -941,6 +941,21 @@ pub fn delete_kanban_board_attachments(app: AppHandle, board_id: String) -> Resu
     Ok(())
 }
 
+/// The attachment id a file in a board's folder belongs to, or None for a
+/// staging leftover, which belongs to nothing.
+///
+/// The sweep is handed ids, and a file is named by its id PLUS the original's
+/// extension (see stored_name), so the name has to be cut back to the id before
+/// it is compared. Comparing the whole name kept only files stored under a bare
+/// id, and retired every attachment added since extensions were kept, on every
+/// board load.
+fn swept_file_owner(name: &str) -> Option<&str> {
+    if is_staging_name(name) {
+        return None;
+    }
+    Some(name.split('.').next().unwrap_or(name))
+}
+
 /// Deletes anything in a board's folder that no card mentions, and reports how
 /// many went.
 ///
@@ -971,7 +986,7 @@ pub fn sweep_kanban_attachments(
     let mut removed = 0u32;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
-        if keep.contains(name.as_str()) {
+        if swept_file_owner(&name).is_some_and(|id| keep.contains(id)) {
             continue;
         }
         // Swept files are retired too. An orphan is usually the tail of a
@@ -1220,6 +1235,21 @@ mod tests {
         // And the real names are not swept up by the same test.
         for real in [id.to_string(), format!("{id}.png"), format!("{id}.tar.gz")] {
             assert!(!is_staging_name(&real), "{real} was mistaken for a temp file");
+        }
+    }
+
+    /// The board-load sweep keeps a file when its card still lists the id,
+    /// whatever extension the copy carries. It used to compare the whole
+    /// filename against the ids, so every `<id>.png` was retired as an orphan
+    /// the next time its board opened.
+    #[test]
+    fn the_sweep_matches_a_file_to_its_id_with_or_without_an_extension() {
+        let id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+        for real in [id.to_string(), format!("{id}.png"), format!("{id}.tar.gz")] {
+            assert_eq!(swept_file_owner(&real), Some(id), "{real} was not matched to its id");
+        }
+        for staging in [format!("{id}.part"), format!("{id}.png.tmp-1234-0")] {
+            assert_eq!(swept_file_owner(&staging), None, "{staging} would survive the sweep");
         }
     }
 
