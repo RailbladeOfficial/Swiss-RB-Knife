@@ -150,12 +150,16 @@ def build_header() -> Image.Image:
     w, h = 150, 57
     img = nebula((w, h), crop=0.10, darken=0.45)
 
-    paste_icon(img, 41, (14, (h - 41) // 2))
+    paste_icon(img, 36, (10, (h - 36) // 2))
 
+    # The name is one line, centered on the strip by its ink rather than its
+    # line box. At 13px it is 86 wide, which is why the icon is 36 and sits
+    # 10 in: at 41 and 14 in, the name only fit as two lines.
     draw = ImageDraw.Draw(img)
     name = font(FONT_SEMI, 13)
-    draw.text((64, 13), "Swiss RB", font=name, fill=TEXT)
-    draw.text((64, 28), "Knife", font=name, fill=TEXT)
+    label = "Swiss RB Knife"
+    _, top, _, bottom = draw.textbbox((0, 0), label, font=name)
+    draw.text((54, (h - (bottom - top)) // 2 - top), label, font=name, fill=TEXT)
 
     # The left edge butts against the header's white background, so it gets a
     # rule of its own: without one the join reads as a rendering fault rather
