@@ -1403,13 +1403,24 @@ function normalizeAttachment(raw: unknown): Attachment | null {
   // board ids to. A hand-edited file cannot introduce a separator here.
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(a.id)) return null;
   const now = Date.now();
-  return {
+  const out: Attachment = {
     id: a.id,
     // A record hand-edited empty still has to show as something clickable.
     name: trimTo(a.name, 200) || "file",
     size: typeof a.size === "number" && a.size >= 0 ? Math.floor(a.size) : 0,
     addedAt: typeof a.addedAt === "number" ? a.addedAt : now,
   };
+  // What the copy is called on disk. Dropping it here left every file stored
+  // with its extension pointing at the bare id after a restart, which is not
+  // there. Kept only when it is this id plus one plain extension, the same
+  // shape stored_name writes, so it still cannot name another file.
+  if (typeof a.file === "string" && isStoredNameFor(a.id, a.file)) out.file = a.file;
+  return out;
+}
+
+function isStoredNameFor(id: string, file: string): boolean {
+  if (file === id) return true;
+  return file.startsWith(id + ".") && /^[a-z0-9]{1,16}$/.test(file.slice(id.length + 1));
 }
 
 function normalizeAttachments(raw: unknown): Attachment[] {

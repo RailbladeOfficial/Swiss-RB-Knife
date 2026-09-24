@@ -1467,6 +1467,10 @@ test("an attachment cannot name a file outside its own board's folder", () => {
   const at = ts().indexOf("function normalizeAttachment(");
   const norm = ts().slice(at, ts().indexOf("\n}", at));
   assert.match(norm, /\[A-Za-z0-9_-\]\{1,64\}/, "an attachment id from disk is not checked");
+  // The on-disk name survives a reload, and only in the shape Rust writes it.
+  // Dropped, every file stored with its extension reads as missing after a
+  // restart; kept unchecked, a hand-edited board could point at any file.
+  assert.match(norm, /isStoredNameFor\(a\.id, a\.file\)/, "an attachment's stored filename is dropped or unchecked on load");
 
   // Nothing in the attachment surface may accept a path from the WebView. The
   // one command that still does is the IMPORT, whose whole job is to be handed
