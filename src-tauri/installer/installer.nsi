@@ -259,6 +259,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 ; 4. Custom page to ask user if he wants to reinstall/uninstall
 ;    only if a previous installation was detected
 Var ReinstallPageCheck
+Var SrbkQuietUninstall
 Page custom PageReinstall PageLeaveReinstall
 Function PageReinstall
   ; Uninstall previous WiX installation if exists.
@@ -421,6 +422,23 @@ Function PageLeaveReinstall
   ${EndIf}
 
   reinst_uninstall:
+    ; SRBK: an upgrade or downgrade runs the OTHER version's uninstaller, and
+    ; its window wears that version's artwork, which no build of this one can
+    ; change. So it runs silently (see /S below). The choice was already made
+    ; on this page, and silent leaves app data alone, which is what a
+    ; reinstall wants. Same version keeps the window, for its Delete app data
+    ; box, and that window is this build's own art anyway.
+    ;
+    ; Silent, the old uninstaller closes a running app WITHOUT asking, so the
+    ; asking happens here first. Cancel keeps this page up. The check uses
+    ; $R0 to $R3, which is why the flag is set before it runs.
+    StrCpy $SrbkQuietUninstall 0
+    ${If} $WixMode <> 1
+    ${AndIf} $R0 <> 0
+      StrCpy $SrbkQuietUninstall 1
+      !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+    ${EndIf}
+
     HideWindow
     ClearErrors
 
@@ -432,6 +450,7 @@ Function PageLeaveReinstall
       ReadRegStr $R1 SHCTX "${UNINSTKEY}" "UninstallString"
       ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 "$R1 /UPDATE" ${|} ; append /UPDATE
       ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 "$R1 /P" ${|} ; append /P
+      ${IfThen} $SrbkQuietUninstall = 1 ${|} StrCpy $R1 "$R1 /S" ${|} ; append /S, see reinst_uninstall
       StrCpy $R1 "$R1 _?=$4" ; append uninstall directory
       ExecWait '$R1' $0
     ${EndIf}
