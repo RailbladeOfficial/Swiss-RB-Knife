@@ -97,7 +97,7 @@ import {
 type Mode = "type" | "draw" | "shape" | "erase" | "select";
 
 /** What Shapes draws. */
-type ShapeKind = "line" | "arrow" | "box" | "ellipse";
+type ShapeKind = "line" | "arrow" | "box" | "ellipse" | "star";
 
 /** Rub Out takes ink off where it passes, like a real eraser. Whole Strokes
  *  removes any stroke it touches, which also gives back the room it took. */
@@ -242,7 +242,7 @@ const PEN_WIDTH: Record<SizeId, number> = { fine: 2, medium: 4, bold: 8 };
 const ERASER_WIDTH: Record<SizeId, number> = { fine: 10, medium: 20, bold: 40 };
 
 const MODES: readonly Mode[] = ["type", "draw", "shape", "erase", "select"];
-const SHAPES: readonly ShapeKind[] = ["line", "arrow", "box", "ellipse"];
+const SHAPES: readonly ShapeKind[] = ["line", "arrow", "box", "ellipse", "star"];
 const ERASERS: readonly EraserKind[] = ["rub", "stroke"];
 
 /** The single keys that switch mode, while not typing in a box. */
@@ -281,6 +281,9 @@ const MAX_HOLES = 64;
 const ARROW_SPREAD = Math.PI / 7;
 /** Points around an ellipse when telling whether the eraser touches it. */
 const ELLIPSE_SAMPLES = 48;
+/** A star's inner corners, as a share of its outer reach. This is the
+ *  ratio of a regular five-pointed star, the one a pen would draw. */
+const STAR_INNER = 0.382;
 /** Shift snaps a shape's line to multiples of this angle. */
 const SNAP_ANGLE = Math.PI / 4;
 
@@ -1058,11 +1061,53 @@ function arrowHead(s: Stroke): number {
   return Math.max(12, strokeWidth(s) * 4);
 }
 
-/** A line, arrow, box or ellipse between the two corners in pts. */
+/** A regular star of radius 1 centered on 0, 0, with its bounds. Worked out
+ *  once: every star on the board is this one, fitted to its own box. */
+const UNIT_STAR = (() => {
+  const unit: number[] = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? 1 : STAR_INNER;
+    const t = -Math.PI / 2 + (i * Math.PI) / 5;
+    unit.push(r * Math.cos(t), r * Math.sin(t));
+  }
+  const xs = unit.filter((_, i) => i % 2 === 0);
+  const ys = unit.filter((_, i) => i % 2 === 1);
+  const ux = Math.min(...xs);
+  const uy = Math.min(...ys);
+  return { unit, ux, uy, uw: Math.max(...xs) - ux, uh: Math.max(...ys) - uy };
+})();
+
+/** A five-pointed star, point up, filling the box between two corners. Its
+ *  ten corners come back as x, y pairs, closed back onto the first.
+ *
+ *  Fitted to the box by its OWN bounds, not by a radius: a star is not as
+ *  tall as it is wide (the two lower points sit well short of a circle's
+ *  bottom), so centering a circle in the box left a gap under it that the
+ *  drag had not asked for. Dragging up or left still draws it point up. */
+function starPoints(x0: number, y0: number, x1: number, y1: number): number[] {
+  const { unit, ux, uy, uw, uh } = UNIT_STAR;
+  const left = Math.min(x0, x1);
+  const top = Math.min(y0, y1);
+  const w = Math.abs(x1 - x0);
+  const h = Math.abs(y1 - y0);
+  const out: number[] = [];
+  for (let i = 0; i < unit.length; i += 2) {
+    out.push(left + ((unit[i] - ux) / uw) * w, top + ((unit[i + 1] - uy) / uh) * h);
+  }
+  out.push(out[0], out[1]);
+  return out;
+}
+
+/** A line, arrow, box, ellipse or star between the two corners in pts. */
 function drawShape(c: CanvasRenderingContext2D, s: Stroke): void {
   const [x0, y0, x1, y1] = s.pts;
   c.beginPath();
-  if (s.shape === "box") {
+  if (s.shape === "star") {
+    const p = starPoints(x0, y0, x1, y1);
+    c.moveTo(p[0], p[1]);
+    for (let i = 2; i < p.length; i += 2) c.lineTo(p[i], p[i + 1]);
+    c.closePath();
+  } else if (s.shape === "box") {
     c.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
   } else if (s.shape === "ellipse") {
     c.ellipse((x0 + x1) / 2, (y0 + y1) / 2, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, 0, 0, Math.PI * 2);
@@ -1086,6 +1131,7 @@ function strokePath(s: Stroke): number[] {
   if (!s.shape) return s.pts;
   const [x0, y0, x1, y1] = s.pts;
   if (s.shape === "box" || s.shape === "clear") return [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0];
+  if (s.shape === "star") return starPoints(x0, y0, x1, y1);
   if (s.shape === "ellipse") {
     const out: number[] = [];
     const cx = (x0 + x1) / 2;
@@ -1216,11 +1262,17 @@ function startStroke(e: PointerEvent): void {
   drawStroke(ctx, liveStroke);
 }
 
-/** A shape's far corner, with Shift held: a square, a circle, or a line at a
- *  multiple of 45 degrees. */
+/** A shape's far corner, with Shift held: a square, a circle, an even star,
+ *  or a line at a multiple of 45 degrees. */
 function constrainCorner(kind: ShapeKind, x0: number, y0: number, x: number, y: number): [number, number] {
   const dx = x - x0;
   const dy = y - y0;
+  if (kind === "star") {
+    // A regular star is a little wider than it is tall, so its box is too.
+    const aspect = UNIT_STAR.uw / UNIT_STAR.uh;
+    const w = Math.max(Math.abs(dx), Math.abs(dy) * aspect);
+    return [x0 + Math.sign(dx || 1) * w, y0 + Math.sign(dy || 1) * (w / aspect)];
+  }
   if (kind === "box" || kind === "ellipse") {
     const side = Math.max(Math.abs(dx), Math.abs(dy));
     return [x0 + Math.sign(dx || 1) * side, y0 + Math.sign(dy || 1) * side];
