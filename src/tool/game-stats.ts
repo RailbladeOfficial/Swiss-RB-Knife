@@ -40,6 +40,7 @@ import { renderDbBackups } from "../core/db-backups";
 import { loadToolJson, saveToolJson, saveToolText } from "../core/tool-store";
 import { newId } from "../core/ids";
 import { fileTimestamp } from "../core/timestamp";
+import { elementToPng } from "../core/element-png";
 import { diffRows } from "../core/row-diff";
 import { attachMenu } from "../menu/menu";
 import {
@@ -3902,7 +3903,13 @@ const STAT_ROWS: StatRow[] = [
     polarity: "neutral",
     rank: () => 0,
     cell: (s) => ({
-      value: s.rates.currentStreak.type === "none" ? "—" : `${s.rates.currentStreak.length} ${s.rates.currentStreak.type}${s.rates.currentStreak.length === 1 ? "" : "s"}`,
+      value: s.rates.currentStreak.type === "none"
+        ? "—"
+        : `${s.rates.currentStreak.length} ${
+            s.rates.currentStreak.length === 1
+              ? s.rates.currentStreak.type
+              : s.rates.currentStreak.type === "loss" ? "losses" : "wins"
+          }`,
       gameRef: "",
     }),
   },
@@ -4132,6 +4139,9 @@ let gsWinChartDraw: (() => void) | null = null;
 const GS_FACE_FADE_MS = 400; // must match the gs-face-* animation duration
 
 function updateWinChartToggleBtn(enabled: boolean): void {
+  // Export rides along: both need a table to act on.
+  const exportBtn = document.getElementById("gsTableStatsExportBtn");
+  if (exportBtn) exportBtn.style.display = enabled ? "" : "none";
   const btn = document.getElementById("gsWinChartToggleBtn") as HTMLButtonElement | null;
   if (!btn) return;
   btn.style.display = enabled ? "" : "none";
@@ -4170,6 +4180,39 @@ function toggleTableStatsFace(): void {
       delete container.dataset.flipping;
     });
   }, GS_FACE_FADE_MS);
+}
+
+/** Saves whichever face is showing, Table Stats or Win Chart, as a PNG in
+ *  Downloads, the same place the game log template goes. */
+async function exportTableStatsPng(): Promise<void> {
+  const container = document.getElementById("gsStatsResults")!;
+  // Mid-flip, both faces are partly faded and the picture would be too.
+  if (container.dataset.flipping === "1") return;
+  const face = container.querySelector<HTMLElement>(
+    gsTableStatsFace === "winchart" ? ".gs-flip-back" : ".gs-flip-front",
+  );
+  if (!face) return;
+
+  const select = document.getElementById("gsStatsTableSelect") as HTMLSelectElement;
+  const chosen = listAllTables(gsStatsGameType).find((t) => t.key === select.value);
+  const slug = (chosen?.label ?? "table")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "table";
+  const kind = gsTableStatsFace === "winchart" ? "win-chart" : "table-stats";
+
+  try {
+    const bytes = await elementToPng(face);
+    const path = await invoke<string>("write_game_stats_download", {
+      filename: `${kind}-${slug}-${fileTimestamp()}.png`,
+      dataBase64: toBase64(bytes),
+    });
+    flash(`Image saved to ${shortPath(path)}`, "success");
+  } catch (err) {
+    devError("Game Stats PNG export failed", err);
+    flash(String(err), "error");
+  }
 }
 
 function renderTableStats(): void {
@@ -5289,6 +5332,9 @@ export function initGameStats(): void {
   document.getElementById("gsStatsAddCompareBtn")!.addEventListener("click", addStatsProfileSelect);
   document.getElementById("gsStatsTableSelect")!.addEventListener("change", renderTableStats);
   document.getElementById("gsWinChartToggleBtn")!.addEventListener("click", toggleTableStatsFace);
+  document.getElementById("gsTableStatsExportBtn")!.addEventListener("click", () => {
+    void exportTableStatsPng();
+  });
   resetStatsProfileSelects();
 
   document.getElementById("gsStatDetailPrevBtn")!.addEventListener("click", () => {
