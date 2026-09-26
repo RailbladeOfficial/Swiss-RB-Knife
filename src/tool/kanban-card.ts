@@ -359,7 +359,7 @@ export function getCardModal(): Modal {
        is, not as it was when the button was pressed. */
     openMenu(e.currentTarget as HTMLElement, () => [
       { label: "Card Color", onClick: () => openCardColor(card) },
-      { label: "Owner", submenu: cardOwnerMenu(card) },
+      { label: "Owner", submenu: cardOwnerMenu(card, () => openCard(card.id)) },
       { label: "Card Stats", onClick: () => openCardStats(card) },
       {
         label: "Duplicate Card",

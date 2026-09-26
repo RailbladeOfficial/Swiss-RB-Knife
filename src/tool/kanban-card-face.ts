@@ -54,6 +54,7 @@ import {
   handleCardClick,
   isFinished,
   isOverdue,
+  kbAskText,
   kbConfirm,
   moveCardToBoard,
   moveCardToColumn,
@@ -381,8 +382,13 @@ export function buildCardEl(board: Board, card: Card, todayStr: string): HTMLEle
  * or revoked while the card was open should be reflected the next time you
  * look, and this menu is opened rarely enough that the read costs nothing.
  */
-export function cardOwnerMenu(card: Card): MenuItem[] {
-  return ownerChoices(card.boardId, currentExternalLabel(card), (owner) => setCardOwner(card, owner));
+export function cardOwnerMenu(card: Card, reopen?: () => void): MenuItem[] {
+  return ownerChoices(
+    card.boardId,
+    currentExternalLabel(card),
+    (owner) => setCardOwner(card, owner),
+    reopen,
+  );
 }
 
 /** The owner choices themselves, shared by one card and by a selection, so the
@@ -391,6 +397,8 @@ function ownerChoices(
   boardId: string,
   externalDefault: string,
   apply: (owner: CardAuthor | undefined) => void,
+  /** How to get back to the modal the menu was opened from, if any. */
+  reopen?: () => void,
 ): MenuItem[] {
   const items: MenuItem[] = [
     {
@@ -408,19 +416,25 @@ function ownerChoices(
     });
   }
 
-  /* NOT keepOpen, unlike the rows above it: this one puts a prompt on screen,
-     and a menu left standing behind a dialog is a menu about something you
+  /* NOT keepOpen, unlike the rows above it: this one puts a modal on screen,
+     and a menu left standing behind a modal is a menu about something you
      can no longer see. */
   items.push({
     label: "External\u2026",
     onClick: () => {
       /* Free text, because the person it names is not a user of this app and
-         there is no list to pick them from. Prompt rather than a modal of its
-         own: it is one short string, and a modal would be a screen to say a
-         name on. */
-      const who = window.prompt("Who asked for this card?", externalDefault);
-      if (who === null) return;
-      apply({ kind: "external", label: trimTo(who, 80) });
+         there is no list to pick them from. */
+      kbAskText(
+        {
+          title: "External Owner",
+          label: "Who asked for this card?",
+          confirmLabel: "Set Owner",
+          value: externalDefault,
+          maxLength: 80,
+          reopen,
+        },
+        (who) => apply({ kind: "external", label: trimTo(who, 80) }),
+      );
     },
   });
 

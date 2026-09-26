@@ -9906,6 +9906,32 @@
   </div>
 
   <!-- =====================================================================
+       KANBAN: ASK
+       One short line of text, asked in-app rather than through the browser's
+       own prompt. The title, label and button are set by the caller (see
+       kbAskText() in kanban.ts).
+  ====================================================================== -->
+  <div id="kbAskBackdrop" class="modal-backdrop" style="display: none;">
+    <div id="kbAskModal" class="modal">
+      <div class="modal-header">
+        <span id="kbAskTitle">Enter a Name</span>
+      </div>
+      <div class="modal-body setup-body">
+        <div class="setup-form">
+          <div class="setup-field">
+            <label for="kbAskInput" id="kbAskLabel">Name</label>
+            <input type="text" id="kbAskInput" spellcheck="false" autocomplete="off" />
+          </div>
+          <div class="setup-actions">
+            <button id="kbAskOkBtn">OK</button>
+            <button id="kbAskCancelBtn" class="modal-cancel-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
        APP CONFIRM
        The shell's own "are you sure", for actions that belong to the app
        rather than to one tool. Replaces what it was launched from, like every

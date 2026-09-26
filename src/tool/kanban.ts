@@ -2345,6 +2345,7 @@ function kbToolIsVisible(): boolean {
 export function topOpenKanbanModal(): Modal | null {
   const stack = [
     _confirmModal,
+    _askModal,
     _lightboxModal,
     _cardStatsModal,
     _boardStatsModal,
@@ -4542,6 +4543,7 @@ let _archiveModal: Modal | null = null;
 let _tagCatEditModal: Modal | null = null;
 let _tagEditModal: Modal | null = null;
 let _confirmModal: Modal | null = null;
+let _askModal: Modal | null = null;
 
 /* =============================================================================
    CONFIRM
@@ -4617,6 +4619,100 @@ export function kbConfirm(
   document.getElementById("kbConfirmOkBtn")!.textContent = opts.confirmLabel;
   confirmAction = onConfirm;
   confirmReopen = opts.reopen ?? null;
+  modal.open();
+}
+
+/* =============================================================================
+   ASK
+   One short line of text, in-app. The house rule is no native browser
+   dialogs: window.prompt blocks the whole window, ignores the theme, and
+   plays none of the modal sounds.
+============================================================================= */
+
+let askAction: ((value: string) => void) | null = null;
+let askReopen: (() => void) | null = null;
+
+function getAskModal(): Modal {
+  if (_askModal) return _askModal;
+
+  const input = document.getElementById("kbAskInput") as HTMLInputElement;
+
+  _askModal = new Modal(document.getElementById("kbAskBackdrop")!, {
+    closeOnEsc: true,
+    onOpen: () =>
+      setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 50),
+    onClosed: () => {
+      // Still set means Escape or the back button closed it: a dismissal,
+      // which owes the same journey back as Cancel.
+      const back = askReopen;
+      askAction = null;
+      askReopen = null;
+      back?.();
+    },
+  });
+
+  const dismiss = (): void => {
+    const back = askReopen;
+    askAction = null;
+    askReopen = null;
+    _askModal!.close({ handoff: true });
+    back?.();
+  };
+
+  const submit = (): void => {
+    // Captured before the close, because onClosed clears them.
+    const action = askAction;
+    const back = askReopen;
+    askAction = null;
+    askReopen = null;
+    _askModal!.close({ handoff: true });
+    action?.(input.value);
+    back?.();
+  };
+
+  document.getElementById("kbAskCancelBtn")!.addEventListener("click", dismiss);
+  document.getElementById("kbAskOkBtn")!.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  return _askModal;
+}
+
+/**
+ * Asks for one line of text, replacing whatever Kanban modal is open, the same
+ * way kbConfirm does. `reopen` runs after either answer, since unlike a
+ * confirm nothing here is deleted and the thing it replaced is still there.
+ */
+export function kbAskText(
+  opts: {
+    title: string;
+    label: string;
+    confirmLabel: string;
+    value?: string;
+    maxLength?: number;
+    reopen?: () => void;
+  },
+  onSubmit: (value: string) => void,
+): void {
+  topOpenKanbanModal()?.close({ handoff: true });
+
+  const modal = getAskModal();
+  const input = document.getElementById("kbAskInput") as HTMLInputElement;
+  document.getElementById("kbAskTitle")!.textContent = opts.title;
+  document.getElementById("kbAskLabel")!.textContent = opts.label;
+  document.getElementById("kbAskOkBtn")!.textContent = opts.confirmLabel;
+  input.value = opts.value ?? "";
+  if (opts.maxLength) input.maxLength = opts.maxLength;
+  else input.removeAttribute("maxlength");
+  askAction = onSubmit;
+  askReopen = opts.reopen ?? null;
   modal.open();
 }
 
