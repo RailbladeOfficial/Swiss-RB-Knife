@@ -150,3 +150,15 @@ test("a Custom theme repaints the ink, not only the text", () => {
     "the whiteboard no longer watches the root for a Custom theme's colors",
   );
 });
+
+test("the shipped security policy lets the pen and eraser cursors load", () => {
+  /* The cursor is an inline data: image. The dev server does not enforce the
+     policy, so a policy without data: in img-src looks fine in dev and ships
+     every cursor as the fallback crosshair. */
+  assert.match(read(TS), /url\("data:image\/svg\+xml/, "the cursor is no longer a data: image; revisit this check");
+  const security = JSON.parse(read("src-tauri/tauri.conf.json")).app.security;
+  for (const key of ["csp", "devCsp"]) {
+    const imgSrc = security[key].split(";").map((d) => d.trim()).find((d) => d.startsWith("img-src"));
+    assert.ok(imgSrc?.split(/\s+/).includes("data:"), `${key} img-src does not allow data: images`);
+  }
+});
