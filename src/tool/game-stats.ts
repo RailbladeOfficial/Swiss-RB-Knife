@@ -3845,7 +3845,7 @@ const STAT_ROWS: StatRow[] = [
     detail: (pid, g) => mostOutsInARowDetail(pid, g),
   },
   {
-    key: "highestWinningScore", label: "Highest Winning Score", group: "Career Records", polarity: "lower-better",
+    key: "highestWinningScore", label: "Highest Winning Score", group: "Career Records", polarity: "higher-better",
     rank: (s) => s.career.highestWinningScore[0]?.value ?? 0,
     cell: (s) => recordCell(s.career.highestWinningScore),
     detail: (pid, g) => topWinningScoresDetail(pid, g),
