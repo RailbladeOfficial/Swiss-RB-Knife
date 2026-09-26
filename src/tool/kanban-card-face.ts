@@ -143,6 +143,14 @@ export function buildCardEl(board: Board, card: Card, todayStr: string): HTMLEle
     mark.textContent = "AI";
     mark.title = `Created by ${card.createdBy.label}`;
     top.appendChild(mark);
+  } else if (card.createdBy?.kind === "external") {
+    // Same mark, same reason: without it a card someone outside asked for
+    // looks exactly like one of your own.
+    const mark = document.createElement("span");
+    mark.className = "kb-card-agent";
+    mark.textContent = "EXT";
+    mark.title = card.createdBy.label ? `Asked for by ${card.createdBy.label}` : "External";
+    top.appendChild(mark);
   }
 
   /* Read off the ladder rather than checked against "none", because a level
