@@ -4078,6 +4078,7 @@ function renderProfileCompare(profileIds: string[]): void {
   const container = document.getElementById("gsStatsResults")!;
   container.innerHTML = "";
   if (profileIds.length === 0) {
+    setProfileExportVisible(false);
     const empty = document.createElement("div");
     empty.className = "gs-empty";
     empty.textContent = "Pick a profile to see their stats. Add up to four to compare side by side.";
@@ -4087,6 +4088,51 @@ function renderProfileCompare(profileIds: string[]): void {
 
   const statsList = profileIds.map((id) => computePlayerStats(games, id));
   container.appendChild(buildStatsComparisonTable(profileIds, statsList, games));
+  setProfileExportVisible(true);
+}
+
+function setProfileExportVisible(visible: boolean): void {
+  const btn = document.getElementById("gsProfileStatsExportBtn");
+  if (btn) btn.style.display = visible ? "" : "none";
+}
+
+/** Saves the Profiles comparison as a PNG in Downloads, named for the players
+ *  in it. */
+async function exportProfileStatsPng(): Promise<void> {
+  const table = document.querySelector<HTMLElement>("#gsStatsResults .gs-stats-table-wrap");
+  if (!table) return;
+  const selects = Array.from(
+    document.querySelectorAll<HTMLSelectElement>("#gsStatsProfileSelects select"),
+  );
+  const names = selects.map((s) => s.value).filter(Boolean).map((id) => playerName(id)).join(" ");
+  await saveStatsPng(table, "player-stats", names);
+}
+
+/** Lower-case, dash-separated, for a filename. */
+function fileSlug(text: string, fallback: string): string {
+  return (
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || fallback
+  );
+}
+
+/** Draws `el` as a PNG and saves it to Downloads, the same place the game log
+ *  template goes. */
+async function saveStatsPng(el: HTMLElement, kind: string, label: string): Promise<void> {
+  try {
+    const bytes = await elementToPng(el);
+    const path = await invoke<string>("write_game_stats_download", {
+      filename: `${kind}-${fileSlug(label, "stats")}-${fileTimestamp()}.png`,
+      dataBase64: toBase64(bytes),
+    });
+    flash(`Image saved to ${shortPath(path)}`, "success");
+  } catch (err) {
+    devError("Game Stats PNG export failed", err);
+    flash(String(err), "error");
+  }
 }
 
 type TableOption = { key: string; gameType: GameType; playerIds: string[]; label: string };
@@ -4182,8 +4228,7 @@ function toggleTableStatsFace(): void {
   }, GS_FACE_FADE_MS);
 }
 
-/** Saves whichever face is showing, Table Stats or Win Chart, as a PNG in
- *  Downloads, the same place the game log template goes. */
+/** Saves whichever face is showing, Table Stats or Win Chart, as a PNG. */
 async function exportTableStatsPng(): Promise<void> {
   const container = document.getElementById("gsStatsResults")!;
   // Mid-flip, both faces are partly faded and the picture would be too.
@@ -4195,24 +4240,8 @@ async function exportTableStatsPng(): Promise<void> {
 
   const select = document.getElementById("gsStatsTableSelect") as HTMLSelectElement;
   const chosen = listAllTables(gsStatsGameType).find((t) => t.key === select.value);
-  const slug = (chosen?.label ?? "table")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "table";
   const kind = gsTableStatsFace === "winchart" ? "win-chart" : "table-stats";
-
-  try {
-    const bytes = await elementToPng(face);
-    const path = await invoke<string>("write_game_stats_download", {
-      filename: `${kind}-${slug}-${fileTimestamp()}.png`,
-      dataBase64: toBase64(bytes),
-    });
-    flash(`Image saved to ${shortPath(path)}`, "success");
-  } catch (err) {
-    devError("Game Stats PNG export failed", err);
-    flash(String(err), "error");
-  }
+  await saveStatsPng(face, kind, chosen?.label ?? "table");
 }
 
 function renderTableStats(): void {
@@ -5334,6 +5363,9 @@ export function initGameStats(): void {
   document.getElementById("gsWinChartToggleBtn")!.addEventListener("click", toggleTableStatsFace);
   document.getElementById("gsTableStatsExportBtn")!.addEventListener("click", () => {
     void exportTableStatsPng();
+  });
+  document.getElementById("gsProfileStatsExportBtn")!.addEventListener("click", () => {
+    void exportProfileStatsPng();
   });
   resetStatsProfileSelects();
 
