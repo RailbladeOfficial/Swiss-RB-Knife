@@ -1,5 +1,30 @@
 [
   {
+    "version": "0.8.1",
+    "date": "2026-09-28",
+    "changes": {
+      "features": {
+        "Game Stats": [
+          "Added ability to export profile and table stats as a PNG."
+        ]
+      },
+      "improvements": {
+        
+      },
+      "bugfixes": {
+        "Kanban": [
+          "Changing the Owner of a card to External now properly launches its intended modal."
+        ],
+        "Whiteboard": [
+          "Ensured the cursor icon showed up how it was supposed to."
+        ],
+        "Game Stats": [
+          "Minor fixes to Stats stylings."
+        ]
+      }
+    }
+  },
+  {
     "version": "0.8.0",
     "date": "2026-09-24",
     "changes": {
